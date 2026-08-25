@@ -216,3 +216,32 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# --- Node / Next.js frontend ---
+node_modules/
+.next/
+out/
+.env.local
+
+# --- Large / downloaded planetary data (do NOT commit raw tiles) ---
+data/raw/
+data/pyramids/
+*.img
+*.cub
+*.lbl
+*.qub
+*.tif
+*.tiff
+
+# --- Model weights / checkpoints ---
+*.pt
+*.pth
+*.ckpt
+weights/
+
+# --- Tile cache / generated outputs ---
+tiles/
+outputs/
+*.geojson.cache
+
+# --- OS ---
+.DS_Store
