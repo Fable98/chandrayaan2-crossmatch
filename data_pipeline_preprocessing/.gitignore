@@ -1,0 +1,35 @@
+# Python & Environment
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+ENV/
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Heavy Raw Spacecraft & Image Data Files (>10MB / Binary)
+*.img
+*.IMG
+*.cub
+*.CUB
+*.dat
+*.DAT
+*.qub
+*.QUB
+
+# Large Processed Datasets & Tiling Outputs
+processed/
+processed_user/
+processed_triplets/
+scratch/
+
+# Keep lightweight JSON manifests and sample PNGs if needed for demo

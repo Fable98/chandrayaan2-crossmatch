@@ -1,0 +1,32 @@
+# Default working GSD is a compromise between TMC (~5 m) and OHRC (~0.3 m).
+# OHRC is downsampled ~15x so matching is not fighting scale + content at once.
+working_gsd_m: 5.0
+tile_size: 1024
+overlap: 128
+pyramid_levels: 5
+
+illumination:
+  photometric_model: lunar_lambert   # lunar_lambert | hapke | none
+  shadow_percentile: 3.0
+  incidence_shadow_deg: 85.0
+  write_invariant: true
+  invariant_modes: [census, gradient, lbp]
+
+sensors:
+  destripe: true
+  iirs_reduce: pca                    # pca | band
+  iirs_pca_components: 1
+  iirs_band_index: 0
+
+georef:
+  # IAU Moon 2000 sphere, equirectangular, meters
+  crs: "+proj=eqc +lat_ts=0 +lon_0=0 +a=1737400 +b=1737400 +units=m +no_defs +type=crs"
+  resampling: bilinear
+  try_isis: false                     # isisimport + cam2map if ISIS3 is on PATH
+
+output:
+  dtype: float32
+  compress: lzw
+  write_shadow_mask: true
+  catalog_json: catalog.json
+  catalog_csv: catalog.csv
