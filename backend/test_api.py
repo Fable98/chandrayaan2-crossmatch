@@ -149,7 +149,7 @@ def test_dem_metadata_in_triplet_response():
     assert r.status_code == 200
     data = r.json()
     assert data["dem_available"] is True
-    assert data["dem_url"] == "/images/dem/dem_512.png"
+    assert data["dem_url"].startswith("/images/dem/")
 
     # Confirm DEM is registered in sensors list
     sensor_names = {s["sensor"] for s in data["sensors"]}
@@ -161,6 +161,25 @@ def test_static_image_dem():
     r = client.get("/images/dem/dem_512.png")
     assert r.status_code == 200
     assert r.headers["content-type"].startswith("image/")
+
+
+def test_all_six_regions_dem_resolve():
+    """
+    Sanity check: confirm DEM images resolve for all 6 regions via their dem_url.
+    """
+    _ensure_loaded()
+    for i in range(1, 7):
+        r_id = f"region_{i:03d}"
+        r = client.get(f"/triplets/{r_id}")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["dem_available"] is True
+        assert data["dem_url"] is not None
+
+        # Hit the dem_url endpoint to confirm image resolves
+        img_r = client.get(data["dem_url"])
+        assert img_r.status_code == 200, f"Failed to fetch DEM for {r_id} at {data['dem_url']}"
+        assert img_r.headers["content-type"].startswith("image/")
 
 
 # ---------------------------------------------------------------------------

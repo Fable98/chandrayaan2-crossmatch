@@ -168,7 +168,14 @@ def _normalize_triplet(data: dict, default_id: str | None = None, region_dir: st
         has_dem = True
 
     triplet["dem_available"] = has_dem
-    triplet["dem_url"] = "/images/dem/dem_512.png" if has_dem else None
+    if has_dem:
+        reg_dem_filename = f"{triplet['id']}_dem_512.png"
+        if os.path.isfile(os.path.join(DATA_DIR, "images", "dem", reg_dem_filename)):
+            triplet["dem_url"] = f"/images/dem/{reg_dem_filename}"
+        else:
+            triplet["dem_url"] = "/images/dem/dem_512.png"
+    else:
+        triplet["dem_url"] = None
 
     if has_dem and not any(s.get("sensor") == "dem" for s in triplet.get("sensors", [])):
         triplet["sensors"].append({
