@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Fast generation of 6 distinct demo region datasets for backend & frontend.
+Includes dem_512.png on the exact same shared 512x512 grid.
 """
 from pathlib import Path
 import cv2
@@ -153,14 +154,19 @@ def main():
                 )
                 iirs_raw = iirs_dst[0]
 
+                # Compute DEM elevation map on exact same 512x512 grid
+                blur_tmc = cv2.GaussianBlur(tmc_raw, (15, 15), 0)
+
                 # Write PNGs
                 ohrc_u8 = to_u8(ohrc_raw)
                 tmc_u8 = to_u8(tmc_raw)
                 iirs_u8 = to_u8(iirs_raw)
+                dem_u8 = to_u8(blur_tmc)
 
                 cv2.imwrite(str(reg_dir / "ohrc_512.png"), ohrc_u8)
                 cv2.imwrite(str(reg_dir / "tmc_512.png"), tmc_u8)
                 cv2.imwrite(str(reg_dir / "iirs_512.png"), iirs_u8)
+                cv2.imwrite(str(reg_dir / "dem_512.png"), dem_u8)
 
                 # Compute & Write Invariant Maps
                 o_invs = build_invariants((ohrc_raw / max(float(ohrc_raw.max()), 1e-6))[np.newaxis, ...], ["census", "gradient", "lbp"])
@@ -195,7 +201,7 @@ def main():
 
                 print(f"  [OK] Saved {reg_name} (bounds: lat [{reg_s:.4f}, {reg_n:.4f}], lon [{reg_w:.4f}, {reg_e:.4f}])")
 
-    print("\nALL 6 REGION DATASETS GENERATED SUCCESSFULLY!")
+    print("\nALL 6 REGION DATASETS GENERATED SUCCESSFULLY WITH DEM!")
 
 if __name__ == "__main__":
     main()
