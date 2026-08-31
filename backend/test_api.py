@@ -429,3 +429,41 @@ def test_static_image_iirs():
 def test_static_image_404():
     r = client.get("/images/ohrc/nonexistent.png")
     assert r.status_code == 404
+
+
+def test_images_serving_by_region_id():
+    """Verify LinkedCursorPanel image requests like /images/ohrc/region_001 resolve."""
+    for reg_id in ("region_001", "region_002", "region_003", "region_004", "region_005", "region_006"):
+        r_ohrc = client.get(f"/images/ohrc/{reg_id}")
+        assert r_ohrc.status_code == 200, f"Failed for /images/ohrc/{reg_id}"
+        assert r_ohrc.headers["content-type"].startswith("image/")
+
+        r_tmc = client.get(f"/images/tmc/{reg_id}")
+        assert r_tmc.status_code == 200, f"Failed for /images/tmc/{reg_id}"
+        assert r_tmc.headers["content-type"].startswith("image/")
+
+
+def test_triplet_top_level_product_ids():
+    """Verify top-level product IDs are present for MetaBar."""
+    _ensure_loaded()
+    r = client.get("/triplets/region_001")
+    assert r.status_code == 200
+    data = r.json()
+    assert "ohrc_product_id" in data
+    assert "tmc2_product_id" in data
+    assert "iirs_product_id" in data
+
+
+def test_matches_canonical_schema():
+    """Verify /triplets/{id}/matches conforms strictly to MatchesResponse schema with matches array."""
+    _ensure_loaded()
+    r = client.get("/triplets/region_001/matches")
+    assert r.status_code == 200
+    data = r.json()
+    assert "triplet_id" in data
+    assert "num_matches" in data
+    assert "homography" in data
+    assert "matches" in data
+    assert "points" not in data
+    assert isinstance(data["matches"], list)
+

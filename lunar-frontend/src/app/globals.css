@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import "leaflet/dist/leaflet.css";
+
+::selection {
+  background: #7a5c2a;
+  color: #f4e6c8;
+}
+
+/* Leaflet ships its own control chrome; retint it to match the console
+   instead of leaving the default white/blue Leaflet look. */
+.leaflet-container {
+  background: #0a0e14;
+  font-family: var(--font-plex-sans);
+}
+.leaflet-control-zoom a {
+  background: #161f2c !important;
+  color: #e3e6ea !important;
+  border-color: #232d3b !important;
+}
+.leaflet-control-zoom a:hover {
+  background: #1c2635 !important;
+}
+.leaflet-control-attribution {
+  background: rgba(10, 14, 20, 0.7) !important;
+  color: #5a6472 !important;
+}
+.leaflet-control-attribution a {
+  color: #8892a0 !important;
+}

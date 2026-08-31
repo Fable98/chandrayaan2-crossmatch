@@ -11,7 +11,7 @@ COORDINATE & BOUNDS CONVENTION:
   Latitude uses standard planetocentric degrees (e.g. -3.41°, -45.09°).
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 # ---------------------------------------------------------------------------
@@ -65,6 +65,9 @@ class TripletSummary(BaseModel):
     id: str
     bounds: TripletBounds
     sensors: list[SensorMeta]
+    ohrc_product_id: str | None = None
+    tmc2_product_id: str | None = None
+    iirs_product_id: str | None = None
     dem_available: bool = False
     dem_url: str | None = None
 
