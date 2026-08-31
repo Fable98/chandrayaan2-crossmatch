@@ -21,7 +21,7 @@ plus the combined intersection footprint.
 from fastapi import APIRouter, HTTPException
 
 from data import loader
-from schemas import FootprintResponse, IIRSOverlay, BBox
+from schemas import FootprintResponse, IIRSOverlay
 
 router = APIRouter(tags=["footprint"])
 
@@ -62,18 +62,21 @@ def get_footprint(triplet_id: str):
 @router.get("/triplets/{triplet_id}/iirs-overlay", response_model=IIRSOverlay)
 def get_iirs_overlay(triplet_id: str):
     """
-    Return IIRS overlay metadata for Leaflet's L.imageOverlay.
+    Return IIRS overlay metadata with full 4-corner footprint.
 
-    Unlike OHRC/TMC-2 footprints (which are 4-corner quads), the IIRS bounds
-    are intentionally axis-aligned. At 80 m/px the rotation error is invisible,
-    and Leaflet's imageOverlay requires a LatLngBounds (axis-aligned rectangle).
-    See loader.get_iirs_bbox() for the scoped derivation.
+    Returns the IIRS footprint as a proper rotated quad — the same Footprint
+    model used by OHRC/TMC-2 — NOT an axis-aligned bounding box.
+
+    VERIFIED: scripts/check_iirs_rotation.py confirmed both region_001 and
+    region_002 IIRS footprints are rotated quads (bottom lons differ from
+    top lons, ~2.5% area loss from bbox). Frontend should use
+    leaflet-distortableImage or equivalent, not L.imageOverlay.
     """
     triplet = loader.get_triplet(triplet_id)
     if triplet is None:
         raise HTTPException(status_code=404, detail=f"Triplet '{triplet_id}' not found")
 
-    # Find the IIRS sensor entry to get its tile_id
+    # Find the IIRS sensor entry
     iirs_entry = None
     for s in triplet["sensors"]:
         if s["sensor"] == "iirs":
@@ -86,22 +89,14 @@ def get_iirs_overlay(triplet_id: str):
             detail=f"IIRS sensor missing from triplet '{triplet_id}'",
         )
 
-    # Use flat bbox fields if the manifest already has them, otherwise derive
-    if "west_lon" in iirs_entry:
-        bounds_dict = {
-            "west_lon": iirs_entry["west_lon"],
-            "east_lon": iirs_entry["east_lon"],
-            "south_lat": iirs_entry["south_lat"],
-            "north_lat": iirs_entry["north_lat"],
-        }
-    else:
-        bounds_dict = loader.get_iirs_bbox(triplet)
-
     tile_id = iirs_entry.get("tile_id", "iirs_overlay.png")
 
+    # Return the 4-corner footprint verbatim from the manifest — no bbox
+    # derivation, no min()/max(). Same pattern as the OHRC/TMC footprint.
     return IIRSOverlay(
         triplet_id=triplet_id,
         image_url=f"/images/iirs/{tile_id}",
-        bounds=BBox(**bounds_dict),
+        corners=iirs_entry["footprint"],
     )
+
 

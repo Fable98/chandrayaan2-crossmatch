@@ -1,20 +1,37 @@
-{
-  "triplet_id": "region_001",
-  "homography": [
-    [1.0023, -0.0015,  12.45],
-    [0.0008,  1.0031, -7.82],
-    [0.0,     0.0,     1.0]
-  ],
-  "matches": [
-    {"ohrc_pixel": [128.5, 256.3], "tmc_pixel": [26.1, 51.7], "confidence": 0.97},
-    {"ohrc_pixel": [310.2, 105.8], "tmc_pixel": [62.4, 21.3], "confidence": 0.95},
-    {"ohrc_pixel": [45.0,  480.1], "tmc_pixel": [9.1,  96.5], "confidence": 0.93},
-    {"ohrc_pixel": [400.7, 400.9], "tmc_pixel": [80.5, 80.6], "confidence": 0.91},
-    {"ohrc_pixel": [256.0, 256.0], "tmc_pixel": [51.5, 51.5], "confidence": 0.96},
-    {"ohrc_pixel": [500.3, 30.2],  "tmc_pixel": [100.4, 6.1], "confidence": 0.89},
-    {"ohrc_pixel": [15.8,  15.4],  "tmc_pixel": [3.2,   3.1], "confidence": 0.92},
-    {"ohrc_pixel": [480.0, 480.0], "tmc_pixel": [96.4, 96.4], "confidence": 0.94},
-    {"ohrc_pixel": [200.1, 350.7], "tmc_pixel": [40.2, 70.5], "confidence": 0.90},
-    {"ohrc_pixel": [350.5, 200.3], "tmc_pixel": [70.4, 40.3], "confidence": 0.88}
-  ]
-}
+[
+    {
+        "image1_x": 128.5,
+        "image1_y": 256.3,
+        "image2_x": 26.1,
+        "image2_y": 51.7,
+        "confidence": 0.97
+    },
+    {
+        "image1_x": 310.2,
+        "image1_y": 105.8,
+        "image2_x": 62.4,
+        "image2_y": 21.3,
+        "confidence": 0.95
+    },
+    {
+        "image1_x": 45.0,
+        "image1_y": 480.1,
+        "image2_x": 9.1,
+        "image2_y": 96.5,
+        "confidence": 0.93
+    },
+    {
+        "image1_x": 400.7,
+        "image1_y": 400.9,
+        "image2_x": 80.5,
+        "image2_y": 80.6,
+        "confidence": 0.91
+    },
+    {
+        "image1_x": 256.0,
+        "image1_y": 256.0,
+        "image2_x": 51.5,
+        "image2_y": 51.5,
+        "confidence": 0.96
+    }
+]

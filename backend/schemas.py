@@ -8,12 +8,10 @@ COORDINATE CONVENTION (used across all endpoints):
   L.polygon() without reordering.
 
   NEVER derive a bounding box via min()/max() on coordinate lists
-  for OHRC or TMC-2. See the footprint router for the full rationale.
-
-  EXCEPTION — IIRS only: the BBox model below uses axis-aligned bounds
-  intentionally. At 80 m/px (275× coarser than OHRC), rotation error is
-  invisible and Leaflet's L.imageOverlay needs an axis-aligned LatLngBounds.
-  See loader.py get_iirs_bbox() for the scoped derivation.
+  for ANY sensor — including IIRS. Verified via scripts/check_iirs_rotation.py:
+  both region_001 and region_002 IIRS footprints are rotated quads (2.4-2.7%
+  area loss from bbox derivation). All sensors use the same 4-corner Footprint
+  model throughout.
 """
 
 from pydantic import BaseModel
@@ -44,24 +42,20 @@ class Footprint(BaseModel):
     bottom_left: Coordinate
 
 
-class BBox(BaseModel):
-    """
-    Axis-aligned bounding box — used for IIRS overlay bounds ONLY.
-
-    Do NOT use this for OHRC or TMC-2 footprints. Those must remain
-    4-corner quads (see Footprint above).
-    """
-    west_lon: float
-    east_lon: float
-    south_lat: float
-    north_lat: float
-
-
 class IIRSOverlay(BaseModel):
-    """Response for GET /triplets/{id}/iirs-overlay."""
+    """
+    Response for GET /triplets/{id}/iirs-overlay.
+
+    IIRS footprint is returned as a proper 4-corner quad (same Footprint
+    model as OHRC/TMC-2), NOT an axis-aligned bounding box. Verified via
+    scripts/check_iirs_rotation.py: both region_001 and region_002 have
+    rotated IIRS quads (bottom lons differ from top lons). Frontend should
+    use leaflet-distortableImage or equivalent for rendering, not
+    L.imageOverlay (which only supports axis-aligned bounds).
+    """
     triplet_id: str
     image_url: str
-    bounds: BBox            # axis-aligned — intentional for IIRS only, see loader.py
+    corners: Footprint      # 4 named corners, clockwise TL→TR→BR→BL (same as OHRC/TMC)
     opacity_hint: float = 0.6
 
 
@@ -113,9 +107,18 @@ class FootprintResponse(BaseModel):
 # ---------------------------------------------------------------------------
 
 class MatchPoint(BaseModel):
-    """A single OHRC ↔ TMC pixel correspondence (post-RANSAC)."""
-    ohrc_pixel: list[float]   # [x, y] in OHRC image coordinates
-    tmc_pixel: list[float]    # [x, y] in TMC image coordinates
+    """
+    A single OHRC ↔ TMC-2 pixel correspondence (post-RANSAC from LoFTR).
+
+    Pixel coordinates come directly from the ML team's matches.json
+    (image1_x/y → ohrc_px, image2_x/y → tmc_px).
+    Geographic coordinates are computed at load time by the backend
+    using a perspective transform from the sensor footprint corners.
+    """
+    ohrc_px: tuple[float, float]      # (x, y) in OHRC 512×512 pixel space
+    tmc_px: tuple[float, float]       # (x, y) in TMC 512×512 pixel space
+    ohrc_latlon: tuple[float, float]  # (lat, lon) — computed from OHRC footprint corners
+    tmc_latlon: tuple[float, float]   # (lat, lon) — computed from TMC footprint corners
     confidence: float
 
 
@@ -123,7 +126,7 @@ class MatchesResponse(BaseModel):
     """Response for GET /triplets/{id}/matches."""
     triplet_id: str
     num_matches: int
-    homography: list[list[float]]   # 3×3 matrix, pre-computed by ML team
+    homography: list[list[float]] | None  # 3×3 matrix, re-derived from inlier points; null if < 4 points
     matches: list[MatchPoint]
 
 
