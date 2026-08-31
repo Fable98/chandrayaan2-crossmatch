@@ -2,13 +2,13 @@
 schemas.py — Pydantic response models for the SIH26166 backend.
 
 COORDINATE & BOUNDS CONVENTION:
-  All three sensors (OHRC, TMC-2, IIRS) in a triplet share the exact same
-  bounding box (TripletBounds) and 512×512 pixel grid by design.
-  OHRC extent defines the common crop boundary; TMC-2 and IIRS are spatially
+  All sensors (OHRC, TMC-2, IIRS, and stereo-derived DEM) in a triplet share
+  the exact same bounding box (TripletBounds) and 512×512 pixel grid by design.
+  OHRC extent defines the common crop boundary; TMC-2, IIRS, and DEM are spatially
   cropped and reprojected into this identical bounding box during preprocessing.
 
-  Longitude uses the standard lunar planetocentric 0–360° convention (e.g. 336.48°).
-  Latitude uses standard planetocentric degrees (e.g. -3.41°).
+  Longitude uses the standard lunar planetocentric 0–360° convention (e.g. 336.48°, 179.92°).
+  Latitude uses standard planetocentric degrees (e.g. -3.41°, -45.09°).
 """
 
 from pydantic import BaseModel
@@ -22,7 +22,7 @@ class TripletBounds(BaseModel):
     """
     Shared bounding box for all sensors in a triplet.
 
-    In the real data pipeline, OHRC, TMC-2, and IIRS are all cropped and
+    In the real data pipeline, OHRC, TMC-2, IIRS, and DEM are all cropped and
     resampled to this exact same extent and a 512×512 pixel grid.
     """
     west_lon: float
@@ -51,7 +51,7 @@ class Footprint(BaseModel):
 
 class SensorMeta(BaseModel):
     """Per-sensor metadata within a triplet."""
-    sensor: str
+    sensor: str  # "ohrc", "tmc", "iirs", "dem"
     gsd_m: float
     sun_elevation_deg: float | None = None
     sun_azimuth_deg: float | None = None
@@ -59,10 +59,14 @@ class SensorMeta(BaseModel):
 
 
 class TripletSummary(BaseModel):
-    """Full metadata for one region (triplet of OHRC + TMC + IIRS tiles)."""
+    """
+    Full metadata for one region (triplet of OHRC + TMC + IIRS tiles, plus DEM if available).
+    """
     id: str
     bounds: TripletBounds
     sensors: list[SensorMeta]
+    dem_available: bool = False
+    dem_url: str | None = None
 
 
 class TripletListResponse(BaseModel):

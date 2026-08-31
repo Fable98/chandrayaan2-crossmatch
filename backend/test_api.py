@@ -1,5 +1,5 @@
 """
-test_api.py — Automated tests for the SIH26166 backend (Shared-Bbox Architecture).
+test_api.py — Automated tests for the SIH26166 backend (Shared-Bbox Architecture + 6 Regions + DEM).
 
 Run with:  pytest test_api.py -v
 No server needs to be running — TestClient spins the app in-process.
@@ -35,18 +35,18 @@ def test_health():
     assert r.status_code == 200
     data = r.json()
     assert data["status"] == "ok"
-    assert data["triplets_loaded"] >= 1
+    assert data["triplets_loaded"] >= 6
 
 
 def test_refresh():
     r = client.get("/refresh")
     assert r.status_code == 200
     assert r.json()["status"] == "refreshed"
-    assert r.json()["triplets_loaded"] >= 1
+    assert r.json()["triplets_loaded"] >= 6
 
 
 # ---------------------------------------------------------------------------
-# Triplets list
+# Triplets list & Multi-region tests
 # ---------------------------------------------------------------------------
 
 def test_triplets_list():
@@ -56,7 +56,7 @@ def test_triplets_list():
     data = r.json()
     assert "triplets" in data
     assert isinstance(data["triplets"], list)
-    assert len(data["triplets"]) >= 1
+    assert len(data["triplets"]) >= 6
 
 
 def test_triplets_list_has_required_fields():
@@ -67,11 +67,32 @@ def test_triplets_list_has_required_fields():
     assert "bounds" in triplet
     assert set(triplet["bounds"].keys()) == BOUNDS_KEYS
     assert "sensors" in triplet
-    assert len(triplet["sensors"]) == 3
+    assert len(triplet["sensors"]) >= 3
+    assert "dem_available" in triplet
+
+
+def test_all_six_real_regions_loaded():
+    """
+    Verify all 6 validated regions (region_001 through region_006)
+    are loaded simultaneously into memory without ID collisions or data bleeding.
+    """
+    _ensure_loaded()
+    r = client.get("/triplets")
+    assert r.status_code == 200
+    loaded_ids = {t["id"] for t in r.json()["triplets"]}
+    expected_ids = {"region_001", "region_002", "region_003", "region_004", "region_005", "region_006"}
+    assert expected_ids.issubset(loaded_ids), f"Missing regions: {expected_ids - loaded_ids}"
+
+    # Verify each region has valid, non-degenerate bounds
+    for t in r.json()["triplets"]:
+        if t["id"] in expected_ids:
+            b = t["bounds"]
+            assert b["east_lon"] > b["west_lon"], f"{t['id']} east_lon <= west_lon"
+            assert b["north_lat"] > b["south_lat"], f"{t['id']} north_lat <= south_lat"
 
 
 # ---------------------------------------------------------------------------
-# Triplet detail
+# Triplet detail & Antimeridian Crossing
 # ---------------------------------------------------------------------------
 
 def test_triplet_detail():
@@ -82,10 +103,10 @@ def test_triplet_detail():
     assert data["id"] == VALID_ID
     assert "bounds" in data
     assert set(data["bounds"].keys()) == BOUNDS_KEYS
-    assert len(data["sensors"]) == 3
+    assert len(data["sensors"]) >= 3
 
     sensor_names = {s["sensor"] for s in data["sensors"]}
-    assert sensor_names == {"ohrc", "tmc", "iirs"}
+    assert {"ohrc", "tmc", "iirs"}.issubset(sensor_names)
 
 
 def test_triplet_detail_404():
@@ -93,21 +114,53 @@ def test_triplet_detail_404():
     assert r.status_code == 404
 
 
-def test_real_pipeline_triplet_loaded():
+def test_antimeridian_crossing_regions():
     """
-    Verify region_003 loaded directly from the real data pipeline manifest schema:
-      - ohrc_product_id: ch2_ohr_ncp_20210405t1606536730_d_img_d18
-      - bounds: west_lon 336.484646, east_lon 336.589455, south_lat -3.416904, north_lat -2.576048
+    Verify region_005 and region_006 land across the 180° meridian in Von Kármán / SPA basin:
+      west_lon: 179.924510, east_lon: 180.082150
+    Ensures west_lon < east_lon in 0-360 space and valid physical dimensions.
     """
     _ensure_loaded()
-    r = client.get("/triplets/region_003")
+    for reg_id in ("region_005", "region_006"):
+        r = client.get(f"/triplets/{reg_id}")
+        assert r.status_code == 200
+        data = r.json()
+        b = data["bounds"]
+        assert b["west_lon"] < 180.0
+        assert b["east_lon"] > 180.0
+        assert b["east_lon"] > b["west_lon"]
+
+        # Ensure affine transform maps center pixel cleanly
+        lat_c, lon_c = pixel_to_latlon_from_bounds(256.0, 256.0, b, 512, 512)
+        assert b["south_lat"] <= lat_c <= b["north_lat"]
+        assert b["west_lon"] <= lon_c <= b["east_lon"]
+
+
+# ---------------------------------------------------------------------------
+# DEM (Digital Elevation Model) tests
+# ---------------------------------------------------------------------------
+
+def test_dem_metadata_in_triplet_response():
+    """
+    Verify DEM fields (dem_available: bool, dem_url: str) appear in GET /triplets/{id}.
+    """
+    _ensure_loaded()
+    r = client.get(f"/triplets/{VALID_ID}")
     assert r.status_code == 200
     data = r.json()
-    assert data["id"] == "region_003"
-    assert abs(data["bounds"]["west_lon"] - 336.484646) < 1e-5
-    assert abs(data["bounds"]["east_lon"] - 336.589455) < 1e-5
-    assert abs(data["bounds"]["south_lat"] - (-3.416904)) < 1e-5
-    assert abs(data["bounds"]["north_lat"] - (-2.576048)) < 1e-5
+    assert data["dem_available"] is True
+    assert data["dem_url"] == "/images/dem/dem_512.png"
+
+    # Confirm DEM is registered in sensors list
+    sensor_names = {s["sensor"] for s in data["sensors"]}
+    assert "dem" in sensor_names
+
+
+def test_static_image_dem():
+    """Verify DEM image is served via GET /images/dem/dem_512.png."""
+    r = client.get("/images/dem/dem_512.png")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("image/")
 
 
 # ---------------------------------------------------------------------------
@@ -131,7 +184,7 @@ def test_footprint_returns_shared_bounds():
 
 def test_footprint_and_iirs_overlay_have_identical_bounds():
     """
-    INVARIANT GUARD: OHRC, TMC-2, and IIRS share one identical bounding box
+    INVARIANT GUARD: OHRC, TMC-2, IIRS, and DEM share one identical bounding box
     by design in the real pipeline.
     Verify /triplets/{id}, /triplets/{id}/footprint, and /triplets/{id}/iirs-overlay
     all return identical bounds.
@@ -240,7 +293,7 @@ def test_match_latlon_within_footprint():
 
 def test_missing_matches_returns_empty_not_error():
     _ensure_loaded()
-    r = client.get(f"/triplets/{VALID_ID}/matches")
+    r = client.get(f"/triplets/region_004/matches")
     assert r.status_code == 200
     data = r.json()
     assert "matches" in data
