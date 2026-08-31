@@ -6,7 +6,7 @@ triplet, plus a re-derived 3×3 homography matrix.
 
 The backend does NOT run any matching. All pixel data comes from the ML
 team's matches.json; geographic coordinates are computed at load time
-from the manifest footprint corners (see geo.py and loader.py).
+from the shared TripletBounds (see geo.py and loader.py).
 """
 
 from fastapi import APIRouter, HTTPException

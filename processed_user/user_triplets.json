@@ -2,32 +2,26 @@
   "triplets": [
     {
       "id": "region_001",
+      "bounds": {
+        "west_lon": 30.100,
+        "east_lon": 30.260,
+        "south_lat": -89.950,
+        "north_lat": -89.900
+      },
       "sensors": [
         {
           "sensor": "ohrc",
           "gsd_m": 0.25,
           "sun_elevation_deg": 42.3,
           "sun_azimuth_deg": 178.5,
-          "incidence_angle_deg": 6.2,
-          "footprint": {
-            "top_left":     {"lat": -89.900, "lon": 30.100},
-            "top_right":    {"lat": -89.900, "lon": 30.250},
-            "bottom_right": {"lat": -89.950, "lon": 30.260},
-            "bottom_left":  {"lat": -89.950, "lon": 30.090}
-          }
+          "incidence_angle_deg": 6.2
         },
         {
           "sensor": "tmc",
           "gsd_m": 5.0,
           "sun_elevation_deg": 40.1,
           "sun_azimuth_deg": 176.2,
-          "incidence_angle_deg": 8.7,
-          "footprint": {
-            "top_left":     {"lat": -89.880, "lon": 30.000},
-            "top_right":    {"lat": -89.880, "lon": 30.400},
-            "bottom_right": {"lat": -89.980, "lon": 30.410},
-            "bottom_left":  {"lat": -89.980, "lon": 29.990}
-          }
+          "incidence_angle_deg": 8.7
         },
         {
           "sensor": "iirs",
@@ -35,50 +29,32 @@
           "gsd_m": 80.0,
           "sun_elevation_deg": 38.9,
           "sun_azimuth_deg": 175.0,
-          "incidence_angle_deg": 12.4,
-          "footprint": {
-            "top_left":     {"lat": -89.850, "lon": 29.800},
-            "top_right":    {"lat": -89.850, "lon": 30.500},
-            "bottom_right": {"lat": -90.000, "lon": 30.520},
-            "bottom_left":  {"lat": -90.000, "lon": 29.780}
-          }
+          "incidence_angle_deg": 12.4
         }
-      ],
-      "intersection_footprint": {
-        "top_left":     {"lat": -89.900, "lon": 30.100},
-        "top_right":    {"lat": -89.900, "lon": 30.250},
-        "bottom_right": {"lat": -89.950, "lon": 30.260},
-        "bottom_left":  {"lat": -89.950, "lon": 30.090}
-      }
+      ]
     },
     {
       "id": "region_002",
+      "bounds": {
+        "west_lon": 22.500,
+        "east_lon": 22.690,
+        "south_lat": -70.260,
+        "north_lat": -70.200
+      },
       "sensors": [
         {
           "sensor": "ohrc",
           "gsd_m": 0.25,
           "sun_elevation_deg": 55.7,
           "sun_azimuth_deg": 162.3,
-          "incidence_angle_deg": 4.1,
-          "footprint": {
-            "top_left":     {"lat": -70.200, "lon": 22.500},
-            "top_right":    {"lat": -70.200, "lon": 22.680},
-            "bottom_right": {"lat": -70.260, "lon": 22.690},
-            "bottom_left":  {"lat": -70.260, "lon": 22.490}
-          }
+          "incidence_angle_deg": 4.1
         },
         {
           "sensor": "tmc",
           "gsd_m": 5.0,
           "sun_elevation_deg": 53.2,
           "sun_azimuth_deg": 160.8,
-          "incidence_angle_deg": 6.9,
-          "footprint": {
-            "top_left":     {"lat": -70.150, "lon": 22.400},
-            "top_right":    {"lat": -70.150, "lon": 22.800},
-            "bottom_right": {"lat": -70.300, "lon": 22.810},
-            "bottom_left":  {"lat": -70.300, "lon": 22.390}
-          }
+          "incidence_angle_deg": 6.9
         },
         {
           "sensor": "iirs",
@@ -86,21 +62,45 @@
           "gsd_m": 80.0,
           "sun_elevation_deg": 51.0,
           "sun_azimuth_deg": 159.1,
-          "incidence_angle_deg": 10.2,
-          "footprint": {
-            "top_left":     {"lat": -70.100, "lon": 22.200},
-            "top_right":    {"lat": -70.100, "lon": 23.000},
-            "bottom_right": {"lat": -70.350, "lon": 23.020},
-            "bottom_left":  {"lat": -70.350, "lon": 22.180}
-          }
+          "incidence_angle_deg": 10.2
         }
-      ],
-      "intersection_footprint": {
-        "top_left":     {"lat": -70.200, "lon": 22.500},
-        "top_right":    {"lat": -70.200, "lon": 22.680},
-        "bottom_right": {"lat": -70.260, "lon": 22.690},
-        "bottom_left":  {"lat": -70.260, "lon": 22.490}
-      }
+      ]
+    },
+    {
+      "id": "region_003",
+      "ohrc_product_id": "ch2_ohr_ncp_20210405t1606536730_d_img_d18",
+      "tmc2_product_id": "ch2_tmc_ncf_20250807t1904346039_d_img_d18",
+      "iirs_product_id": "ch2_iir_nri_20211221t0324126144_d_img_hw1",
+      "bounds": {
+        "west_lon": 336.484646,
+        "east_lon": 336.589455,
+        "south_lat": -3.416904,
+        "north_lat": -2.576048
+      },
+      "sensors": [
+        {
+          "sensor": "ohrc",
+          "gsd_m": 0.25,
+          "sun_elevation_deg": 14.063051,
+          "sun_azimuth_deg": 269.646098,
+          "incidence_angle_deg": null
+        },
+        {
+          "sensor": "tmc",
+          "gsd_m": 5.4,
+          "sun_elevation_deg": 48.753985,
+          "sun_azimuth_deg": 108.866212,
+          "incidence_angle_deg": null
+        },
+        {
+          "sensor": "iirs",
+          "tile_id": "iirs_overlay.png",
+          "gsd_m": 69.04,
+          "sun_elevation_deg": 82.736335,
+          "sun_azimuth_deg": 335.798629,
+          "incidence_angle_deg": null
+        }
+      ]
     }
   ]
 }

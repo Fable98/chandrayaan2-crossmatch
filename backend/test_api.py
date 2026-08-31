@@ -1,5 +1,5 @@
 """
-test_api.py — Automated tests for the SIH26166 backend.
+test_api.py — Automated tests for the SIH26166 backend (Shared-Bbox Architecture).
 
 Run with:  pytest test_api.py -v
 No server needs to be running — TestClient spins the app in-process.
@@ -7,14 +7,17 @@ No server needs to be running — TestClient spins the app in-process.
 
 from fastapi.testclient import TestClient
 from main import app
-from geo import pixel_to_latlon_from_corners
+from geo import (
+    pixel_to_latlon_from_bounds,
+    pixel_to_latlon_from_bounds_batch,
+)
 
 client = TestClient(app)
 
 VALID_ID = "region_001"
 INVALID_ID = "nonexistent_region"
 
-CORNER_KEYS = {"top_left", "top_right", "bottom_right", "bottom_left"}
+BOUNDS_KEYS = {"west_lon", "east_lon", "south_lat", "north_lat"}
 
 
 def _ensure_loaded():
@@ -23,7 +26,7 @@ def _ensure_loaded():
 
 
 # ---------------------------------------------------------------------------
-# Health
+# Health & refresh
 # ---------------------------------------------------------------------------
 
 def test_health():
@@ -51,7 +54,6 @@ def test_triplets_list():
     r = client.get("/triplets")
     assert r.status_code == 200
     data = r.json()
-    # Response is wrapped: {"triplets": [...]}
     assert "triplets" in data
     assert isinstance(data["triplets"], list)
     assert len(data["triplets"]) >= 1
@@ -62,8 +64,9 @@ def test_triplets_list_has_required_fields():
     r = client.get("/triplets")
     triplet = r.json()["triplets"][0]
     assert "id" in triplet
+    assert "bounds" in triplet
+    assert set(triplet["bounds"].keys()) == BOUNDS_KEYS
     assert "sensors" in triplet
-    assert "intersection_footprint" in triplet
     assert len(triplet["sensors"]) == 3
 
 
@@ -77,6 +80,8 @@ def test_triplet_detail():
     assert r.status_code == 200
     data = r.json()
     assert data["id"] == VALID_ID
+    assert "bounds" in data
+    assert set(data["bounds"].keys()) == BOUNDS_KEYS
     assert len(data["sensors"]) == 3
 
     sensor_names = {s["sensor"] for s in data["sensors"]}
@@ -88,59 +93,64 @@ def test_triplet_detail_404():
     assert r.status_code == 404
 
 
+def test_real_pipeline_triplet_loaded():
+    """
+    Verify region_003 loaded directly from the real data pipeline manifest schema:
+      - ohrc_product_id: ch2_ohr_ncp_20210405t1606536730_d_img_d18
+      - bounds: west_lon 336.484646, east_lon 336.589455, south_lat -3.416904, north_lat -2.576048
+    """
+    _ensure_loaded()
+    r = client.get("/triplets/region_003")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["id"] == "region_003"
+    assert abs(data["bounds"]["west_lon"] - 336.484646) < 1e-5
+    assert abs(data["bounds"]["east_lon"] - 336.589455) < 1e-5
+    assert abs(data["bounds"]["south_lat"] - (-3.416904)) < 1e-5
+    assert abs(data["bounds"]["north_lat"] - (-2.576048)) < 1e-5
+
+
 # ---------------------------------------------------------------------------
-# Footprint — the bbox-vs-quad regression guard
+# Footprint & IIRS overlay (Shared-Bbox Invariants)
 # ---------------------------------------------------------------------------
 
-def test_footprint_has_four_named_corners_not_bbox():
+def test_footprint_returns_shared_bounds():
     """
-    REGRESSION GUARD: ensures footprints are 4-corner quads (top_left,
-    top_right, bottom_right, bottom_left), NOT axis-aligned bounding boxes.
-    A previous min/max bbox implementation caused visible misalignment on
-    the Leaflet map. This test must never be removed.
+    Ensure /triplets/{id}/footprint returns the shared TripletBounds.
     """
     _ensure_loaded()
     r = client.get(f"/triplets/{VALID_ID}/footprint")
     assert r.status_code == 200
     data = r.json()
-
-    # Each sensor + intersection must have exactly 4 named corners
-    for key in ("ohrc", "tmc", "iirs", "intersection"):
-        footprint = data[key]
-        assert set(footprint.keys()) == CORNER_KEYS, (
-            f"{key} footprint has keys {set(footprint.keys())}, "
-            f"expected named corners {CORNER_KEYS} — NOT a bbox"
-        )
-        # Each corner must be a {lat, lon} object
-        for corner_name in CORNER_KEYS:
-            corner = footprint[corner_name]
-            assert "lat" in corner and "lon" in corner, (
-                f"{key}.{corner_name} missing lat/lon"
-            )
+    assert data["triplet_id"] == VALID_ID
+    assert "bounds" in data
+    assert set(data["bounds"].keys()) == BOUNDS_KEYS
+    for k in BOUNDS_KEYS:
+        assert isinstance(data["bounds"][k], (int, float))
 
 
-def test_footprint_corners_are_not_axis_aligned():
+def test_footprint_and_iirs_overlay_have_identical_bounds():
     """
-    Extra safety: for OHRC/TMC, if the quad is truly rotated, not all
-    lats or lons will be identical across corners. This catches accidental
-    degenerate data where someone replaced a real quad with a bbox.
-
-    NOTE: may need to be relaxed if some real quads happen to be axis-aligned,
-    but for our current lunar south-pole data the slight rotation is expected.
+    INVARIANT GUARD: OHRC, TMC-2, and IIRS share one identical bounding box
+    by design in the real pipeline.
+    Verify /triplets/{id}, /triplets/{id}/footprint, and /triplets/{id}/iirs-overlay
+    all return identical bounds.
     """
     _ensure_loaded()
-    r = client.get(f"/triplets/{VALID_ID}/footprint")
-    data = r.json()
+    r_triplet = client.get(f"/triplets/{VALID_ID}")
+    r_footprint = client.get(f"/triplets/{VALID_ID}/footprint")
+    r_overlay = client.get(f"/triplets/{VALID_ID}/iirs-overlay")
 
-    for sensor in ("ohrc", "tmc"):
-        fp = data[sensor]
-        lons = [fp[c]["lon"] for c in CORNER_KEYS]
-        lats = [fp[c]["lat"] for c in CORNER_KEYS]
-        # A true quad should have at least 3 distinct coordinate values
-        # (a bbox would have exactly 2 distinct lats and 2 distinct lons)
-        assert len(set(lons)) >= 3 or len(set(lats)) >= 3, (
-            f"{sensor} footprint looks axis-aligned — possible bbox regression"
-        )
+    assert r_triplet.status_code == 200
+    assert r_footprint.status_code == 200
+    assert r_overlay.status_code == 200
+
+    triplet_bounds = r_triplet.json()["bounds"]
+    footprint_bounds = r_footprint.json()["bounds"]
+    overlay_bounds = r_overlay.json()["bounds"]
+
+    assert footprint_bounds == triplet_bounds
+    assert overlay_bounds == triplet_bounds
 
 
 def test_footprint_404():
@@ -148,8 +158,31 @@ def test_footprint_404():
     assert r.status_code == 404
 
 
+def test_iirs_overlay_bounds_present():
+    _ensure_loaded()
+    r = client.get(f"/triplets/{VALID_ID}/iirs-overlay")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["triplet_id"] == VALID_ID
+    assert data["image_url"].startswith("/images/iirs/")
+    assert "bounds" in data
+    assert set(data["bounds"].keys()) == BOUNDS_KEYS
+
+
+def test_iirs_overlay_has_opacity_hint():
+    _ensure_loaded()
+    r = client.get(f"/triplets/{VALID_ID}/iirs-overlay")
+    data = r.json()
+    assert 0.0 <= data["opacity_hint"] <= 1.0
+
+
+def test_iirs_overlay_404():
+    r = client.get(f"/triplets/{INVALID_ID}/iirs-overlay")
+    assert r.status_code == 404
+
+
 # ---------------------------------------------------------------------------
-# Matches — updated for new schema with px + latlon fields
+# Matches — enriched with shared-bbox geo coordinates
 # ---------------------------------------------------------------------------
 
 def test_matches_has_homography():
@@ -158,7 +191,6 @@ def test_matches_has_homography():
     assert r.status_code == 200
     data = r.json()
     assert data["triplet_id"] == VALID_ID
-    # Homography can be null (< 4 points) or a 3×3 matrix
     if data["homography"] is not None:
         assert len(data["homography"]) == 3
         assert all(len(row) == 3 for row in data["homography"])
@@ -176,54 +208,38 @@ def test_matches_has_points_with_pixel_and_latlon():
     assert data["num_matches"] >= 1
 
     for m in data["matches"]:
-        # Pixel coordinates (from ML team)
         assert len(m["ohrc_px"]) == 2, "ohrc_px should be (x, y)"
         assert len(m["tmc_px"]) == 2, "tmc_px should be (x, y)"
-        # Geographic coordinates (computed by backend)
         assert len(m["ohrc_latlon"]) == 2, "ohrc_latlon should be (lat, lon)"
         assert len(m["tmc_latlon"]) == 2, "tmc_latlon should be (lat, lon)"
-        # Confidence score
         assert 0.0 <= m["confidence"] <= 1.0
 
 
 def test_match_latlon_within_footprint():
     """
-    Verify all ohrc_latlon values from the API response fall within
-    region_001's OHRC footprint bounds (loose sanity check).
+    Verify all match lat/lon values fall within the triplet's shared bounds.
     """
     _ensure_loaded()
+    triplet_r = client.get(f"/triplets/{VALID_ID}")
+    bounds = triplet_r.json()["bounds"]
+    min_lat, max_lat = bounds["south_lat"], bounds["north_lat"]
+    min_lon, max_lon = bounds["west_lon"], bounds["east_lon"]
 
-    # Get the OHRC footprint bounds for region_001
-    fp_r = client.get(f"/triplets/{VALID_ID}/footprint")
-    fp = fp_r.json()["ohrc"]
-    all_lats = [fp[c]["lat"] for c in CORNER_KEYS]
-    all_lons = [fp[c]["lon"] for c in CORNER_KEYS]
-    min_lat, max_lat = min(all_lats), max(all_lats)
-    min_lon, max_lon = min(all_lons), max(all_lons)
-
-    # Allow a small epsilon for floating-point rounding at edges
     eps = 0.01
 
     r = client.get(f"/triplets/{VALID_ID}/matches")
     for m in r.json()["matches"]:
-        lat, lon = m["ohrc_latlon"]
-        assert min_lat - eps <= lat <= max_lat + eps, (
-            f"ohrc_latlon lat {lat} outside footprint [{min_lat}, {max_lat}]"
-        )
-        assert min_lon - eps <= lon <= max_lon + eps, (
-            f"ohrc_latlon lon {lon} outside footprint [{min_lon}, {max_lon}]"
-        )
+        ohrc_lat, ohrc_lon = m["ohrc_latlon"]
+        assert min_lat - eps <= ohrc_lat <= max_lat + eps
+        assert min_lon - eps <= ohrc_lon <= max_lon + eps
+
+        tmc_lat, tmc_lon = m["tmc_latlon"]
+        assert min_lat - eps <= tmc_lat <= max_lat + eps
+        assert min_lon - eps <= tmc_lon <= max_lon + eps
 
 
 def test_missing_matches_returns_empty_not_error():
-    """
-    A triplet with no match file should return 200 with empty matches list,
-    NOT a 500 error. This keeps the frontend robust for partially-processed regions.
-    """
     _ensure_loaded()
-    # region_002 may have matches from the mock data, but nonexistent triplet
-    # should 404. Instead, test by checking that region_002 at minimum returns
-    # 200 with whatever it has (the important contract is: known triplet → 200).
     r = client.get(f"/triplets/{VALID_ID}/matches")
     assert r.status_code == 200
     data = r.json()
@@ -232,137 +248,90 @@ def test_missing_matches_returns_empty_not_error():
 
 
 def test_matches_404_for_unknown_triplet():
-    """Unknown triplet ID → 404 (triplet doesn't exist, not just missing matches)."""
     r = client.get(f"/triplets/{INVALID_ID}/matches")
     assert r.status_code == 404
 
 
 # ---------------------------------------------------------------------------
-# Pixel-to-latlon unit test (geo.py directly)
+# Direct Geo Conversion Unit Tests (Shared-Bbox & 0-360 Longitude)
 # ---------------------------------------------------------------------------
 
 def test_pixel_to_latlon_sanity():
     """
-    Call pixel_to_latlon_from_corners with the center pixel (256, 256)
-    and verify the result is within region_001's OHRC footprint bounds.
+    Verify pixel_to_latlon_from_bounds maps center pixel (256, 256)
+    to the geographic centroid of the bounding box.
     """
-    # Region 001 OHRC corners (from user_triplets.json)
-    corners = {
-        "top_left":     {"lat": -89.900, "lon": 30.100},
-        "top_right":    {"lat": -89.900, "lon": 30.250},
-        "bottom_right": {"lat": -89.950, "lon": 30.260},
-        "bottom_left":  {"lat": -89.950, "lon": 30.090},
+    bounds = {
+        "west_lon": 30.100,
+        "east_lon": 30.260,
+        "south_lat": -89.950,
+        "north_lat": -89.900,
     }
 
-    lat, lon = pixel_to_latlon_from_corners(256.0, 256.0, corners, 512, 512)
+    lat, lon = pixel_to_latlon_from_bounds(256.0, 256.0, bounds, 512, 512)
 
-    # Center pixel should map to roughly the center of the footprint
-    all_lats = [c["lat"] for c in corners.values()]
-    all_lons = [c["lon"] for c in corners.values()]
-    mid_lat = sum(all_lats) / 4
-    mid_lon = sum(all_lons) / 4
+    mid_lat = (-89.950 + -89.900) / 2.0
+    mid_lon = (30.100 + 30.260) / 2.0
 
-    # Within 0.05° of the centroid (generous but catches gross errors)
-    assert abs(lat - mid_lat) < 0.05, f"Center lat {lat} too far from centroid {mid_lat}"
-    assert abs(lon - mid_lon) < 0.05, f"Center lon {lon} too far from centroid {mid_lon}"
+    assert abs(lat - mid_lat) < 1e-6
+    assert abs(lon - mid_lon) < 1e-6
 
 
 def test_pixel_to_latlon_corners_map_correctly():
     """
-    Verify that pixel (0,0) maps to top_left and pixel (512,512) maps to
-    bottom_right — the fundamental correctness check for the transform.
+    Verify (0, 0) maps to (north_lat, west_lon) and
+    (512, 512) maps to (south_lat, east_lon).
     """
-    corners = {
-        "top_left":     {"lat": -89.900, "lon": 30.100},
-        "top_right":    {"lat": -89.900, "lon": 30.250},
-        "bottom_right": {"lat": -89.950, "lon": 30.260},
-        "bottom_left":  {"lat": -89.950, "lon": 30.090},
+    bounds = {
+        "west_lon": 30.100,
+        "east_lon": 30.260,
+        "south_lat": -89.950,
+        "north_lat": -89.900,
     }
 
-    lat_tl, lon_tl = pixel_to_latlon_from_corners(0, 0, corners, 512, 512)
-    assert abs(lat_tl - corners["top_left"]["lat"]) < 1e-6
-    assert abs(lon_tl - corners["top_left"]["lon"]) < 1e-6
+    lat_tl, lon_tl = pixel_to_latlon_from_bounds(0, 0, bounds, 512, 512)
+    assert abs(lat_tl - bounds["north_lat"]) < 1e-6
+    assert abs(lon_tl - bounds["west_lon"]) < 1e-6
 
-    lat_br, lon_br = pixel_to_latlon_from_corners(512, 512, corners, 512, 512)
-    assert abs(lat_br - corners["bottom_right"]["lat"]) < 1e-6
-    assert abs(lon_br - corners["bottom_right"]["lon"]) < 1e-6
-
-
-# ---------------------------------------------------------------------------
-# IIRS overlay
-# ---------------------------------------------------------------------------
-
-def test_iirs_overlay_corners_present():
-    _ensure_loaded()
-    r = client.get(f"/triplets/{VALID_ID}/iirs-overlay")
-    assert r.status_code == 200
-    data = r.json()
-    assert data["triplet_id"] == VALID_ID
-    assert data["image_url"].startswith("/images/iirs/")
-
-    corners = data["corners"]
-    assert set(corners.keys()) == CORNER_KEYS
-    for corner_name in CORNER_KEYS:
-        c = corners[corner_name]
-        assert "lat" in c and "lon" in c
+    lat_br, lon_br = pixel_to_latlon_from_bounds(512, 512, bounds, 512, 512)
+    assert abs(lat_br - bounds["south_lat"]) < 1e-6
+    assert abs(lon_br - bounds["east_lon"]) < 1e-6
 
 
-def test_iirs_overlay_corners_are_not_axis_aligned():
+def test_0_360_longitude_bounds_and_conversion():
     """
-    Assert that for rotated regions (like region_001 confirmed by diagnostic),
-    the IIRS overlay corners form a rotated quad (not collapsed to an axis-aligned bbox).
+    Verify geo transformation using real-world 0–360° longitude convention
+    values confirmed from actual data pipeline output:
+      west_lon: 336.484646
+      east_lon: 336.589455
+      south_lat: -3.416904
+      north_lat: -2.576048
     """
-    _ensure_loaded()
-    r = client.get(f"/triplets/{VALID_ID}/iirs-overlay")
-    data = r.json()
-    corners = data["corners"]
-    lons = [corners[c]["lon"] for c in CORNER_KEYS]
-    lats = [corners[c]["lat"] for c in CORNER_KEYS]
-    assert len(set(lons)) >= 3 or len(set(lats)) >= 3, (
-        "IIRS overlay corners look axis-aligned — possible bbox regression"
-    )
+    real_bounds = {
+        "west_lon": 336.484646,
+        "east_lon": 336.589455,
+        "south_lat": -3.416904,
+        "north_lat": -2.576048,
+    }
 
+    # Top-left (0, 0)
+    lat_tl, lon_tl = pixel_to_latlon_from_bounds(0.0, 0.0, real_bounds, 512, 512)
+    assert abs(lat_tl - (-2.576048)) < 1e-6
+    assert abs(lon_tl - 336.484646) < 1e-6
 
-def test_footprints_and_iirs_overlay_have_consistent_winding():
-    """
-    Ensure OHRC, TMC, IIRS (from /footprint), and IIRS (from /iirs-overlay)
-    all share the exact same geometric CLOCKWISE winding order:
-    top_left -> top_right -> bottom_right -> bottom_left.
-    Guards against flipped rendering in leaflet-distortableImage.
-    """
-    _ensure_loaded()
-    r_fp = client.get(f"/triplets/{VALID_ID}/footprint")
-    fp_data = r_fp.json()
-    r_iirs = client.get(f"/triplets/{VALID_ID}/iirs-overlay")
-    iirs_overlay_corners = r_iirs.json()["corners"]
+    # Bottom-right (512, 512)
+    lat_br, lon_br = pixel_to_latlon_from_bounds(512.0, 512.0, real_bounds, 512, 512)
+    assert abs(lat_br - (-3.416904)) < 1e-6
+    assert abs(lon_br - 336.589455) < 1e-6
 
-    def signed_area(quad):
-        ordered = [quad[k] for k in ["top_left", "top_right", "bottom_right", "bottom_left"]]
-        a = 0.0
-        for i in range(4):
-            j = (i + 1) % 4
-            a += ordered[i]["lon"] * ordered[j]["lat"] - ordered[j]["lon"] * ordered[i]["lat"]
-        return a / 2.0
-
-    # In lon=x, lat=y Cartesian coordinates, CW winding produces negative signed area
-    for sensor in ("ohrc", "tmc", "iirs", "intersection"):
-        sa = signed_area(fp_data[sensor])
-        assert sa < 0, f"{sensor} footprint winding is not CLOCKWISE (signed area: {sa})"
-
-    sa_overlay = signed_area(iirs_overlay_corners)
-    assert sa_overlay < 0, f"IIRS overlay winding is not CLOCKWISE (signed area: {sa_overlay})"
-
-
-def test_iirs_overlay_has_opacity_hint():
-    _ensure_loaded()
-    r = client.get(f"/triplets/{VALID_ID}/iirs-overlay")
-    data = r.json()
-    assert 0.0 <= data["opacity_hint"] <= 1.0
-
-
-def test_iirs_overlay_404():
-    r = client.get(f"/triplets/{INVALID_ID}/iirs-overlay")
-    assert r.status_code == 404
+    # Batch test
+    pts = [(0.0, 0.0), (256.0, 256.0), (512.0, 512.0)]
+    batch_res = pixel_to_latlon_from_bounds_batch(pts, real_bounds, 512, 512)
+    assert len(batch_res) == 3
+    assert abs(batch_res[0][0] - (-2.576048)) < 1e-6
+    assert abs(batch_res[0][1] - 336.484646) < 1e-6
+    assert abs(batch_res[2][0] - (-3.416904)) < 1e-6
+    assert abs(batch_res[2][1] - 336.589455) < 1e-6
 
 
 # ---------------------------------------------------------------------------
