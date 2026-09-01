@@ -67,7 +67,7 @@ export default function LinkedCursorPanel({ tripletId, points }: Props) {
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-border px-4 py-2">
         <h2 className="text-2xs uppercase tracking-wide text-ink-faint">
-          Linked cursor · click a feature on OHRC
+          Linked cursor · click a teal dot on OHRC
         </h2>
         <span className="text-2xs font-mono text-ink-faint">
           {points.length} matches (post-RANSAC)
@@ -81,6 +81,10 @@ export default function LinkedCursorPanel({ tripletId, points }: Props) {
           src={imageUrl(`/images/ohrc/${tripletId}`)}
           onClick={handleClick}
           marker={selection ? { xFrac: selection.ohrcPx[0] / TILE_PX, yFrac: selection.ohrcPx[1] / TILE_PX, kind: "query" } : null}
+          ghostMarkers={points.map((p) => ({
+            xFrac: p.ohrc_px[0] / TILE_PX,
+            yFrac: p.ohrc_px[1] / TILE_PX,
+          }))}
         />
 
         <div className="flex flex-col items-center gap-1 text-ink-faint">
@@ -107,9 +111,9 @@ export default function LinkedCursorPanel({ tripletId, points }: Props) {
 
       <div className="border-t border-border px-4 py-2 text-2xs font-mono text-ink-faint">
         {selection === null &&
-          "Click anywhere on the OHRC tile to find the nearest verified LoFTR + RANSAC correspondence."}
+          "Teal dots mark verified LoFTR + RANSAC matches — click one (or near one) to link it to TMC-2."}
         {selection !== null && !showMatch &&
-          `No confident match within ${NEARBY_PX}px of that pixel — matches are sparse by design (large craters and ridges, not a dense mesh).`}
+          `No confident match within ${NEARBY_PX}px of that pixel — try clicking directly on one of the teal dots.`}
         {showMatch &&
           `ohrc_px=(${selection!.match!.ohrc_px[0].toFixed(1)}, ${selection!.match!.ohrc_px[1].toFixed(1)})  →  tmc_px=(${selection!.match!.tmc_px[0].toFixed(1)}, ${selection!.match!.tmc_px[1].toFixed(1)})`}
       </div>
@@ -122,12 +126,14 @@ function ImagePane({
   src,
   onClick,
   marker,
+  ghostMarkers,
   innerRef,
 }: {
   label: string;
   src: string;
   onClick?: (e: React.MouseEvent<HTMLDivElement>) => void;
   marker: { xFrac: number; yFrac: number; kind: "query" | "match" } | null;
+  ghostMarkers?: { xFrac: number; yFrac: number }[];
   innerRef?: React.RefObject<HTMLDivElement>;
 }) {
   return (
@@ -141,6 +147,7 @@ function ImagePane({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
+          key={src}
           src={src}
           alt={label}
           className="h-full w-full select-none object-cover"
@@ -149,6 +156,13 @@ function ImagePane({
             (e.currentTarget as HTMLImageElement).style.display = "none";
           }}
         />
+        {ghostMarkers?.map((g, i) => (
+          <div
+            key={i}
+            className="pointer-events-none absolute h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-parallax/60 ring-1 ring-parallax/20"
+            style={{ left: `${g.xFrac * 100}%`, top: `${g.yFrac * 100}%` }}
+          />
+        ))}
         {marker && (
           <div
             className={`absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 ${

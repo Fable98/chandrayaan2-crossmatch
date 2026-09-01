@@ -68,6 +68,17 @@ export default function MapPanel({ triplet, iirsOverlay }: Props) {
         <FitOnChange boundsKey={triplet.id} bounds={bounds} />
       </MapContainer>
 
+      {activeLayers.size === 0 && (
+        <div className="pointer-events-none absolute left-1/2 top-1/2 z-[999] -translate-x-1/2 -translate-y-1/2 border border-border bg-panel/90 px-4 py-2 text-center">
+          <p className="text-xs text-ink-dim">
+            The orange box is the shared OHRC/TMC/IIRS footprint.
+          </p>
+          <p className="mt-0.5 text-2xs text-ink-faint">
+            Toggle a layer on the right to draw imagery inside it.
+          </p>
+        </div>
+      )}
+
       <div className="absolute right-3 top-3 z-[1000] flex flex-col gap-1.5 border border-border bg-panel/95 p-2 backdrop-blur-sm">
         <span className="text-2xs uppercase tracking-wide text-ink-faint px-1">
           Layers
