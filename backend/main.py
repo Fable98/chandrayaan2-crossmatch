@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from data import loader
-from routers import triplets, footprint, matches
+from routers import triplets, footprint, matches, images
 from schemas import HealthResponse
 
 
@@ -55,7 +55,7 @@ app = FastAPI(
 # CORS — allow the Next.js frontend origin
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[CORS_ORIGIN],
+    allow_origins=[CORS_ORIGIN, "http://localhost:3000", "http://127.0.0.1:3000", "*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -69,18 +69,16 @@ app.add_middleware(
 app.include_router(triplets.router)
 app.include_router(footprint.router)
 app.include_router(matches.router)
+app.include_router(images.router)
 
 
 # ---------------------------------------------------------------------------
-# Static image mount — /images/{sensor}/{tile_id}
-# See routers/images.py for rationale on using StaticFiles instead of a router.
+# Static image mount — fallback for direct file paths
 # ---------------------------------------------------------------------------
 
 images_dir = os.path.join(loader.DATA_DIR, "images")
 if os.path.isdir(images_dir):
-    app.mount("/images", StaticFiles(directory=images_dir), name="images")
-else:
-    print(f"[main] WARNING: images directory not found at {images_dir}")
+    app.mount("/static_images", StaticFiles(directory=images_dir), name="static_images")
 
 
 # ---------------------------------------------------------------------------

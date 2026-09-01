@@ -1,0 +1,72 @@
+[
+    {
+        "image1_x": 480.0,
+        "image1_y": 80.0,
+        "image2_x": 441.7,
+        "image2_y": 378.64,
+        "confidence": 0.8353
+    },
+    {
+        "image1_x": 488.0,
+        "image1_y": 64.0,
+        "image2_x": 455.93,
+        "image2_y": 362.47,
+        "confidence": 0.7389
+    },
+    {
+        "image1_x": 480.0,
+        "image1_y": 72.0,
+        "image2_x": 439.71,
+        "image2_y": 368.24,
+        "confidence": 0.5887
+    },
+    {
+        "image1_x": 128.0,
+        "image1_y": 288.0,
+        "image2_x": 23.03,
+        "image2_y": 465.86,
+        "confidence": 0.5432
+    },
+    {
+        "image1_x": 128.0,
+        "image1_y": 296.0,
+        "image2_x": 22.06,
+        "image2_y": 473.28,
+        "confidence": 0.4385
+    },
+    {
+        "image1_x": 120.0,
+        "image1_y": 288.0,
+        "image2_x": 14.56,
+        "image2_y": 465.8,
+        "confidence": 0.4188
+    },
+    {
+        "image1_x": 296.0,
+        "image1_y": 88.0,
+        "image2_x": 159.14,
+        "image2_y": 335.49,
+        "confidence": 0.3732
+    },
+    {
+        "image1_x": 304.0,
+        "image1_y": 88.0,
+        "image2_x": 168.95,
+        "image2_y": 336.47,
+        "confidence": 0.3486
+    },
+    {
+        "image1_x": 120.0,
+        "image1_y": 296.0,
+        "image2_x": 14.5,
+        "image2_y": 472.34,
+        "confidence": 0.2229
+    },
+    {
+        "image1_x": 296.0,
+        "image1_y": 80.0,
+        "image2_x": 158.04,
+        "image2_y": 327.72,
+        "confidence": 0.2108
+    }
+]

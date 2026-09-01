@@ -1,8 +1,9 @@
 """
-loader.py — Loads user_triplets.json and match files into memory at startup.
+loader.py — Loads user_triplets.json, processed_triplets, and match files into memory at startup.
 
 The backend reads manifest data and ML match output, performs pixel-to-geo
-conversion once at load time (using geo.py), and caches everything in memory.
+conversion once at load time using shared TripletBounds (via geo.py), detects
+DEM (Digital Elevation Model) availability, and caches everything in memory.
 It NEVER writes to the data directory or re-runs any ML computation.
 """
 
@@ -11,7 +12,7 @@ import os
 from pathlib import Path
 
 from geo import (
-    pixel_to_latlon_batch,
+    pixel_to_latlon_from_bounds_batch,
     compute_homography_from_points,
 )
 
@@ -23,6 +24,11 @@ from geo import (
 DATA_DIR: str = os.environ.get(
     "DATA_DIR",
     str(Path(__file__).resolve().parent.parent.parent / "processed_user"),
+)
+
+PROCESSED_TRIPLETS_DIR: str = os.environ.get(
+    "PROCESSED_TRIPLETS_DIR",
+    str(Path(__file__).resolve().parent.parent.parent / "processed_triplets"),
 )
 
 # ML team's output directory — searched as a secondary source for match files
@@ -48,18 +54,9 @@ _matches: dict[str, dict] = {}        # keyed by triplet id
 # Internal helpers
 # ---------------------------------------------------------------------------
 
-def _get_sensor_footprint(triplet: dict, sensor_name: str) -> dict | None:
-    """Extract the footprint dict for a given sensor from a triplet."""
-    for s in triplet["sensors"]:
-        if s["sensor"] == sensor_name:
-            return s["footprint"]
-    return None
-
-
 def _parse_ml_matches(
     raw_matches: list[dict],
-    ohrc_corners: dict,
-    tmc_corners: dict,
+    bounds: dict,
 ) -> tuple[list[dict], list[list[float]] | None]:
     """
     Transform raw ML match output into the backend's MatchPoint shape.
@@ -79,12 +76,12 @@ def _parse_ml_matches(
     ohrc_pixels = [(m["image1_x"], m["image1_y"]) for m in raw_matches]
     tmc_pixels = [(m["image2_x"], m["image2_y"]) for m in raw_matches]
 
-    # Convert pixels to lat/lon using perspective transform from corners
-    ohrc_latlons = pixel_to_latlon_batch(
-        ohrc_pixels, ohrc_corners, IMAGE_SIZE, IMAGE_SIZE,
+    # Convert pixels to lat/lon using the shared affine transform from bounds
+    ohrc_latlons = pixel_to_latlon_from_bounds_batch(
+        ohrc_pixels, bounds, IMAGE_SIZE, IMAGE_SIZE,
     )
-    tmc_latlons = pixel_to_latlon_batch(
-        tmc_pixels, tmc_corners, IMAGE_SIZE, IMAGE_SIZE,
+    tmc_latlons = pixel_to_latlon_from_bounds_batch(
+        tmc_pixels, bounds, IMAGE_SIZE, IMAGE_SIZE,
     )
 
     # Build the MatchPoint-shaped dicts
@@ -123,34 +120,148 @@ def _load_match_file(filepath: str) -> list[dict]:
     return []
 
 
+def _normalize_triplet(data: dict, default_id: str | None = None, region_dir: str | None = None) -> dict:
+    """Ensure triplet has an id, bounds, sensors list, and DEM availability."""
+    triplet = dict(data)
+    if "id" not in triplet:
+        triplet["id"] = default_id or triplet.get("region_id") or triplet.get("ohrc_product_id") or "triplet_01"
+
+    # Build sensors list if not present
+    if "sensors" not in triplet:
+        sensors = []
+        if "ohrc_product_id" in triplet:
+            sensors.append({
+                "sensor": "ohrc",
+                "gsd_m": triplet.get("ohrc_gsd_m", 0.25),
+                "sun_elevation_deg": triplet.get("ohrc_sun_elevation_deg"),
+                "sun_azimuth_deg": triplet.get("ohrc_sun_azimuth_deg"),
+                "incidence_angle_deg": triplet.get("ohrc_incidence_deg"),
+            })
+        if "tmc2_product_id" in triplet or "tmc_product_id" in triplet:
+            sensors.append({
+                "sensor": "tmc",
+                "gsd_m": triplet.get("tmc2_gsd_m", 5.0),
+                "sun_elevation_deg": triplet.get("tmc2_sun_elevation_deg"),
+                "sun_azimuth_deg": triplet.get("tmc2_sun_azimuth_deg"),
+                "incidence_angle_deg": triplet.get("tmc2_incidence_deg"),
+            })
+        if "iirs_product_id" in triplet:
+            sensors.append({
+                "sensor": "iirs",
+                "tile_id": "iirs_overlay.png",
+                "gsd_m": triplet.get("iirs_gsd_m", 80.0),
+                "sun_elevation_deg": triplet.get("iirs_sun_elevation_deg"),
+                "sun_azimuth_deg": triplet.get("iirs_sun_azimuth_deg"),
+                "incidence_angle_deg": triplet.get("iirs_incidence_deg"),
+            })
+        triplet["sensors"] = sensors
+
+    # Check DEM (Digital Elevation Model) presence
+    has_dem = False
+    if region_dir and os.path.isdir(region_dir):
+        if os.path.isfile(os.path.join(region_dir, "dem_512.png")) or os.path.isfile(os.path.join(region_dir, "dem_overlay.png")):
+            has_dem = True
+
+    # Fallback check in central images/dem
+    dem_img_path = os.path.join(DATA_DIR, "images", "dem", "dem_512.png")
+    if os.path.isfile(dem_img_path) or triplet.get("dem_available"):
+        has_dem = True
+
+    triplet["dem_available"] = has_dem
+    if has_dem:
+        reg_dem_filename = f"{triplet['id']}_dem_512.png"
+        if os.path.isfile(os.path.join(DATA_DIR, "images", "dem", reg_dem_filename)):
+            triplet["dem_url"] = f"/images/dem/{reg_dem_filename}"
+        else:
+            triplet["dem_url"] = "/images/dem/dem_512.png"
+    else:
+        triplet["dem_url"] = None
+
+    if has_dem and not any(s.get("sensor") == "dem" for s in triplet.get("sensors", [])):
+        triplet["sensors"].append({
+            "sensor": "dem",
+            "gsd_m": 5.0,
+            "sun_elevation_deg": None,
+            "sun_azimuth_deg": None,
+            "incidence_angle_deg": None,
+        })
+
+    return triplet
+
+
 # ---------------------------------------------------------------------------
 # Main loader
 # ---------------------------------------------------------------------------
 
 def load_all() -> None:
     """
-    Read user_triplets.json and all match files into memory.
-    Called once at startup and again on GET /refresh.
+    Read user_triplets.json, processed_triplets, manifest.json, or batch triplet
+    directories into memory. Called once at startup and again on GET /refresh.
 
     For each triplet, match points are enriched with lat/lon coordinates
-    computed from the sensor footprint corners (see geo.py).
+    computed from the shared TripletBounds (see geo.py).
     """
     global _triplets, _triplet_list, _matches
 
+    triplets_raw = []
+
+    # 1. Check processed_triplets directory for the 6 real validated regions
+    if os.path.isdir(PROCESSED_TRIPLETS_DIR):
+        for entry in sorted(os.listdir(PROCESSED_TRIPLETS_DIR)):
+            sub_dir = os.path.join(PROCESSED_TRIPLETS_DIR, entry)
+            if os.path.isdir(sub_dir):
+                sub_manifest = os.path.join(sub_dir, "manifest.json")
+                if os.path.isfile(sub_manifest):
+                    with open(sub_manifest, "r") as f:
+                        sub_data = json.load(f)
+                    if isinstance(sub_data, dict):
+                        triplets_raw.append(_normalize_triplet(sub_data, default_id=entry, region_dir=sub_dir))
+
+    # 2. Check user_triplets.json in DATA_DIR
     manifest_path = os.path.join(DATA_DIR, "user_triplets.json")
-    with open(manifest_path, "r") as f:
-        manifest = json.load(f)
+    if os.path.isfile(manifest_path):
+        with open(manifest_path, "r") as f:
+            manifest = json.load(f)
+        if isinstance(manifest, dict):
+            for t in manifest.get("triplets", []):
+                triplets_raw.append(_normalize_triplet(t))
+        elif isinstance(manifest, list):
+            for t in manifest:
+                triplets_raw.append(_normalize_triplet(t))
 
-    triplets_raw = manifest.get("triplets", [])
+    # 3. Check standalone manifest.json in DATA_DIR
+    standalone_manifest = os.path.join(DATA_DIR, "manifest.json")
+    if os.path.isfile(standalone_manifest):
+        with open(standalone_manifest, "r") as f:
+            m_data = json.load(f)
+        if isinstance(m_data, dict):
+            triplets_raw.append(_normalize_triplet(m_data))
 
-    # Build lookup dict and ordered list
-    _triplets = {t["id"]: t for t in triplets_raw}
-    _triplet_list = triplets_raw
+    # 4. Check subdirectories in DATA_DIR for manifest.json
+    if os.path.isdir(DATA_DIR):
+        for entry in os.listdir(DATA_DIR):
+            sub_dir = os.path.join(DATA_DIR, entry)
+            if os.path.isdir(sub_dir) and sub_dir != PROCESSED_TRIPLETS_DIR:
+                sub_manifest = os.path.join(sub_dir, "manifest.json")
+                if os.path.isfile(sub_manifest):
+                    with open(sub_manifest, "r") as f:
+                        sub_data = json.load(f)
+                    if isinstance(sub_data, dict):
+                        triplets_raw.append(_normalize_triplet(sub_data, default_id=entry, region_dir=sub_dir))
+
+    # Build lookup dict and ordered list (deduplicating by id)
+    _triplets = {}
+    _triplet_list = []
+    for t in triplets_raw:
+        tid = t.get("id")
+        if tid and tid not in _triplets:
+            _triplets[tid] = t
+            _triplet_list.append(t)
 
     # -------------------------------------------------------------------
     # Load match files from two sources:
     #   1. processed_user/matches/{triplet_id}_matches.json
-    #   2. ML_model/matches.json (mapped to the first triplet)
+    #   2. ML_model/matches.json (mapped to region_001)
     # -------------------------------------------------------------------
     _matches = {}
 
@@ -164,14 +275,11 @@ def load_all() -> None:
                 raw = _load_match_file(filepath)
                 _matches[triplet_id] = raw
 
-    # Source 2: ML_model/matches.json — mapped to region_001 (the primary
-    # triplet the ML team ran LoFTR on). This is a temporary convention
-    # until the ML team adds per-triplet naming.
+    # Source 2: ML_model/matches.json — mapped to region_001
     ml_matches_path = os.path.join(ML_OUTPUT_DIR, "matches.json")
     if os.path.isfile(ml_matches_path):
         raw = _load_match_file(ml_matches_path)
         if raw:
-            # ML output takes precedence over mock data for region_001
             _matches["region_001"] = raw
 
     # -------------------------------------------------------------------
@@ -181,15 +289,10 @@ def load_all() -> None:
     for triplet_id, raw_points in _matches.items():
         triplet = _triplets.get(triplet_id)
         if triplet is None:
-            # Match file references a triplet not in the manifest — skip
-            print(f"[loader] WARNING: match file for '{triplet_id}' has no manifest entry, skipping")
             continue
 
-        ohrc_corners = _get_sensor_footprint(triplet, "ohrc")
-        tmc_corners = _get_sensor_footprint(triplet, "tmc")
-
-        if ohrc_corners is None or tmc_corners is None:
-            print(f"[loader] WARNING: missing OHRC/TMC footprint for '{triplet_id}', skipping geo conversion")
+        bounds = triplet.get("bounds")
+        if bounds is None:
             enriched[triplet_id] = {
                 "triplet_id": triplet_id,
                 "matches": [],
@@ -197,7 +300,7 @@ def load_all() -> None:
             }
             continue
 
-        points, homography = _parse_ml_matches(raw_points, ohrc_corners, tmc_corners)
+        points, homography = _parse_ml_matches(raw_points, bounds)
 
         enriched[triplet_id] = {
             "triplet_id": triplet_id,
@@ -209,7 +312,7 @@ def load_all() -> None:
 
     print(
         f"[loader] Loaded {len(_triplets)} triplet(s) and "
-        f"{len(_matches)} match file(s) from {DATA_DIR}"
+        f"{len(_matches)} match file(s)"
     )
 
 
@@ -235,4 +338,3 @@ def get_matches(triplet_id: str) -> dict | None:
 def triplet_count() -> int:
     """Return the number of loaded triplets (for health check)."""
     return len(_triplets)
-

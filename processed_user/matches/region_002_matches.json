@@ -1,37 +1,51 @@
 [
     {
-        "image1_x": 100.0,
-        "image1_y": 200.0,
-        "image2_x": 20.1,
-        "image2_y": 40.2,
-        "confidence": 0.96
+        "image1_x": 480.0,
+        "image1_y": 104.0,
+        "image2_x": 329.31,
+        "image2_y": 415.85,
+        "confidence": 0.606
     },
     {
-        "image1_x": 300.5,
-        "image1_y": 150.3,
-        "image2_x": 60.3,
-        "image2_y": 30.2,
-        "confidence": 0.94
+        "image1_x": 480.0,
+        "image1_y": 96.0,
+        "image2_x": 327.34,
+        "image2_y": 406.77,
+        "confidence": 0.4681
     },
     {
-        "image1_x": 450.2,
-        "image1_y": 450.8,
-        "image2_x": 90.3,
-        "image2_y": 90.5,
-        "confidence": 0.92
+        "image1_x": 320.0,
+        "image1_y": 344.0,
+        "image2_x": 294.73,
+        "image2_y": 455.21,
+        "confidence": 0.3626
     },
     {
-        "image1_x": 75.3,
-        "image1_y": 400.1,
-        "image2_x": 15.2,
-        "image2_y": 80.3,
-        "confidence": 0.91
+        "image1_x": 296.0,
+        "image1_y": 128.0,
+        "image2_x": 134.32,
+        "image2_y": 399.5,
+        "confidence": 0.3101
     },
     {
-        "image1_x": 256.0,
-        "image1_y": 256.0,
-        "image2_x": 51.4,
-        "image2_y": 51.4,
-        "confidence": 0.95
+        "image1_x": 472.0,
+        "image1_y": 80.0,
+        "image2_x": 319.3,
+        "image2_y": 392.48,
+        "confidence": 0.2575
+    },
+    {
+        "image1_x": 304.0,
+        "image1_y": 128.0,
+        "image2_x": 150.31,
+        "image2_y": 399.51,
+        "confidence": 0.25
+    },
+    {
+        "image1_x": 472.0,
+        "image1_y": 104.0,
+        "image2_x": 318.9,
+        "image2_y": 413.95,
+        "confidence": 0.2099
     }
 ]
