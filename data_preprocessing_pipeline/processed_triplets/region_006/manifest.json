@@ -1,0 +1,18 @@
+{
+  "region_id": "region_006",
+  "ohrc_product_id": "ch2_ohr_ncp_20220914t0835371412_d_img_d32",
+  "tmc2_product_id": "ch2_tmc_ncf_20191125t0749024661_d_img_d18",
+  "iirs_product_id": "ch2_iir_nri_20220221t1109265965_d_img_d18",
+  "ohrc_gsd_m": 0.32,
+  "tmc2_gsd_m": 3.96,
+  "iirs_gsd_m": 71.24,
+  "ohrc_sun_azimuth_deg": 89.392682,
+  "tmc2_sun_azimuth_deg": 251.647896,
+  "sun_azimuth_mismatch_deg": 162.25521400000002,
+  "bounds": {
+    "west_lon": 234.396774,
+    "east_lon": 234.528638,
+    "south_lat": 5.148811500000001,
+    "north_lat": 5.35283875
+  }
+}
