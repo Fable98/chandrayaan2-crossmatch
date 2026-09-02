@@ -29,7 +29,6 @@ Thumbs.db
 # Large Processed Datasets & Tiling Outputs
 processed/
 processed_user/
-processed_triplets/
 scratch/
 
 # Keep lightweight JSON manifests and sample PNGs if needed for demo
