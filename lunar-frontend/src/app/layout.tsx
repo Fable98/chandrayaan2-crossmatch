@@ -1,6 +1,19 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Sans, IBM_Plex_Mono } from "next/font/google";
+import { Inter, IBM_Plex_Sans, IBM_Plex_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-inter",
+});
+
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  style: ["normal", "italic"],
+  weight: ["400", "500", "600"],
+  variable: "--font-playfair",
+});
 
 const plexSans = IBM_Plex_Sans({
   subsets: ["latin"],
@@ -15,9 +28,9 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SIH26166 — Lunar Correspondence Console",
+  title: "Astralynx — Step Into the Celestial Frontier",
   description:
-    "Multi-modal registration of Chandrayaan-2 OHRC, TMC-2 and IIRS imagery.",
+    "Discover the fusion of cosmic exploration and intelligent innovation, where every step unveils a universe powered by AI.",
 };
 
 export default function RootLayout({
@@ -26,8 +39,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${plexSans.variable} ${plexMono.variable}`}>
-      <body className="bg-void text-ink font-sans antialiased">
+    <html
+      lang="en"
+      className={`${inter.variable} ${playfair.variable} ${plexSans.variable} ${plexMono.variable}`}
+    >
+      <body className="bg-[#070d14] text-[#f0f4f5] font-sans antialiased">
         {children}
       </body>
     </html>

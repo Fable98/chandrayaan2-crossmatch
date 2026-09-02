@@ -1,0 +1,198 @@
+[
+    {
+        "image1_x": 376.0,
+        "image1_y": 176.0,
+        "image2_x": 326.99,
+        "image2_y": 178.49,
+        "confidence": 0.3719
+    },
+    {
+        "image1_x": 376.0,
+        "image1_y": 184.0,
+        "image2_x": 328.51,
+        "image2_y": 183.86,
+        "confidence": 0.6122
+    },
+    {
+        "image1_x": 256.0,
+        "image1_y": 208.0,
+        "image2_x": 230.3,
+        "image2_y": 233.56,
+        "confidence": 0.4606
+    },
+    {
+        "image1_x": 376.0,
+        "image1_y": 248.0,
+        "image2_x": 336.66,
+        "image2_y": 230.48,
+        "confidence": 0.4394
+    },
+    {
+        "image1_x": 464.0,
+        "image1_y": 248.0,
+        "image2_x": 454.97,
+        "image2_y": 199.62,
+        "confidence": 0.6235
+    },
+    {
+        "image1_x": 392.0,
+        "image1_y": 424.0,
+        "image2_x": 407.79,
+        "image2_y": 450.39,
+        "confidence": 0.5526
+    },
+    {
+        "image1_x": 192.0,
+        "image1_y": 440.0,
+        "image2_x": 167.37,
+        "image2_y": 441.67,
+        "confidence": 0.246
+    },
+    {
+        "image1_x": 200.0,
+        "image1_y": 440.0,
+        "image2_x": 173.91,
+        "image2_y": 441.66,
+        "confidence": 0.315
+    },
+    {
+        "image1_x": 140.0,
+        "image1_y": 135.0,
+        "image2_x": 170.62,
+        "image2_y": 217.28,
+        "confidence": 0.548
+    },
+    {
+        "image1_x": 253.0,
+        "image1_y": 110.0,
+        "image2_x": 231.85,
+        "image2_y": 179.48,
+        "confidence": 0.6331
+    },
+    {
+        "image1_x": 284.0,
+        "image1_y": 133.0,
+        "image2_x": 250.3,
+        "image2_y": 182.72,
+        "confidence": 0.6685
+    },
+    {
+        "image1_x": 177.0,
+        "image1_y": 343.0,
+        "image2_x": 170.22,
+        "image2_y": 343.39,
+        "confidence": 0.6201
+    },
+    {
+        "image1_x": 91.0,
+        "image1_y": 389.0,
+        "image2_x": 114.6,
+        "image2_y": 384.59,
+        "confidence": 0.635
+    },
+    {
+        "image1_x": 177.0,
+        "image1_y": 184.0,
+        "image2_x": 185.21,
+        "image2_y": 234.95,
+        "confidence": 0.6658
+    },
+    {
+        "image1_x": 110.0,
+        "image1_y": 46.0,
+        "image2_x": 165.39,
+        "image2_y": 184.77,
+        "confidence": 0.7512
+    },
+    {
+        "image1_x": 331.0,
+        "image1_y": 76.0,
+        "image2_x": 281.56,
+        "image2_y": 138.63,
+        "confidence": 0.8078
+    },
+    {
+        "image1_x": 233.0,
+        "image1_y": 453.0,
+        "image2_x": 199.77,
+        "image2_y": 463.96,
+        "confidence": 0.8351
+    },
+    {
+        "image1_x": 301.0,
+        "image1_y": 72.0,
+        "image2_x": 261.41,
+        "image2_y": 147.35,
+        "confidence": 0.6868
+    },
+    {
+        "image1_x": 402.0,
+        "image1_y": 188.0,
+        "image2_x": 355.55,
+        "image2_y": 177.26,
+        "confidence": 0.6551
+    },
+    {
+        "image1_x": 207.0,
+        "image1_y": 139.0,
+        "image2_x": 204.31,
+        "image2_y": 205.23,
+        "confidence": 0.8169
+    },
+    {
+        "image1_x": 115.0,
+        "image1_y": 294.0,
+        "image2_x": 141.48,
+        "image2_y": 311.78,
+        "confidence": 0.7858
+    },
+    {
+        "image1_x": 317.0,
+        "image1_y": 287.0,
+        "image2_x": 280.09,
+        "image2_y": 278.7,
+        "confidence": 0.4761
+    },
+    {
+        "image1_x": 205.0,
+        "image1_y": 237.0,
+        "image2_x": 196.87,
+        "image2_y": 262.03,
+        "confidence": 0.8302
+    },
+    {
+        "image1_x": 371.0,
+        "image1_y": 116.0,
+        "image2_x": 315.61,
+        "image2_y": 145.17,
+        "confidence": 0.542
+    },
+    {
+        "image1_x": 55.0,
+        "image1_y": 140.0,
+        "image2_x": 134.45,
+        "image2_y": 234.34,
+        "confidence": 0.7184
+    },
+    {
+        "image1_x": 110.0,
+        "image1_y": 77.0,
+        "image2_x": 162.79,
+        "image2_y": 196.64,
+        "confidence": 0.6711
+    },
+    {
+        "image1_x": 336.0,
+        "image1_y": 185.0,
+        "image2_x": 291.11,
+        "image2_y": 197.62,
+        "confidence": 0.7167
+    },
+    {
+        "image1_x": 296.0,
+        "image1_y": 418.0,
+        "image2_x": 264.59,
+        "image2_y": 425.13,
+        "confidence": 0.5741
+    }
+]

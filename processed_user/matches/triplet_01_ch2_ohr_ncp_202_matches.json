@@ -194,5 +194,12 @@
         "image2_x": 97.94,
         "image2_y": 439.81,
         "confidence": 0.5694
+    },
+    {
+        "image1_x": 213.0,
+        "image1_y": 206.0,
+        "image2_x": 33.33,
+        "image2_y": 408.86,
+        "confidence": 0.6223
     }
 ]
