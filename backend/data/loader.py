@@ -9,6 +9,7 @@ It NEVER writes to the data directory or re-runs any ML computation.
 
 import json
 import os
+import sys
 from pathlib import Path
 
 from geo import (
@@ -16,25 +17,49 @@ from geo import (
     compute_homography_from_points,
 )
 
-
 # ---------------------------------------------------------------------------
 # Data directories — override via env vars
 # ---------------------------------------------------------------------------
 
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+try:
+    from lunar_project.src.ml.evaluation.metrics import compute_all_metrics
+except ImportError:
+    compute_all_metrics = None
+
+
+def _first_existing(*paths: str | Path) -> str:
+    """Return the first existing path, or the first candidate if none exist."""
+    for path in paths:
+        candidate = Path(path)
+        if candidate.exists():
+            return str(candidate)
+    return str(Path(paths[0]))
+
+
 DATA_DIR: str = os.environ.get(
     "DATA_DIR",
-    str(Path(__file__).resolve().parent.parent.parent / "processed_user"),
+    _first_existing(
+        REPO_ROOT / "data_preprocessing_pipeline",
+        REPO_ROOT / "processed_user",
+    ),
 )
 
 PROCESSED_TRIPLETS_DIR: str = os.environ.get(
     "PROCESSED_TRIPLETS_DIR",
-    str(Path(__file__).resolve().parent.parent.parent / "processed_triplets"),
+    _first_existing(
+        REPO_ROOT / "data_preprocessing_pipeline" / "processed_triplets",
+        REPO_ROOT / "processed_triplets",
+    ),
 )
 
 # ML team's output directory — searched as a secondary source for match files
 ML_OUTPUT_DIR: str = os.environ.get(
     "ML_OUTPUT_DIR",
-    str(Path(__file__).resolve().parent.parent.parent / "ML_model"),
+    str(REPO_ROOT / "ML_model"),
 )
 
 # Image size used by the ML pipeline (matcher.py resizes to this)
@@ -125,6 +150,20 @@ def _normalize_triplet(data: dict, default_id: str | None = None, region_dir: st
     triplet = dict(data)
     if "id" not in triplet:
         triplet["id"] = default_id or triplet.get("region_id") or triplet.get("ohrc_product_id") or "triplet_01"
+
+    # Ignore placeholder/demo triplets that don't contain a real shared bounding box.
+    if not triplet.get("bounds"):
+        if triplet.get("region_id") is None and triplet.get("ohrc_product_id") is None:
+            triplet["bounds"] = {
+                "west_lon": 0.0,
+                "east_lon": 0.0,
+                "south_lat": 0.0,
+                "north_lat": 0.0,
+            }
+
+    # If a triplet has no usable bounds, treat it as non-production/demo data.
+    if not isinstance(triplet.get("bounds"), dict):
+        triplet["bounds"] = None
 
     # Build sensors list if not present
     if "sensors" not in triplet:
@@ -249,12 +288,16 @@ def load_all() -> None:
                     if isinstance(sub_data, dict):
                         triplets_raw.append(_normalize_triplet(sub_data, default_id=entry, region_dir=sub_dir))
 
-    # Build lookup dict and ordered list (deduplicating by id)
+    # Build lookup dict and ordered list (deduplicating by id), only keeping
+    # production triplets that carry a valid shared bounding box.
     _triplets = {}
     _triplet_list = []
     for t in triplets_raw:
         tid = t.get("id")
-        if tid and tid not in _triplets:
+        bounds = t.get("bounds")
+        if not tid or not isinstance(bounds, dict):
+            continue
+        if tid not in _triplets:
             _triplets[tid] = t
             _triplet_list.append(t)
 
@@ -302,10 +345,18 @@ def load_all() -> None:
 
         points, homography = _parse_ml_matches(raw_points, bounds)
 
+        metrics_data = None
+        if compute_all_metrics and len(raw_points) >= 4:
+            import numpy as np
+            src_pts = np.array([[m["image1_x"], m["image1_y"]] for m in raw_points])
+            dst_pts = np.array([[m["image2_x"], m["image2_y"]] for m in raw_points])
+            metrics_data = compute_all_metrics(src_pts, dst_pts, num_raw_matches=len(raw_points), image_size=IMAGE_SIZE)
+
         enriched[triplet_id] = {
             "triplet_id": triplet_id,
             "matches": points,
             "homography": homography,
+            "metrics": metrics_data,
         }
 
     _matches = enriched

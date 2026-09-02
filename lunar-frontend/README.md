@@ -28,9 +28,9 @@ assuming.
 - **Fused map** tab: Leaflet map showing the shared footprint rectangle
   (all sensors share one bbox by pipeline design — see backend notes) with
   toggleable IIRS mineralogy and DEM elevation overlays via
-  `L.imageOverlay`. Longitude conversion uses the exact
-  `normalizeTo180` + antimeridian guard logic validated against the real
-  `region_005`/`region_006` data (which genuinely straddle 180°).
+  `L.imageOverlay`. Longitude values in the real processed data use the
+  standard 0–360° lunar convention; the current region_005 / region_006
+  footprints stay in the 234° range rather than crossing 180°.
 - **Linked cursor** tab: click a point on the OHRC tile, and the nearest
   LoFTR+RANSAC match (by pixel distance, within a 40px threshold) is
   highlighted on the corresponding TMC-2 tile, with its confidence score.

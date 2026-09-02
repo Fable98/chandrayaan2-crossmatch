@@ -52,5 +52,6 @@ def get_matches(triplet_id: str):
         triplet_id=match_data["triplet_id"],
         num_matches=len(match_data["matches"]),
         homography=match_data["homography"],
+        metrics=match_data.get("metrics"),
         matches=match_data["matches"],
     )

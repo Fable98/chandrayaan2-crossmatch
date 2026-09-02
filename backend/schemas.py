@@ -123,11 +123,28 @@ class MatchPoint(BaseModel):
     confidence: float
 
 
+class MatchMetrics(BaseModel):
+    """Evaluation metrics for registration accuracy and distribution."""
+    num_inliers: int
+    num_raw_matches: int = 0
+    inlier_ratio: float = 0.0
+    rmse_px: float = 0.0
+    mean_reprojection_error_px: float = 0.0
+    median_reprojection_error_px: float = 0.0
+    max_reprojection_error_px: float = 0.0
+    sub_pixel_accurate: bool = False
+    fraction_below_1px: float = 0.0
+    source_coverage_ratio: float = 0.0
+    destination_coverage_ratio: float = 0.0
+    combined_coverage_score: float = 0.0
+
+
 class MatchesResponse(BaseModel):
     """Response for GET /triplets/{id}/matches."""
     triplet_id: str
     num_matches: int
     homography: list[list[float]] | None  # 3×3 matrix, re-derived from inlier points; null if < 4 points
+    metrics: MatchMetrics | None = None
     matches: list[MatchPoint]
 
 

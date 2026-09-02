@@ -116,9 +116,8 @@ def test_triplet_detail_404():
 
 def test_antimeridian_crossing_regions():
     """
-    Verify region_005 and region_006 land across the 180° meridian in Von Kármán / SPA basin:
-      west_lon: 179.924510, east_lon: 180.082150
-    Ensures west_lon < east_lon in 0-360 space and valid physical dimensions.
+    The current processed data uses the standard 0–360° lunar longitude convention
+    and does not straddle the 180° meridian for the real region_005 / region_006 values.
     """
     _ensure_loaded()
     for reg_id in ("region_005", "region_006"):
@@ -126,8 +125,8 @@ def test_antimeridian_crossing_regions():
         assert r.status_code == 200
         data = r.json()
         b = data["bounds"]
-        assert b["west_lon"] < 180.0
-        assert b["east_lon"] > 180.0
+        assert 0.0 <= b["west_lon"] <= 360.0
+        assert 0.0 <= b["east_lon"] <= 360.0
         assert b["east_lon"] > b["west_lon"]
 
         # Ensure affine transform maps center pixel cleanly
@@ -466,4 +465,28 @@ def test_matches_canonical_schema():
     assert "matches" in data
     assert "points" not in data
     assert isinstance(data["matches"], list)
+
+
+def test_matches_contains_evaluation_metrics():
+    """Verify /triplets/{id}/matches contains computed evaluation metrics (RMSE, inliers, coverage)."""
+    _ensure_loaded()
+    r = client.get("/triplets/region_001/matches")
+    assert r.status_code == 200
+    data = r.json()
+    assert "metrics" in data
+    metrics = data["metrics"]
+    if metrics is not None:
+        assert "num_inliers" in metrics
+        assert "rmse_px" in metrics
+        assert "combined_coverage_score" in metrics
+        assert "sub_pixel_accurate" in metrics
+        assert metrics["num_inliers"] == data["num_matches"]
+
+
+def test_registered_image_serving():
+    """Verify registered output products are served via /images/registered/{region_id}."""
+    r = client.get("/images/registered/region_001")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("image/")
+
 

@@ -1,20 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, imageUrl } from "@/lib/api";
 import { footprintSizeKm } from "@/lib/geo";
-import type { TripletSummary, MatchPoint, IIRSOverlay } from "@/lib/types";
+import type { TripletSummary, MatchPoint, IIRSOverlay, MatchMetrics } from "@/lib/types";
 import RegionList from "./RegionList";
 import MapPanel from "./DynamicMapPanel";
 import LinkedCursorPanel from "./LinkedCursorPanel";
 
-type View = "map" | "linked-cursor";
+type View = "map" | "linked-cursor" | "registration";
 
 export default function Console() {
   const [triplets, setTriplets] = useState<TripletSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<TripletSummary | null>(null);
   const [matches, setMatches] = useState<MatchPoint[]>([]);
+  const [metrics, setMetrics] = useState<MatchMetrics | null>(null);
   const [iirsOverlay, setIirsOverlay] = useState<IIRSOverlay | null>(null);
   const [view, setView] = useState<View>("map");
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +38,7 @@ export default function Console() {
     if (!selectedId) return;
     setDetail(null);
     setMatches([]);
+    setMetrics(null);
     setIirsOverlay(null);
 
     Promise.all([
@@ -47,6 +49,7 @@ export default function Console() {
       .then(([d, m, iirs]) => {
         setDetail(d);
         setMatches(m.matches);
+        setMetrics(m.metrics ?? null);
         setIirsOverlay(iirs);
       })
       .catch((err) => setError(describeError(err)));
@@ -86,6 +89,12 @@ export default function Console() {
           >
             Linked cursor
           </TabButton>
+          <TabButton
+            active={view === "registration"}
+            onClick={() => setView("registration")}
+          >
+            Registration QA
+          </TabButton>
         </nav>
       </header>
 
@@ -113,30 +122,137 @@ export default function Console() {
         {detail && view === "linked-cursor" && (
           <LinkedCursorPanel tripletId={detail.id} points={matches} />
         )}
-        {detail && <MetaBar triplet={detail} />}
+        {detail && view === "registration" && (
+          <RegistrationPanel tripletId={detail.id} metrics={metrics} />
+        )}
+        {detail && <MetaBar triplet={detail} metrics={metrics} />}
       </main>
     </div>
   );
 }
 
-function MetaBar({ triplet }: { triplet: TripletSummary }) {
+function RegistrationPanel({
+  tripletId,
+  metrics,
+}: {
+  tripletId: string;
+  metrics: MatchMetrics | null;
+}) {
+  return (
+    <div className="flex h-full flex-col overflow-y-auto p-6">
+      <div className="mb-4 flex items-center justify-between border-b border-border pb-3">
+        <div>
+          <h2 className="text-sm font-semibold text-ink">
+            Geometric Registration Output · {tripletId}
+          </h2>
+          <p className="text-2xs text-ink-faint">
+            Source (OHRC) warped via estimated homography into target (TMC-2) coordinate space.
+          </p>
+        </div>
+        {metrics && (
+          <div className="flex gap-3 text-2xs font-mono">
+            <span className="rounded bg-panel-raised px-2 py-1 text-teal">
+              RMSE: {metrics.rmse_px.toFixed(3)} px
+            </span>
+            <span
+              className={`rounded px-2 py-1 ${
+                metrics.sub_pixel_accurate
+                  ? "bg-teal/20 text-teal"
+                  : "bg-amber-500/20 text-amber-300"
+              }`}
+            >
+              {metrics.sub_pixel_accurate ? "Sub-pixel: YES" : "Sub-pixel: NO"}
+            </span>
+            <span className="rounded bg-panel-raised px-2 py-1 text-ink-dim">
+              Inliers: {metrics.num_inliers}
+            </span>
+            <span className="rounded bg-panel-raised px-2 py-1 text-ink-dim">
+              Coverage: {(metrics.combined_coverage_score * 100).toFixed(0)}%
+            </span>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-3 gap-4">
+        <div className="flex flex-col items-center gap-2">
+          <div className="relative aspect-square w-full overflow-hidden border border-border bg-panel">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl(`/images/registered/${tripletId}/registered_ohrc.png`)}
+              alt="Warped Source (OHRC)"
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = imageUrl(`/images/ohrc/${tripletId}`);
+              }}
+            />
+          </div>
+          <span className="font-mono text-2xs text-ink-dim">1. Warped Source (OHRC)</span>
+        </div>
+
+        <div className="flex flex-col items-center gap-2">
+          <div className="relative aspect-square w-full overflow-hidden border border-border bg-panel">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl(`/images/registered/${tripletId}/blend_overlay.png`)}
+              alt="Blend Overlay (50% Alpha)"
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = imageUrl(`/images/tmc/${tripletId}`);
+              }}
+            />
+          </div>
+          <span className="font-mono text-2xs text-ink-dim">2. Blend Overlay (50% Alpha)</span>
+        </div>
+
+        <div className="flex flex-col items-center gap-2">
+          <div className="relative aspect-square w-full overflow-hidden border border-border bg-panel">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={imageUrl(`/images/registered/${tripletId}/checkerboard_qa.png`)}
+              alt="Checkerboard QA"
+              className="h-full w-full object-cover"
+              onError={(e) => {
+                (e.currentTarget as HTMLImageElement).src = imageUrl(`/images/tmc/${tripletId}`);
+              }}
+            />
+          </div>
+          <span className="font-mono text-2xs text-ink-dim">3. Checkerboard Continuity QA</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MetaBar({
+  triplet,
+  metrics,
+}: {
+  triplet: TripletSummary;
+  metrics: MatchMetrics | null;
+}) {
   const { widthKm, heightKm } = footprintSizeKm(triplet.bounds);
   return (
-    <div className="flex flex-wrap gap-x-6 gap-y-1 border-t border-border bg-panel px-4 py-2 text-2xs font-mono text-ink-faint">
-      <span>OHRC {triplet.ohrc_product_id ?? triplet.id}</span>
-      <span>TMC-2 {triplet.tmc2_product_id ?? "—"}</span>
-      <span>IIRS {triplet.iirs_product_id ?? "—"}</span>
-      <span>
-        {widthKm.toFixed(2)} × {heightKm.toFixed(2)} km
-      </span>
-      <span>
-        lon {triplet.bounds.west_lon.toFixed(4)}°–
-        {triplet.bounds.east_lon.toFixed(4)}°
-      </span>
-      <span>
-        lat {triplet.bounds.south_lat.toFixed(4)}°–
-        {triplet.bounds.north_lat.toFixed(4)}°
-      </span>
+    <div className="flex flex-wrap items-center justify-between border-t border-border bg-panel px-4 py-2 text-2xs font-mono text-ink-faint">
+      <div className="flex flex-wrap gap-x-6 gap-y-1">
+        <span>OHRC {triplet.ohrc_product_id ?? triplet.id}</span>
+        <span>TMC-2 {triplet.tmc2_product_id ?? "—"}</span>
+        <span>IIRS {triplet.iirs_product_id ?? "—"}</span>
+        <span>
+          {widthKm.toFixed(2)} × {heightKm.toFixed(2)} km
+        </span>
+        <span>
+          lon {triplet.bounds.west_lon.toFixed(4)}°–{triplet.bounds.east_lon.toFixed(4)}°
+        </span>
+        <span>
+          lat {triplet.bounds.south_lat.toFixed(4)}°–{triplet.bounds.north_lat.toFixed(4)}°
+        </span>
+      </div>
+      {metrics && (
+        <div className="flex gap-3 text-teal">
+          <span>RMSE: {metrics.rmse_px.toFixed(2)}px</span>
+          <span>Coverage: {(metrics.combined_coverage_score * 100).toFixed(0)}%</span>
+        </div>
+      )}
     </div>
   );
 }
