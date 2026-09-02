@@ -1,0 +1,24 @@
+[
+  {
+    "region_id": "region_001",
+    "status": "evaluated",
+    "num_inliers": 10,
+    "num_raw_matches": 10,
+    "inlier_ratio": 1.0,
+    "rmse_px": 1.7467,
+    "mean_reprojection_error_px": 1.553,
+    "median_reprojection_error_px": 1.4159,
+    "max_reprojection_error_px": 3.232,
+    "sub_pixel_accurate": false,
+    "fraction_below_1px": 0.3,
+    "source_coverage_ratio": 0.0469,
+    "destination_coverage_ratio": 0.0469,
+    "combined_coverage_score": 0.0469,
+    "source_occupied_cells": 3,
+    "destination_occupied_cells": 3,
+    "total_cells": 64,
+    "mean_confidence": 0.4062,
+    "min_confidence": 0.2136,
+    "max_confidence": 0.8125
+  }
+]
