@@ -1,9 +1,9 @@
 """
-data_preprocessing_pipeline/pipeline.py — Remote Sensing Ingestion and DEM Orthorectification Pipeline
+data_preprocessing_pipeline/pipeline.py — Remote Sensing Ingestion and DEM Relief Compensation Pipeline
 
-Ingests raw Chandrayaan-2 planetary data (PDS4 XML/IMG, GeoTIFF, multi-band cubes, and standard formats),
-applies lunar photometric normalization, and performs DEM-guided orthorectification into a common
-map projection (Equirectangular / Orthographic) to eliminate relief displacement parallax.
+Standardizes multi-modal Chandrayaan-2 planetary imagery products (OHRC, TMC, IIRS),
+applies lunar photometric normalization, and performs DEM-based relief displacement compensation
+into a common map frame (local approximation, not full photogrammetric sensor-model ray-tracing).
 """
 
 from __future__ import annotations
@@ -224,7 +224,7 @@ def process_and_orthorectify(
     gsd_m: Optional[float] = None,
 ) -> Path:
     """
-    Full pipeline entry point: Ingests raw lunar imagery and outputs Orthorectified GeoTIFF.
+    Full pipeline entry point: Ingests raw lunar imagery and generates DEM relief-compensated products.
     """
     in_path = Path(input_image_path)
     if not in_path.exists():
@@ -259,7 +259,7 @@ def process_and_orthorectify(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Ingest raw lunar data and generate DEM-guided orthorectified GeoTIFFs."
+        description="Ingest raw lunar data and apply DEM-based relief displacement compensation."
     )
     parser.add_argument("input", type=str, help="Path to raw image file (PDS4/IMG, GeoTIFF, PNG)")
     parser.add_argument("--dem", type=str, default=None, help="Path to DEM elevation map")

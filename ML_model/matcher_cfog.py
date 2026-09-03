@@ -247,8 +247,8 @@ def subpixel_phase_correlation(
     F1 = np.fft.fft2(p1)
     F2 = np.fft.fft2(p2)
 
-    denom = np.abs(F1 * np.conj(F2)) + 1e-9
-    cross_power = (F1 * np.conj(F2)) / denom
+    denom = np.abs(F2 * np.conj(F1)) + 1e-9
+    cross_power = (F2 * np.conj(F1)) / denom
     corr = np.fft.fftshift(np.real(np.fft.ifft2(cross_power)).astype(np.float32))
 
     peak_y, peak_x = np.unravel_index(np.argmax(corr), corr.shape)
@@ -261,17 +261,30 @@ def subpixel_phase_correlation(
     cy, cx = h // 2, w // 2
     sub_y, sub_x = float(peak_y), float(peak_x)
 
-    # 2D quadratic peak interpolation on 3x3 neighborhood
+    # 2D Log-Gaussian peak interpolation on 3x3 neighborhood
+    # Approximates continuous sinc envelope as Gaussian, eliminating parabolic truncation bias
     if 0 < peak_y < h - 1 and 0 < peak_x < w - 1:
-        denom_x = 2.0 * (corr[peak_y, peak_x - 1] - 2.0 * corr[peak_y, peak_x] + corr[peak_y, peak_x + 1])
-        denom_y = 2.0 * (corr[peak_y - 1, peak_x] - 2.0 * corr[peak_y, peak_x] + corr[peak_y + 1, peak_x])
+        c_val = max(float(corr[peak_y, peak_x]), 1e-6)
+        c_left = max(float(corr[peak_y, peak_x - 1]), 1e-6)
+        c_right = max(float(corr[peak_y, peak_x + 1]), 1e-6)
+        c_up = max(float(corr[peak_y - 1, peak_x]), 1e-6)
+        c_down = max(float(corr[peak_y + 1, peak_x]), 1e-6)
+
+        ln_c = np.log(c_val)
+        ln_l = np.log(c_left)
+        ln_r = np.log(c_right)
+        ln_u = np.log(c_up)
+        ln_d = np.log(c_down)
+
+        denom_x = 2.0 * (ln_l - 2.0 * ln_c + ln_r)
+        denom_y = 2.0 * (ln_u - 2.0 * ln_c + ln_d)
 
         if abs(denom_x) > 1e-9:
-            delta_x = (corr[peak_y, peak_x - 1] - corr[peak_y, peak_x + 1]) / denom_x
+            delta_x = (ln_l - ln_r) / denom_x
             sub_x += float(np.clip(delta_x, -0.9, 0.9))
 
         if abs(denom_y) > 1e-9:
-            delta_y = (corr[peak_y - 1, peak_x] - corr[peak_y + 1, peak_x]) / denom_y
+            delta_y = (ln_u - ln_d) / denom_y
             sub_y += float(np.clip(delta_y, -0.9, 0.9))
 
     shift_x = float(sub_x - cx)
@@ -329,10 +342,31 @@ def match_images_cfog(
     scale_factor1 = float(working_gsd / meta1.gsd_m)  # e.g. 5.0 / 0.25 = 20.0
     scale_factor2 = float(working_gsd / meta2.gsd_m)  # e.g. 5.0 / 5.0 = 1.0
 
-    work_w1 = max(64, int(round(orig_w1 / scale_factor1)))
-    work_h1 = max(64, int(round(orig_h1 / scale_factor1)))
-    work_w2 = max(64, int(round(orig_w2 / scale_factor2)))
-    work_h2 = max(64, int(round(orig_h2 / scale_factor2)))
+    work_w1 = int(round(orig_w1 / scale_factor1))
+    work_h1 = int(round(orig_h1 / scale_factor1))
+    work_w2 = int(round(orig_w2 / scale_factor2))
+    work_h2 = int(round(orig_h2 / scale_factor2))
+
+    # Reject if physical footprint is too small for multi-scale matching without altering pixel scale
+    MIN_WORKING_DIM = 16
+    if work_w1 < MIN_WORKING_DIM or work_h1 < MIN_WORKING_DIM or work_w2 < MIN_WORKING_DIM or work_h2 < MIN_WORKING_DIM:
+        return {
+            "status": "dimension_error",
+            "message": (
+                f"Normalized physical image dimensions too small for multi-scale matching "
+                f"({work_w1}x{work_h1} px for source, {work_w2}x{work_h2} px for reference at {working_gsd}m/px; "
+                f"minimum required footprint is {MIN_WORKING_DIM}x{MIN_WORKING_DIM} px)."
+            ),
+            "match_count": 0,
+            "inlier_count": 0,
+            "metrics": None,
+            "homography": None,
+            "metadata": {
+                "source": meta1.to_dict(),
+                "reference": meta2.to_dict(),
+                "working_scale": {"working_gsd_m": working_gsd},
+            },
+        }
 
     # Resample to working scale with area averaging
     work1_gray = cv2.resize(raw1_gray, (work_w1, work_h1), interpolation=cv2.INTER_AREA)
@@ -382,6 +416,8 @@ def match_images_cfog(
                 continue
 
             tmpl = pc1[cy - half_patch_c : cy + half_patch_c, cx - half_patch_c : cx + half_patch_c]
+            if float(np.std(tmpl)) < 1e-4:
+                continue
 
             cx2 = int(cx * (work_w2 / float(work_w1)))
             cy2 = int(cy * (work_h2 / float(work_h1)))
@@ -395,6 +431,7 @@ def match_images_cfog(
             if (
                 search_region.shape[0] <= tmpl.shape[0]
                 or search_region.shape[1] <= tmpl.shape[1]
+                or float(np.std(search_region)) < 1e-4
             ):
                 continue
 
@@ -476,8 +513,8 @@ def match_images_cfog(
         # Map working-scale coordinates back to NATIVE sensor pixel spaces
         nat_x1 = float(wx1 * scale_factor1)
         nat_y1 = float(wy1 * scale_factor1)
-        nat_x2 = float((wx2 - ref_dx) * scale_factor2)
-        nat_y2 = float((wy2 - ref_dy) * scale_factor2)
+        nat_x2 = float((wx2 + ref_dx) * scale_factor2)
+        nat_y2 = float((wy2 + ref_dy) * scale_factor2)
 
         native_pts1.append([nat_x1, nat_y1])
         native_pts2.append([nat_x2, nat_y2])
@@ -531,6 +568,37 @@ def match_images_cfog(
             "message": f"Estimated transformation rejected by quality gate: {tx_check['reason']}",
             "match_count": len(pts1_arr),
             "inlier_count": int(np.sum(inlier_mask)),
+            "metrics": None,
+            "homography": None,
+            "metadata": {
+                "source": meta1.to_dict(),
+                "reference": meta2.to_dict(),
+                "working_scale": {"working_gsd_m": working_gsd},
+            },
+        }
+
+    # QUALITY GATE 4: Spatial Support & Concentration Check
+    # Verify inliers have genuine spatial support across >= 3 distinct cells
+    # and no single cell contains > 60% of all inlier points
+    inlier_indices = np.where(inlier_mask.ravel() == 1)[0]
+    inlier_cells = [selected_matches[i]["cell"] for i in inlier_indices if i < len(selected_matches)]
+    distinct_cells = len(set(inlier_cells))
+
+    from collections import Counter
+    cell_counts = Counter(inlier_cells)
+    max_in_single_cell = max(cell_counts.values()) if cell_counts else 0
+    concentration_ratio = max_in_single_cell / max(1, len(inlier_indices))
+
+    if len(inlier_indices) >= 4 and (distinct_cells < 3 or concentration_ratio > 0.60):
+        return {
+            "status": "geometric_verification_failed",
+            "message": (
+                f"Transformation rejected by spatial quality gate: inliers are excessively concentrated "
+                f"({distinct_cells} distinct cells occupied, required >= 3; "
+                f"single cell concentration {concentration_ratio*100:.1f}%, maximum allowed is 60%)."
+            ),
+            "match_count": len(pts1_arr),
+            "inlier_count": len(inlier_indices),
             "metrics": None,
             "homography": None,
             "metadata": {

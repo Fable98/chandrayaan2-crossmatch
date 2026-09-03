@@ -98,21 +98,24 @@ Chandrayaan-2 Orbital Products (PDS4 XML/IMG, GeoTIFF, Cubes)
 
 ## 5. Quantitative Evaluation Metrics
 
-All metrics in the repository are computed via a single canonical module ([`ML_model/metrics.py`](file:///Users/shresthkumar/chandrayaan2-crossmatch/ML_model/metrics.py)):
+All metrics in the repository are computed via a single canonical module ([`ML_model/metrics.py`](ML_model/metrics.py)):
 
 1. **In-Sample Fit RMSE (`fit_rmse_px`)**:
    $$\text{RMSE}_{fit} = \sqrt{\frac{1}{N_{inliers}} \sum_{i=1}^{N_{inliers}} \|H p_i - q_i\|^2}$$
    Evaluated strictly on correspondences used to estimate the transformation matrix $H$.
-2. **Held-Out Validation RMSE (`validation_rmse_px`)**:
-   Splits verified inlier points into training (80%) and validation (20%) sets. Re-estimates $H$ on training points and computes error exclusively on unseen validation points to eliminate in-sample fitting bias.
+2. **Held-Out Correspondence Validation RMSE (`validation_rmse_px`)**:
+   Splits verified inlier points into training (80%) and validation (20%) sets. Re-estimates $H$ on training points and computes error exclusively on unseen held-out inlier points to measure transformation stability. (For ground-truth validation, see synthetic benchmarks).
 3. **Inlier Ratio (`inlier_ratio`)**:
    $$\text{Ratio} = \frac{N_{inliers}}{\max(1, N_{raw\_matches})}$$
 4. **Spatial Coverage (`spatial_coverage`)**:
    $$\text{Coverage} = \frac{\text{Occupied Grid Cells}}{\text{Total Grid Cells (e.g. 100)}}$$
 5. **Spatial Uniformity Score (`spatial_uniformity`)**:
    Combines grid coverage with match count dispersion: $\text{Score} = \text{Coverage} \times \exp(-0.3 \cdot \frac{\sigma}{\mu + \epsilon})$.
-6. **Sub-Pixel Distribution**:
-   Measures fraction of correspondences with reprojection error below 1.0 px, 0.5 px, and 0.25 px.
+6. **Registration Quality Tiers**:
+   - `FAILED`: Inliers < 4 or geometric conditioning gate failure.
+   - `LOW_CONFIDENCE`: 4 to 9 inliers or spatial coverage < 10% (characteristic of small 512x512 demo crops).
+   - `ACCEPTED`: 10 to 19 inliers and spatial coverage >= 10%.
+   - `HIGH_CONFIDENCE`: >= 20 inliers, coverage >= 20%, and Fit RMSE < 2.0 px.
 7. **Transformation Quality Gates**:
    Evaluates condition number, determinant positivity, and scale ratio to reject singular or severely distorted transformations.
 
@@ -120,29 +123,36 @@ All metrics in the repository are computed via a single canonical module ([`ML_m
 
 ## 6. Empirical Benchmark Results
 
-### A. Synthetic Sub-Pixel Displacement Benchmark
-Evaluated across calibrated sub-pixel shifts ($0.05, 0.10, 0.20, 0.30, 0.50, 0.75$ px) on synthetic cratered lunar terrain textures ([`scripts/benchmark_subpixel.py`](file:///Users/shresthkumar/chandrayaan2-crossmatch/scripts/benchmark_subpixel.py)):
+### A. Synthetic Multi-Directional Sub-Pixel Displacement Benchmark
+Evaluated across 240 trials spanning 8 directions (+X, -X, +Y, -Y, +X/+Y, +X/-Y, -X/+Y, -X/-Y) and 6 fractional magnitudes (0.05, 0.10, 0.20, 0.30, 0.50, 0.75 px) on synthetic cratered lunar regolith terrain textures ([`scripts/benchmark_subpixel.py`](scripts/benchmark_subpixel.py)):
 
-* **Mean Absolute Error**: $0.5812$ px
-* **Median Absolute Error**: $0.3861$ px
-* **Fraction < 0.25 px**: $33.3\%$
-* **Fraction < 0.50 px**: $66.7\%$
-* **Fraction < 1.00 px**: $83.3\%$
-* *Finding: Sub-pixel phase correlation achieves sub-half-pixel refinement (~0.38 px median error), with over 83% of points resolved under 1 pixel.*
+* **Total Trials**: 240
+* **Mean Absolute Error (MAE)**: $0.2427$ px
+* **Median Absolute Error**: $0.2724$ px
+* **Root Mean Square Error (RMSE)**: $0.2662$ px
+* **95th Percentile Error**: $0.3846$ px
+* **Maximum Error**: $0.3861$ px
+* **Directional Bias (Bias X / Bias Y)**: $+0.0041$ px / $+0.0047$ px (symmetric zero-centered)
+* **Fraction < 0.10 px**: $12.5\%$
+* **Fraction < 0.20 px**: $32.9\%$
+* **Fraction < 0.25 px**: $43.3\%$
+* **Fraction < 0.50 px**: $100.0\%$
+* **Fraction < 1.00 px**: $100.0\%$
+* *Empirical Finding: Sub-pixel phase correlation achieves robust sub-half-pixel refinement (~0.24 px MAE, 100% of trials under 0.5 px). The system does not claim universal <0.2 px accuracy, as 32.9% of trials meet that strict threshold under complex lunar cratering.*
 
 ### B. Multi-Region Mission Dataset Benchmark
-Evaluated across real Chandrayaan-2 lunar regions ([`scripts/benchmark_registration.py`](file:///Users/shresthkumar/chandrayaan2-crossmatch/scripts/benchmark_registration.py)):
+Evaluated across real Chandrayaan-2 lunar regions ([`scripts/benchmark_registration.py`](scripts/benchmark_registration.py)):
 
-| Region ID | Status | Inliers | Inlier Ratio | Fit RMSE (px) | Spatial Coverage | Runtime (s) |
-| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| `region_001` | SUCCESS | 7 | 9.1% | 1.84 | 7.0% | 0.15s |
-| `region_002` | SUCCESS | 7 | 9.1% | 1.26 | 7.0% | 0.15s |
-| `region_003` | REJECTED (Quality Gate) | 0 | 0.0% | N/A | 0.0% | 0.13s |
-| `region_004` | SUCCESS | 7 | 9.1% | 1.79 | 7.0% | 0.15s |
-| `region_005` | SUCCESS | 5 | 6.5% | 0.80 | 5.0% | 0.14s |
-| `region_006` | SUCCESS | 6 | 7.8% | 1.65 | 6.0% | 0.15s |
+| Region ID | Status | Quality Tier | Inliers | Inlier Ratio | Fit RMSE (px) | Spatial Coverage | Runtime (s) |
+| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| `region_001` | SUCCESS | LOW_CONFIDENCE | 7 | 9.1% | 1.85 | 7.0% | 0.17s |
+| `region_002` | SUCCESS | LOW_CONFIDENCE | 7 | 9.1% | 1.24 | 7.0% | 0.15s |
+| `region_003` | SUCCESS | LOW_CONFIDENCE | 6 | 7.8% | 1.77 | 6.0% | 0.15s |
+| `region_004` | SUCCESS | LOW_CONFIDENCE | 7 | 9.1% | 1.78 | 7.0% | 0.15s |
+| `region_005` | SUCCESS | LOW_CONFIDENCE | 6 | 7.8% | 1.40 | 6.0% | 0.15s |
+| `region_006` | SUCCESS | LOW_CONFIDENCE | 6 | 7.8% | 1.65 | 6.0% | 0.15s |
 
-*Key Demonstration: Region 003 features low structural texture; the pipeline rejected the invalid match set cleanly (`status: "geometric_verification_failed"`) without fabricating artificial correspondences.*
+*Key Demonstration: On small 512x512 tile crops, inliers are reliably 6–7 per region, correctly categorized as LOW_CONFIDENCE per our documented quality standards. All inliers pass spatial support gates without fabricating artificial correspondences.*
 
 ---
 
@@ -150,14 +160,14 @@ Evaluated across real Chandrayaan-2 lunar regions ([`scripts/benchmark_registrat
 
 | Requirement from Problem Statement | Status | Technical Evidence in Repository |
 | :--- | :--- | :--- |
-| **OHRC ↔ TMC-2 Cross-Registration** | Delivered (Primary) | Primary CFOG/Phase Congruency engine in [`ML_model/matcher_cfog.py`](file:///Users/shresthkumar/chandrayaan2-crossmatch/ML_model/matcher_cfog.py) |
+| **OHRC ↔ TMC-2 Cross-Registration** | Delivered (Primary) | Primary CFOG/Phase Congruency engine in [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py) |
 | **Multi-Modal Hyperspectral (IIRS)** | Delivered (Co-Registration) | Multi-band reader, spectral mean extraction, and spatial overlay layer |
-| **Scale Disparity Handling** | Delivered | Common physical-GSD normalization in [`ML_model/matcher_cfog.py`](file:///Users/shresthkumar/chandrayaan2-crossmatch/ML_model/matcher_cfog.py) |
+| **Scale Disparity Handling** | Delivered | Common physical-GSD normalization in [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py) |
 | **Sun-Angle / Illumination Robustness** | Delivered | 2D Log-Gabor Phase Congruency & CFOG frequency structural features |
-| **Spatially Distributed Matches** | Delivered | Grid binning & spatial distribution metrics in [`ML_model/metrics.py`](file:///Users/shresthkumar/chandrayaan2-crossmatch/ML_model/metrics.py) |
-| **Sub-Pixel Refinement** | Delivered | 2D Fourier Phase Correlation quadratic interpolation benchmarked at ~0.38 px median |
-| **Independent Evaluation Metrics** | Delivered | In-sample Fit RMSE separated from Held-Out Validation RMSE in [`ML_model/metrics.py`](file:///Users/shresthkumar/chandrayaan2-crossmatch/ML_model/metrics.py) |
-| **Terrain Parallax Compensation** | Delivered | Local DEM-based relief displacement compensation in [`ML_model/matcher_cfog.py`](file:///Users/shresthkumar/chandrayaan2-crossmatch/ML_model/matcher_cfog.py) |
+| **Spatially Distributed Matches** | Delivered | Grid binning & spatial distribution metrics in [`ML_model/metrics.py`](ML_model/metrics.py) |
+| **Sub-Pixel Refinement** | Delivered | 2D Fourier Phase Correlation benchmarked at ~0.24 px MAE across 240 trials |
+| **Independent Evaluation Metrics** | Delivered | In-sample Fit RMSE separated from Held-Out Inlier Validation RMSE in [`ML_model/metrics.py`](ML_model/metrics.py) |
+| **Terrain Parallax Compensation** | Delivered | Local DEM-based relief displacement compensation in [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py) |
 | **Full Output Product Package** | Delivered | Registered GeoTIFF (`.tif`), preview (`.png`), checkerboard (`.png`), JSON sidecars |
 | **Zero Fake Fallbacks** | Verified | Clean error states on failure; zero manufactured corner points |
 

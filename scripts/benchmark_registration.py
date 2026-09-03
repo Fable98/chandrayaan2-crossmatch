@@ -71,6 +71,8 @@ def run_full_registration_benchmark(
         record = {
             "region_id": r_dir.name,
             "status": status,
+            "quality_tier": metrics.get("quality_tier", "FAILED" if status != "success" else "LOW_CONFIDENCE"),
+            "failure_reason": reg_result.get("message") if status != "success" else None,
             "elapsed_seconds": elapsed_sec,
             "match_count": metrics.get("match_count", 0),
             "inlier_count": metrics.get("inlier_count", 0),
@@ -82,7 +84,7 @@ def run_full_registration_benchmark(
             "spatial_uniformity": metrics.get("spatial_uniformity", 0.0),
         }
         results.append(record)
-        print(f"[{r_dir.name}] Status: {status:28s} | Inliers: {record['inlier_count']:2d} | Fit RMSE: {str(record['fit_rmse_px']):6s} | Time: {elapsed_sec:.2f}s")
+        print(f"[{r_dir.name}] Status: {status:28s} | Tier: {record['quality_tier']:14s} | Inliers: {record['inlier_count']:2d} | Fit RMSE: {str(record['fit_rmse_px']):6s} | Time: {elapsed_sec:.2f}s")
 
     report = {
         "benchmark_name": "Chandrayaan-2 Primary OHRC <-> TMC-2 Cross-Sensor Benchmark",

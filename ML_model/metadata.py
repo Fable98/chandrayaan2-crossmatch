@@ -59,17 +59,17 @@ SENSOR_SPECS = {
     "TMC-2": {
         "gsd_m": 5.0,  # ~4–5 m at 100 km nominal orbit (stereo Fore, Nadir, Aft)
         "wavelength_range_um": (0.40, 0.85),  # Panchromatic optical
-        "nominal_emission_deg": 12.0,  # Stereo view angles: Nadir 0°, Fore +26°, Aft -26° (approx. 12° off-nadir aggregate)
+        "nominal_emission_deg": None,  # Scene/product dependent (Fore +26°, Nadir 0°, Aft -26°); no universal default
     },
     "IIRS": {
         "gsd_m": 75.0,  # ~70–80 m hyperspectral swath
         "wavelength_range_um": (0.80, 5.00),  # 256 contiguous spectral bands
-        "nominal_emission_deg": 0.0,
+        "nominal_emission_deg": None,
     },
     "DEM": {
         "gsd_m": 5.0,
         "wavelength_range_um": None,
-        "nominal_emission_deg": 0.0,
+        "nominal_emission_deg": None,
     },
 }
 
@@ -125,8 +125,8 @@ def extract_sensor_metadata(
             sensor_type = "DEM"
             provenance["sensor"] = "filename_inference"
         else:
-            sensor_type = "OHRC"
-            provenance["sensor"] = "default"
+            sensor_type = "UNKNOWN"
+            provenance["sensor"] = "unknown"
 
     # Step 2: Check for PDS4 XML label
     header_data: Dict[str, Any] = {}
@@ -193,12 +193,14 @@ def extract_sensor_metadata(
     elif explicit_gsd is not None and explicit_gsd > 0:
         gsd_val = float(explicit_gsd)
         provenance["gsd_m"] = "request"
-    elif sensor_type in SENSOR_SPECS:
+    elif sensor_type in SENSOR_SPECS and SENSOR_SPECS[sensor_type].get("gsd_m") is not None:
         gsd_val = SENSOR_SPECS[sensor_type]["gsd_m"]
-        provenance["gsd_m"] = "default"
+        provenance["gsd_m"] = "sensor_spec"
     else:
-        gsd_val = 1.0
-        provenance["gsd_m"] = "fallback"
+        raise ValueError(
+            f"Physical ground sampling distance (GSD) could not be determined for image '{p.name}' (sensor: {sensor_type}). "
+            "Please provide an explicit 'explicit_gsd' parameter or product metadata headers."
+        )
 
     # Step 4: Resolve observation geometry (emission & azimuth)
     emission_val = None

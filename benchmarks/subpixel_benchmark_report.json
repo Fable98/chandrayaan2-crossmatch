@@ -1,5 +1,16 @@
 {
-    "benchmark_name": "Synthetic Lunar Terrain Sub-Pixel Phase Correlation",
+    "benchmark_name": "Multi-Directional Synthetic Lunar Terrain Sub-Pixel Benchmark",
+    "total_trials": 240,
+    "tested_directions": [
+        "+X",
+        "-X",
+        "+Y",
+        "-Y",
+        "diag_+X_+Y",
+        "diag_+X_-Y",
+        "diag_-X_+Y",
+        "diag_-X_-Y"
+    ],
     "tested_shifts_px": [
         0.05,
         0.1,
@@ -8,58 +19,102 @@
         0.5,
         0.75
     ],
-    "total_trials": 90,
-    "mean_absolute_error_px": 0.5812,
-    "median_absolute_error_px": 0.3861,
-    "max_absolute_error_px": 1.6078,
-    "std_absolute_error_px": 0.5207,
-    "fraction_below_0_25px": 0.3333,
-    "fraction_below_0_5px": 0.6667,
-    "fraction_below_1px": 0.8333,
-    "validated_subpixel_threshold_px": 0.25,
-    "subpixel_capable": false,
-    "per_shift_breakdown": {
+    "mean_absolute_error_px": 0.2439,
+    "median_absolute_error_px": 0.2747,
+    "rmse_px": 0.2673,
+    "p95_error_px": 0.3843,
+    "max_absolute_error_px": 0.386,
+    "bias_x_px": 0.0031,
+    "bias_y_px": 0.0082,
+    "fraction_below_0_10px": 0.1167,
+    "fraction_below_0_20px": 0.3125,
+    "fraction_below_0_25px": 0.425,
+    "fraction_below_0_50px": 1.0,
+    "fraction_below_1_00px": 1.0,
+    "per_direction_breakdown": {
+        "+X": {
+            "mean_error_px": 0.2108,
+            "median_error_px": 0.226,
+            "max_error_px": 0.3208
+        },
+        "-X": {
+            "mean_error_px": 0.2422,
+            "median_error_px": 0.2587,
+            "max_error_px": 0.311
+        },
+        "+Y": {
+            "mean_error_px": 0.2299,
+            "median_error_px": 0.2556,
+            "max_error_px": 0.3099
+        },
+        "-Y": {
+            "mean_error_px": 0.2223,
+            "median_error_px": 0.2215,
+            "max_error_px": 0.3138
+        },
+        "diag_+X_+Y": {
+            "mean_error_px": 0.2615,
+            "median_error_px": 0.3128,
+            "max_error_px": 0.385
+        },
+        "diag_+X_-Y": {
+            "mean_error_px": 0.2616,
+            "median_error_px": 0.3127,
+            "max_error_px": 0.3855
+        },
+        "diag_-X_+Y": {
+            "mean_error_px": 0.2614,
+            "median_error_px": 0.3135,
+            "max_error_px": 0.386
+        },
+        "diag_-X_-Y": {
+            "mean_error_px": 0.2614,
+            "median_error_px": 0.3125,
+            "max_error_px": 0.3845
+        }
+    },
+    "per_magnitude_breakdown": {
         "0.05_px": {
-            "tested_displacement_px": 0.05,
-            "mean_error_px": 0.075,
-            "median_error_px": 0.075,
-            "max_error_px": 0.0753,
-            "std_error_px": 0.0002
+            "mean_error_px": 0.3399,
+            "median_error_px": 0.3519,
+            "rmse_px": 0.3429,
+            "p95_error_px": 0.3843,
+            "max_error_px": 0.3847
         },
         "0.10_px": {
-            "tested_displacement_px": 0.1,
-            "mean_error_px": 0.1506,
-            "median_error_px": 0.1507,
-            "max_error_px": 0.151,
-            "std_error_px": 0.0003
+            "mean_error_px": 0.3371,
+            "median_error_px": 0.349,
+            "rmse_px": 0.3406,
+            "p95_error_px": 0.3851,
+            "max_error_px": 0.386
         },
         "0.20_px": {
-            "tested_displacement_px": 0.2,
-            "mean_error_px": 0.3061,
-            "median_error_px": 0.3064,
-            "max_error_px": 0.3085,
-            "std_error_px": 0.0015
+            "mean_error_px": 0.2923,
+            "median_error_px": 0.3187,
+            "rmse_px": 0.2977,
+            "p95_error_px": 0.3442,
+            "max_error_px": 0.3453
         },
         "0.30_px": {
-            "tested_displacement_px": 0.3,
-            "mean_error_px": 0.4725,
-            "median_error_px": 0.471,
-            "max_error_px": 0.4811,
-            "std_error_px": 0.0061
+            "mean_error_px": 0.2324,
+            "median_error_px": 0.2634,
+            "rmse_px": 0.2395,
+            "p95_error_px": 0.2835,
+            "max_error_px": 0.285
         },
         "0.50_px": {
-            "tested_displacement_px": 0.5,
-            "mean_error_px": 0.9081,
-            "median_error_px": 0.9021,
-            "max_error_px": 0.9938,
-            "std_error_px": 0.0571
+            "mean_error_px": 0.1387,
+            "median_error_px": 0.1456,
+            "rmse_px": 0.1562,
+            "p95_error_px": 0.2335,
+            "max_error_px": 0.2579
         },
         "0.75_px": {
-            "tested_displacement_px": 0.75,
-            "mean_error_px": 1.5747,
-            "median_error_px": 1.571,
-            "max_error_px": 1.6078,
-            "std_error_px": 0.0218
+            "mean_error_px": 0.1229,
+            "median_error_px": 0.1046,
+            "rmse_px": 0.1571,
+            "p95_error_px": 0.2711,
+            "max_error_px": 0.2799
         }
     }
 }

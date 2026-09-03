@@ -16,7 +16,7 @@ from contextlib import asynccontextmanager
 # Ensure backend directory is on sys.path for direct imports (data, routers, schemas)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -114,17 +114,18 @@ async def register_images(
     source_file: UploadFile = File(...),
     reference_file: UploadFile = File(...),
     dem_file: Optional[UploadFile] = File(None),
-    source_sensor: str = "OHRC",
-    reference_sensor: str = "TMC",
-    method: str = "cfog",
+    source_sensor: str = Form("OHRC"),
+    reference_sensor: str = Form("TMC"),
+    method: str = Form("cfog"),
 ):
     """
     Dynamically register an uploaded source image against an uploaded reference image.
 
     Features:
-    - Phase Congruency & CFOG structural matching (default, illumination-invariant).
-    - DEM-guided orthorectification (if DEM provided or auto-detected).
-    - Multi-scale patch Phase Correlation with sub-pixel quadratic surface fitting (<0.2 px).
+    - 2D Phase Congruency & CFOG structural matching (illumination-robust structural representation).
+    - DEM-based relief displacement compensation (when DEM elevation is provided).
+    - Multi-scale patch Phase Correlation with empirically benchmarked sub-pixel refinement.
+    - Common physical-GSD normalization across multi-resolution sensor pairs.
     - Safety checks: File type, size limit, and robust multi-band reading.
     """
     import sys

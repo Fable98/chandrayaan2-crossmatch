@@ -68,11 +68,12 @@ def evaluate_held_out_validation(
     random_seed: int = 42,
 ) -> Dict[str, Any]:
     """
-    Evaluates independent validation error by splitting verified inliers into
+    Evaluates held-out inlier correspondence validation error by splitting verified inliers into
     training (80%) and held-out validation (20%) sets.
     
     The transformation is re-estimated strictly on the training subset, and
     evaluated on the unseen held-out validation subset to eliminate in-sample bias.
+    Note: Evaluated on held-out inliers; for true independent ground truth, see synthetic benchmarks.
     """
     n = len(inliers_src)
     if n < 8:
@@ -328,21 +329,33 @@ def compute_canonical_metrics(
     # Transform Quality
     tx_quality = verify_transformation_quality(H, image_shape)
 
+    # Quality Tier Classification with explicit documented thresholds
+    coverage = dist_metrics["coverage"]
+    if inlier_count < 4:
+        quality_tier = "FAILED"
+    elif inlier_count >= 20 and coverage >= 0.20 and fit_rmse < 2.0:
+        quality_tier = "HIGH_CONFIDENCE"
+    elif inlier_count >= 10 and coverage >= 0.10:
+        quality_tier = "ACCEPTED"
+    else:
+        quality_tier = "LOW_CONFIDENCE"
+
     return {
         "match_count": raw_count,
         "inlier_count": inlier_count,
         "inlier_ratio": round(inlier_ratio, 4),
         "fit_rmse_px": round(fit_rmse, 4),
-        "validation_rmse_px": val_results["validation_rmse_px"],
+        "validation_rmse_px": val_results["validation_rmse_px"],  # Kept for API backward compatibility
+        "held_out_inlier_validation_rmse_px": val_results["validation_rmse_px"],
         "validation_median_error_px": val_results["validation_median_error_px"],
         "validation_status": val_results["validation_status"],
+        "quality_tier": quality_tier,
         "mean_reprojection_error_px": round(mean_err, 4),
         "median_reprojection_error_px": round(median_err, 4),
         "max_reprojection_error_px": round(max_err, 4),
         "fraction_below_1px": round(frac_1, 4),
         "fraction_below_0_5px": round(frac_05, 4),
         "fraction_below_0_25px": round(frac_025, 4),
-        "sub_pixel_accurate": bool(fit_rmse < 1.0 and frac_1 > 0.8),
         "spatial_coverage": dist_metrics["coverage"],
         "spatial_uniformity": dist_metrics["uniformity_score"],
         "spatial_distribution": dist_metrics,
