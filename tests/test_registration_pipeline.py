@@ -23,9 +23,9 @@ import numpy as np
 import cv2
 import pytest
 
-# Add project roots
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ML_model"))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
+REPO_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO_ROOT / "ML_model"))
+sys.path.insert(0, str(REPO_ROOT / "backend"))
 
 from matcher_cfog import match_images_cfog, verify_spatial_quality_gate, load_as_float_and_color
 from metrics import compute_canonical_metrics, verify_transformation_quality
@@ -553,6 +553,57 @@ def test_iirs_hyperspectral_co_registration_integration():
             with open(outputs[sidecar_key], "r") as sf:
                 parsed = json.load(sf)
                 assert isinstance(parsed, (dict, list))
+
+
+def test_evaluation_summary_contains_iirs_and_triplet_consistency():
+    """
+    Regression guard ensuring that evaluation_summary.json contains multi-modal IIRS
+    pairwise metrics (OHRC-IIRS, TMC-IIRS) and 3-way circular triplet consistency
+    metrics for every region_* and triplet_* dataset.
+    """
+    summary_path = REPO_ROOT / "evaluation_output" / "evaluation_summary.json"
+    assert summary_path.exists(), f"Missing evaluation summary at {summary_path}"
+
+    with open(summary_path) as f:
+        summary = json.load(f)
+
+    assert isinstance(summary, list)
+    assert len(summary) >= 8, f"Expected at least 8 evaluated datasets, found {len(summary)}"
+
+    found_ids = {entry.get("region_id") or entry.get("dataset_id") for entry in summary}
+    required_ids = {
+        "region_001", "region_002", "region_003", "region_004", "region_005", "region_006",
+        "triplet_01_ch2_ohr_ncp_202", "triplet_new_2022"
+    }
+    assert required_ids.issubset(found_ids), f"Missing datasets in summary: {required_ids - found_ids}"
+
+    for entry in summary:
+        ds_id = entry.get("region_id") or entry.get("dataset_id")
+
+        # 1. Must have pairs breakdown
+        assert "pairs" in entry, f"Missing 'pairs' dictionary for {ds_id}"
+        pairs = entry["pairs"]
+        assert "ohrc_tmc" in pairs, f"Missing 'ohrc_tmc' pair in {ds_id}"
+        assert "ohrc_iirs" in pairs, f"Missing 'ohrc_iirs' pair in {ds_id}"
+        assert "tmc_iirs" in pairs, f"Missing 'tmc_iirs' pair in {ds_id}"
+
+        # 2. IIRS pairs must be populated dictionaries with status and inlier_count
+        assert pairs["ohrc_iirs"] is not None, f"Null ohrc_iirs pair for {ds_id}"
+        assert "status" in pairs["ohrc_iirs"], f"Missing status in ohrc_iirs for {ds_id}"
+        assert "inlier_count" in pairs["ohrc_iirs"], f"Missing inlier_count in ohrc_iirs for {ds_id}"
+
+        assert pairs["tmc_iirs"] is not None, f"Null tmc_iirs pair for {ds_id}"
+        assert "status" in pairs["tmc_iirs"], f"Missing status in tmc_iirs for {ds_id}"
+        assert "inlier_count" in pairs["tmc_iirs"], f"Missing inlier_count in tmc_iirs for {ds_id}"
+
+        # 3. Triplet cycle consistency must be present with cycle_rmse_px and cycle_closed_successfully
+        assert "triplet_consistency" in entry, f"Missing 'triplet_consistency' in {ds_id}"
+        tc = entry["triplet_consistency"]
+        assert "cycle_rmse_px" in tc, f"Missing cycle_rmse_px in triplet_consistency for {ds_id}"
+        assert isinstance(tc["cycle_rmse_px"], (int, float)), f"cycle_rmse_px should be numeric in {ds_id}"
+        assert "cycle_closed_successfully" in tc, f"Missing cycle_closed_successfully in {ds_id}"
+        assert isinstance(tc["cycle_closed_successfully"], bool), f"cycle_closed_successfully should be bool in {ds_id}"
+
 
 
 

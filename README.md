@@ -143,21 +143,26 @@ Evaluated across 240 trials spanning 8 directions (+X, -X, +Y, -Y, diag_+X_+Y, d
 * **Fraction < 1.00 px**: $100.0\%$
 * *Empirical Finding: On the tested synthetic lunar-terrain benchmark, the Fourier phase-correlation refinement achieved approximately 0.24 px MAE, with all tested trials below 0.5 px. Accuracy is displacement-dependent and the benchmark does not establish universal <0.2 px precision. Peak refinement uses local log-domain peak interpolation intended to reduce interpolation bias.*
 
-### B. Multi-Region Mission Dataset Benchmark
+### B. Multi-Sensor Dataset Benchmark & 3-Way Triplet Cycle Consistency
 Evaluated across all demonstration Chandrayaan-2 lunar regions and triplets ([`scripts/benchmark_registration.py`](scripts/benchmark_registration.py)):
 
-| Region ID | Status | Quality Tier | Inliers | Inlier Ratio | Fit RMSE (px) | Spatial Coverage | Runtime (s) |
-| :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| `region_001` | SUCCESS | LOW_CONFIDENCE | 7 | 9.1% | 1.85 | 7.0% | 0.48s |
-| `region_002` | SUCCESS | LOW_CONFIDENCE | 7 | 10.6% | 1.24 | 7.0% | 0.16s |
-| `region_003` | SUCCESS | LOW_CONFIDENCE | 6 | 7.8% | 1.77 | 6.0% | 0.16s |
-| `region_004` | SUCCESS | LOW_CONFIDENCE | 7 | 10.0% | 1.78 | 7.0% | 0.16s |
-| `region_005` | SUCCESS | LOW_CONFIDENCE | 6 | 13.3% | 1.40 | 6.0% | 0.16s |
-| `region_006` | SUCCESS | LOW_CONFIDENCE | 6 | 10.7% | 1.65 | 6.0% | 0.16s |
-| `triplet_01_ch2_ohr_ncp_202` | SUCCESS | LOW_CONFIDENCE | 7 | 7.2% | 2.20 | 7.0% | 0.16s |
-| `triplet_new_2022` | SUCCESS | LOW_CONFIDENCE | 6 | 6.7% | 2.07 | 6.0% | 0.16s |
+#### 1. Multi-Sensor Pairwise Registration Performance
+| Dataset ID | OHRC ↔ TMC-2 Inliers (RMSE) | OHRC ↔ IIRS Inliers (RMSE) | TMC-2 ↔ IIRS Inliers (RMSE) | 3-Way Cycle RMSE ($A \to B \to C \to A$) | Cycle Closed? |
+| :--- | :---: | :---: | :---: | :---: | :---: |
+| `region_001` | 7 (1.85 px) | Rejected (Ill-conditioned) | Rejected (Ill-conditioned) | 43.23 px | No |
+| `region_002` | 7 (1.24 px) | Rejected (Ill-conditioned) | Rejected (Ill-conditioned) | 27.90 px | No |
+| `region_003` | 6 (1.77 px) | Rejected (Ill-conditioned) | Rejected (Ill-conditioned) | 105.31 px | No |
+| `region_004` | 7 (1.78 px) | Rejected (Ill-conditioned) | Rejected (Ill-conditioned) | 68.91 px | No |
+| `region_005` | 6 (1.40 px) | Rejected (Ill-conditioned) | Rejected (Ill-conditioned) | 70.10 px | No |
+| `region_006` | 6 (1.65 px) | Rejected (Ill-conditioned) | Rejected (Ill-conditioned) | 2685.52 px | No |
+| `triplet_01_ch2_ohr_ncp_202` | 7 (2.20 px) | 6 (1.34 px) | Rejected (Ill-conditioned) | 58.30 px | No |
+| `triplet_new_2022` | 6 (2.07 px) | 5 (0.92 px) | 5 (0.26 px) | 223.77 px | No |
 
-*Key Demonstration: The pipeline produces geometrically verified low-confidence registrations across all 8 packaged demonstration regions and mission triplets. On small 512x512 tile crops, inliers are reliably 6–7 per region, correctly categorized as LOW_CONFIDENCE per our documented quality standards. All inliers pass spatial support gates without fabricating artificial correspondences.*
+#### 2. Scientific Analysis of the IIRS Scale Disparity & Triplet Cycle Closure
+* **Scale Disparity (~300× vs OHRC, ~15× vs TMC-2)**: IIRS has a coarse nominal spatial resolution (~70–75 m/px). On small demonstration 512×512 tiles covering approximately 3.8 km of terrain, an IIRS tile contains only ~50 native resolution cells.
+* **Honest Quality Gate Enforcement**: On small demonstration regions `region_001` through `region_006`, band-averaged IIRS exhibits low high-frequency spatial variation. While candidate matches are detected, their spatial geometry is collinear or degenerate, and our production geometric quality gate correctly rejects them (`geometric_verification_failed: Pathological projective distortion or ill-conditioned matrix`) rather than manufacturing artificial correspondences.
+* **Triplet Ingestion Evidence**: On `triplet_01_ch2_ohr_ncp_202`, `OHRC ↔ IIRS` produces 6 verified inliers (1.34 px RMSE). On `triplet_new_2022`, all three pairwise legs succeed (`OHRC ↔ TMC-2`: 6 inliers, `OHRC ↔ IIRS`: 5 inliers, `TMC-2 ↔ IIRS`: 5 inliers).
+* **Closed-Loop Cycle Consistency**: Single-pair RANSAC RMSE is in-sample; closed-loop circular error ($A \to B \to C \to A$, implemented in [`data_preprocessing_pipeline/triplet_evaluator.py`](data_preprocessing_pipeline/triplet_evaluator.py)) provides a ground-truth-independent check. When pairs encounter degenerate geometries or fallback identities, cycle RMSE ranges from 27.9 px to 2685.5 px, correctly reporting `cycle_closed_successfully: false`.
 
 ---
 

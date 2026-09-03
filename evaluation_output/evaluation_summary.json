@@ -1,6 +1,7 @@
 [
     {
         "region_id": "region_001",
+        "dataset_id": "region_001",
         "status": "evaluated",
         "num_inliers": 7,
         "num_raw_matches": 77,
@@ -22,10 +23,51 @@
         "total_cells": 100,
         "uniformity_score": 0.0235,
         "quality_tier": "LOW_CONFIDENCE",
-        "method": "CFOG + Phase Congruency"
+        "method": "CFOG + Phase Congruency",
+        "pairs": {
+            "ohrc_tmc": {
+                "status": "success",
+                "message": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 77,
+                "inlier_count": 7,
+                "inlier_ratio": 0.0909,
+                "fit_rmse_px": 1.8517,
+                "spatial_coverage": 0.07,
+                "spatial_uniformity": 0.0235
+            },
+            "ohrc_iirs": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 22,
+                "inlier_count": 6,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "tmc_iirs": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 29,
+                "inlier_count": 7,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            }
+        },
+        "triplet_consistency": {
+            "cycle_rmse_px": 43.2327,
+            "cycle_mean_px": 40.2056,
+            "cycle_closed_successfully": false
+        }
     },
     {
         "region_id": "region_002",
+        "dataset_id": "region_002",
         "status": "evaluated",
         "num_inliers": 7,
         "num_raw_matches": 66,
@@ -47,10 +89,51 @@
         "total_cells": 100,
         "uniformity_score": 0.0235,
         "quality_tier": "LOW_CONFIDENCE",
-        "method": "CFOG + Phase Congruency"
+        "method": "CFOG + Phase Congruency",
+        "pairs": {
+            "ohrc_tmc": {
+                "status": "success",
+                "message": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 66,
+                "inlier_count": 7,
+                "inlier_ratio": 0.1061,
+                "fit_rmse_px": 1.2421,
+                "spatial_coverage": 0.07,
+                "spatial_uniformity": 0.0235
+            },
+            "ohrc_iirs": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 31,
+                "inlier_count": 6,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "tmc_iirs": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 30,
+                "inlier_count": 7,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            }
+        },
+        "triplet_consistency": {
+            "cycle_rmse_px": 27.9007,
+            "cycle_mean_px": 24.7399,
+            "cycle_closed_successfully": false
+        }
     },
     {
         "region_id": "region_003",
+        "dataset_id": "region_003",
         "status": "evaluated",
         "num_inliers": 6,
         "num_raw_matches": 77,
@@ -72,10 +155,51 @@
         "total_cells": 100,
         "uniformity_score": 0.0183,
         "quality_tier": "LOW_CONFIDENCE",
-        "method": "CFOG + Phase Congruency"
+        "method": "CFOG + Phase Congruency",
+        "pairs": {
+            "ohrc_tmc": {
+                "status": "success",
+                "message": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 77,
+                "inlier_count": 6,
+                "inlier_ratio": 0.0779,
+                "fit_rmse_px": 1.7724,
+                "spatial_coverage": 0.06,
+                "spatial_uniformity": 0.0183
+            },
+            "ohrc_iirs": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 24,
+                "inlier_count": 6,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "tmc_iirs": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 20,
+                "inlier_count": 6,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            }
+        },
+        "triplet_consistency": {
+            "cycle_rmse_px": 105.3129,
+            "cycle_mean_px": 100.4365,
+            "cycle_closed_successfully": false
+        }
     },
     {
         "region_id": "region_004",
+        "dataset_id": "region_004",
         "status": "evaluated",
         "num_inliers": 7,
         "num_raw_matches": 70,
@@ -97,10 +221,51 @@
         "total_cells": 100,
         "uniformity_score": 0.0235,
         "quality_tier": "LOW_CONFIDENCE",
-        "method": "CFOG + Phase Congruency"
+        "method": "CFOG + Phase Congruency",
+        "pairs": {
+            "ohrc_tmc": {
+                "status": "success",
+                "message": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 70,
+                "inlier_count": 7,
+                "inlier_ratio": 0.1,
+                "fit_rmse_px": 1.7787,
+                "spatial_coverage": 0.07,
+                "spatial_uniformity": 0.0235
+            },
+            "ohrc_iirs": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 18,
+                "inlier_count": 5,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "tmc_iirs": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 31,
+                "inlier_count": 7,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            }
+        },
+        "triplet_consistency": {
+            "cycle_rmse_px": 68.9064,
+            "cycle_mean_px": 61.8889,
+            "cycle_closed_successfully": false
+        }
     },
     {
         "region_id": "region_005",
+        "dataset_id": "region_005",
         "status": "evaluated",
         "num_inliers": 6,
         "num_raw_matches": 45,
@@ -122,10 +287,51 @@
         "total_cells": 100,
         "uniformity_score": 0.0183,
         "quality_tier": "LOW_CONFIDENCE",
-        "method": "CFOG + Phase Congruency"
+        "method": "CFOG + Phase Congruency",
+        "pairs": {
+            "ohrc_tmc": {
+                "status": "success",
+                "message": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 45,
+                "inlier_count": 6,
+                "inlier_ratio": 0.1333,
+                "fit_rmse_px": 1.4022,
+                "spatial_coverage": 0.06,
+                "spatial_uniformity": 0.0183
+            },
+            "ohrc_iirs": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 16,
+                "inlier_count": 5,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "tmc_iirs": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 16,
+                "inlier_count": 7,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            }
+        },
+        "triplet_consistency": {
+            "cycle_rmse_px": 70.0975,
+            "cycle_mean_px": 51.1728,
+            "cycle_closed_successfully": false
+        }
     },
     {
         "region_id": "region_006",
+        "dataset_id": "region_006",
         "status": "evaluated",
         "num_inliers": 6,
         "num_raw_matches": 56,
@@ -147,10 +353,51 @@
         "total_cells": 100,
         "uniformity_score": 0.0183,
         "quality_tier": "LOW_CONFIDENCE",
-        "method": "CFOG + Phase Congruency"
+        "method": "CFOG + Phase Congruency",
+        "pairs": {
+            "ohrc_tmc": {
+                "status": "success",
+                "message": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 56,
+                "inlier_count": 6,
+                "inlier_ratio": 0.1071,
+                "fit_rmse_px": 1.6526,
+                "spatial_coverage": 0.06,
+                "spatial_uniformity": 0.0183
+            },
+            "ohrc_iirs": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 16,
+                "inlier_count": 5,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "tmc_iirs": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 16,
+                "inlier_count": 5,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            }
+        },
+        "triplet_consistency": {
+            "cycle_rmse_px": 2685.5157,
+            "cycle_mean_px": 599.7907,
+            "cycle_closed_successfully": false
+        }
     },
     {
         "region_id": "triplet_01_ch2_ohr_ncp_202",
+        "dataset_id": "triplet_01_ch2_ohr_ncp_202",
         "status": "evaluated",
         "num_inliers": 7,
         "num_raw_matches": 97,
@@ -172,10 +419,51 @@
         "total_cells": 100,
         "uniformity_score": 0.0235,
         "quality_tier": "LOW_CONFIDENCE",
-        "method": "CFOG + Phase Congruency"
+        "method": "CFOG + Phase Congruency",
+        "pairs": {
+            "ohrc_tmc": {
+                "status": "success",
+                "message": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 97,
+                "inlier_count": 7,
+                "inlier_ratio": 0.0722,
+                "fit_rmse_px": 2.1959,
+                "spatial_coverage": 0.07,
+                "spatial_uniformity": 0.0235
+            },
+            "ohrc_iirs": {
+                "status": "success",
+                "message": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 24,
+                "inlier_count": 6,
+                "inlier_ratio": 0.25,
+                "fit_rmse_px": 1.338,
+                "spatial_coverage": 0.06,
+                "spatial_uniformity": 0.0183
+            },
+            "tmc_iirs": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 36,
+                "inlier_count": 7,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            }
+        },
+        "triplet_consistency": {
+            "cycle_rmse_px": 58.2971,
+            "cycle_mean_px": 54.2601,
+            "cycle_closed_successfully": false
+        }
     },
     {
         "region_id": "triplet_new_2022",
+        "dataset_id": "triplet_new_2022",
         "status": "evaluated",
         "num_inliers": 6,
         "num_raw_matches": 90,
@@ -197,6 +485,46 @@
         "total_cells": 100,
         "uniformity_score": 0.0183,
         "quality_tier": "LOW_CONFIDENCE",
-        "method": "CFOG + Phase Congruency"
+        "method": "CFOG + Phase Congruency",
+        "pairs": {
+            "ohrc_tmc": {
+                "status": "success",
+                "message": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 90,
+                "inlier_count": 6,
+                "inlier_ratio": 0.0667,
+                "fit_rmse_px": 2.0658,
+                "spatial_coverage": 0.06,
+                "spatial_uniformity": 0.0183
+            },
+            "ohrc_iirs": {
+                "status": "success",
+                "message": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 16,
+                "inlier_count": 5,
+                "inlier_ratio": 0.3125,
+                "fit_rmse_px": 0.919,
+                "spatial_coverage": 0.05,
+                "spatial_uniformity": 0.0135
+            },
+            "tmc_iirs": {
+                "status": "success",
+                "message": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 16,
+                "inlier_count": 5,
+                "inlier_ratio": 0.3125,
+                "fit_rmse_px": 0.2634,
+                "spatial_coverage": 0.05,
+                "spatial_uniformity": 0.0135
+            }
+        },
+        "triplet_consistency": {
+            "cycle_rmse_px": 223.7728,
+            "cycle_mean_px": 146.3642,
+            "cycle_closed_successfully": false
+        }
     }
 ]
