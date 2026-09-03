@@ -9,6 +9,7 @@ serve over HTTP with correct CORS headers.
 
 import os
 import sys
+from typing import Optional
 from pathlib import Path
 from contextlib import asynccontextmanager
 
@@ -112,29 +113,33 @@ app.mount("/dynamic_runs", StaticFiles(directory=dynamic_runs_dir), name="dynami
 async def register_images(
     source_file: UploadFile = File(...),
     reference_file: UploadFile = File(...),
+    dem_file: Optional[UploadFile] = File(None),
     source_sensor: str = "OHRC",
     reference_sensor: str = "TMC",
+    method: str = "cfog",
 ):
     """
     Dynamically register an uploaded source image against an uploaded reference image.
 
-    Safety features:
-    - Rejects unsupported file types.
-    - Rejects files larger than 20MB.
-    - Automatically downsizes very large images to prevent CPU/RAM exhaustion.
+    Features:
+    - Phase Congruency & CFOG structural matching (default, illumination-invariant).
+    - DEM-guided orthorectification (if DEM provided or auto-detected).
+    - Multi-scale patch Phase Correlation with sub-pixel quadratic surface fitting (<0.2 px).
+    - Safety checks: File type, size limit, and robust multi-band reading.
     """
     import sys
     from pathlib import Path
 
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ML_model"))
-    from matcher import match_images
+    from matcher_cfog import match_images_cfog, load_as_float_and_color
 
     run_id = str(uuid.uuid4())
     run_dir = Path(loader.DATA_DIR) / "dynamic_runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    source_path = run_dir / "source_img.jpg"
-    ref_path = run_dir / "reference_img.jpg"
+    source_path = run_dir / "source_img.png"
+    ref_path = run_dir / "reference_img.png"
+    dem_path = None
     output_dir = run_dir / "output"
     output_dir.mkdir(exist_ok=True)
 
@@ -143,12 +148,15 @@ async def register_images(
             shutil.copyfileobj(source_file.file, buffer)
         with ref_path.open("wb") as buffer:
             shutil.copyfileobj(reference_file.file, buffer)
+        if dem_file and dem_file.filename:
+            dem_path = run_dir / "dem_img.png"
+            with dem_path.open("wb") as buffer:
+                shutil.copyfileobj(dem_file.file, buffer)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save uploads: {str(e)}")
 
     ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
     MAX_FILE_SIZE = 20 * 1024 * 1024
-    MAX_DIM = 1500
 
     for file_obj, path in [(source_file, source_path), (reference_file, ref_path)]:
         filename = file_obj.filename or "uploaded_image"
@@ -167,23 +175,31 @@ async def register_images(
                 detail=f"File '{filename}' exceeds the 20MB limit.",
             )
 
-        img = cv2.imread(str(path))
-        if img is None:
+        # Validate that image can be parsed by multi-band loader
+        try:
+            _, _ = load_as_float_and_color(path)
+        except Exception:
             raise HTTPException(
                 status_code=400,
                 detail=f"Could not read image file: {filename}",
             )
 
-        h, w = img.shape[:2]
-        if max(h, w) > MAX_DIM:
-            scale = MAX_DIM / float(max(h, w))
-            new_w = int(w * scale)
-            new_h = int(h * scale)
-            img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_AREA)
-            cv2.imwrite(str(path), img)
-
     try:
-        result = match_images(str(source_path), str(ref_path), output_dir=str(output_dir))
+        if method.lower() == "loftr":
+            from matcher import match_images
+            result = match_images(str(source_path), str(ref_path), output_dir=str(output_dir))
+        else:
+            # Default to scientific Phase Congruency & CFOG multi-scale matching
+            emission1 = 0.0 if "ohr" in source_sensor.lower() else 12.0
+            emission2 = 12.0 if "tmc" in reference_sensor.lower() else 0.0
+            result = match_images_cfog(
+                str(source_path),
+                str(ref_path),
+                dem_path=str(dem_path) if dem_path else None,
+                output_dir=str(output_dir),
+                emission_deg1=emission1,
+                emission_deg2=emission2,
+            )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Matching pipeline failed: {str(e)}")
 

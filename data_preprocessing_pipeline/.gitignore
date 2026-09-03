@@ -30,5 +30,6 @@ Thumbs.db
 processed/
 processed_user/
 scratch/
+dynamic_runs/
 
 # Keep lightweight JSON manifests and sample PNGs if needed for demo

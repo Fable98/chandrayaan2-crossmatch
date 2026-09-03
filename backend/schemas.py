@@ -137,6 +137,10 @@ class MatchMetrics(BaseModel):
     source_coverage_ratio: float = 0.0
     destination_coverage_ratio: float = 0.0
     combined_coverage_score: float = 0.0
+    uniformity_score: float = 0.0
+    triplet_consistency_px: float | None = None
+    method: str | None = None
+    orthorectified: bool = False
 
 
 class MatchesResponse(BaseModel):

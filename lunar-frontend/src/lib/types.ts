@@ -57,8 +57,12 @@ export interface MatchMetrics {
   destination_coverage_ratio: number;
   combined_coverage_score: number;
   source_occupied_cells: number;
-  destination_occupied_cells: number;
-  total_cells: number;
+  destination_occupied_cells?: number;
+  total_cells?: number;
+  uniformity_score?: number;
+  triplet_consistency_px?: number | null;
+  method?: string | null;
+  orthorectified?: boolean;
 }
 
 export interface MatchesResponse {
