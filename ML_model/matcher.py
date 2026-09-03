@@ -164,15 +164,17 @@ def match_images(img_path1, img_path2, output_dir="output"):
     # Calculate RMSE based on the final inliers
     projected_pts = cv2.perspectiveTransform(uniform_mkpts0.reshape(-1, 1, 2), H_final)
     projected_pts = projected_pts.reshape(-1, 2)
-    errors = np.linalg.norm(projected_pts - refined_mkpts1, axis=2).flatten()
+    errors = np.linalg.norm(projected_pts - refined_mkpts1, axis=1).flatten()
     
     rmse = np.sqrt(np.mean(errors**2))
     inlier_ratio = len(uniform_mkpts0) / max(1, len(mkpts0))
+    uniformity_score = len(grid_dict) / float(grid_size * grid_size)
     
     metrics = {
         "num_inliers": len(uniform_mkpts0),
         "rmse_px": float(rmse),
         "inlier_ratio": float(inlier_ratio),
+        "uniformity_score": float(uniformity_score),
         "sub_pixel_accurate": bool(rmse < 1.0),
         "fraction_below_1px": float(np.mean(errors < 1.0))
     }

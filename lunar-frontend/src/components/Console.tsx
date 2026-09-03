@@ -10,6 +10,7 @@ import DossierModal from "./archive/DossierModal";
 import VaultModal, { PayloadFilter } from "./archive/VaultModal";
 import TheoryModal from "./archive/TheoryModal";
 import InfoModal, { InfoModalContent } from "./archive/InfoModal";
+import RegistrationLauncher from "./RegistrationLauncher";
 
 type View = "registration" | "linked-cursor" | "map";
 
@@ -251,8 +252,9 @@ export default function Console({ onBackToHero }: Props = {}) {
           </button>
         </nav>
 
-        {/* Right: Vault Quick Access / Region Counter */}
+        {/* Right: Vault Quick Access / Region Counter / Live Registration */}
         <div className="flex items-center gap-3">
+          <RegistrationLauncher />
           <button
             onClick={() => openVaultWithFilter("all")}
             className="flex items-center gap-2 rounded border border-[#23211d] bg-[#0e0e12] px-3 py-1 font-mono text-xs text-[#d4af37] transition-all hover:border-[#d4af37] hover:bg-[#1a1712] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"

@@ -8,20 +8,24 @@ serve over HTTP with correct CORS headers.
 """
 
 import os
+import sys
+from pathlib import Path
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+# Ensure backend directory is on sys.path for direct imports (data, routers, schemas)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from data import loader
-from routers import triplets, footprint, matches
+from routers import triplets, footprint, matches, images
 from schemas import HealthResponse, RegisterResponse
 
 import shutil
 import uuid
 import cv2
-from fastapi import UploadFile, File, HTTPException
 
 
 # ---------------------------------------------------------------------------
@@ -29,6 +33,16 @@ from fastapi import UploadFile, File, HTTPException
 # ---------------------------------------------------------------------------
 
 CORS_ORIGIN: str = os.environ.get("CORS_ORIGIN", "http://localhost:3000")
+ALLOWED_ORIGINS: str = os.environ.get(
+    "ALLOWED_ORIGINS",
+    f"{CORS_ORIGIN},http://localhost:3000,http://127.0.0.1:3000,*",
+)
+
+allowed_origins_list: list[str] = [
+    origin.strip() for origin in ALLOWED_ORIGINS.split(",") if origin.strip()
+]
+if not allowed_origins_list:
+    allowed_origins_list = ["*"]
 
 
 # ---------------------------------------------------------------------------
@@ -57,10 +71,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow the Next.js frontend origin
+# CORS — allow origins from ALLOWED_ORIGINS environment variable + all Vercel previews
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[CORS_ORIGIN],
+    allow_origins=allowed_origins_list,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -74,11 +89,11 @@ app.add_middleware(
 app.include_router(triplets.router)
 app.include_router(footprint.router)
 app.include_router(matches.router)
+app.include_router(images.router)
 
 
 # ---------------------------------------------------------------------------
 # Static image mount — /images/{sensor}/{tile_id}
-# See routers/images.py for rationale on using StaticFiles instead of a router.
 # ---------------------------------------------------------------------------
 
 images_dir = os.path.join(loader.DATA_DIR, "images")
