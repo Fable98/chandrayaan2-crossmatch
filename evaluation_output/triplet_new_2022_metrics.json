@@ -37,30 +37,71 @@
         },
         "ohrc_iirs": {
             "status": "success",
-            "message": null,
-            "quality_tier": "LOW_CONFIDENCE",
-            "match_count": 16,
             "inlier_count": 5,
-            "inlier_ratio": 0.3125,
             "fit_rmse_px": 0.919,
-            "spatial_coverage": 0.05,
-            "spatial_uniformity": 0.0135
+            "forward_ohrc_to_iirs": {
+                "status": "success",
+                "message": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 16,
+                "inlier_count": 5,
+                "inlier_ratio": 0.3125,
+                "fit_rmse_px": 0.919,
+                "spatial_coverage": 0.05,
+                "spatial_uniformity": 0.0135
+            },
+            "reverse_iirs_to_ohrc": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 12,
+                "inlier_count": 4,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "bidirectional_agreement": false,
+            "directional_note": "Forward (OHRC->IIRS) produced 'success' while Reverse (IIRS->OHRC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~300x physical scale disparity."
         },
         "tmc_iirs": {
             "status": "success",
-            "message": null,
-            "quality_tier": "LOW_CONFIDENCE",
-            "match_count": 16,
             "inlier_count": 5,
-            "inlier_ratio": 0.3125,
             "fit_rmse_px": 0.2634,
-            "spatial_coverage": 0.05,
-            "spatial_uniformity": 0.0135
+            "forward_tmc_to_iirs": {
+                "status": "success",
+                "message": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 16,
+                "inlier_count": 5,
+                "inlier_ratio": 0.3125,
+                "fit_rmse_px": 0.2634,
+                "spatial_coverage": 0.05,
+                "spatial_uniformity": 0.0135
+            },
+            "reverse_iirs_to_tmc": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 16,
+                "inlier_count": 5,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "bidirectional_agreement": false,
+            "directional_note": "Forward (TMC->IIRS) produced 'success' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
         }
     },
     "triplet_consistency": {
-        "cycle_rmse_px": 223.7728,
-        "cycle_mean_px": 146.3642,
-        "cycle_closed_successfully": false
+        "status": "cycle_not_computable",
+        "reason": "Missing verified homography for leg(s): CA (C -> A)",
+        "cycle_rmse_px": null,
+        "cycle_mean_px": null,
+        "cycle_closed_successfully": false,
+        "failed_legs": [
+            "CA (C -> A)"
+        ]
     }
 }

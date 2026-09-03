@@ -47,22 +47,46 @@ def evaluate_triplet_consistency(
     # 3. Match C -> A
     res_CA = match_images_cfog(image_c_path, image_a_path, dem_path=dem_path, output_dir=out_base / "CA")
 
-    H_AB = np.array(res_AB.get("homography") or np.eye(3))
-    H_BC = np.array(res_BC.get("homography") or np.eye(3))
-    H_CA = np.array(res_CA.get("homography") or np.eye(3))
+    failed_legs = []
+    if res_AB.get("status") != "success" or res_AB.get("homography") is None:
+        failed_legs.append("AB (A -> B)")
+    if res_BC.get("status") != "success" or res_BC.get("homography") is None:
+        failed_legs.append("BC (B -> C)")
+    if res_CA.get("status") != "success" or res_CA.get("homography") is None:
+        failed_legs.append("CA (C -> A)")
 
-    cycle_rmse, cycle_mean = compute_triplet_consistency(
-        H_AB, H_BC, H_CA, image_shape=(512, 512), num_test_points=num_test_points
-    )
+    if failed_legs:
+        evaluation_report = {
+            "status": "cycle_not_computable",
+            "reason": f"Missing verified homography for leg(s): {', '.join(failed_legs)}",
+            "triplet_cycle_rmse_px": None,
+            "triplet_mean_cycle_error_px": None,
+            "cycle_closed_successfully": False,
+            "failed_legs": failed_legs,
+            "pair_AB_metrics": res_AB.get("metrics"),
+            "pair_BC_metrics": res_BC.get("metrics"),
+            "pair_CA_metrics": res_CA.get("metrics"),
+        }
+    else:
+        H_AB = np.array(res_AB["homography"])
+        H_BC = np.array(res_BC["homography"])
+        H_CA = np.array(res_CA["homography"])
 
-    evaluation_report = {
-        "triplet_cycle_rmse_px": float(cycle_rmse),
-        "triplet_mean_cycle_error_px": float(cycle_mean),
-        "cycle_closed_successfully": bool(cycle_rmse < 1.5),
-        "pair_AB_metrics": res_AB.get("metrics"),
-        "pair_BC_metrics": res_BC.get("metrics"),
-        "pair_CA_metrics": res_CA.get("metrics"),
-    }
+        cycle_rmse, cycle_mean = compute_triplet_consistency(
+            H_AB, H_BC, H_CA, image_shape=(512, 512), num_test_points=num_test_points
+        )
+
+        evaluation_report = {
+            "status": "evaluated",
+            "reason": None,
+            "triplet_cycle_rmse_px": float(cycle_rmse),
+            "triplet_mean_cycle_error_px": float(cycle_mean),
+            "cycle_closed_successfully": bool(cycle_rmse < 1.5),
+            "failed_legs": [],
+            "pair_AB_metrics": res_AB.get("metrics"),
+            "pair_BC_metrics": res_BC.get("metrics"),
+            "pair_CA_metrics": res_CA.get("metrics"),
+        }
 
     report_path = out_base / "triplet_consistency_report.json"
     with open(report_path, "w") as f:

@@ -37,30 +37,72 @@
         },
         "ohrc_iirs": {
             "status": "geometric_verification_failed",
-            "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
-            "quality_tier": "FAILED",
-            "match_count": 16,
-            "inlier_count": 5,
-            "inlier_ratio": 0.0,
+            "inlier_count": 0,
             "fit_rmse_px": null,
-            "spatial_coverage": 0.0,
-            "spatial_uniformity": 0.0
+            "forward_ohrc_to_iirs": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 16,
+                "inlier_count": 5,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "reverse_iirs_to_ohrc": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 8,
+                "inlier_count": 4,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "bidirectional_agreement": true,
+            "directional_note": null
         },
         "tmc_iirs": {
             "status": "geometric_verification_failed",
-            "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
-            "quality_tier": "FAILED",
-            "match_count": 16,
-            "inlier_count": 7,
-            "inlier_ratio": 0.0,
+            "inlier_count": 0,
             "fit_rmse_px": null,
-            "spatial_coverage": 0.0,
-            "spatial_uniformity": 0.0
+            "forward_tmc_to_iirs": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 16,
+                "inlier_count": 7,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "reverse_iirs_to_tmc": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "quality_tier": "FAILED",
+                "match_count": 17,
+                "inlier_count": 5,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "bidirectional_agreement": true,
+            "directional_note": null
         }
     },
     "triplet_consistency": {
-        "cycle_rmse_px": 70.0975,
-        "cycle_mean_px": 51.1728,
-        "cycle_closed_successfully": false
+        "status": "cycle_not_computable",
+        "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+        "cycle_rmse_px": null,
+        "cycle_mean_px": null,
+        "cycle_closed_successfully": false,
+        "failed_legs": [
+            "BC (B -> C)",
+            "CA (C -> A)"
+        ]
     }
 }

@@ -596,13 +596,37 @@ def test_evaluation_summary_contains_iirs_and_triplet_consistency():
         assert "status" in pairs["tmc_iirs"], f"Missing status in tmc_iirs for {ds_id}"
         assert "inlier_count" in pairs["tmc_iirs"], f"Missing inlier_count in tmc_iirs for {ds_id}"
 
-        # 3. Triplet cycle consistency must be present with cycle_rmse_px and cycle_closed_successfully
+        # 3. Triplet cycle consistency must enforce ZERO synthetic fallbacks
         assert "triplet_consistency" in entry, f"Missing 'triplet_consistency' in {ds_id}"
         tc = entry["triplet_consistency"]
-        assert "cycle_rmse_px" in tc, f"Missing cycle_rmse_px in triplet_consistency for {ds_id}"
-        assert isinstance(tc["cycle_rmse_px"], (int, float)), f"cycle_rmse_px should be numeric in {ds_id}"
-        assert "cycle_closed_successfully" in tc, f"Missing cycle_closed_successfully in {ds_id}"
-        assert isinstance(tc["cycle_closed_successfully"], bool), f"cycle_closed_successfully should be bool in {ds_id}"
+        assert "status" in tc, f"Missing status in triplet_consistency for {ds_id}"
+        assert tc["status"] in ("evaluated", "cycle_not_computable"), (
+            f"Invalid triplet status '{tc['status']}' in {ds_id}. Must be 'evaluated' or 'cycle_not_computable'."
+        )
+
+        failed_legs = tc.get("failed_legs", [])
+        if tc["status"] == "cycle_not_computable":
+            # Must NOT substitute an identity matrix to produce a fake numeric cycle RMSE
+            assert tc["cycle_rmse_px"] is None, (
+                f"{ds_id} reports cycle_not_computable but has numeric cycle_rmse_px: {tc['cycle_rmse_px']}"
+            )
+            assert tc["cycle_closed_successfully"] is False
+            assert "reason" in tc and tc["reason"] is not None
+            assert len(failed_legs) > 0, f"Expected failed legs list for uncomputable cycle in {ds_id}"
+        elif tc["status"] == "evaluated":
+            # Evaluated requires all underlying legs to have succeeded with real homographies
+            assert isinstance(tc["cycle_rmse_px"], (int, float)), (
+                f"Evaluated cycle must have numeric cycle_rmse_px in {ds_id}"
+            )
+            assert len(failed_legs) == 0, f"Evaluated cycle cannot have failed legs in {ds_id}: {failed_legs}"
+            assert pairs.get("ohrc_tmc", {}).get("status") == "success"
+
+        # Hard invariant: NEVER report a numeric cycle RMSE if any underlying leg failed
+        if failed_legs:
+            assert tc["cycle_rmse_px"] is None, (
+                f"Violation of zero-synthetic-fallback principle: {ds_id} reported numeric cycle RMSE "
+                f"({tc['cycle_rmse_px']}) despite failed leg(s): {failed_legs}"
+            )
 
 
 

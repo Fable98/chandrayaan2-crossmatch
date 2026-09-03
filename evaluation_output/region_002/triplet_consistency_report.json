@@ -1,7 +1,13 @@
 {
-    "triplet_cycle_rmse_px": 27.9007,
-    "triplet_mean_cycle_error_px": 24.7399,
+    "status": "cycle_not_computable",
+    "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+    "triplet_cycle_rmse_px": null,
+    "triplet_mean_cycle_error_px": null,
     "cycle_closed_successfully": false,
+    "failed_legs": [
+        "BC (B -> C)",
+        "CA (C -> A)"
+    ],
     "pair_AB_metrics": {
         "match_count": 66,
         "inlier_count": 7,

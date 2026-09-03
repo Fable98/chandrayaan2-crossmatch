@@ -146,23 +146,31 @@ Evaluated across 240 trials spanning 8 directions (+X, -X, +Y, -Y, diag_+X_+Y, d
 ### B. Multi-Sensor Dataset Benchmark & 3-Way Triplet Cycle Consistency
 Evaluated across all demonstration Chandrayaan-2 lunar regions and triplets ([`scripts/benchmark_registration.py`](scripts/benchmark_registration.py)):
 
-#### 1. Multi-Sensor Pairwise Registration Performance
-| Dataset ID | OHRC ↔ TMC-2 Inliers (RMSE) | OHRC ↔ IIRS Inliers (RMSE) | TMC-2 ↔ IIRS Inliers (RMSE) | 3-Way Cycle RMSE ($A \to B \to C \to A$) | Cycle Closed? |
+#### 1. Multi-Sensor Bidirectional Pairwise & Triplet Cycle Results
+| Dataset ID | OHRC ↔ TMC-2 | OHRC ↔ IIRS (Fwd / Rev) | TMC-2 ↔ IIRS (Fwd / Rev) | 3-Way Cycle Status ($A \to B \to C \to A$) | Cycle RMSE |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| `region_001` | 7 (1.85 px) | Rejected (Ill-conditioned) | Rejected (Ill-conditioned) | 43.23 px | No |
-| `region_002` | 7 (1.24 px) | Rejected (Ill-conditioned) | Rejected (Ill-conditioned) | 27.90 px | No |
-| `region_003` | 6 (1.77 px) | Rejected (Ill-conditioned) | Rejected (Ill-conditioned) | 105.31 px | No |
-| `region_004` | 7 (1.78 px) | Rejected (Ill-conditioned) | Rejected (Ill-conditioned) | 68.91 px | No |
-| `region_005` | 6 (1.40 px) | Rejected (Ill-conditioned) | Rejected (Ill-conditioned) | 70.10 px | No |
-| `region_006` | 6 (1.65 px) | Rejected (Ill-conditioned) | Rejected (Ill-conditioned) | 2685.52 px | No |
-| `triplet_01_ch2_ohr_ncp_202` | 7 (2.20 px) | 6 (1.34 px) | Rejected (Ill-conditioned) | 58.30 px | No |
-| `triplet_new_2022` | 6 (2.07 px) | 5 (0.92 px) | 5 (0.26 px) | 223.77 px | No |
+| `region_001` | 7 inliers (1.85 px) | Rej (6 inl) / Rej (4 inl) | Rej (7 inl) / Insuff (0 inl) | `cycle_not_computable` (BC, CA failed) | *None* |
+| `region_002` | 7 inliers (1.24 px) | Rej (6 inl) / Rej (2 inl) | Rej (7 inl) / Insuff (0 inl) | `cycle_not_computable` (BC, CA failed) | *None* |
+| `region_003` | 6 inliers (1.77 px) | Rej (6 inl) / Rej (2 inl) | Rej (6 inl) / Insuff (0 inl) | `cycle_not_computable` (BC, CA failed) | *None* |
+| `region_004` | 7 inliers (1.78 px) | Rej (5 inl) / Insuff (0 inl) | Rej (7 inl) / Insuff (0 inl) | `cycle_not_computable` (BC, CA failed) | *None* |
+| `region_005` | 6 inliers (1.40 px) | Rej (5 inl) / Rej (4 inl) | Rej (7 inl) / Rej (5 inl) | `cycle_not_computable` (BC, CA failed) | *None* |
+| `region_006` | 6 inliers (1.65 px) | Rej (5 inl) / **5 inl (1.43 px)** | Rej (5 inl) / Rej (4 inl) | `cycle_not_computable` (BC failed) | *None* |
+| `triplet_01_ch2_ohr_ncp_202` | 7 inliers (2.20 px) | **6 inl (1.34 px)** / Insuff (0 inl) | Rej (7 inl) / Rej (5 inl) | `cycle_not_computable` (BC, CA failed) | *None* |
+| `triplet_new_2022` | 6 inliers (2.07 px) | **5 inl (0.92 px)** / Rej (4 inl) | **5 inl (0.26 px)** / Rej (5 inl) | `cycle_not_computable` (CA failed) | *None* |
 
-#### 2. Scientific Analysis of the IIRS Scale Disparity & Triplet Cycle Closure
-* **Scale Disparity (~300× vs OHRC, ~15× vs TMC-2)**: IIRS has a coarse nominal spatial resolution (~70–75 m/px). On small demonstration 512×512 tiles covering approximately 3.8 km of terrain, an IIRS tile contains only ~50 native resolution cells.
-* **Honest Quality Gate Enforcement**: On small demonstration regions `region_001` through `region_006`, band-averaged IIRS exhibits low high-frequency spatial variation. While candidate matches are detected, their spatial geometry is collinear or degenerate, and our production geometric quality gate correctly rejects them (`geometric_verification_failed: Pathological projective distortion or ill-conditioned matrix`) rather than manufacturing artificial correspondences.
-* **Triplet Ingestion Evidence**: On `triplet_01_ch2_ohr_ncp_202`, `OHRC ↔ IIRS` produces 6 verified inliers (1.34 px RMSE). On `triplet_new_2022`, all three pairwise legs succeed (`OHRC ↔ TMC-2`: 6 inliers, `OHRC ↔ IIRS`: 5 inliers, `TMC-2 ↔ IIRS`: 5 inliers).
-* **Closed-Loop Cycle Consistency**: Single-pair RANSAC RMSE is in-sample; closed-loop circular error ($A \to B \to C \to A$, implemented in [`data_preprocessing_pipeline/triplet_evaluator.py`](data_preprocessing_pipeline/triplet_evaluator.py)) provides a ground-truth-independent check. When pairs encounter degenerate geometries or fallback identities, cycle RMSE ranges from 27.9 px to 2685.5 px, correctly reporting `cycle_closed_successfully: false`.
+*Note: In the table above, "Rej" indicates candidate matches failed geometric verification (ill-conditioned matrix / planar distortion), and "Insuff" indicates fewer than 4 verified correspondences.*
+
+#### 2. Technical Audit: Why Direction Matters in Cross-Scale Matching
+The registration pipeline exhibits directional sensitivity when pairing sensors across extreme scale disparity (~300× between OHRC and IIRS, ~13× between TMC-2 and IIRS):
+1. **Asymmetric Grid Sampling**: Feature template centers are placed on a uniform $10 \times 10$ grid over `Image 1`. When `Image 1` is OHRC, downsampling to working scale ($69\text{ m/px}$) reduces the $512 \times 512$ tile to $40 \times 40$ pixels, dropping boundary cells and restricting candidates to the central tile. When `Image 1` is IIRS, templates are sampled across the full $512 \times 512$ canvas.
+2. **Search Window Dynamics**: Template matching searches within `Image 2`. Searching a $16 \times 16$ template inside a $512 \times 512$ image (Image 2 = IIRS) tests a wide $170 \times 170$ search region, whereas searching inside a $40 \times 40$ image (Image 2 = OHRC) constrains the search region to $32 \times 32$ pixels.
+3. **Conditioning of $H$ vs $H^{-1}$**: Mapping from a small spatial distribution to a wide distribution vs. the reverse creates distinct singular value ratios and projectivity coefficients in `verify_transformation_quality()`. For example, on `region_006`, `IIRS -> OHRC` satisfies geometric quality gates (5 inliers, 1.43 px RMSE), while `OHRC -> IIRS` is rejected due to collinearity.
+
+#### 3. Strict Enforcement of the "Zero Synthetic Fallback" Principle
+In earlier iterations, when an intermediate leg of the 3-way circular loop ($A \to B \to C \to A$) failed, an identity matrix ($I_{3\times 3}$) was substituted into the chain. This produced physically meaningless "cycle RMSE" values (such as 2685.5 px on `region_006`). 
+- In [`data_preprocessing_pipeline/triplet_evaluator.py`](data_preprocessing_pipeline/triplet_evaluator.py), identity-matrix fallbacks are completely eliminated.
+- If ANY of the three legs ($A \to B$, $B \to C$, or $C \to A$) fails geometric verification, the cycle error is not computed. The system returns `status: "cycle_not_computable"` with a `reason` naming the failed leg(s) and `cycle_rmse_px: null`.
+- Only when all three physical legs genuinely produce verified transformations will a real numeric cycle RMSE be reported. Across the 8 current demonstration crops, all 8 have at least one unclosed leg in direct circular matching, correctly reporting `cycle_not_computable`.
 
 ---
 
