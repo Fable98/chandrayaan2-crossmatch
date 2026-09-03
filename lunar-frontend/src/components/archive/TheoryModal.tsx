@@ -6,10 +6,10 @@ interface Props {
 
 export default function TheoryModal({ onClose }: Props) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 backdrop-blur-md">
-      <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden border border-[#23211d] bg-[#0d0d11] text-[#f0f2f5] shadow-[0_0_50px_rgba(0,0,0,0.8)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
+      <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#080b12]/90 text-[#f0f2f5] shadow-[0_20px_60px_rgba(0,0,0,0.9)] backdrop-blur-2xl">
         {/* Header Bar */}
-        <div className="flex items-center justify-between border-b border-[#23211d] bg-[#121217] px-6 py-4">
+        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-6 py-4 backdrop-blur-md">
           <div className="flex items-center gap-2">
             <span className="font-mono text-xs text-[#d4af37]">[ THEORY DOSSIER ]</span>
             <span className="font-mono text-xs font-bold uppercase tracking-wider text-white">
@@ -19,7 +19,7 @@ export default function TheoryModal({ onClose }: Props) {
 
           <button
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center border border-[#23211d] font-mono text-xs text-[#9a958e] transition-colors hover:border-[#d4af37] hover:text-[#d4af37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/15 bg-white/[0.04] font-mono text-xs text-[#9a958e] backdrop-blur-sm transition-colors hover:border-[#d4af37] hover:text-[#d4af37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
             title="Close Theory"
           >
             ✕

@@ -20,23 +20,23 @@ export default function DossierModal({
   const { widthKm, heightKm } = footprintSizeKm(triplet.bounds);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden border border-[#23211d] bg-[#0d0d11] text-[#f0f2f5] shadow-[0_0_50px_rgba(0,0,0,0.8)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
+      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#0a0d14]/85 text-[#f0f2f5] shadow-[0_20px_60px_rgba(0,0,0,0.9)] backdrop-blur-2xl">
         {/* Header Bar */}
-        <div className="flex items-center justify-between border-b border-[#23211d] bg-[#121217] px-6 py-4">
+        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-6 py-4 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <span className="font-mono text-xs text-[#d4af37]">[ DOSSIER REPORT ]</span>
             <span className="font-mono text-xs font-bold uppercase tracking-wider text-white">
               {triplet.id}
             </span>
-            <span className="rounded border border-[#38342d] bg-[#1a1712] px-2 py-0.5 font-mono text-[10px] text-[#d4af37]">
+            <span className="rounded-md border border-white/15 bg-white/[0.05] px-2 py-0.5 font-mono text-[10px] text-[#d4af37]">
               {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km
             </span>
           </div>
 
           <button
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center border border-[#23211d] font-mono text-xs text-[#9a958e] transition-colors hover:border-[#d4af37] hover:text-[#d4af37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/15 bg-white/[0.04] font-mono text-xs text-[#9a958e] backdrop-blur-sm transition-colors hover:border-[#d4af37] hover:text-[#d4af37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
             title="Close Dossier"
           >
             ✕

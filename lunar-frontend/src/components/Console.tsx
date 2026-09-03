@@ -185,91 +185,108 @@ export default function Console({ onBackToHero }: Props = {}) {
   }
 
   return (
-    <div className="min-h-screen bg-[#08080a] font-sans text-[#f0f2f5] selection:bg-[#2c2619] selection:text-[#f3df9b]">
-      {/* Toast Notification */}
-      {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-[9999] flex items-center gap-3 rounded border border-[#d4af37] bg-[#121217] px-4 py-2.5 font-mono text-xs text-[#f3df9b] shadow-[0_0_30px_rgba(212,175,55,0.3)] animate-fade-in">
-          <span className="h-2 w-2 rounded-full bg-[#d4af37]" />
-          <span>{toastMessage}</span>
-        </div>
-      )}
+    <div className="relative min-h-screen bg-[#07090e] font-sans text-[#f0f2f5] selection:bg-[#2c2619] selection:text-[#f3df9b]">
+      {/* Deep Space Starfield Background Layer */}
+      <div
+        className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-no-repeat"
+        style={{
+          backgroundImage: "url('/starfield-bg.png')",
+        }}
+      />
+      {/* Subtle cosmic vignette for deep contrast & readability */}
+      <div className="fixed inset-0 pointer-events-none z-0 bg-black/40 backdrop-brightness-[0.95]" />
 
-      {/* 1. Obsidian Top Navigation Bar */}
-      <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-[#23211d] bg-[#08080a]/90 px-6 backdrop-blur-md md:px-12">
-        {/* Left: Editorial Archive Brand + Back Link */}
-        <div className="flex items-center gap-4">
-          {onBackToHero && (
-            <button
-              onClick={onBackToHero}
-              className="flex items-center gap-1.5 rounded border border-[#38342d] bg-[#121217] px-3 py-1 font-mono text-xs text-[#d4af37] transition-all duration-200 hover:border-[#d4af37] hover:bg-[#2c2619] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
-            >
-              <span>←</span>
-              <span>HERO</span>
-            </button>
-          )}
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-xs text-[#d4af37]">[ ]</span>
-            <span className="text-xs font-bold uppercase tracking-[0.25em] text-[#e8d5b5]">
-              CHANDRAYAAN-2 ARCHIVES
-            </span>
+      <div className="relative z-10">
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div className="fixed bottom-6 right-6 z-[9999] flex items-center gap-3 rounded-xl border border-[#d4af37]/60 bg-[#0d1017]/85 px-4 py-2.5 font-mono text-xs text-[#f3df9b] shadow-[0_8px_32px_rgba(212,175,55,0.3)] backdrop-blur-xl animate-fade-in">
+            <span className="h-2 w-2 rounded-full bg-[#d4af37] shadow-[0_0_8px_#d4af37]" />
+            <span>{toastMessage}</span>
           </div>
-        </div>
+        )}
 
-        {/* Center: Nav Modes (FUSED MAP / LINKED CURSOR / REGISTRATION QA) */}
-        <nav className="hidden items-center gap-8 md:flex">
-          <button
-            onClick={() => {
-              setView("map");
-              scrollToArena();
-            }}
-            className={`text-xs font-semibold uppercase tracking-[0.2em] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37] ${
-              view === "map" ? "text-[#d4af37]" : "text-[#9a958e] hover:text-white"
-            }`}
-          >
-            FUSED MAP
-          </button>
-          <button
-            onClick={() => {
-              setView("linked-cursor");
-              scrollToArena();
-            }}
-            className={`text-xs font-semibold uppercase tracking-[0.2em] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37] ${
-              view === "linked-cursor" ? "text-[#d4af37]" : "text-[#9a958e] hover:text-white"
-            }`}
-          >
-            LINKED CURSOR
-          </button>
-          <button
-            onClick={() => {
-              setView("registration");
-              scrollToArena();
-            }}
-            className={`text-xs font-semibold uppercase tracking-[0.2em] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37] ${
-              view === "registration" ? "text-[#d4af37]" : "text-[#9a958e] hover:text-white"
-            }`}
-          >
-            REGISTRATION QA
-          </button>
-        </nav>
+        {/* 1. Obsidian Top Navigation Bar */}
+        <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-white/10 bg-[#07090e]/60 px-6 backdrop-blur-xl shadow-[0_4px_30px_rgba(0,0,0,0.5)] md:px-12">
+          {/* Left: Editorial Archive Brand + Back Link */}
+          <div className="flex items-center gap-4">
+            {onBackToHero && (
+              <button
+                onClick={onBackToHero}
+                className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.05] px-3 py-1.5 font-mono text-xs text-[#d4af37] backdrop-blur-md transition-all duration-200 hover:border-[#d4af37]/60 hover:bg-[#d4af37]/15 hover:text-[#f3df9b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
+              >
+                <span>←</span>
+                <span>HERO</span>
+              </button>
+            )}
+            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1 backdrop-blur-sm">
+              <span className="font-mono text-xs text-[#d4af37]">[ ]</span>
+              <span className="text-xs font-bold uppercase tracking-[0.25em] text-[#e8d5b5]">
+                CHANDRAYAAN-2 ARCHIVES
+              </span>
+            </div>
+          </div>
 
-        {/* Right: Vault Quick Access / Region Counter / Live Registration */}
-        <div className="flex items-center gap-3">
-          <RegistrationLauncher />
-          <button
-            onClick={() => openVaultWithFilter("all")}
-            className="flex items-center gap-2 rounded border border-[#23211d] bg-[#0e0e12] px-3 py-1 font-mono text-xs text-[#d4af37] transition-all hover:border-[#d4af37] hover:bg-[#1a1712] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
-            title="Open Full Archive Vault"
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37]" />
-            <span>{triplets.length < 10 ? `0${triplets.length}` : triplets.length} TILES READY</span>
-          </button>
-        </div>
-      </header>
+          {/* Center: Nav Modes (FUSED MAP / LINKED CURSOR / REGISTRATION QA) */}
+          <nav className="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-1 backdrop-blur-md md:flex">
+            <button
+              onClick={() => {
+                setView("map");
+                scrollToArena();
+              }}
+              className={`rounded-lg px-3.5 py-1 text-xs font-semibold uppercase tracking-[0.18em] transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37] ${
+                view === "map"
+                  ? "border border-[#d4af37]/40 bg-[#d4af37]/20 text-[#f3df9b] shadow-[0_0_12px_rgba(212,175,55,0.25)]"
+                  : "text-[#9a958e] hover:bg-white/[0.05] hover:text-white"
+              }`}
+            >
+              FUSED MAP
+            </button>
+            <button
+              onClick={() => {
+                setView("linked-cursor");
+                scrollToArena();
+              }}
+              className={`rounded-lg px-3.5 py-1 text-xs font-semibold uppercase tracking-[0.18em] transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37] ${
+                view === "linked-cursor"
+                  ? "border border-[#d4af37]/40 bg-[#d4af37]/20 text-[#f3df9b] shadow-[0_0_12px_rgba(212,175,55,0.25)]"
+                  : "text-[#9a958e] hover:bg-white/[0.05] hover:text-white"
+              }`}
+            >
+              LINKED CURSOR
+            </button>
+            <button
+              onClick={() => {
+                setView("registration");
+                scrollToArena();
+              }}
+              className={`rounded-lg px-3.5 py-1 text-xs font-semibold uppercase tracking-[0.18em] transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37] ${
+                view === "registration"
+                  ? "border border-[#d4af37]/40 bg-[#d4af37]/20 text-[#f3df9b] shadow-[0_0_12px_rgba(212,175,55,0.25)]"
+                  : "text-[#9a958e] hover:bg-white/[0.05] hover:text-white"
+              }`}
+            >
+              REGISTRATION QA
+            </button>
+          </nav>
+
+          {/* Right: Vault Quick Access / Region Counter / Live Registration */}
+          <div className="flex items-center gap-3">
+            <RegistrationLauncher />
+            <button
+              onClick={() => openVaultWithFilter("all")}
+              className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/[0.05] px-3.5 py-1.5 font-mono text-xs text-[#d4af37] backdrop-blur-md transition-all hover:border-[#d4af37]/60 hover:bg-[#d4af37]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
+              title="Open Full Archive Vault"
+            >
+              <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37] shadow-[0_0_6px_#d4af37]" />
+              <span>{triplets.length < 10 ? `0${triplets.length}` : triplets.length} TILES READY</span>
+            </button>
+          </div>
+        </header>
 
       {/* Main Body */}
       <main className="mx-auto max-w-[1440px] px-6 py-10 md:px-12">
         {/* 2. Headline Area: EXPLORING the silent FRONTIERS */}
-        <section className="mb-10 flex flex-col justify-between gap-4 border-b border-[#23211d] pb-8 md:flex-row md:items-end">
+        <section className="mb-10 flex flex-col justify-between gap-4 border-b border-white/10 pb-8 md:flex-row md:items-end">
           <div>
             <span className="font-mono text-xs uppercase tracking-[0.25em] text-[#9a958e]">
               EXPLORING
@@ -277,7 +294,7 @@ export default function Console({ onBackToHero }: Props = {}) {
             <h1 className="mt-1 font-serif text-5xl font-normal italic tracking-tight text-[#e8d5b5] sm:text-6xl md:text-7xl">
               the silent
             </h1>
-            <span className="mt-1 block text-3xl font-bold uppercase tracking-[0.2em] text-white sm:text-4xl">
+            <span className="mt-1 block text-3xl font-bold uppercase tracking-[0.2em] text-white sm:text-4xl drop-shadow-[0_0_20px_rgba(255,255,255,0.15)]">
               FRONTIERS
             </span>
           </div>
@@ -285,11 +302,11 @@ export default function Console({ onBackToHero }: Props = {}) {
           <div className="flex flex-col items-start font-mono text-xs text-[#9a958e] md:items-end">
             <button
               onClick={() => openVaultWithFilter("all")}
-              className="text-[#d4af37] hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+              className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[#d4af37] backdrop-blur-sm transition-all hover:border-[#d4af37]/50 hover:bg-[#d4af37]/10 hover:text-[#f3df9b] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
             >
               {triplets.length < 10 ? `0${triplets.length}` : triplets.length} — VALIDATED TILES ↗
             </button>
-            <span className="text-[11px] text-[#6b665f]">
+            <span className="mt-1 text-[11px] text-[#6b665f]">
               ISRO CHANDRAYAAN-2 · SIH26166
             </span>
           </div>
@@ -298,22 +315,22 @@ export default function Console({ onBackToHero }: Props = {}) {
         {/* 3. Featured Inspection Arena (FIG. 01 / LUNA) */}
         <section ref={arenaRef} className="mb-14 grid grid-cols-1 gap-6 lg:grid-cols-12 scroll-mt-20">
           {/* Left Column: Tiles / Articles Navigation */}
-          <div className="flex flex-col border border-[#23211d] bg-[#0d0d11] p-5 lg:col-span-3">
-            <div className="flex items-center justify-between border-b border-[#23211d] pb-3">
+          <div className="flex flex-col rounded-2xl border border-white/10 bg-[#0a0d14]/55 p-5 shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] backdrop-blur-xl lg:col-span-3">
+            <div className="flex items-center justify-between border-b border-white/10 pb-3">
               <span className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-white">
                 TILES.
               </span>
               <div className="flex items-center gap-1 font-mono text-xs">
                 <button
                   onClick={handlePrev}
-                  className="flex h-6 w-6 items-center justify-center border border-[#23211d] text-[#9a958e] transition-colors hover:border-[#d4af37] hover:text-[#d4af37] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+                  className="flex h-6 w-6 items-center justify-center rounded border border-white/15 bg-white/[0.04] text-[#9a958e] backdrop-blur-sm transition-colors hover:border-[#d4af37] hover:bg-[#d4af37]/10 hover:text-[#d4af37] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
                   title="Previous Region"
                 >
                   &lt;
                 </button>
                 <button
                   onClick={handleNext}
-                  className="flex h-6 w-6 items-center justify-center border border-[#23211d] text-[#9a958e] transition-colors hover:border-[#d4af37] hover:text-[#d4af37] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+                  className="flex h-6 w-6 items-center justify-center rounded border border-white/15 bg-white/[0.04] text-[#9a958e] backdrop-blur-sm transition-colors hover:border-[#d4af37] hover:bg-[#d4af37]/10 hover:text-[#d4af37] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
                   title="Next Region"
                 >
                   &gt;
@@ -321,8 +338,8 @@ export default function Console({ onBackToHero }: Props = {}) {
               </div>
             </div>
 
-            {/* Search Input */}
-            <div className="mt-3 flex items-center gap-2 border-b border-[#23211d] pb-2 font-mono text-xs text-[#6b665f]">
+            {/* Search Input Box */}
+            <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 font-mono text-xs text-[#6b665f] backdrop-blur-md focus-within:border-[#d4af37]/50 focus-within:bg-white/[0.07]">
               <svg className="h-3.5 w-3.5 text-[#6b665f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -331,7 +348,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="SEARCH TILES..."
-                className="w-full bg-transparent text-xs text-white placeholder-[#4f4b45] focus:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+                className="w-full bg-transparent text-xs text-white placeholder-[#6b665f] focus:outline-none"
               />
             </div>
 
@@ -344,10 +361,10 @@ export default function Console({ onBackToHero }: Props = {}) {
                   <button
                     key={t.id}
                     onClick={() => setSelectedId(t.id)}
-                    className={`group flex w-full flex-col p-2.5 text-left transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${
+                    className={`group flex w-full flex-col rounded-lg p-2.5 text-left transition-all backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${
                       active
-                        ? "border-l-2 border-[#d4af37] bg-[#1a1712]"
-                        : "border-l-2 border-transparent hover:bg-[#141419]"
+                        ? "border border-[#d4af37]/50 bg-[#d4af37]/15 shadow-[0_0_15px_rgba(212,175,55,0.15)]"
+                        : "border border-white/[0.04] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.06]"
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -355,7 +372,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                         {i + 1 < 10 ? `0${i + 1}` : i + 1}.
                       </span>
                       {t.dem_available && (
-                        <span className="font-mono text-[9px] text-[#d4af37]">
+                        <span className="rounded border border-[#d4af37]/30 bg-[#d4af37]/15 px-1.5 py-0.2 font-mono text-[9px] text-[#d4af37]">
                           DEM
                         </span>
                       )}
@@ -377,22 +394,22 @@ export default function Console({ onBackToHero }: Props = {}) {
           </div>
 
           {/* Center Column: Featured Interactive Card with [ FIG. 01 / LUNA ] & Circular Gold Button */}
-          <div className="relative flex min-h-[460px] flex-col overflow-hidden border border-[#23211d] bg-[#0d0d11] p-6 lg:col-span-6">
+          <div className="relative flex min-h-[460px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0a0d14]/55 p-6 shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] backdrop-blur-xl lg:col-span-6">
             {/* Top Badge: FIG. 01 / LUNA */}
             <div className="mb-4 flex items-center justify-between">
-              <span className="rounded border border-[#38342d] bg-[#121217] px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-[#d4af37]">
+              <span className="rounded-lg border border-white/15 bg-white/[0.05] px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-[#d4af37] backdrop-blur-md">
                 [ FIG. {currentIndex >= 0 ? (currentIndex + 1 < 10 ? `0${currentIndex + 1}` : currentIndex + 1) : "01"} / {detail?.id ?? "LUNA"} ]
               </span>
               <div className="flex items-center gap-3">
                 {detail && (
                   <button
                     onClick={() => handleOpenDossierModal(detail)}
-                    className="font-mono text-[10px] text-[#d4af37] hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+                    className="rounded-md border border-[#d4af37]/30 bg-[#d4af37]/10 px-2.5 py-1 font-mono text-[10px] text-[#d4af37] backdrop-blur-sm transition-all hover:bg-[#d4af37]/20 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
                   >
                     REPORT ↗
                   </button>
                 )}
-                <span className="font-mono text-[10px] uppercase text-[#6b665f]">
+                <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-0.5 font-mono text-[10px] uppercase text-[#9a958e] backdrop-blur-sm">
                   {view.replace("-", " ")}
                 </span>
               </div>
@@ -416,7 +433,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                 <div className="flex h-full flex-col justify-between">
                   <div className="grid grid-cols-3 gap-3">
                     <div className="flex flex-col gap-1.5">
-                      <div className="relative aspect-square overflow-hidden border border-[#23211d] bg-[#141419]">
+                      <div className="relative aspect-square overflow-hidden rounded-xl border border-white/15 bg-black/40 shadow-inner backdrop-blur-sm">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={imageUrl(`/images/registered/${detail.id}/registered_ohrc.png`)}
@@ -431,7 +448,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <div className="relative aspect-square overflow-hidden border border-[#23211d] bg-[#141419]">
+                      <div className="relative aspect-square overflow-hidden rounded-xl border border-white/15 bg-black/40 shadow-inner backdrop-blur-sm">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={imageUrl(`/images/registered/${detail.id}/blend_overlay.png`)}
@@ -446,7 +463,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <div className="relative aspect-square overflow-hidden border border-[#23211d] bg-[#141419]">
+                      <div className="relative aspect-square overflow-hidden rounded-xl border border-white/15 bg-black/40 shadow-inner backdrop-blur-sm">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
                           src={imageUrl(`/images/registered/${detail.id}/checkerboard_qa.png`)}
@@ -461,12 +478,12 @@ export default function Console({ onBackToHero }: Props = {}) {
                     </div>
                   </div>
 
-                  <div className="mt-4 flex flex-wrap items-center justify-between border-t border-[#23211d] pt-3 pr-16 font-mono text-[11px]">
+                  <div className="mt-4 flex flex-wrap items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] p-3.5 pr-16 font-mono text-[11px] backdrop-blur-md">
                     <span className="text-[#9a958e]">
                       Status: <span className="text-[#d4af37] font-semibold">{metrics?.sub_pixel_accurate ? "Sub-Pixel Verified (< 0.5 px)" : "Standard Match"}</span>
                     </span>
                     <span className="text-[#6b665f]">
-                      Inliers: <span className="text-white">{metrics?.num_inliers ?? 0}</span>
+                      Inliers: <span className="text-white font-semibold">{metrics?.num_inliers ?? 0}</span>
                     </span>
                   </div>
                 </div>
@@ -481,7 +498,7 @@ export default function Console({ onBackToHero }: Props = {}) {
 
               {/* View 3: Fused Map Pane */}
               {detail && view === "map" && (
-                <div className="h-full min-h-[380px]">
+                <div className="h-full min-h-[380px] rounded-xl overflow-hidden border border-white/10">
                   <MapPanel triplet={detail} iirsOverlay={iirsOverlay} />
                 </div>
               )}
@@ -490,7 +507,7 @@ export default function Console({ onBackToHero }: Props = {}) {
             {/* Circular Gold Floating Action Button (Cycle View Mode) */}
             <button
               onClick={cycleView}
-              className="absolute bottom-5 right-5 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-[#d4af37] text-black shadow-[0_0_20px_rgba(212,175,55,0.4)] transition-all duration-300 hover:scale-110 hover:bg-[#f3df9b] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              className="absolute bottom-5 right-5 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-[#d4af37] text-black shadow-[0_0_25px_rgba(212,175,55,0.45)] backdrop-blur-sm transition-all duration-300 hover:scale-110 hover:bg-[#f3df9b] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               title="Cycle Inspection View"
             >
               <span className="text-base font-bold">→</span>
@@ -498,10 +515,10 @@ export default function Console({ onBackToHero }: Props = {}) {
           </div>
 
           {/* Right Column: ■ FROM THE ARCHIVE */}
-          <div className="flex flex-col justify-between border border-[#23211d] bg-[#0d0d11] p-6 lg:col-span-3">
+          <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#0a0d14]/55 p-6 shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] backdrop-blur-xl lg:col-span-3">
             <div>
               <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 bg-[#d4af37]" />
+                <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37] shadow-[0_0_6px_#d4af37]" />
                 <span className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-[#d4af37]">
                   FROM THE ARCHIVE
                 </span>
@@ -513,34 +530,34 @@ export default function Console({ onBackToHero }: Props = {}) {
                 geometric truth in the void.
               </p>
 
-              {/* Volumes & Metrics List */}
-              <div className="mt-6 space-y-4 border-t border-[#23211d] pt-4 font-mono text-xs">
-                <div>
+              {/* Volumes & Metrics List - Light Glassmorphic Text Boxes */}
+              <div className="mt-6 space-y-3 font-mono text-xs">
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 backdrop-blur-md transition-all hover:border-white/20 hover:bg-white/[0.05]">
                   <div className="flex items-center justify-between text-[10px] text-[#6b665f]">
                     <span>VOL. 01.1</span>
                     <span>RMSE ACCURACY</span>
                   </div>
-                  <p className="mt-0.5 font-sans text-sm font-semibold text-[#e8d5b5]">
+                  <p className="mt-1 font-sans text-sm font-semibold text-[#e8d5b5]">
                     {metrics ? `${metrics.rmse_px.toFixed(3)} px` : "0.419 px"}
                   </p>
                 </div>
 
-                <div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 backdrop-blur-md transition-all hover:border-white/20 hover:bg-white/[0.05]">
                   <div className="flex items-center justify-between text-[10px] text-[#6b665f]">
                     <span>VOL. 01.2</span>
                     <span>FEATURE COVERAGE</span>
                   </div>
-                  <p className="mt-0.5 font-sans text-sm font-semibold text-[#e8d5b5]">
+                  <p className="mt-1 font-sans text-sm font-semibold text-[#e8d5b5]">
                     {metrics ? `${(metrics.combined_coverage_score * 100).toFixed(0)}% Occupied` : "23% Occupied"}
                   </p>
                 </div>
 
-                <div>
+                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 backdrop-blur-md transition-all hover:border-white/20 hover:bg-white/[0.05]">
                   <div className="flex items-center justify-between text-[10px] text-[#6b665f]">
                     <span>VOL. 01.3</span>
                     <span>SCALE RATIO</span>
                   </div>
-                  <p className="mt-0.5 font-sans text-sm font-semibold text-[#e8d5b5]">
+                  <p className="mt-1 font-sans text-sm font-semibold text-[#e8d5b5]">
                     16× (0.25m OHRC → 4m TMC)
                   </p>
                 </div>
@@ -548,10 +565,10 @@ export default function Console({ onBackToHero }: Props = {}) {
             </div>
 
             {/* Quick Link */}
-            <div className="mt-6 border-t border-[#23211d] pt-4">
+            <div className="mt-6">
               <button
                 onClick={cycleView}
-                className="group flex items-center gap-2 text-xs font-semibold text-[#d4af37] transition-colors hover:text-[#f3df9b] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+                className="group flex w-full items-center justify-between rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/10 p-3 text-xs font-semibold text-[#d4af37] backdrop-blur-md transition-all duration-200 hover:border-[#d4af37]/60 hover:bg-[#d4af37]/20 hover:text-[#f3df9b] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
               >
                 <span>Switch View Mode ({view})</span>
                 <span className="transition-transform duration-200 group-hover:translate-x-1">→</span>
@@ -571,14 +588,14 @@ export default function Console({ onBackToHero }: Props = {}) {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 border border-[#23211d] md:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {/* Card 1: Dossier 01 (Polar Rim & Permanent Shadow) */}
             {(() => {
               const bounds = region001 ? footprintSizeKm(region001.bounds) : { widthKm: 3.2, heightKm: 3.8 };
               return (
                 <div
                   onClick={() => region001 && handleOpenDossierModal(region001)}
-                  className="group relative flex min-h-[220px] cursor-pointer flex-col justify-between border-b border-[#23211d] p-5 transition-all duration-200 hover:border-[#d4af37] hover:bg-[#15151c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] md:border-b-0 md:border-r"
+                  className="group relative flex min-h-[220px] cursor-pointer flex-col justify-between rounded-2xl border border-white/10 bg-[#0a0d14]/50 p-5 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-all duration-300 hover:border-[#d4af37]/50 hover:bg-[#121622]/70 hover:shadow-[0_8px_32px_rgba(212,175,55,0.15)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && region001) handleOpenDossierModal(region001);
@@ -588,7 +605,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                     <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#d4af37]">
                       DOSSIER · 01
                     </span>
-                    <span className="font-mono text-[9px] text-[#6b665f] group-hover:text-[#d4af37] transition-colors">
+                    <span className="font-mono text-[9px] text-[#6b665f] transition-colors group-hover:text-[#d4af37]">
                       CLICK TO OPEN ↗
                     </span>
                   </div>
@@ -599,13 +616,13 @@ export default function Console({ onBackToHero }: Props = {}) {
                     <p className="mt-1 text-xs text-[#9a958e]">
                       Sub-pixel alignment across extreme illumination disparity (&gt;160° solar angle).
                     </p>
-                    <div className="mt-2 flex items-center gap-3 font-mono text-[10px]">
+                    <div className="mt-3 flex items-center gap-3 font-mono text-[10px]">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           if (region001) handleOpenDossierModal(region001);
                         }}
-                        className="text-[#d4af37] hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+                        className="rounded-md border border-[#d4af37]/30 bg-[#d4af37]/10 px-2 py-0.5 text-[#d4af37] backdrop-blur-sm hover:bg-[#d4af37]/20 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
                       >
                         READ DOSSIER →
                       </button>
@@ -614,7 +631,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                           e.stopPropagation();
                           if (region001) handleSelectRegionAndScroll(region001.id, "registration");
                         }}
-                        className="text-[#9a958e] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+                        className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[#9a958e] backdrop-blur-sm hover:text-white hover:border-white/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
                       >
                         OPEN WORKSPACE →
                       </button>
@@ -628,17 +645,17 @@ export default function Console({ onBackToHero }: Props = {}) {
             })()}
 
             {/* Card 2: Editorial Quote & Theory Link */}
-            <div className="relative flex min-h-[220px] flex-col justify-between border-b border-[#23211d] bg-[#0e0e12] p-5 transition-colors hover:bg-[#14141a] md:border-b-0 md:border-r">
+            <div className="relative flex min-h-[220px] flex-col justify-between rounded-2xl border border-white/10 bg-[#0a0d14]/50 p-5 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-all hover:border-white/20 hover:bg-[#121622]/70">
               <div className="flex items-center justify-between">
                 <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#d4af37]">
                   QUOTE / REF-99
                 </span>
                 <button
                   onClick={toggleBookmark}
-                  className={`flex h-7 w-7 items-center justify-center rounded border transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${
+                  className={`flex h-7 w-7 items-center justify-center rounded-lg border backdrop-blur-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${
                     savedQuoteBookmarked
                       ? "border-[#d4af37] bg-[#d4af37] text-black shadow-[0_0_12px_rgba(212,175,55,0.5)]"
-                      : "border-[#23211d] bg-[#121217] text-[#9a958e] hover:border-[#d4af37] hover:text-[#d4af37]"
+                      : "border-white/15 bg-white/[0.04] text-[#9a958e] hover:border-[#d4af37] hover:text-[#d4af37]"
                   }`}
                   title={savedQuoteBookmarked ? "Remove Bookmark" : "Save to References"}
                 >
@@ -655,11 +672,11 @@ export default function Console({ onBackToHero }: Props = {}) {
               <div className="flex items-center justify-between font-mono text-[10px]">
                 <button
                   onClick={() => setTheoryModalOpen(true)}
-                  className="text-[#6b665f] transition-colors hover:text-[#d4af37] hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+                  className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[#9a958e] backdrop-blur-sm transition-colors hover:text-[#d4af37] hover:border-[#d4af37]/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
                 >
                   THEORY OF HOMOGRAPHY ↗
                 </button>
-                <span className="text-[9px] text-[#4f4b45]">
+                <span className="text-[9px] text-[#6b665f]">
                   {savedQuoteBookmarked ? "SAVED" : "REF-99"}
                 </span>
               </div>
@@ -671,7 +688,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                 setView("registration");
                 scrollToArena();
               }}
-              className="group relative flex min-h-[220px] cursor-pointer flex-col justify-between border-b border-[#23211d] p-5 transition-all duration-200 hover:border-[#d4af37] hover:bg-[#15151c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] md:border-b-0"
+              className="group relative flex min-h-[220px] cursor-pointer flex-col justify-between rounded-2xl border border-white/10 bg-[#0a0d14]/50 p-5 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-all duration-300 hover:border-[#d4af37]/50 hover:bg-[#121622]/70 hover:shadow-[0_8px_32px_rgba(212,175,55,0.15)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
               tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
@@ -681,7 +698,7 @@ export default function Console({ onBackToHero }: Props = {}) {
               }}
             >
               <div className="flex items-center justify-between">
-                <span className="rounded border border-[#38342d] bg-[#141419] px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-[#d4af37]">
+                <span className="rounded-lg border border-[#d4af37]/30 bg-[#d4af37]/15 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-[#d4af37] backdrop-blur-sm">
                   FIELD NOTE
                 </span>
                 <span className="font-mono text-[10px] font-semibold text-[#d4af37]">
@@ -700,7 +717,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                 </div>
               </div>
               <span className="font-mono text-[10px] text-[#6b665f]">
-                RANSAC inliers: <span className="text-white">{metrics?.num_inliers ?? 28}</span> (Live)
+                RANSAC inliers: <span className="text-white font-semibold">{metrics?.num_inliers ?? 28}</span> (Live)
               </span>
             </div>
 
@@ -711,7 +728,7 @@ export default function Console({ onBackToHero }: Props = {}) {
               return (
                 <div
                   onClick={() => target && handleOpenDossierModal(target)}
-                  className="group relative flex min-h-[220px] cursor-pointer flex-col justify-between border-t border-[#23211d] p-5 transition-all duration-200 hover:border-[#d4af37] hover:bg-[#15151c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] md:border-r"
+                  className="group relative flex min-h-[220px] cursor-pointer flex-col justify-between rounded-2xl border border-white/10 bg-[#0a0d14]/50 p-5 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-all duration-300 hover:border-[#d4af37]/50 hover:bg-[#121622]/70 hover:shadow-[0_8px_32px_rgba(212,175,55,0.15)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && target) handleOpenDossierModal(target);
@@ -727,13 +744,13 @@ export default function Console({ onBackToHero }: Props = {}) {
                     <p className="mt-1 text-xs text-[#9a958e]">
                       Multi-modal registration between 0.25m OHRC and 70m IIRS hyperspectral imagery.
                     </p>
-                    <div className="mt-2 flex items-center gap-3 font-mono text-[10px]">
+                    <div className="mt-3 flex items-center gap-3 font-mono text-[10px]">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           if (target) handleOpenDossierModal(target);
                         }}
-                        className="text-[#d4af37] hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+                        className="rounded-md border border-[#d4af37]/30 bg-[#d4af37]/10 px-2 py-0.5 text-[#d4af37] backdrop-blur-sm hover:bg-[#d4af37]/20 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
                       >
                         READ DOSSIER →
                       </button>
@@ -742,7 +759,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                           e.stopPropagation();
                           if (target) handleSelectRegionAndScroll(target.id, "map");
                         }}
-                        className="text-[#9a958e] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+                        className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[#9a958e] backdrop-blur-sm hover:text-white hover:border-white/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
                       >
                         OPEN WORKSPACE →
                       </button>
@@ -762,7 +779,7 @@ export default function Console({ onBackToHero }: Props = {}) {
               return (
                 <div
                   onClick={() => target && handleOpenDossierModal(target)}
-                  className="group relative flex min-h-[220px] cursor-pointer flex-col justify-between border-t border-[#23211d] p-5 transition-all duration-200 hover:border-[#d4af37] hover:bg-[#15151c] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] md:border-r"
+                  className="group relative flex min-h-[220px] cursor-pointer flex-col justify-between rounded-2xl border border-white/10 bg-[#0a0d14]/50 p-5 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-all duration-300 hover:border-[#d4af37]/50 hover:bg-[#121622]/70 hover:shadow-[0_8px_32px_rgba(212,175,55,0.15)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && target) handleOpenDossierModal(target);
@@ -778,13 +795,13 @@ export default function Console({ onBackToHero }: Props = {}) {
                     <p className="mt-1 text-xs text-[#9a958e]">
                       Handling longitude wrap-around (180° / 360°) with continuous spatial projection.
                     </p>
-                    <div className="mt-2 flex items-center gap-3 font-mono text-[10px]">
+                    <div className="mt-3 flex items-center gap-3 font-mono text-[10px]">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           if (target) handleOpenDossierModal(target);
                         }}
-                        className="text-[#d4af37] hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+                        className="rounded-md border border-[#d4af37]/30 bg-[#d4af37]/10 px-2 py-0.5 text-[#d4af37] backdrop-blur-sm hover:bg-[#d4af37]/20 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
                       >
                         READ DOSSIER →
                       </button>
@@ -793,7 +810,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                           e.stopPropagation();
                           if (target) handleSelectRegionAndScroll(target.id, "linked-cursor");
                         }}
-                        className="text-[#9a958e] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+                        className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[#9a958e] backdrop-blur-sm hover:text-white hover:border-white/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
                       >
                         OPEN WORKSPACE →
                       </button>
@@ -809,7 +826,7 @@ export default function Console({ onBackToHero }: Props = {}) {
             {/* Card 6: Access The Vault */}
             <div
               onClick={() => openVaultWithFilter("all")}
-              className="group relative flex min-h-[220px] cursor-pointer flex-col items-center justify-center border-t border-[#23211d] bg-[#0e0e12] p-5 text-center transition-all duration-200 hover:border-[#d4af37] hover:bg-[#181612] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
+              className="group relative flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-white/15 bg-gradient-to-br from-[#0e1422]/60 to-[#0a0d14]/70 p-5 text-center shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-all duration-300 hover:border-[#d4af37]/60 hover:bg-[#161d2e]/80 hover:shadow-[0_8px_32px_rgba(212,175,55,0.2)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
               tabIndex={0}
               onKeyDown={(e) => {
                 if (e.key === "Enter") openVaultWithFilter("all");
@@ -832,7 +849,7 @@ export default function Console({ onBackToHero }: Props = {}) {
         </section>
 
         {/* 5. Archival Footer */}
-        <footer className="border-t border-[#23211d] pt-8 font-mono text-xs text-[#6b665f]">
+        <footer className="rounded-2xl border border-white/10 bg-[#0a0d14]/40 p-8 font-mono text-xs text-[#6b665f] shadow-[0_8px_32px_0_rgba(0,0,0,0.35)] backdrop-blur-xl">
           <div className="flex flex-col justify-between gap-8 md:flex-row md:items-start">
             {/* Left Statement */}
             <div className="max-w-md">
@@ -1010,6 +1027,7 @@ export default function Console({ onBackToHero }: Props = {}) {
           onClose={() => setInfoModalContent(null)}
         />
       )}
+      </div>
     </div>
   );
 }
