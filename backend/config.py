@@ -17,7 +17,11 @@ REPO_ROOT = BACKEND_DIR.parent
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=(".env", str(REPO_ROOT / ".env")),
+        env_file=(
+            str(BACKEND_DIR / ".env"),
+            str(REPO_ROOT / ".env"),
+            ".env",
+        ),
         env_file_encoding="utf-8",
         extra="ignore",
     )
