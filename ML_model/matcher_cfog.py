@@ -262,7 +262,7 @@ def subpixel_phase_correlation(
     sub_y, sub_x = float(peak_y), float(peak_x)
 
     # 2D Log-Gaussian peak interpolation on 3x3 neighborhood
-    # Approximates continuous sinc envelope as Gaussian, eliminating parabolic truncation bias
+    # Approximates continuous sinc envelope as Gaussian; local log-domain peak interpolation intended to reduce interpolation bias
     if 0 < peak_y < h - 1 and 0 < peak_x < w - 1:
         c_val = max(float(corr[peak_y, peak_x]), 1e-6)
         c_left = max(float(corr[peak_y, peak_x - 1]), 1e-6)

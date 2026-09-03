@@ -4,7 +4,7 @@ benchmark_subpixel.py — Rigorous Multi-Directional Synthetic Sub-Pixel Precisi
 Evaluates the Fourier Phase Correlation 2D Log-Gaussian peak refinement algorithm across:
 - 8 Cardinal and Intercardinal Directions (+X, -X, +Y, -Y, +X/+Y, +X/-Y, -X/+Y, -X/-Y)
 - 6 Fractional Magnitudes (0.05, 0.10, 0.20, 0.30, 0.50, 0.75 px)
-- Multiple independent synthetic lunar regolith terrain textures and crater seeds.
+- Five separately seeded synthetic terrain realizations per combination.
 
 Reports full statistical error distributions (MAE, RMSE, Median, 95th Percentile, Biases, Threshold Fractions).
 """
@@ -35,6 +35,17 @@ DIRECTIONS: Dict[str, Tuple[float, float]] = {
     "diag_+X_-Y": (1.0 / np.sqrt(2.0), -1.0 / np.sqrt(2.0)),
     "diag_-X_+Y": (-1.0 / np.sqrt(2.0), 1.0 / np.sqrt(2.0)),
     "diag_-X_-Y": (-1.0 / np.sqrt(2.0), -1.0 / np.sqrt(2.0)),
+}
+
+DIRECTION_SEEDS: Dict[str, int] = {
+    "+X": 11,
+    "-X": 23,
+    "+Y": 37,
+    "-Y": 41,
+    "diag_+X_+Y": 53,
+    "diag_+X_-Y": 67,
+    "diag_-X_+Y": 79,
+    "diag_-X_-Y": 97,
 }
 
 
@@ -104,7 +115,7 @@ def run_subpixel_benchmark(
 ) -> Dict[str, Any]:
     """
     Executes full multi-directional sub-pixel benchmark across 8 directions,
-    6 displacement magnitudes, and multiple independent terrain textures.
+    6 displacement magnitudes, and five separately seeded synthetic terrain realizations.
     """
     all_errors: List[float] = []
     dx_errors: List[float] = []
@@ -121,7 +132,7 @@ def run_subpixel_benchmark(
             true_dy = float(shift_mag * v_dir)
 
             for seed_idx in range(num_seeds_per_combination):
-                seed = 1000 * seed_idx + int(shift_mag * 100) + hash(dir_name) % 500
+                seed = 1000 * seed_idx + int(round(shift_mag * 100)) + DIRECTION_SEEDS[dir_name]
                 base_patch = generate_synthetic_lunar_patch(patch_size, seed=seed)
                 shifted_patch = apply_fourier_fractional_shift(base_patch, true_dx, true_dy)
 

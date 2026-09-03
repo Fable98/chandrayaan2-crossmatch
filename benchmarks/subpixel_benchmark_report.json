@@ -19,102 +19,102 @@
         0.5,
         0.75
     ],
-    "mean_absolute_error_px": 0.2439,
-    "median_absolute_error_px": 0.2747,
-    "rmse_px": 0.2673,
-    "p95_error_px": 0.3843,
-    "max_absolute_error_px": 0.386,
-    "bias_x_px": 0.0031,
-    "bias_y_px": 0.0082,
-    "fraction_below_0_10px": 0.1167,
+    "mean_absolute_error_px": 0.2416,
+    "median_absolute_error_px": 0.274,
+    "rmse_px": 0.2663,
+    "p95_error_px": 0.3844,
+    "max_absolute_error_px": 0.3855,
+    "bias_x_px": -0.0011,
+    "bias_y_px": 0.0,
+    "fraction_below_0_10px": 0.1333,
     "fraction_below_0_20px": 0.3125,
-    "fraction_below_0_25px": 0.425,
+    "fraction_below_0_25px": 0.4042,
     "fraction_below_0_50px": 1.0,
     "fraction_below_1_00px": 1.0,
     "per_direction_breakdown": {
         "+X": {
-            "mean_error_px": 0.2108,
-            "median_error_px": 0.226,
-            "max_error_px": 0.3208
+            "mean_error_px": 0.2372,
+            "median_error_px": 0.2596,
+            "max_error_px": 0.3134
         },
         "-X": {
-            "mean_error_px": 0.2422,
-            "median_error_px": 0.2587,
-            "max_error_px": 0.311
+            "mean_error_px": 0.2119,
+            "median_error_px": 0.2404,
+            "max_error_px": 0.3071
         },
         "+Y": {
-            "mean_error_px": 0.2299,
-            "median_error_px": 0.2556,
-            "max_error_px": 0.3099
+            "mean_error_px": 0.2179,
+            "median_error_px": 0.2554,
+            "max_error_px": 0.3239
         },
         "-Y": {
-            "mean_error_px": 0.2223,
-            "median_error_px": 0.2215,
-            "max_error_px": 0.3138
+            "mean_error_px": 0.2196,
+            "median_error_px": 0.2631,
+            "max_error_px": 0.3098
         },
         "diag_+X_+Y": {
-            "mean_error_px": 0.2615,
-            "median_error_px": 0.3128,
-            "max_error_px": 0.385
+            "mean_error_px": 0.2616,
+            "median_error_px": 0.3131,
+            "max_error_px": 0.3848
         },
         "diag_+X_-Y": {
+            "mean_error_px": 0.2615,
+            "median_error_px": 0.3134,
+            "max_error_px": 0.3853
+        },
+        "diag_-X_+Y": {
             "mean_error_px": 0.2616,
             "median_error_px": 0.3127,
             "max_error_px": 0.3855
         },
-        "diag_-X_+Y": {
-            "mean_error_px": 0.2614,
-            "median_error_px": 0.3135,
-            "max_error_px": 0.386
-        },
         "diag_-X_-Y": {
-            "mean_error_px": 0.2614,
-            "median_error_px": 0.3125,
-            "max_error_px": 0.3845
+            "mean_error_px": 0.2618,
+            "median_error_px": 0.3122,
+            "max_error_px": 0.3847
         }
     },
     "per_magnitude_breakdown": {
         "0.05_px": {
-            "mean_error_px": 0.3399,
-            "median_error_px": 0.3519,
-            "rmse_px": 0.3429,
-            "p95_error_px": 0.3843,
-            "max_error_px": 0.3847
+            "mean_error_px": 0.338,
+            "median_error_px": 0.3532,
+            "rmse_px": 0.3412,
+            "p95_error_px": 0.3839,
+            "max_error_px": 0.3846
         },
         "0.10_px": {
-            "mean_error_px": 0.3371,
-            "median_error_px": 0.349,
-            "rmse_px": 0.3406,
-            "p95_error_px": 0.3851,
-            "max_error_px": 0.386
+            "mean_error_px": 0.3348,
+            "median_error_px": 0.348,
+            "rmse_px": 0.3388,
+            "p95_error_px": 0.3853,
+            "max_error_px": 0.3855
         },
         "0.20_px": {
-            "mean_error_px": 0.2923,
-            "median_error_px": 0.3187,
-            "rmse_px": 0.2977,
-            "p95_error_px": 0.3442,
-            "max_error_px": 0.3453
+            "mean_error_px": 0.2931,
+            "median_error_px": 0.3181,
+            "rmse_px": 0.2981,
+            "p95_error_px": 0.3443,
+            "max_error_px": 0.3445
         },
         "0.30_px": {
-            "mean_error_px": 0.2324,
-            "median_error_px": 0.2634,
-            "rmse_px": 0.2395,
-            "p95_error_px": 0.2835,
-            "max_error_px": 0.285
+            "mean_error_px": 0.2401,
+            "median_error_px": 0.2779,
+            "rmse_px": 0.2465,
+            "p95_error_px": 0.2838,
+            "max_error_px": 0.2842
         },
         "0.50_px": {
-            "mean_error_px": 0.1387,
-            "median_error_px": 0.1456,
-            "rmse_px": 0.1562,
-            "p95_error_px": 0.2335,
-            "max_error_px": 0.2579
+            "mean_error_px": 0.1158,
+            "median_error_px": 0.1442,
+            "rmse_px": 0.1346,
+            "p95_error_px": 0.2051,
+            "max_error_px": 0.2409
         },
         "0.75_px": {
-            "mean_error_px": 0.1229,
-            "median_error_px": 0.1046,
-            "rmse_px": 0.1571,
-            "p95_error_px": 0.2711,
-            "max_error_px": 0.2799
+            "mean_error_px": 0.128,
+            "median_error_px": 0.1058,
+            "rmse_px": 0.1631,
+            "p95_error_px": 0.2763,
+            "max_error_px": 0.2813
         }
     }
 }

@@ -169,7 +169,7 @@ def test_spatial_distribution_metrics():
 
 
 # ---------------------------------------------------------------------------
-# Test 6: In-Sample Fit RMSE vs Independent Held-Out Validation RMSE
+# Test 6: In-Sample Fit RMSE vs Held-Out Inlier Correspondence Validation RMSE
 # ---------------------------------------------------------------------------
 def test_held_out_validation_rmse_evaluated():
     np.random.seed(42)
@@ -230,38 +230,40 @@ def test_register_api_endpoint(test_client, synthetic_lunar_pair):
 def test_real_20x_scale_disparity_registration():
     """
     Tests actual ~20x physical scale disparity:
-    - OHRC at 0.25 m/px (1024x1024 pixels, covering 256m x 256m)
-    - TMC-2 at 5.0 m/px (covering common physical footprint)
-    - Applies known physical ground displacement
+    - OHRC at 0.25 m/px (1024x1024 pixels, covering 256m x 256m physical footprint)
+    - TMC-2 at 5.0 m/px (51x51 pixels, covering ~255m x 255m physical footprint)
+    - Known physical ground displacement: +10.0 m in X, -5.0 m in Y
+      In OHRC native: +40.0 px X, -20.0 px Y (+10m / 0.25m, -5m / 0.25m)
+      In TMC-2 native: +2.0 px X, -1.0 px Y (+10m / 5.0m, -5m / 5.0m)
     - Verifies recovery of transformation across the 20x scale bridge.
     """
-    np.random.seed(123)
-    # 1. Create a master ground elevation / reflectance map (1024x1024 at 0.25m = 256m wide)
+    np.random.seed(42)
     h_ohrc, w_ohrc = 1024, 1024
-    master_terrain = np.zeros((h_ohrc, w_ohrc), dtype=np.uint8)
+    master_terrain = np.zeros((h_ohrc, w_ohrc), dtype=np.float32)
 
-    # Add distinct crater features distributed across the terrain
-    for _ in range(40):
+    # Add distinct crater features distributed across the physical terrain
+    for _ in range(50):
         cx = np.random.randint(100, 924)
         cy = np.random.randint(100, 924)
-        rad = np.random.randint(25, 75)
-        val = int(np.random.randint(150, 255))
+        rad = np.random.randint(20, 60)
+        val = np.random.uniform(100, 255)
         cv2.circle(master_terrain, (cx, cy), rad, val, -1)
-        cv2.circle(master_terrain, (cx, cy), max(5, rad - 10), int(val // 2), -1)
+        cv2.circle(master_terrain, (cx, cy), max(3, rad - 8), val * 0.4, -1)
 
-    noise = np.random.randint(0, 20, (h_ohrc, w_ohrc), dtype=np.uint8)
-    ohrc_raw = cv2.add(master_terrain, noise)
+    master_terrain = cv2.GaussianBlur(master_terrain, (0, 0), 2.0)
+    noise = np.random.normal(0, 5, (h_ohrc, w_ohrc)).astype(np.float32)
+    ohrc_raw = np.clip(master_terrain + noise, 0, 255).astype(np.uint8)
 
-    # 2. Known physical displacement: 20 meters in X, -15 meters in Y
-    # In OHRC space (0.25 m/px): 20 / 0.25 = +80 px, -15 / 0.25 = -60 px
-    # In TMC space (5.0 m/px): 20 / 5.0 = +4 px, -15 / 5.0 = -3 px
+    # Known physical displacement: +10 meters X, -5 meters Y
+    # In OHRC native space (0.25 m/px): +40 px X, -20 px Y
     shift_x_ohrc = 40.0
     shift_y_ohrc = -20.0
     M_ohrc = np.float32([[1, 0, shift_x_ohrc], [0, 1, shift_y_ohrc]])
     ohrc_shifted = cv2.warpAffine(ohrc_raw, M_ohrc, (w_ohrc, h_ohrc))
 
-    # Downsample to TMC-2 resolution: 1024 / 20 = 51.2 -> scale to ~5m/px
-    tmc_raw = cv2.resize(ohrc_shifted, (w_ohrc // 20 * 10, h_ohrc // 20 * 10), interpolation=cv2.INTER_AREA)
+    # Downsample to TMC-2 resolution: 1024 * 0.25 / 5.0 = 51.2 -> 51x51 px @ 5.0 m/px
+    w_tmc, h_tmc = 51, 51
+    tmc_raw = cv2.resize(ohrc_shifted, (w_tmc, h_tmc), interpolation=cv2.INTER_AREA)
 
     with tempfile.TemporaryDirectory() as tmpdir:
         p_ohrc = Path(tmpdir) / "test_ohrc.png"
@@ -282,12 +284,37 @@ def test_real_20x_scale_disparity_registration():
             explicit_gsd2=5.0,
         )
 
-        assert res["status"] in ("success", "insufficient_correspondences", "geometric_verification_failed")
-        # Ensure that if it succeeded, it verified full output package
-        if res["status"] == "success":
-            assert res["metrics"]["inlier_count"] >= 4
-            assert os.path.exists(res["outputs"]["registered_raster"])
-            assert os.path.exists(res["outputs"]["preview"])
+        # MUST succeed — no fallbacks allowed
+        assert res["status"] == "success", f"20x registration failed: {res.get('message')}"
+        assert res["homography"] is not None
+
+        # Verify scale factor recovery across the 20x bridge
+        # Homography maps OHRC (0.25m) to TMC (5.0m), so scale is ~0.25 / 5.0 = 0.05
+        H = np.array(res["homography"])
+        scale_x = float(np.sqrt(H[0, 0]**2 + H[1, 0]**2))
+        scale_y = float(np.sqrt(H[0, 1]**2 + H[1, 1]**2))
+        expected_scale = 0.25 / 5.0  # 0.05
+        assert abs(scale_x - expected_scale) < 0.005, f"Scale X deviation: {scale_x} vs {expected_scale}"
+        assert abs(scale_y - expected_scale) < 0.005, f"Scale Y deviation: {scale_y} vs {expected_scale}"
+
+        # Verify translation in TMC pixel space: expected +2.0 px X (+10m / 5m), -1.0 px Y (-5m / 5m)
+        est_tx_tmc = float(H[0, 2])
+        est_ty_tmc = float(H[1, 2])
+        assert abs(est_tx_tmc - 2.0) < 0.5, f"Translation X error: {est_tx_tmc} vs 2.0 px"
+        assert abs(est_ty_tmc - (-1.0)) < 0.5, f"Translation Y error: {est_ty_tmc} vs -1.0 px"
+
+        # Verify full output package
+        outputs = res["outputs"]
+        assert os.path.exists(outputs["registered_raster"])
+        assert os.path.exists(outputs["preview"])
+        assert os.path.exists(outputs["checkerboard"])
+        assert os.path.exists(outputs["matches"])
+        assert os.path.exists(outputs["metrics"])
+        assert os.path.exists(outputs["transform"])
+        assert os.path.exists(outputs["metadata"])
+
+        # Verify inlier count
+        assert res["metrics"]["inlier_count"] >= 4
 
 
 # ---------------------------------------------------------------------------
@@ -322,4 +349,49 @@ def test_spatial_quality_gate_rejects_clustered_matches():
     # Gate logic verification
     assert distinct_cells < 3
     assert concentration > 0.60
+
+
+# ---------------------------------------------------------------------------
+# Test 12: GeoTIFF & Product Package Authenticity & Validity
+# ---------------------------------------------------------------------------
+def test_geotiff_output_validity(synthetic_lunar_pair):
+    """
+    Verifies that registered_source.tif is a genuine TIFF/GeoTIFF raster
+    (not a renamed PNG/JPEG), matches reference spatial dimensions,
+    and all JSON sidecars are valid parseable JSON.
+    """
+    from PIL import Image
+    p1, p2, _, _ = synthetic_lunar_pair
+    with tempfile.TemporaryDirectory() as out_dir:
+        res = match_images_cfog(
+            p1, p2, output_dir=out_dir, explicit_gsd1=5.0, explicit_gsd2=5.0
+        )
+        assert res["status"] == "success"
+        tif_file = Path(res["outputs"]["registered_raster"])
+        assert tif_file.exists()
+
+        # 1. Check genuine TIFF format via PIL
+        with Image.open(tif_file) as im:
+            assert im.format == "TIFF", f"File is not genuine TIFF: {im.format}"
+            assert im.size == (512, 512), f"Dimensions mismatch: {im.size} vs (512, 512)"
+
+        # 2. Check GeoTIFF metadata via rasterio if installed
+        try:
+            import rasterio
+            with rasterio.open(str(tif_file)) as src:
+                assert src.width == 512
+                assert src.height == 512
+                assert src.count in (1, 3)
+                assert src.dtypes[0] == "uint8"
+        except ImportError:
+            pass
+
+        # 3. Check JSON sidecars are valid
+        for sidecar_key in ("matches", "metrics", "transform", "metadata"):
+            sidecar_path = Path(res["outputs"][sidecar_key])
+            assert sidecar_path.exists(), f"Sidecar {sidecar_key} missing"
+            with open(sidecar_path, "r") as f:
+                parsed = json.load(f)
+                assert isinstance(parsed, (dict, list))
+
 

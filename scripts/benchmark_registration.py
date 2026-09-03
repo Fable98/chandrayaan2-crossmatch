@@ -5,7 +5,7 @@ Evaluates the primary OHRC <-> TMC-2 cross-sensor registration pipeline
 across available mission regions, reporting real, un-fabricated telemetry:
 - Match count and RANSAC inlier count.
 - True inlier ratio.
-- In-sample Fit RMSE vs. Independent Held-Out Validation RMSE.
+- In-sample Fit RMSE vs. Held-Out Inlier Correspondence Validation RMSE.
 - Spatial coverage and uniformity.
 - Wall-clock runtime per region.
 """

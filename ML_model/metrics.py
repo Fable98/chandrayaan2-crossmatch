@@ -320,7 +320,7 @@ def compute_canonical_metrics(
     frac_05 = float(np.mean(fit_errors < 0.5)) if len(fit_errors) > 0 else 0.0
     frac_025 = float(np.mean(fit_errors < 0.25)) if len(fit_errors) > 0 else 0.0
 
-    # Independent Held-Out Validation
+    # Held-Out Inlier Correspondence Validation
     val_results = evaluate_held_out_validation(inliers_src, inliers_dst)
 
     # Spatial Distribution

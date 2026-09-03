@@ -27,7 +27,7 @@ This repository provides an open, reproducible, and photogrammetrically defensib
 | **Physical Scale Disparity** | OHRC (~0.25 m) vs. TMC-2 (~5 m) is a ~20× linear resolution gap. Windowing identical pixel patches covers drastically different ground areas (32 m vs. 640 m). | **Common Physical-GSD Normalization**: Resamples source imagery to a shared working physical ground footprint (~5 m/px) prior to coarse matching and patch correlation. |
 | **Solar Incidence & Illumination** | Drastic solar azimuth/elevation changes invert crater rim shadows, create false intensity gradients, and defeat raw pixel cross-correlation. | **Illumination-Robust Structural Representations**: 2D Log-Gabor Phase Congruency and CFOG (Channel Features of Oriented Gradients) extract frequency-phase edge features invariant to contrast reversals. |
 | **Topographic Relief Displacement** | Off-nadir emission angles on 3D cratered lunar terrain induce parallax displacement proportional to terrain elevation. | **DEM Relief Displacement Compensation**: Ingests lunar DEM elevation and spacecraft viewing geometry to compensate local parallax shifts prior to matching. |
-| **Evaluation Bias** | In-sample RANSAC RMSE evaluated strictly on the surviving inliers is self-fulfilling. | **Fit RMSE vs. Held-Out Validation RMSE**: Withholds an independent 20% validation split to evaluate true out-of-sample reprojection error. |
+| **Evaluation Bias** | In-sample RANSAC RMSE evaluated strictly on the surviving inliers is self-fulfilling. | **Fit RMSE vs. Held-Out Validation RMSE**: Withholds a 20% held-out inlier split to evaluate out-of-sample reprojection error on verified correspondences. |
 | **Correspondence Integrity** | Unreliable algorithms fabricate corner points when matching fails. | **Zero Synthetic Fallbacks**: Failed registrations cleanly report failure diagnostic statuses without fabricating correspondences or identity matrices. |
 
 ---
@@ -71,7 +71,7 @@ Chandrayaan-2 Orbital Products (PDS4 XML/IMG, GeoTIFF, Cubes)
                         │
                         ▼
    Local Fourier Phase Correlation Sub-Pixel Refinement
-   (2D quadratic peak surface fitting on matched physical ground patches)
+   (2D Fourier cross-power with log-domain peak interpolation)
                         │
                         ▼
    Robust Geometric Estimation & Quality Gates
@@ -88,7 +88,7 @@ Chandrayaan-2 Orbital Products (PDS4 XML/IMG, GeoTIFF, Cubes)
                         │
                         ▼
    Canonical Quantitative Evaluation
-   (Fit RMSE, Held-out Validation RMSE, Spatial Coverage, Uniformity Score)
+   (Fit RMSE, Held-out Inlier Validation RMSE, Spatial Coverage, Uniformity Score)
                         │
                         ▼
    IIRS Hyperspectral Co-Registration & Spatial-Spectral Overlay
@@ -104,7 +104,8 @@ All metrics in the repository are computed via a single canonical module ([`ML_m
    $$\text{RMSE}_{fit} = \sqrt{\frac{1}{N_{inliers}} \sum_{i=1}^{N_{inliers}} \|H p_i - q_i\|^2}$$
    Evaluated strictly on correspondences used to estimate the transformation matrix $H$.
 2. **Held-Out Correspondence Validation RMSE (`validation_rmse_px`)**:
-   Splits verified inlier points into training (80%) and validation (20%) sets. Re-estimates $H$ on training points and computes error exclusively on unseen held-out inlier points to measure transformation stability. (For ground-truth validation, see synthetic benchmarks).
+   Splits verified inlier points into training (80%) and validation (20%) sets. Re-estimates $H$ on training points and computes error exclusively on unseen held-out inlier points to measure transformation stability.
+   *(Note: Synthetic benchmarks provide known ground-truth validation; real-image metrics provide held-out inlier correspondence validation).*
 3. **Inlier Ratio (`inlier_ratio`)**:
    $$\text{Ratio} = \frac{N_{inliers}}{\max(1, N_{raw\_matches})}$$
 4. **Spatial Coverage (`spatial_coverage`)**:
@@ -124,35 +125,37 @@ All metrics in the repository are computed via a single canonical module ([`ML_m
 ## 6. Empirical Benchmark Results
 
 ### A. Synthetic Multi-Directional Sub-Pixel Displacement Benchmark
-Evaluated across 240 trials spanning 8 directions (+X, -X, +Y, -Y, +X/+Y, +X/-Y, -X/+Y, -X/-Y) and 6 fractional magnitudes (0.05, 0.10, 0.20, 0.30, 0.50, 0.75 px) on synthetic cratered lunar regolith terrain textures ([`scripts/benchmark_subpixel.py`](scripts/benchmark_subpixel.py)):
+Evaluated across 240 trials spanning 8 directions (+X, -X, +Y, -Y, diag_+X_+Y, diag_+X_-Y, diag_-X_+Y, diag_-X_-Y), 6 fractional magnitudes (0.05, 0.10, 0.20, 0.30, 0.50, 0.75 px), and five separately seeded synthetic terrain realizations ([`scripts/benchmark_subpixel.py`](scripts/benchmark_subpixel.py)):
 
 * **Total Trials**: 240
-* **Mean Absolute Error (MAE)**: $0.2427$ px
-* **Median Absolute Error**: $0.2724$ px
-* **Root Mean Square Error (RMSE)**: $0.2662$ px
-* **95th Percentile Error**: $0.3846$ px
-* **Maximum Error**: $0.3861$ px
-* **Directional Bias (Bias X / Bias Y)**: $+0.0041$ px / $+0.0047$ px (symmetric zero-centered)
-* **Fraction < 0.10 px**: $12.5\%$
-* **Fraction < 0.20 px**: $32.9\%$
-* **Fraction < 0.25 px**: $43.3\%$
+* **Tested Directions**: 8 directions (`+X`, `-X`, `+Y`, `-Y`, `diag_+X_+Y`, `diag_+X_-Y`, `diag_-X_+Y`, `diag_-X_-Y`)
+* **Tested Displacement Magnitudes**: 6 magnitudes ($0.05, 0.10, 0.20, 0.30, 0.50, 0.75$ px)
+* **Mean Absolute Error (MAE)**: $0.2416$ px
+* **Median Absolute Error**: $0.2740$ px
+* **Root Mean Square Error (RMSE)**: $0.2663$ px
+* **95th Percentile Error (P95)**: $0.3844$ px
+* **Maximum Error**: $0.3855$ px
+* **Directional Bias (Bias X / Bias Y)**: $-0.0011$ px / $0.0000$ px (symmetric zero-centered)
+* **Fraction < 0.10 px**: $13.3\%$
+* **Fraction < 0.20 px**: $31.2\%$
+* **Fraction < 0.25 px**: $40.4\%$
 * **Fraction < 0.50 px**: $100.0\%$
 * **Fraction < 1.00 px**: $100.0\%$
-* *Empirical Finding: Sub-pixel phase correlation achieves robust sub-half-pixel refinement (~0.24 px MAE, 100% of trials under 0.5 px). The system does not claim universal <0.2 px accuracy, as 32.9% of trials meet that strict threshold under complex lunar cratering.*
+* *Empirical Finding: On the tested synthetic lunar-terrain benchmark, the Fourier phase-correlation refinement achieved approximately 0.24 px MAE, with all tested trials below 0.5 px. Accuracy is displacement-dependent and the benchmark does not establish universal <0.2 px precision. Peak refinement uses local log-domain peak interpolation intended to reduce interpolation bias.*
 
 ### B. Multi-Region Mission Dataset Benchmark
-Evaluated across real Chandrayaan-2 lunar regions ([`scripts/benchmark_registration.py`](scripts/benchmark_registration.py)):
+Evaluated across the demonstration Chandrayaan-2 lunar regions ([`scripts/benchmark_registration.py`](scripts/benchmark_registration.py)):
 
 | Region ID | Status | Quality Tier | Inliers | Inlier Ratio | Fit RMSE (px) | Spatial Coverage | Runtime (s) |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
 | `region_001` | SUCCESS | LOW_CONFIDENCE | 7 | 9.1% | 1.85 | 7.0% | 0.17s |
-| `region_002` | SUCCESS | LOW_CONFIDENCE | 7 | 9.1% | 1.24 | 7.0% | 0.15s |
+| `region_002` | SUCCESS | LOW_CONFIDENCE | 7 | 10.6% | 1.24 | 7.0% | 0.15s |
 | `region_003` | SUCCESS | LOW_CONFIDENCE | 6 | 7.8% | 1.77 | 6.0% | 0.15s |
-| `region_004` | SUCCESS | LOW_CONFIDENCE | 7 | 9.1% | 1.78 | 7.0% | 0.15s |
-| `region_005` | SUCCESS | LOW_CONFIDENCE | 6 | 7.8% | 1.40 | 6.0% | 0.15s |
-| `region_006` | SUCCESS | LOW_CONFIDENCE | 6 | 7.8% | 1.65 | 6.0% | 0.15s |
+| `region_004` | SUCCESS | LOW_CONFIDENCE | 7 | 10.0% | 1.78 | 7.0% | 0.15s |
+| `region_005` | SUCCESS | LOW_CONFIDENCE | 6 | 13.3% | 1.40 | 6.0% | 0.15s |
+| `region_006` | SUCCESS | LOW_CONFIDENCE | 6 | 10.7% | 1.65 | 6.0% | 0.16s |
 
-*Key Demonstration: On small 512x512 tile crops, inliers are reliably 6–7 per region, correctly categorized as LOW_CONFIDENCE per our documented quality standards. All inliers pass spatial support gates without fabricating artificial correspondences.*
+*Key Demonstration: The pipeline produces geometrically verified low-confidence registrations on the six packaged demonstration regions. On small 512x512 tile crops, inliers are reliably 6–7 per region, correctly categorized as LOW_CONFIDENCE per our documented quality standards. All inliers pass spatial support gates without fabricating artificial correspondences.*
 
 ---
 
@@ -166,7 +169,7 @@ Evaluated across real Chandrayaan-2 lunar regions ([`scripts/benchmark_registrat
 | **Sun-Angle / Illumination Robustness** | Delivered | 2D Log-Gabor Phase Congruency & CFOG frequency structural features |
 | **Spatially Distributed Matches** | Delivered | Grid binning & spatial distribution metrics in [`ML_model/metrics.py`](ML_model/metrics.py) |
 | **Sub-Pixel Refinement** | Delivered | 2D Fourier Phase Correlation benchmarked at ~0.24 px MAE across 240 trials |
-| **Independent Evaluation Metrics** | Delivered | In-sample Fit RMSE separated from Held-Out Inlier Validation RMSE in [`ML_model/metrics.py`](ML_model/metrics.py) |
+| **Held-Out Inlier Correspondence Validation** | Delivered | In-sample Fit RMSE separated from Held-Out Inlier Validation RMSE in [`ML_model/metrics.py`](ML_model/metrics.py) |
 | **Terrain Parallax Compensation** | Delivered | Local DEM-based relief displacement compensation in [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py) |
 | **Full Output Product Package** | Delivered | Registered GeoTIFF (`.tif`), preview (`.png`), checkerboard (`.png`), JSON sidecars |
 | **Zero Fake Fallbacks** | Verified | Clean error states on failure; zero manufactured corner points |
