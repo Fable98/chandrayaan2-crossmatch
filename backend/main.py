@@ -28,8 +28,17 @@ from schemas import HealthResponse
 # Configuration
 # ---------------------------------------------------------------------------
 
-from config import settings
-import database
+CORS_ORIGIN: str = os.environ.get("CORS_ORIGIN", "http://localhost:3000")
+ALLOWED_ORIGINS: str = os.environ.get(
+    "ALLOWED_ORIGINS",
+    f"{CORS_ORIGIN},http://localhost:3000,http://127.0.0.1:3000,*",
+)
+
+allowed_origins_list: list[str] = [
+    origin.strip() for origin in ALLOWED_ORIGINS.split(",") if origin.strip()
+]
+if not allowed_origins_list:
+    allowed_origins_list = ["*"]
 
 
 # ---------------------------------------------------------------------------
@@ -61,7 +70,7 @@ app = FastAPI(
 # CORS — allow origins from ALLOWED_ORIGINS environment variable
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
+    allow_origins=allowed_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
