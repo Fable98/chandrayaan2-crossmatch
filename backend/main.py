@@ -67,10 +67,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow origins from ALLOWED_ORIGINS environment variable
+# CORS — allow origins from ALLOWED_ORIGINS environment variable + all Vercel previews
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins_list,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
