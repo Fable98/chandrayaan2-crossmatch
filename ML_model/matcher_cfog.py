@@ -444,11 +444,15 @@ def match_images_cfog(
     pc1 = compute_phase_congruency(comp1_gray, num_orientations=4, num_scales=3)
     pc2 = compute_phase_congruency(comp2_gray, num_orientations=4, num_scales=3)
 
-    # 6. Spatially Distributed Coarse Matching
+    # 6. Spatially Distributed Coarse Matching (Symmetric Scale-Aware Sizing)
+    min_work_w = min(work_w1, work_w2)
+    min_work_h = min(work_h1, work_h2)
+
     cell_w = work_w1 / float(grid_size)
     cell_h = work_h1 / float(grid_size)
 
     coarse_matches = []
+    # Key half-patch size to preserve Phase Congruency Log-Gabor support
     half_patch_c = max(8, int(round((patch_size_m / working_gsd) / 4.0)))
 
     # Search window in image 2
