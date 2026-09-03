@@ -242,6 +242,9 @@ weights/
 tiles/
 outputs/
 *.geojson.cache
+registration_output_demo/
+benchmarks/registration_benchmark_output/
+dynamic_runs/
 
 # --- OS ---
 .DS_Store

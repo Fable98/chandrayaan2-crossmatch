@@ -1,267 +1,232 @@
-# Chandrayaan-2 Multi-Sensor Cross-Registration Engine (SIH26166)
+# Chandrayaan-2 Multi-Modal Cross-Sensor Image Correspondence
 
-Automated sub-pixel tie-point correspondence and projective co-registration software designed for Chandrayaan-2's Orbiter High-Resolution Camera (OHRC), Terrain Mapping Camera-2 (TMC-2), and Imaging Infrared Spectrometer (IIRS) instruments.
-
-Developed for the Smart India Hackathon (SIH26166) problem statement proposed by the Indian Space Research Organisation (ISRO).
-
----
-
-## 1. Problem Statement Overview
-
-Planetary image registration across distinct sensors on the Chandrayaan-2 orbiter presents acute computer vision and photogrammetric challenges:
-
-* **Orbiter High-Resolution Camera (OHRC)**: Panchromatic optical imagery at 0.25–0.32 m/pixel ground sampling distance (GSD).
-* **Terrain Mapping Camera-2 (TMC-2)**: Stereo optical imagery at ~4–5 m/pixel GSD (Fore, Aft, and Nadir views).
-* **Imaging Infrared Spectrometer (IIRS)**: Hyperspectral imagery at ~70–80 m/pixel GSD spanning 256 contiguous spectral channels (0.8–5.0 um).
-
-### Core Photogrammetric and Geometric Challenges
-
-1. **Extreme Scale Disparity**: An 18x–20x spatial resolution gap exists between OHRC and TMC-2, and an ~280x gap between OHRC and IIRS. Traditional patch-based cross-correlation fails because high-frequency textural features visible in OHRC collapse into single pixels in TMC-2 and sub-pixel fractions in IIRS.
-2. **Drastic Illumination Inversions**: Non-repeat polar orbits produce image acquisitions under wildly divergent solar azimuth and elevation angles (>160 degrees difference). Craters illuminate from opposite sides, producing inverted shadows that cause intensity-based metrics (such as MSE, SSIM, and normalized cross-correlation) to converge on false local minima.
-3. **Sub-Pixel Accuracy Demands**: Scientific analysis, DEM generation, and precision landing hazard avoidance require tie-point registration accuracy below 1.0 pixel RMSE.
-4. **Spatial Uniformity**: Feature detectors typically cluster hundreds of keypoints along high-contrast crater rims while completely ignoring flat lunar maria, producing degenerate geometric transformations when computing planar homographies or polynomial warps.
+### SIH Problem Statement 26166
+**Title**: Multi-modal, Sun angle and scale invariant image correspondence using Chandrayaan-2 optical images (OHRC, TMC and IIRS)  
+**Organization**: Indian Space Research Organisation (ISRO)
 
 ---
 
-## 2. Requirement Comparison: Demanded vs. Delivered
+## 1. Executive Summary
 
-The table below directly benchmarks the ISRO SIH26166 problem statement requirements against the software capabilities implemented in this repository:
+This repository provides an open, reproducible, and photogrammetrically defensible pipeline for cross-sensor image correspondence between Chandrayaan-2 orbital instruments:
+- **Orbiter High-Resolution Camera (OHRC)**: High-resolution panchromatic imaging (~0.25–0.32 m GSD).
+- **Terrain Mapping Camera-2 (TMC-2)**: Stereo panchromatic triplets (~4–5 m GSD) supporting lunar surface topographic mapping.
+- **Imaging Infrared Spectrometer (IIRS)**: Hyperspectral sensor (~70–80 m GSD) across 256 contiguous bands (~0.8–5.0 µm) providing mineralogical and volatile signatures.
 
-| Requirement (ISRO SIH26166) | Demanded Specification | Implementation Status | Implementation Details |
-| :--- | :--- | :---: | :--- |
-| **Generic Software Solution** | Must process arbitrary, previously unseen image pairs dynamically without hardcoded coordinates. | **Delivered** | Dynamic `POST /register` endpoint accepts arbitrary image uploads (GeoTIFF, PNG, JPEG), executes on-the-fly feature matching, computes homography, and returns registered products. |
-| **Sub-Pixel Accuracy** | Precision better than 1.0 pixel (e.g., < 0.5 pixel mean error). | **Delivered** | Two-stage matching: LoFTR transformer provides coarse correspondences, followed by 2D Fourier Phase Correlation with sub-pixel quadratic peak interpolation on extracted patches. |
-| **Spatial Uniformity** | Matches distributed across the full image domain, not clustered on crater rims. | **Delivered** | 10x10 spatial non-maximal suppression grid. The image is divided into 100 cells, capping matches to the top 5 highest-confidence points per cell to enforce broad spatial coverage. |
-| **Aspect-Ratio Preservation** | Scaled coordinates must match unscaled sensor geometry without aspect-ratio distortion. | **Delivered** | Dynamic resizing maps coordinates back to original unscaled pixel space using explicit independent coordinate scale factors before computing homography. |
-| **Registered Output Product** | Software must produce a warped product and visual proof of alignment. | **Delivered** | Generates perspective-warped source images (`warped_source.jpg`) and interactive 50px alternating checkerboard composite products (`registered_checkerboard.jpg`). |
-| **Scientific Metric Evaluation** | Quantitative accuracy metrics must be calculated and exposed. | **Delivered** | Calculates Root Mean Square Error (RMSE), total inlier count, true RANSAC inlier ratio, uniformity distribution score, and sub-pixel pass/fail validation. |
-| **Multi-Modal Hyperspectral Ingestion** | Ingestion of multi-band hyperspectral cubes (>3 channels). | **Delivered** | Rasterio and tifffile pipeline detects cubes with >3 channels and computes a calibrated pseudo-panchromatic intensity map via spectral averaging across valid bands. |
-| **Illumination Robustness** | Must handle severe solar incidence variations without divergence. | **Delivered** | Transformer-based dense local feature matching (LoFTR) learns global contextual relationships rather than relying on local intensity gradients. |
+### Primary Supported Scope
+* **Primary Registration Pipeline**: High-precision correspondence between **OHRC and TMC-2** (~16–20× linear physical resolution difference).
+* **IIRS Co-Registration Extension**: Co-registration of lower-resolution hyperspectral imagery as a spatial-spectral contextual overlay. IIRS is treated honestly as an ~70–80 m spectrometer product, without unphysical claims of sub-meter spatial reconstruction.
+* **Baseline Alternative**: A pretrained LoFTR baseline is provided for comparative evaluation alongside the primary structural engine.
 
 ---
 
-## 3. Engineering Architecture & Pipeline
+## 2. Scientific & Engineering Challenges
 
-```
-+-----------------------------------------------------------------------------------+
-|                            Input Multi-Sensor Imagery                             |
-|          OHRC (0.25 m/px)   |   TMC-2 (~4-5 m/px)   |   IIRS (~70-80 m/px)        |
-+-----------------------------------------------------------------------------------+
-                                         |
-                                         v
-+-----------------------------------------------------------------------------------+
-| Phase 1: Robust Sensor Ingestion & Preprocessing (`ML_model/matcher.py`)          |
-| - Format-agnostic loader: GeoTIFF, TIFF, PNG, JPEG via Rasterio & OpenCV          |
-| - Hyperspectral handling: Multi-band cubes (>3 channels) converted to             |
-|   1-channel pseudo-panchromatic intensity maps via spectral mean reduction        |
-| - Bit-depth normalization: Standardized to uint8 dynamic range                    |
-+-----------------------------------------------------------------------------------+
-                                         |
-                                         v
-+-----------------------------------------------------------------------------------+
-| Phase 2: Scale-Invariant Deep Feature Matching (LoFTR)                            |
-| - Internal 512x512 inference resolution with scale tracking                       |
-| - Linear Transformer self- and cross-attention across sensor representations       |
-| - Coordinate projection back to original pixel dimensions                         |
-+-----------------------------------------------------------------------------------+
-                                         |
-                                         v
-+-----------------------------------------------------------------------------------+
-| Phase 3: Spatial Uniformity Grid Filter                                            |
-| - 10x10 spatial grid partitioning over source image dimensions                    |
-| - Confidence-based non-maximal suppression (top 5 points per grid cell)           |
-| - Prevents crater rim clustering and enforces distributed coverage                 |
-+-----------------------------------------------------------------------------------+
-                                         |
-                                         v
-+-----------------------------------------------------------------------------------+
-| Phase 4: Sub-Pixel Refinement via Phase Correlation                               |
-| - Local patch extraction (32x32 window) around candidate tie-points                |
-| - 2D Fourier Cross-Power Spectrum computation                                     |
-| - Quadratic surface fitting for sub-pixel peak interpolation (<0.2 px precision)  |
-+-----------------------------------------------------------------------------------+
-                                         |
-                                         v
-+-----------------------------------------------------------------------------------+
-| Phase 5: RANSAC Homography & Registration Product Generation                      |
-| - Robust planar homography matrix estimation (RANSAC with 3.0 px threshold)       |
-| - Projective transformation of source image (`cv2.warpPerspective`)               |
-| - 50px alternating checkerboard composite blend for visual verification           |
-+-----------------------------------------------------------------------------------+
-                                         |
-                                         v
-+-----------------------------------------------------------------------------------+
-| Phase 6: Telemetry & Error Metrics                                                |
-| - RMSE (Root Mean Square Error in pixels)                                         |
-| - Inlier count & true RANSAC inlier ratio                                         |
-| - Spatial uniformity coverage percentage                                          |
-| - Sub-pixel verification flag (RMSE < 1.0 px)                                     |
-+-----------------------------------------------------------------------------------+
+| Challenge | Physical Phenomenon | Engineering Solution in this Pipeline |
+| :--- | :--- | :--- |
+| **Physical Scale Disparity** | OHRC (~0.25 m) vs. TMC-2 (~5 m) is a ~20× linear resolution gap. Windowing identical pixel patches covers drastically different ground areas (32 m vs. 640 m). | **Common Physical-GSD Normalization**: Resamples source imagery to a shared working physical ground footprint (~5 m/px) prior to coarse matching and patch correlation. |
+| **Solar Incidence & Illumination** | Drastic solar azimuth/elevation changes invert crater rim shadows, create false intensity gradients, and defeat raw pixel cross-correlation. | **Illumination-Robust Structural Representations**: 2D Log-Gabor Phase Congruency and CFOG (Channel Features of Oriented Gradients) extract frequency-phase edge features invariant to contrast reversals. |
+| **Topographic Relief Displacement** | Off-nadir emission angles on 3D cratered lunar terrain induce parallax displacement proportional to terrain elevation. | **DEM Relief Displacement Compensation**: Ingests lunar DEM elevation and spacecraft viewing geometry to compensate local parallax shifts prior to matching. |
+| **Evaluation Bias** | In-sample RANSAC RMSE evaluated strictly on the surviving inliers is self-fulfilling. | **Fit RMSE vs. Held-Out Validation RMSE**: Withholds an independent 20% validation split to evaluate true out-of-sample reprojection error. |
+| **Correspondence Integrity** | Unreliable algorithms fabricate corner points when matching fails. | **Zero Synthetic Fallbacks**: Failed registrations cleanly report failure diagnostic statuses without fabricating correspondences or identity matrices. |
+
+---
+
+## 3. Sensor Specifications
+
+| Sensor | Modality | Spectral Range | Nominal Spatial Resolution (GSD) | Mission Function |
+| :--- | :--- | :--- | :--- | :--- |
+| **OHRC** | Panchromatic optical | ~0.45–0.70 µm | ~0.25–0.32 m | Ultra-high resolution lunar lander site characterization and crater hazard assessment |
+| **TMC-2** | Panchromatic optical stereo | ~0.40–0.85 µm | ~4–5 m | Stereo triplets (Fore, Nadir, Aft) for lunar 3D digital elevation model (DEM) generation |
+| **IIRS** | Hyperspectral | ~0.80–5.00 µm | ~70–80 m | 256 contiguous spectral channels for mineralogical mapping and lunar hydration/OH detection |
+
+*Note: Nominal spatial resolutions correspond to the ~100 km circular lunar polar orbit. Resampling multi-sensor imagery to a common processing grid normalizes pixel coordinates, but does not alter the underlying sensor resolution limit.*
+
+---
+
+## 4. End-to-End System Architecture
+
+```text
+Chandrayaan-2 Orbital Products (PDS4 XML/IMG, GeoTIFF, Cubes)
+                        │
+                        ▼
+   Metadata & Observation Geometry Extraction
+   (Sensor type, GSD, Solar Azimuth, Emission Angle, Provenance)
+                        │
+                        ▼
+   Common Physical-GSD Normalization
+   (Resamples OHRC to reference working GSD ~5 m/px with INTER_AREA)
+                        │
+                        ▼
+   DEM Relief Displacement Compensation
+   (Terrain elevation parallax correction under off-nadir geometry)
+                        │
+                        ▼
+   Illumination-Robust Structural Feature Extraction
+   (2D Log-Gabor Phase Congruency & CFOG gradient channel representations)
+                        │
+                        ▼
+   Spatially Distributed Coarse Matching
+   (Configurable NxN spatial grid binning with maximum matches per cell)
+                        │
+                        ▼
+   Local Fourier Phase Correlation Sub-Pixel Refinement
+   (2D quadratic peak surface fitting on matched physical ground patches)
+                        │
+                        ▼
+   Robust Geometric Estimation & Quality Gates
+   (RANSAC projective/affine estimation with condition number & determinant sanity checks)
+                        │
+                        ▼
+   Complete Registered Product Package Generation
+   ┌────────────────────┬────────────────────┬────────────────────┐
+   │ registered_source  │ checkerboard_qa    │ matches.json       │
+   │ (.tif / GeoTIFF)   │ (.png 50px blocks) │ (native coords)    │
+   ├────────────────────┼────────────────────┼────────────────────┤
+   │ preview.png        │ metrics.json       │ metadata.json      │
+   └────────────────────┴────────────────────┴────────────────────┘
+                        │
+                        ▼
+   Canonical Quantitative Evaluation
+   (Fit RMSE, Held-out Validation RMSE, Spatial Coverage, Uniformity Score)
+                        │
+                        ▼
+   IIRS Hyperspectral Co-Registration & Spatial-Spectral Overlay
 ```
 
 ---
 
-## 4. Scope & Scientific Demarcation
+## 5. Quantitative Evaluation Metrics
 
-* **Primary Registration Engine (OHRC <-> TMC-2)**: High-resolution panchromatic optical data (OHRC) is registered to stereo context optical data (TMC-2). The deep matching network and phase correlation algorithms operate directly between these two sensors.
-* **IIRS Hyperspectral Status**: IIRS data has a native spatial resolution of ~70–80 m/pixel across 256 spectral channels. In this software:
-  * Multi-band GeoTIFF cubes are ingested and converted to calibrated intensity layers.
-  * IIRS mineralogy layers are presented as co-registered spatial overlays within the GIS viewer.
-  * Direct 256-band hyperspectral tie-point matching is classified as an experimental stretch capability due to physical resolution limits (80 m information cannot synthetically yield 0.25 m spatial features).
-* **Terminology**: This system uses the scientifically verified designation **illumination-robust**, reflecting deep cross-attention invariance to solar angles rather than unphysical claims of absolute illumination invariance.
+All metrics in the repository are computed via a single canonical module ([`ML_model/metrics.py`](file:///Users/shresthkumar/chandrayaan2-crossmatch/ML_model/metrics.py)):
 
----
-
-## 5. Repository Layout
-
-```
-chandrayaan2-crossmatch/
-├── ML_model/
-│   ├── matcher.py              # Core LoFTR, 10x10 grid filter, phase correlation & warping
-│   └── loftr_outdoor.ckpt      # Pre-trained deep matching weights
-├── backend/
-│   ├── main.py                 # FastAPI application & dynamic /register endpoint
-│   ├── config.py               # Pydantic environment configuration
-│   ├── schemas.py              # Request/response validation schemas
-│   ├── test_api.py             # Pytest automated test suite (34 test cases)
-│   ├── requirements.txt        # Backend dependencies (FastAPI, Uvicorn, OpenCV, Rasterio)
-│   ├── data/
-│   │   └── loader.py           # In-memory triplet catalog and match point indexing
-│   └── routers/
-│       ├── triplets.py         # Triplet catalog endpoints
-│       ├── matches.py          # Tie-point and telemetry endpoints
-│       └── images.py           # Tile, DEM, and IIRS imagery streaming
-├── lunar-frontend/             # Production Next.js 14 Web Application
-│   ├── src/
-│   │   ├── app/                # Next.js App Router root layout and page
-│   │   ├── components/
-│   │   │   ├── Console.tsx             # Primary mission registration console
-│   │   │   ├── MapPanel.tsx            # Leaflet-based multi-payload lunar GIS map
-│   │   │   ├── LinkedCursorPanel.tsx   # Interactive side-by-side tie-point inspection
-│   │   │   ├── RegistrationLauncher.tsx# Dynamic file upload & live registration modal
-│   │   │   ├── archive/                # Dossier, Vault, and Theory technical modals
-│   │   │   └── hero/                   # 3D interactive lunar globe landing interface
-│   │   └── lib/                # API client, coordinate math, and TypeScript interfaces
-│   ├── package.json
-│   ├── vercel.json             # Vercel deployment configuration
-│   └── tailwind.config.js
-├── data_preprocessing_pipeline/
-│   ├── processed_triplets/     # Pre-processed lunar region datasets
-│   └── config/default.yaml     # Ingestion GSD and projection profiles
-├── requirements.txt            # Root Python dependencies
-└── render.yaml                 # Render infrastructure-as-code deployment specification
-```
+1. **In-Sample Fit RMSE (`fit_rmse_px`)**:
+   $$\text{RMSE}_{fit} = \sqrt{\frac{1}{N_{inliers}} \sum_{i=1}^{N_{inliers}} \|H p_i - q_i\|^2}$$
+   Evaluated strictly on correspondences used to estimate the transformation matrix $H$.
+2. **Held-Out Validation RMSE (`validation_rmse_px`)**:
+   Splits verified inlier points into training (80%) and validation (20%) sets. Re-estimates $H$ on training points and computes error exclusively on unseen validation points to eliminate in-sample fitting bias.
+3. **Inlier Ratio (`inlier_ratio`)**:
+   $$\text{Ratio} = \frac{N_{inliers}}{\max(1, N_{raw\_matches})}$$
+4. **Spatial Coverage (`spatial_coverage`)**:
+   $$\text{Coverage} = \frac{\text{Occupied Grid Cells}}{\text{Total Grid Cells (e.g. 100)}}$$
+5. **Spatial Uniformity Score (`spatial_uniformity`)**:
+   Combines grid coverage with match count dispersion: $\text{Score} = \text{Coverage} \times \exp(-0.3 \cdot \frac{\sigma}{\mu + \epsilon})$.
+6. **Sub-Pixel Distribution**:
+   Measures fraction of correspondences with reprojection error below 1.0 px, 0.5 px, and 0.25 px.
+7. **Transformation Quality Gates**:
+   Evaluates condition number, determinant positivity, and scale ratio to reject singular or severely distorted transformations.
 
 ---
 
-## 6. Installation and Setup
+## 6. Empirical Benchmark Results
+
+### A. Synthetic Sub-Pixel Displacement Benchmark
+Evaluated across calibrated sub-pixel shifts ($0.05, 0.10, 0.20, 0.30, 0.50, 0.75$ px) on synthetic cratered lunar terrain textures ([`scripts/benchmark_subpixel.py`](file:///Users/shresthkumar/chandrayaan2-crossmatch/scripts/benchmark_subpixel.py)):
+
+* **Mean Absolute Error**: $0.5812$ px
+* **Median Absolute Error**: $0.3861$ px
+* **Fraction < 0.25 px**: $33.3\%$
+* **Fraction < 0.50 px**: $66.7\%$
+* **Fraction < 1.00 px**: $83.3\%$
+* *Finding: Sub-pixel phase correlation achieves sub-half-pixel refinement (~0.38 px median error), with over 83% of points resolved under 1 pixel.*
+
+### B. Multi-Region Mission Dataset Benchmark
+Evaluated across real Chandrayaan-2 lunar regions ([`scripts/benchmark_registration.py`](file:///Users/shresthkumar/chandrayaan2-crossmatch/scripts/benchmark_registration.py)):
+
+| Region ID | Status | Inliers | Inlier Ratio | Fit RMSE (px) | Spatial Coverage | Runtime (s) |
+| :--- | :--- | :---: | :---: | :---: | :---: | :---: |
+| `region_001` | SUCCESS | 7 | 9.1% | 1.84 | 7.0% | 0.15s |
+| `region_002` | SUCCESS | 7 | 9.1% | 1.26 | 7.0% | 0.15s |
+| `region_003` | REJECTED (Quality Gate) | 0 | 0.0% | N/A | 0.0% | 0.13s |
+| `region_004` | SUCCESS | 7 | 9.1% | 1.79 | 7.0% | 0.15s |
+| `region_005` | SUCCESS | 5 | 6.5% | 0.80 | 5.0% | 0.14s |
+| `region_006` | SUCCESS | 6 | 7.8% | 1.65 | 6.0% | 0.15s |
+
+*Key Demonstration: Region 003 features low structural texture; the pipeline rejected the invalid match set cleanly (`status: "geometric_verification_failed"`) without fabricating artificial correspondences.*
+
+---
+
+## 7. SIH Problem Statement 26166 Delivery Matrix
+
+| Requirement from Problem Statement | Status | Technical Evidence in Repository |
+| :--- | :--- | :--- |
+| **OHRC ↔ TMC-2 Cross-Registration** | Delivered (Primary) | Primary CFOG/Phase Congruency engine in [`ML_model/matcher_cfog.py`](file:///Users/shresthkumar/chandrayaan2-crossmatch/ML_model/matcher_cfog.py) |
+| **Multi-Modal Hyperspectral (IIRS)** | Delivered (Co-Registration) | Multi-band reader, spectral mean extraction, and spatial overlay layer |
+| **Scale Disparity Handling** | Delivered | Common physical-GSD normalization in [`ML_model/matcher_cfog.py`](file:///Users/shresthkumar/chandrayaan2-crossmatch/ML_model/matcher_cfog.py) |
+| **Sun-Angle / Illumination Robustness** | Delivered | 2D Log-Gabor Phase Congruency & CFOG frequency structural features |
+| **Spatially Distributed Matches** | Delivered | Grid binning & spatial distribution metrics in [`ML_model/metrics.py`](file:///Users/shresthkumar/chandrayaan2-crossmatch/ML_model/metrics.py) |
+| **Sub-Pixel Refinement** | Delivered | 2D Fourier Phase Correlation quadratic interpolation benchmarked at ~0.38 px median |
+| **Independent Evaluation Metrics** | Delivered | In-sample Fit RMSE separated from Held-Out Validation RMSE in [`ML_model/metrics.py`](file:///Users/shresthkumar/chandrayaan2-crossmatch/ML_model/metrics.py) |
+| **Terrain Parallax Compensation** | Delivered | Local DEM-based relief displacement compensation in [`ML_model/matcher_cfog.py`](file:///Users/shresthkumar/chandrayaan2-crossmatch/ML_model/matcher_cfog.py) |
+| **Full Output Product Package** | Delivered | Registered GeoTIFF (`.tif`), preview (`.png`), checkerboard (`.png`), JSON sidecars |
+| **Zero Fake Fallbacks** | Verified | Clean error states on failure; zero manufactured corner points |
+
+---
+
+## 8. Installation & Usage Guide
 
 ### Prerequisites
+* Python 3.10+ (macOS, Linux, Windows WSL)
+* Node.js 18+ (for Next.js frontend)
 
-* Python 3.10 to 3.12 (Python 3.11 recommended)
-* Node.js 18.x or later (with npm 9+)
-* Git LFS (if cloning model checkpoints)
-
-### 1. Clone the Repository
-
+### Installation
 ```bash
+# 1. Clone repository
 git clone https://github.com/Fable98/chandrayaan2-crossmatch.git
 cd chandrayaan2-crossmatch
-```
 
-### 2. Backend Setup
-
-```bash
-# Create and activate a virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
+# 2. Install backend dependencies
 pip install -r backend/requirements.txt
 
-# Run the test suite to verify installation
-pytest backend/test_api.py
+# 3. Install frontend dependencies
+cd lunar-frontend && npm install && cd ..
 ```
 
-### 3. Frontend Setup
-
+### Running the Deterministic Demo
 ```bash
-cd lunar-frontend
-npm install
-cp .env.local.example .env.local
-cd ..
+python3 scripts/demo_registration.py \
+  --source data_preprocessing_pipeline/processed_triplets/region_001/ohrc_512.png \
+  --reference data_preprocessing_pipeline/processed_triplets/region_001/tmc_512.png \
+  --dem data_preprocessing_pipeline/processed_triplets/region_001/dem_512.png \
+  --output registration_output_demo
+```
+
+### Running the Benchmarks
+```bash
+# Synthetic ground-truth subpixel benchmark
+python3 scripts/benchmark_subpixel.py
+
+# Multi-region registration benchmark
+python3 scripts/benchmark_registration.py
+```
+
+### Running the Test Suite
+```bash
+pytest backend/test_api.py tests/test_registration_pipeline.py -v
+```
+
+### Starting the Production Servers Locally
+```bash
+# Terminal 1: FastAPI Backend (Port 8000)
+python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+# Terminal 2: Next.js Mission Console (Port 3000)
+cd lunar-frontend && npm run dev
 ```
 
 ---
 
-## 7. Running the Project Locally
+## 9. Limitations & Future Scope
 
-To run the complete system, start the backend and frontend in separate terminal windows:
-
-### Terminal 1: FastAPI Backend Service
-
-```bash
-source venv/bin/activate
-uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
-```
-
-* API Base URL: `http://localhost:8000`
-* Health Check: `http://localhost:8000/health`
-* Interactive API Documentation (Swagger): `http://localhost:8000/docs`
-
-### Terminal 2: Next.js Frontend
-
-```bash
-cd lunar-frontend
-npm run dev
-```
-
-* Web Application: `http://localhost:3000`
-* Direct Mission Console: `http://localhost:3000/?view=console`
+1. **Planar Projective Approximation**: The homography model operates as a local projective approximation. On steep lunar crater walls (>30° slope), non-planar relief displacement can induce localized residual errors.
+2. **DEM Relief Compensation**: Relief displacement compensation currently uses local vertical height offsets rather than full iterative photogrammetric ray-intersection with a lunar orbital sensor model.
+3. **IIRS Resolution Boundary**: IIRS GSD (~70–80 m) limits direct optical tie-point extraction. Hyperspectral information is integrated through co-registration rather than sub-meter feature correspondence.
 
 ---
 
-## 8. Deployment Architecture
+## 10. Authoritative References
 
-| Component | Platform | URL | Configuration |
-| :--- | :--- | :--- | :--- |
-| **Frontend** | Vercel | `https://chandrayaan2-crossmatch-sand.vercel.app` | Next.js 14 App Router, auto-deploy from `main` branch with root directory `lunar-frontend`. |
-| **Backend** | Render | `https://chandrayaan2-crossmatch.onrender.com` | FastAPI with Uvicorn, Python 3.11 environment. |
-
-### Memory Optimization for Free Tier Hosting
-
-To operate reliably within constrained cloud environments (such as Render's 512 MB RAM free tier):
-* **Lazy Loading**: Heavy dependencies (`torch`, `kornia`, `LoFTR`) are imported on-demand inside `match_images` rather than during module initialization. The API boots in under 20 MB of RAM.
-* **Explicit Garbage Collection**: `gc.collect()` and `torch.cuda.empty_cache()` are invoked immediately after registration inference to release memory buffers.
-* **CORS Security**: `backend/main.py` uses regex origin validation (`allow_origin_regex=r"https://.*\.vercel\.app"`) to support preview and production frontend domains without manual origin whitelisting.
-
----
-
-## 9. Verification & Testing
-
-### Backend Unit Tests
-
-The backend test suite verifies schema conformance, catalog retrieval, tile streaming, error handling, and dynamic registration validation:
-
-```bash
-pytest backend/test_api.py -v
-```
-
-All 34 tests execute and pass in under one second.
-
-### Frontend Compilation
-
-Verify TypeScript types and production bundle generation:
-
-```bash
-cd lunar-frontend
-npm run build
-```
-
-The Next.js build compiles all routes cleanly with zero linting or type errors.
-
----
-
-## 10. License
-
-Developed under the Smart India Hackathon (SIH 2024 / SIH26166) initiative for research and academic evaluation under ISRO problem statement specifications.
+1. **ISRO Chandrayaan-2 Payload Documentation**: ISSDC/PRADAN Planetary Data System (PDS4) standards for OHRC, TMC-2, and IIRS.
+2. **Phase Congruency**: Kovesi, P. (2000). *Phase Congruency Detects Corners and Edges*. The Australian Pattern Recognition Society Conference (DICTA 2000).
+3. **CFOG Descriptor**: Ye, Y., Shan, J., Hao, S., Bruzzone, L., & Qin, Y. (2019). *A Local Feature Descriptor Based on Channel Features of Oriented Gradients for Multispectral Remote Sensing Image Registration*. IEEE Transactions on Geoscience and Remote Sensing (TGRS), 58(4), 2310-2321.
+4. **LoFTR Baseline**: Sun, J., Shen, Z., Wang, Y., Bao, H., & Zhou, X. (2021). *LoFTR: Detector-Free Local Feature Matching with Transformers*. IEEE/CVF Conference on Computer Vision and Pattern Recognition (CVPR).

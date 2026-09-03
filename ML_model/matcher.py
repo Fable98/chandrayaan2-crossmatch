@@ -1,16 +1,25 @@
+"""
+matcher.py — Pretrained LoFTR Baseline (Alternative / Benchmark Pipeline)
+
+Retained as an alternative baseline for comparative evaluation against the primary
+CFOG / Phase Congruency pipeline. Uses pretrained outdoor transformer weights (not lunar-trained).
+"""
+
 import cv2
 import numpy as np
 import json
 import os
 import math
 
+from metrics import compute_canonical_metrics
+
 def match_images(img_path1, img_path2, output_dir="output"):
     """
-    Complete pipeline for SIH26166:
-    1. Scale-invariant LoFTR matching (mapping back to original resolution).
-    2. Grid-based spatial uniformity filter.
-    3. Sub-pixel refinement via Phase Correlation.
-    4. Homography computation and Registered Product generation.
+    Pretrained LoFTR Baseline Matcher:
+    1. Resizes to model-compatible 512x512 with recorded coordinate scaling.
+    2. Runs pretrained LoFTR feature matcher (baseline).
+    3. Transforms detected coordinates back to native image dimensions.
+    4. Evaluates canonical metrics (Fit RMSE, Held-out Validation RMSE, spatial distribution).
     """
     # LAZY IMPORTS: Prevents OOM crash on Render Free Tier (512MB RAM) during startup
     import torch
@@ -27,7 +36,7 @@ def match_images(img_path1, img_path2, output_dir="output"):
             with rasterio.open(path) as src:
                 if src.count > 3:  # Hyperspectral cube (e.g., IIRS)
                     bands = src.read()  # (C, H, W)
-                    gray = bands.mean(axis=0).astype("float32")
+                    gray = np.nanmean(bands, axis=0).astype("float32")
                     gray = np.clip(gray, 0, 255).astype("uint8")
                     color = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
                     return gray, color
@@ -51,47 +60,51 @@ def match_images(img_path1, img_path2, output_dir="output"):
     img1_orig, img1_color = load_as_gray_and_color(img_path1)
     img2_orig, img2_color = load_as_gray_and_color(img_path2)
     
-    orig_h1, orig_w1 = img1_orig.shape
-    orig_h2, orig_w2 = img2_orig.shape
+    orig_h1, orig_w1 = img1_orig.shape[:2]
+    orig_h2, orig_w2 = img2_orig.shape[:2]
 
     # 2. Prepare for LoFTR (Resize internally for inference only)
     # LoFTR performs best on ~512x512. We resize for the network, then scale coordinates back.
     target_size = 512
-    img1_resized = cv2.resize(img1_orig, (target_size, target_size))
-    img2_resized = cv2.resize(img2_orig, (target_size, target_size))
+    img1_resized = cv2.resize(img1_orig, (target_size, target_size), interpolation=cv2.INTER_AREA)
+    img2_resized = cv2.resize(img2_orig, (target_size, target_size), interpolation=cv2.INTER_AREA)
 
-    img1_tensor = K.image_to_tensor(img1_resized, keepdim=True).float() / 255.0
-    img2_tensor = K.image_to_tensor(img2_resized, keepdim=True).float() / 255.0
-    img1_tensor = img1_tensor.unsqueeze(0).to(device)
-    img2_tensor = img2_tensor.unsqueeze(0).to(device)
+    t_img1 = K.image_to_tensor(img1_resized, False).float() / 255.0
+    t_img2 = K.image_to_tensor(img2_resized, False).float() / 255.0
 
-    # Load LoFTR
-    matcher = LoFTR(pretrained=None).to(device).eval()
-    # Assume loftr_outdoor.ckpt is in the same directory or root
-    ckpt_path = 'loftr_outdoor.ckpt'
-    if not os.path.exists(ckpt_path):
-        ckpt_path = os.path.join(os.path.dirname(__file__), 'loftr_outdoor.ckpt')
-        
-    state_dict = torch.load(ckpt_path, map_location=device)
-    if 'state_dict' in state_dict:
-        matcher.load_state_dict(state_dict['state_dict'])
-    else:
-        matcher.load_state_dict(state_dict)
+    t_img1 = t_img1.to(device)
+    t_img2 = t_img2.to(device)
 
-    # 3. Inference
+    # 3. Match using pretrained LoFTR
+    matcher = LoFTR(pretrained='outdoor').to(device)
+    matcher.eval()
+    
     with torch.no_grad():
-        correspondences = matcher({"image0": img1_tensor, "image1": img2_tensor})
+        input_dict = {"image0": t_img1, "image1": t_img2}
+        correspondences = matcher(input_dict)
 
     mkpts0_resized = correspondences['keypoints0'].cpu().numpy()
     mkpts1_resized = correspondences['keypoints1'].cpu().numpy()
     confidence = correspondences['confidence'].cpu().numpy()
 
-    if len(mkpts0_resized) < 4:
-        return {"error": "Not enough matches found."}
+    del matcher, t_img1, t_img2, input_dict, correspondences
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+    gc.collect()
 
-    # 4. Scale coordinates back to ORIGINAL image space (Crucial for Scale Invariance)
-    scale_x1, scale_y1 = orig_w1 / target_size, orig_h1 / target_size
-    scale_x2, scale_y2 = orig_w2 / target_size, orig_h2 / target_size
+    if len(mkpts0_resized) < 4:
+        return {
+            "status": "insufficient_correspondences",
+            "message": f"Pretrained LoFTR baseline found only {len(mkpts0_resized)} matches (minimum 4 required).",
+            "match_count": len(mkpts0_resized),
+            "inlier_count": 0,
+            "metrics": None,
+            "homography": None,
+        }
+
+    # 4. Map coordinates back to NATIVE image space
+    scale_x1, scale_y1 = orig_w1 / float(target_size), orig_h1 / float(target_size)
+    scale_x2, scale_y2 = orig_w2 / float(target_size), orig_h2 / float(target_size)
 
     mkpts0 = mkpts0_resized.copy()
     mkpts1 = mkpts1_resized.copy()
@@ -187,52 +200,39 @@ def match_images(img_path1, img_path2, output_dir="output"):
     warp_path = os.path.join(output_dir, "warped_source.jpg")
     cv2.imwrite(warp_path, warped_img1)
 
-    # 10. Calculate Metrics
-    # Calculate RMSE based on the final inliers
-    projected_pts = cv2.perspectiveTransform(uniform_mkpts0.reshape(-1, 1, 2), H_final)
-    projected_pts = projected_pts.reshape(-1, 2)
-    errors = np.linalg.norm(projected_pts - refined_mkpts1, axis=1).flatten()
-    
-    rmse = np.sqrt(np.mean(errors**2))
-    # FIX: inlier_ratio should reflect true RANSAC survival rate, not grid-capped subset
-    inlier_ratio = len(good_mkpts0) / max(1, len(mkpts0))
-    uniformity_score = len(grid_dict) / float(grid_size * grid_size)
-    
-    metrics = {
-        "num_inliers": len(uniform_mkpts0),
-        "rmse_px": float(rmse),
-        "inlier_ratio": float(inlier_ratio),
-        "uniformity_score": float(uniformity_score),
-        "sub_pixel_accurate": bool(rmse < 1.0),
-        "fraction_below_1px": float(np.mean(errors < 1.0))
-    }
+    # 10. Compute Canonical Master Metrics
+    inlier_mask_final = np.ones((len(uniform_mkpts0), 1), dtype=np.uint8)
+    metrics = compute_canonical_metrics(
+        uniform_mkpts0, refined_mkpts1, inlier_mask_final, H_final, (orig_h2, orig_w2), grid_size
+    )
+    # Add backward compatibility aliases
+    metrics["num_inliers"] = metrics["inlier_count"]
+    metrics["rmse_px"] = metrics["fit_rmse_px"]
+    metrics["uniformity_score"] = metrics["spatial_uniformity"]
 
     # Save matches to JSON
     matches_data = []
     for i in range(len(uniform_mkpts0)):
         matches_data.append({
-            "image1_x": float(uniform_mkpts0[i][0]),
-            "image1_y": float(uniform_mkpts0[i][1]),
-            "image2_x": float(refined_mkpts1[i][0]),
-            "image2_y": float(refined_mkpts1[i][1])
+            "source_x": float(uniform_mkpts0[i][0]),
+            "source_y": float(uniform_mkpts0[i][1]),
+            "target_x": float(refined_mkpts1[i][0]),
+            "target_y": float(refined_mkpts1[i][1]),
+            "is_inlier": True,
         })
         
     json_path = os.path.join(output_dir, "matches.json")
     with open(json_path, 'w') as f:
         json.dump(matches_data, f, indent=4)
 
-    # Explicit memory cleanup to prevent OOM on subsequent requests
-    del matcher, img1_tensor, img2_tensor, correspondences
-    gc.collect()
-    if torch.cuda.is_available():
-        torch.cuda.empty_cache()
-
     return {
+        "status": "success",
+        "method": "loftr_pretrained_baseline",
         "metrics": metrics,
         "homography": H_final.tolist() if H_final is not None else None,
         "matches_path": json_path,
         "visual_path": vis_path,
-        "warped_path": warp_path
+        "warped_path": warp_path,
     }
 
 if __name__ == "__main__":

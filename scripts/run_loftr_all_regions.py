@@ -1,17 +1,18 @@
 """
-run_loftr_all_regions.py — Multi-modal, Sun angle & scale invariant matching pipeline.
+run_loftr_all_regions.py — Baseline LoFTR cross-sensor matching pipeline with physical-GSD and illumination-robust representations.
 
 Performs:
-  1. LoFTR inference on multi-modal pairs (OHRC <-> TMC, OHRC <-> IIRS, TMC <-> IIRS)
-  2. Multi-representation matching: combines raw optical imagery with photometric/census invariant representations
+  1. Pretrained LoFTR inference on multi-modal pairs (OHRC <-> TMC, OHRC <-> IIRS, TMC <-> IIRS)
+  2. Multi-representation matching: combines optical imagery with photometric/structural invariant representations
   3. RANSAC geometric verification & outlier rejection
   4. Grid-based uniform spatial distribution filtering
-  5. Computes complete evaluation metrics (RMSE, inlier ratio, coverage, sub-pixel validation)
+  5. Computes complete canonical evaluation metrics (Fit RMSE, validation RMSE, inlier ratio, coverage)
   6. Generates registered output products
 """
 
 import json
 import os
+import sys
 from pathlib import Path
 from typing import Any
 import cv2
@@ -20,8 +21,8 @@ import torch
 import kornia as K
 from kornia.feature import LoFTR
 
-from scripts.distribution import filter_uniform_matches
-from lunar_project.src.ml.evaluation.metrics import compute_all_metrics
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ML_model"))
+from metrics import compute_canonical_metrics
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 PROCESSED_TRIPLETS_DIR = BASE_DIR / "data_preprocessing_pipeline" / "processed_triplets"

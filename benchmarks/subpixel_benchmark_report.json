@@ -1,0 +1,65 @@
+{
+    "benchmark_name": "Synthetic Lunar Terrain Sub-Pixel Phase Correlation",
+    "tested_shifts_px": [
+        0.05,
+        0.1,
+        0.2,
+        0.3,
+        0.5,
+        0.75
+    ],
+    "total_trials": 90,
+    "mean_absolute_error_px": 0.5812,
+    "median_absolute_error_px": 0.3861,
+    "max_absolute_error_px": 1.6078,
+    "std_absolute_error_px": 0.5207,
+    "fraction_below_0_25px": 0.3333,
+    "fraction_below_0_5px": 0.6667,
+    "fraction_below_1px": 0.8333,
+    "validated_subpixel_threshold_px": 0.25,
+    "subpixel_capable": false,
+    "per_shift_breakdown": {
+        "0.05_px": {
+            "tested_displacement_px": 0.05,
+            "mean_error_px": 0.075,
+            "median_error_px": 0.075,
+            "max_error_px": 0.0753,
+            "std_error_px": 0.0002
+        },
+        "0.10_px": {
+            "tested_displacement_px": 0.1,
+            "mean_error_px": 0.1506,
+            "median_error_px": 0.1507,
+            "max_error_px": 0.151,
+            "std_error_px": 0.0003
+        },
+        "0.20_px": {
+            "tested_displacement_px": 0.2,
+            "mean_error_px": 0.3061,
+            "median_error_px": 0.3064,
+            "max_error_px": 0.3085,
+            "std_error_px": 0.0015
+        },
+        "0.30_px": {
+            "tested_displacement_px": 0.3,
+            "mean_error_px": 0.4725,
+            "median_error_px": 0.471,
+            "max_error_px": 0.4811,
+            "std_error_px": 0.0061
+        },
+        "0.50_px": {
+            "tested_displacement_px": 0.5,
+            "mean_error_px": 0.9081,
+            "median_error_px": 0.9021,
+            "max_error_px": 0.9938,
+            "std_error_px": 0.0571
+        },
+        "0.75_px": {
+            "tested_displacement_px": 0.75,
+            "mean_error_px": 1.5747,
+            "median_error_px": 1.571,
+            "max_error_px": 1.6078,
+            "std_error_px": 0.0218
+        }
+    }
+}

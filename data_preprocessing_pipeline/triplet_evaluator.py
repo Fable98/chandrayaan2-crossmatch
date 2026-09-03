@@ -18,7 +18,8 @@ import numpy as np
 
 # Add project roots
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ML_model"))
-from matcher_cfog import match_images_cfog, compute_triplet_consistency
+from matcher_cfog import match_images_cfog
+from metrics import compute_triplet_consistency
 
 
 def evaluate_triplet_consistency(

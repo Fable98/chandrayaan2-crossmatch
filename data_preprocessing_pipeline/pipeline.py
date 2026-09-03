@@ -120,7 +120,7 @@ def load_raw_lunar_image(path: Path | str) -> Tuple[np.ndarray, Dict[str, Any]]:
     return arr.astype(np.float32), metadata
 
 
-def orthorectify_image_with_dem(
+def apply_dem_relief_compensation(
     image: np.ndarray,
     dem: Optional[np.ndarray] = None,
     emission_deg: float = 0.0,
@@ -128,8 +128,11 @@ def orthorectify_image_with_dem(
     gsd_m: float = 5.0,
 ) -> np.ndarray:
     """
-    Projective relief displacement correction using lunar DEM elevation data.
-    Maps perspective sensor coordinates back to common map projection.
+    Applies simplified local DEM-based relief displacement compensation.
+    Corrects geometric parallax caused by lunar terrain elevation under off-nadir emission angles.
+    
+    NOTE: This is local DEM relief displacement compensation. It is not equivalent to a
+    full photogrammetric rigorous sensor-model ray-tracing orthorectifier.
     """
     h, w = image.shape[:2]
     if dem is None or abs(emission_deg) < 1e-3:
@@ -154,27 +157,31 @@ def orthorectify_image_with_dem(
     map_x = (x_coords + dx).astype(np.float32)
     map_y = (y_coords + dy).astype(np.float32)
 
-    ortho = cv2.remap(
+    compensated = cv2.remap(
         image,
         map_x,
         map_y,
         interpolation=cv2.INTER_LINEAR,
         borderMode=cv2.BORDER_REFLECT,
     )
-    return ortho
+    return compensated
 
 
-def export_orthorectified_geotiff(
-    ortho_arr: np.ndarray,
+# Backward compatibility alias
+orthorectify_image_with_dem = apply_dem_relief_compensation
+
+
+def export_registered_geotiff(
+    arr: np.ndarray,
     out_path: Path | str,
     meta: Optional[Dict[str, Any]] = None,
 ) -> None:
     """
-    Exports orthorectified array as GeoTIFF (if rasterio is installed) or GeoTIFF/PNG.
+    Exports registered/compensated array as GeoTIFF (if rasterio is installed) or PNG.
     """
     out_p = Path(out_path)
     out_p.parent.mkdir(parents=True, exist_ok=True)
-    u8 = (np.clip(ortho_arr, 0.0, 1.0) * 255.0).astype(np.uint8)
+    u8 = (np.clip(arr, 0.0, 1.0) * 255.0).astype(np.uint8)
 
     written = False
     try:
@@ -203,6 +210,9 @@ def export_orthorectified_geotiff(
     # Also save standard image output for web visualization
     img_out = out_p.with_suffix(".png")
     cv2.imwrite(str(img_out), u8)
+
+
+export_orthorectified_geotiff = export_registered_geotiff
 
 
 def process_and_orthorectify(

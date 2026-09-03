@@ -177,7 +177,7 @@ async def register_images(
 
         # Validate that image can be parsed by multi-band loader
         try:
-            _, _ = load_as_float_and_color(path)
+            load_as_float_and_color(path)
         except Exception:
             raise HTTPException(
                 status_code=400,
@@ -189,30 +189,42 @@ async def register_images(
             from matcher import match_images
             result = match_images(str(source_path), str(ref_path), output_dir=str(output_dir))
         else:
-            # Default to scientific Phase Congruency & CFOG multi-scale matching
-            emission1 = 0.0 if "ohr" in source_sensor.lower() else 12.0
-            emission2 = 12.0 if "tmc" in reference_sensor.lower() else 0.0
+            # Default to primary Phase Congruency & CFOG multi-scale matching
             result = match_images_cfog(
                 str(source_path),
                 str(ref_path),
                 dem_path=str(dem_path) if dem_path else None,
                 output_dir=str(output_dir),
-                emission_deg1=emission1,
-                emission_deg2=emission2,
+                source_sensor=source_sensor,
+                reference_sensor=reference_sensor,
             )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Matching pipeline failed: {str(e)}")
 
-    if isinstance(result, dict) and result.get("error"):
-        raise HTTPException(status_code=400, detail=str(result["error"]))
+    status = result.get("status", "success")
+    if status != "success":
+        return RegisterResponse(
+            status=status,
+            message=result.get("message", "Registration failed to verify geometric correspondence."),
+            metrics=result.get("metrics"),
+            homography=None,
+            visual_url=None,
+            warped_url=None,
+            matches_url=None,
+            raster_url=None,
+            metadata=result.get("metadata"),
+        )
 
     return RegisterResponse(
         status="success",
+        message="Registration verified successfully.",
         metrics=result.get("metrics"),
         homography=result.get("homography"),
-        visual_url=f"/dynamic_runs/{run_id}/output/registered_checkerboard.jpg",
-        warped_url=f"/dynamic_runs/{run_id}/output/warped_source.jpg",
+        visual_url=f"/dynamic_runs/{run_id}/output/registered_checkerboard.png",
+        warped_url=f"/dynamic_runs/{run_id}/output/registered_preview.png",
         matches_url=f"/dynamic_runs/{run_id}/output/matches.json",
+        raster_url=f"/dynamic_runs/{run_id}/output/registered_source.tif",
+        metadata=result.get("metadata"),
     )
 
 

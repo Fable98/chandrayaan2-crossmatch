@@ -139,8 +139,12 @@ class MatchMetrics(BaseModel):
     combined_coverage_score: float = 0.0
     uniformity_score: float = 0.0
     triplet_consistency_px: float | None = None
+    fit_rmse_px: float | None = None
+    validation_rmse_px: float | None = None
+    validation_status: str | None = None
     method: str | None = None
     orthorectified: bool = False
+    terrain_correction: dict | None = None
 
 
 class MatchesResponse(BaseModel):
@@ -168,8 +172,12 @@ class RegisterRequest(BaseModel):
 
 class RegisterResponse(BaseModel):
     status: str
+    message: str | None = None
     metrics: dict | None = None
     homography: list[list[float]] | None = None
     visual_url: str | None = None
     warped_url: str | None = None
     matches_url: str | None = None
+    raster_url: str | None = None
+    metadata: dict | None = None
+
