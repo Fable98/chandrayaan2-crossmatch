@@ -233,7 +233,22 @@ async def register_images(
 # Health & refresh endpoints
 # ---------------------------------------------------------------------------
 
+@app.get("/", tags=["system"])
+@app.head("/", tags=["system"])
+def root():
+    """Root endpoint providing service status, metadata, and docs links."""
+    return {
+        "status": "online",
+        "service": "Chandrayaan-2 Cross-Sensor Image Correspondence API (SIH26166)",
+        "version": "0.1.0",
+        "triplets_loaded": loader.triplet_count(),
+        "documentation": "/docs",
+        "health": "/health",
+    }
+
+
 @app.get("/health", response_model=HealthResponse, tags=["system"])
+@app.head("/health", tags=["system"])
 def health_check():
     """Check that the backend is running and report how many triplets are loaded."""
     return HealthResponse(

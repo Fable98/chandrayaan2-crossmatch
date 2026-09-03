@@ -29,6 +29,17 @@ def _ensure_loaded():
 # Health & refresh
 # ---------------------------------------------------------------------------
 
+def test_root_endpoint():
+    _ensure_loaded()
+    r_get = client.get("/")
+    assert r_get.status_code == 200
+    assert r_get.json()["status"] == "online"
+    assert r_get.json()["triplets_loaded"] >= 6
+
+    r_head = client.head("/")
+    assert r_head.status_code == 200
+
+
 def test_health():
     _ensure_loaded()
     r = client.get("/health")
@@ -36,6 +47,9 @@ def test_health():
     data = r.json()
     assert data["status"] == "ok"
     assert data["triplets_loaded"] >= 6
+
+    r_head = client.head("/health")
+    assert r_head.status_code == 200
 
 
 def test_refresh():
