@@ -28,7 +28,8 @@ from schemas import HealthResponse
 # Configuration
 # ---------------------------------------------------------------------------
 
-CORS_ORIGIN: str = os.environ.get("CORS_ORIGIN", "http://localhost:3000")
+from config import settings
+import database
 
 
 # ---------------------------------------------------------------------------
@@ -57,10 +58,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow the Next.js frontend origin
+# CORS — allow origins from ALLOWED_ORIGINS environment variable
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[CORS_ORIGIN, "http://localhost:3000", "http://127.0.0.1:3000", "*"],
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

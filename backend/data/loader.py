@@ -18,12 +18,21 @@ from geo import (
 )
 
 # ---------------------------------------------------------------------------
-# Data directories — override via env vars
+# Data directories — override via Settings / env vars
 # ---------------------------------------------------------------------------
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
+REPO_ROOT = BACKEND_DIR.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
+
+try:
+    from config import settings
+except ImportError:
+    settings = None
 
 try:
     from lunar_project.src.ml.evaluation.metrics import compute_all_metrics
@@ -40,26 +49,25 @@ def _first_existing(*paths: str | Path) -> str:
     return str(Path(paths[0]))
 
 
-DATA_DIR: str = os.environ.get(
-    "DATA_DIR",
-    _first_existing(
-        REPO_ROOT / "data_preprocessing_pipeline",
-        REPO_ROOT / "processed_user",
-    ),
+DATA_DIR: str = (getattr(settings, "DATA_DIR", None) or os.environ.get("DATA_DIR")) or _first_existing(
+    REPO_ROOT / "data_preprocessing_pipeline",
+    REPO_ROOT / "processed_user",
 )
 
-PROCESSED_TRIPLETS_DIR: str = os.environ.get(
-    "PROCESSED_TRIPLETS_DIR",
-    _first_existing(
+PROCESSED_TRIPLETS_DIR: str = (
+    getattr(settings, "PROCESSED_TRIPLETS_DIR", None)
+    or os.environ.get("PROCESSED_TRIPLETS_DIR")
+    or _first_existing(
         REPO_ROOT / "data_preprocessing_pipeline" / "processed_triplets",
         REPO_ROOT / "processed_triplets",
-    ),
+    )
 )
 
 # ML team's output directory — searched as a secondary source for match files
-ML_OUTPUT_DIR: str = os.environ.get(
-    "ML_OUTPUT_DIR",
-    str(REPO_ROOT / "ML_model"),
+ML_OUTPUT_DIR: str = (
+    getattr(settings, "ML_OUTPUT_DIR", None)
+    or os.environ.get("ML_OUTPUT_DIR")
+    or str(REPO_ROOT / "ML_model")
 )
 
 # Image size used by the ML pipeline (matcher.py resizes to this)
