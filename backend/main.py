@@ -8,7 +8,12 @@ serve over HTTP with correct CORS headers.
 """
 
 import os
+import sys
+from pathlib import Path
 from contextlib import asynccontextmanager
+
+# Ensure backend directory is on sys.path for direct imports (data, routers, schemas)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
