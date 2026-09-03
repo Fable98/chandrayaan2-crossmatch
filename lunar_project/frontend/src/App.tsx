@@ -1,7 +1,5 @@
 import "./globals.css";
 
-import RegistrationLauncher from "@/components/RegistrationLauncher";
-
 export default function RootLayout({
   children,
 }: {
@@ -17,8 +15,6 @@ export default function RootLayout({
 export default function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-cyan-100">
-      <RegistrationLauncher />
-      {children}
     </div>
   );
 }

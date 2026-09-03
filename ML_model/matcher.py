@@ -4,44 +4,6 @@ import json
 import os
 import math
 
-def load_and_preprocess_image(img_path):
-    """
-    Loads an image. If it's a multi-band/hyperspectral cube (>3 channels),
-    it synthesizes a 1-channel pseudo-panchromatic image for LoFTR.
-    """
-    # Try to read with tifffile first (best for multi-band GeoTIFFs/IIRS data)
-    try:
-        import tifffile
-        img_raw = tifffile.imread(img_path)
-    except Exception:
-        # Fallback to OpenCV for standard JPG/PNG
-        img_raw = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
-        if img_raw is None:
-            raise ValueError(f"Could not read image: {img_path}")
-            
-    # Handle hyperspectral/multi-band cubes (H, W, C) or (C, H, W)
-    if len(img_raw.shape) == 3:
-        # If channels are first (C, H, W), transpose to (H, W, C)
-        if img_raw.shape[0] < img_raw.shape[1] and img_raw.shape[0] < img_raw.shape[2]:
-            img_raw = np.transpose(img_raw, (1, 2, 0))
-            
-        if img_raw.shape[2] > 3:
-            # Hyperspectral cube detected! Synthesize pseudo-panchromatic
-            img_float = img_raw.astype(np.float32)
-            # Average all bands to create a robust intensity map
-            pseudo_pan = np.mean(img_float, axis=2)
-            pseudo_pan = cv2.normalize(pseudo_pan, None, 0, 255, cv2.NORM_MINMAX)
-            return pseudo_pan.astype(np.uint8)
-        elif img_raw.shape[2] == 3:
-            # Standard RGB/BGR
-            return cv2.cvtColor(img_raw.astype(np.uint8), cv2.COLOR_BGR2GRAY)
-            
-    # If already 2D (H, W)
-    if len(img_raw.shape) == 2:
-        return img_raw.astype(np.uint8)
-        
-    raise ValueError(f"Unsupported image shape: {img_raw.shape}")
-
 def match_images(img_path1, img_path2, output_dir="output"):
     """
     Complete pipeline for SIH26166:
@@ -59,12 +21,35 @@ def match_images(img_path1, img_path2, output_dir="output"):
     os.makedirs(output_dir, exist_ok=True)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    # 1. Read original images
-    # Use IIRS-safe loader
-    img1_orig = load_and_preprocess_image(img_path1)
-    img2_orig = load_and_preprocess_image(img_path2)
-    img1_color = cv2.cvtColor(img1_orig, cv2.COLOR_GRAY2BGR)
-    img2_color = cv2.cvtColor(img2_orig, cv2.COLOR_GRAY2BGR)
+    def load_as_gray_and_color(path):
+        try:
+            import rasterio
+            with rasterio.open(path) as src:
+                if src.count > 3:  # Hyperspectral cube (e.g., IIRS)
+                    bands = src.read()  # (C, H, W)
+                    gray = bands.mean(axis=0).astype("float32")
+                    gray = np.clip(gray, 0, 255).astype("uint8")
+                    color = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+                    return gray, color
+                elif src.count >= 3:
+                    rgb = np.dstack([src.read(i) for i in (1, 2, 3)])
+                    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+                    color = cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+                    return gray, color
+                else:
+                    gray = src.read(1).astype(np.uint8)
+                    color = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+                    return gray, color
+        except Exception:
+            pass
+        
+        gray = cv2.imread(path, cv2.IMREAD_GRAYSCALE)
+        color = cv2.imread(path)
+        return gray, color
+
+    # 1. Read original images (with IIRS hyperspectral support)
+    img1_orig, img1_color = load_as_gray_and_color(img_path1)
+    img2_orig, img2_color = load_as_gray_and_color(img_path2)
     
     orig_h1, orig_w1 = img1_orig.shape
     orig_h2, orig_w2 = img2_orig.shape
@@ -209,7 +194,8 @@ def match_images(img_path1, img_path2, output_dir="output"):
     errors = np.linalg.norm(projected_pts - refined_mkpts1, axis=1).flatten()
     
     rmse = np.sqrt(np.mean(errors**2))
-    inlier_ratio = len(uniform_mkpts0) / max(1, len(mkpts0))
+    # FIX: inlier_ratio should reflect true RANSAC survival rate, not grid-capped subset
+    inlier_ratio = len(good_mkpts0) / max(1, len(mkpts0))
     uniformity_score = len(grid_dict) / float(grid_size * grid_size)
     
     metrics = {
