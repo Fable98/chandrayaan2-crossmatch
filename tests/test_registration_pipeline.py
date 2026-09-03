@@ -27,7 +27,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ML_model"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 
-from matcher_cfog import match_images_cfog, verify_spatial_quality_gate
+from matcher_cfog import match_images_cfog, verify_spatial_quality_gate, load_as_float_and_color
 from metrics import compute_canonical_metrics, verify_transformation_quality
 from metadata import extract_sensor_metadata
 from fastapi.testclient import TestClient
@@ -408,5 +408,151 @@ def test_geotiff_output_validity(synthetic_lunar_pair):
             with open(sidecar_path, "r") as f:
                 parsed = json.load(f)
                 assert isinstance(parsed, (dict, list))
+
+
+# ---------------------------------------------------------------------------
+# Test 13: Known-Ground-Truth Synthetic IIRS Co-Registration Integration Test
+# ---------------------------------------------------------------------------
+def test_iirs_hyperspectral_co_registration_integration():
+    """
+    Known-ground-truth synthetic IIRS co-registration integration test.
+
+    Validates:
+    1. Multi-band hyperspectral raster ingestion (> 3 bands, e.g. 8 spectral channels).
+    2. Verification that production loader recognizes multi-band cube (count > 3).
+    3. Physical-GSD-aware normalization between coarse IIRS (75.0 m/px) and optical reference (37.5 m/px).
+    4. End-to-end co-registration via the actual production pipeline (match_images_cfog).
+    5. Zero fake correspondences (genuine inliers passing RANSAC and spatial quality gates).
+    6. Recovery of known geometric scale factor (75.0 / 37.5 = 2.0).
+    7. Full production output package generation with mandatory Rasterio GeoTIFF validation.
+
+    Note: This test validates hyperspectral IIRS ingestion, physical-GSD normalization,
+    and end-to-end co-registration under controlled known-ground-truth synthetic
+    conditions. It does not constitute independent validation on real Chandrayaan-2
+    IIRS imagery and does not establish sub-meter IIRS tie-point accuracy.
+    """
+    import rasterio
+    from PIL import Image
+
+    np.random.seed(101)
+    # Reference image: 256x256 at 37.5 m/px -> 9600m x 9600m physical footprint
+    h_ref, w_ref = 256, 256
+    ref_gsd = 37.5
+    iirs_gsd = 75.0
+
+    master_terrain = np.zeros((h_ref, w_ref), dtype=np.float32)
+    # Add multiple distinct crater and ridge structures across the terrain
+    for _ in range(35):
+        cx = np.random.randint(40, w_ref - 40)
+        cy = np.random.randint(40, h_ref - 40)
+        rad = np.random.randint(15, 38)
+        val = np.random.uniform(120, 240)
+        cv2.circle(master_terrain, (cx, cy), rad, val, -1)
+        cv2.circle(master_terrain, (cx, cy), max(3, rad - 6), val * 0.4, -1)
+
+    master_terrain = cv2.GaussianBlur(master_terrain, (0, 0), 1.5)
+    noise_ref = np.random.normal(0, 3, (h_ref, w_ref)).astype(np.float32)
+    ref_img = np.clip(master_terrain + noise_ref, 0, 255).astype(np.uint8)
+
+    # IIRS source: 128x128 at 75.0 m/px (covering same 9600m footprint, 2x coarser)
+    # Known physical ground shift: +150 m X (+4 px ref, +2 px IIRS), -75 m Y (-2 px ref, -1 px IIRS)
+    shift_x_ref = 4.0
+    shift_y_ref = -2.0
+    M = np.float32([[1, 0, shift_x_ref], [0, 1, shift_y_ref]])
+    ref_shifted = cv2.warpAffine(ref_img, M, (w_ref, h_ref))
+    iirs_base = cv2.resize(ref_shifted, (128, 128), interpolation=cv2.INTER_AREA).astype(np.float32)
+
+    # Construct 8-band hyperspectral cube with distinct spectral responses per band
+    num_bands = 8
+    bands = np.zeros((num_bands, 128, 128), dtype=np.uint8)
+    for b in range(num_bands):
+        spectral_factor = 0.75 + 0.05 * b  # Distinct spectral response per band
+        noise_b = np.random.normal(0, 2, (128, 128)).astype(np.float32)
+        bands[b] = np.clip(iirs_base * spectral_factor + noise_b, 0, 255).astype(np.uint8)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        iirs_path = Path(tmpdir) / "test_iirs_cube.tif"
+        ref_path = Path(tmpdir) / "test_ref_optical.png"
+        out_dir = Path(tmpdir) / "output_iirs_reg"
+
+        # 1. Write genuine multi-band GeoTIFF using rasterio
+        with rasterio.open(
+            str(iirs_path),
+            "w",
+            driver="GTiff",
+            height=128,
+            width=128,
+            count=num_bands,
+            dtype="uint8",
+        ) as dst:
+            for b in range(num_bands):
+                dst.write(bands[b], b + 1)
+
+        cv2.imwrite(str(ref_path), ref_img)
+
+        # 2. Verify production loader directly recognizes multi-band hyperspectral raster
+        gray_loaded, color_loaded, raster_meta = load_as_float_and_color(iirs_path)
+        assert raster_meta["count"] == num_bands
+        assert raster_meta["count"] > 3
+        assert raster_meta["driver"] == "GTiff"
+        assert gray_loaded.shape == (128, 128)
+        assert gray_loaded.dtype == np.float32
+
+        # 3. Verify metadata extraction identifies sensor
+        meta_extracted = extract_sensor_metadata(iirs_path, declared_sensor="IIRS", explicit_gsd=iirs_gsd)
+        assert meta_extracted.sensor == "IIRS"
+        assert meta_extracted.gsd_m == 75.0
+
+        # 4. Call actual production registration pipeline
+        res = match_images_cfog(
+            iirs_path,
+            ref_path,
+            output_dir=out_dir,
+            source_sensor="IIRS",
+            reference_sensor="TMC-2",
+            explicit_gsd1=iirs_gsd,
+            explicit_gsd2=ref_gsd,
+        )
+
+        # Must succeed without fallback
+        assert res["status"] == "success", f"IIRS co-registration failed: {res.get('message')}"
+        assert res["homography"] is not None
+
+        # Verify physical scale factor recovery:
+        # Homography maps IIRS native (75 m/px) to Ref native (37.5 m/px)
+        # Expected linear scale factor is 75.0 / 37.5 = 2.0
+        H = np.array(res["homography"])
+        scale_x = float(np.sqrt(H[0, 0]**2 + H[1, 0]**2))
+        scale_y = float(np.sqrt(H[0, 1]**2 + H[1, 1]**2))
+        expected_scale = 75.0 / 37.5  # 2.0
+        assert abs(scale_x - expected_scale) < 0.15, f"Scale X deviation: {scale_x} vs {expected_scale}"
+        assert abs(scale_y - expected_scale) < 0.15, f"Scale Y deviation: {scale_y} vs {expected_scale}"
+
+        # Verify inlier count
+        metrics = res["metrics"]
+        assert metrics is not None
+        assert metrics["inlier_count"] >= 4
+        assert metrics["inlier_count"] > 10  # Plentiful genuine correspondences across grid
+
+        # 5. Verify full production output package
+        outputs = res["outputs"]
+        for key in ("registered_raster", "preview", "checkerboard", "matches", "metrics", "transform", "metadata"):
+            p = Path(outputs[key])
+            assert p.exists(), f"Output product {key} missing at {p}"
+
+        # 6. Mandatory Rasterio verification of output GeoTIFF
+        with rasterio.open(str(outputs["registered_raster"])) as src:
+            assert src.driver == "GTiff"
+            assert src.width == w_ref
+            assert src.height == h_ref
+            assert src.count in (1, 3)
+            assert src.dtypes[0] == "uint8"
+
+        # 7. Check JSON sidecars are valid parseable JSON
+        for sidecar_key in ("matches", "metrics", "transform", "metadata"):
+            with open(outputs[sidecar_key], "r") as sf:
+                parsed = json.load(sf)
+                assert isinstance(parsed, (dict, list))
+
 
 

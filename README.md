@@ -164,7 +164,7 @@ Evaluated across the demonstration Chandrayaan-2 lunar regions ([`scripts/benchm
 | Requirement from Problem Statement | Status | Technical Evidence in Repository |
 | :--- | :--- | :--- |
 | **OHRC ↔ TMC-2 Cross-Registration** | Delivered (Primary) | Primary CFOG/Phase Congruency engine in [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py) |
-| **Multi-Modal Hyperspectral (IIRS)** | Delivered (Co-Registration) | Multi-band reader, spectral mean extraction, and spatial overlay layer |
+| **Multi-Modal Hyperspectral (IIRS)** | Delivered (Co-Registration) | Multi-band hyperspectral IIRS ingestion and physical-GSD-aware co-registration verified through a known-ground-truth synthetic IIRS integration test in [`tests/test_registration_pipeline.py`](tests/test_registration_pipeline.py). Due to IIRS's coarse spatial resolution (~75 m), this validates spatial co-registration rather than sub-meter feature correspondence. |
 | **Scale Disparity Handling** | Delivered | Common physical-GSD normalization in [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py); verified via known-ground-truth synthetic 20× physical-scale integration test in [`tests/test_registration_pipeline.py`](tests/test_registration_pipeline.py) |
 | **Sun-Angle / Illumination Robustness** | Delivered | 2D Log-Gabor Phase Congruency & CFOG frequency structural features |
 | **Spatially Distributed Matches** | Delivered | Grid binning & spatial distribution metrics in [`ML_model/metrics.py`](ML_model/metrics.py) |
