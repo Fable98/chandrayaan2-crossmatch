@@ -45,6 +45,7 @@ export default function MapPanel({ triplet, iirsOverlay }: Props) {
         center={center}
         zoom={13}
         className="h-full w-full"
+        attributionControl={false}
       >
         {/* No basemap tile layer: there's no verified public lunar tile
             server wired up here, and a fabricated URL would silently 404

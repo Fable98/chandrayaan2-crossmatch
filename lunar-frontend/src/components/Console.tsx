@@ -461,7 +461,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                     </div>
                   </div>
 
-                  <div className="mt-4 flex flex-wrap items-center justify-between border-t border-[#23211d] pt-3 font-mono text-[11px]">
+                  <div className="mt-4 flex flex-wrap items-center justify-between border-t border-[#23211d] pt-3 pr-16 font-mono text-[11px]">
                     <span className="text-[#9a958e]">
                       Status: <span className="text-[#d4af37] font-semibold">{metrics?.sub_pixel_accurate ? "Sub-Pixel Verified (< 0.5 px)" : "Standard Match"}</span>
                     </span>
@@ -490,7 +490,7 @@ export default function Console({ onBackToHero }: Props = {}) {
             {/* Circular Gold Floating Action Button (Cycle View Mode) */}
             <button
               onClick={cycleView}
-              className="absolute bottom-5 right-5 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-[#d4af37] text-black shadow-[0_0_20px_rgba(212,175,55,0.4)] transition-all duration-300 hover:scale-110 hover:bg-[#f3df9b] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              className="absolute bottom-5 right-5 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-[#d4af37] text-black shadow-[0_0_20px_rgba(212,175,55,0.4)] transition-all duration-300 hover:scale-110 hover:bg-[#f3df9b] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
               title="Cycle Inspection View"
             >
               <span className="text-base font-bold">→</span>

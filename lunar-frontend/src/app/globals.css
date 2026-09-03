@@ -26,11 +26,7 @@
   color: #3fb5c9 !important;
 }
 .leaflet-control-attribution {
-  background: rgba(9, 11, 14, 0.8) !important;
-  color: #5c6574 !important;
-}
-.leaflet-control-attribution a {
-  color: #9aa3af !important;
+  display: none !important;
 }
 
 /* Grayscale high-contrast photographic tone grading for lunar tiles */
