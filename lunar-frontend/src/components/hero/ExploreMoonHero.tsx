@@ -53,25 +53,7 @@ export default function ExploreMoonHero({ onOpenConsole }: Props) {
           isLoaded ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
         }`}
       >
-        {/* Top-Left: Page Label + SPACED Brand */}
-        <div className="flex items-center gap-4">
-          <div className="flex flex-col text-left font-mono">
-            <span className="text-[10px] uppercase tracking-wider text-ink-faint">Page</span>
-            <span className="text-xs font-bold tracking-wider text-white">05.</span>
-          </div>
-          <div className="h-4 w-px bg-white/10" />
-          <div className="flex items-baseline gap-2">
-            <a
-              href="#"
-              className="text-xs font-bold uppercase tracking-[0.35em] text-white transition-opacity hover:opacity-80 md:text-sm"
-            >
-              SPACED
-            </a>
-            <span className="font-mono text-[10px] uppercase tracking-widest text-teal">
-              CH-2
-            </span>
-          </div>
-        </div>
+        <div />
 
         {/* Top-Right: Nav Links */}
         <nav className="flex items-center gap-4 md:gap-5">
@@ -120,36 +102,13 @@ export default function ExploreMoonHero({ onOpenConsole }: Props) {
             </span>
           </h1>
 
-          {/* Split Two-Column Description Block */}
-          <div className="mt-10 grid grid-cols-1 gap-8 md:grid-cols-2 md:gap-12">
-            {/* Column 1: Description & Button */}
-            <div className="flex flex-col items-start">
-              <h2 className="text-sm font-bold tracking-wide text-white md:text-base">
-                Description
-              </h2>
-              <p className="mt-0.5 text-xs text-white/70 md:text-sm">
-                What is the moon?
-              </p>
-
-              <button
-                onClick={onOpenConsole}
-                className="group mt-3 flex items-center justify-center rounded-full bg-teal px-4 py-1 text-xs font-bold text-black shadow-[0_0_20px_rgba(63,181,201,0.4)] transition-all duration-200 hover:bg-[#52cde3] hover:scale-105 active:scale-95"
-                title="Launch Registration Console"
-              >
-                <span className="transition-transform duration-200 group-hover:translate-x-0.5">
-                  &gt;&gt;
-                </span>
-              </button>
-            </div>
-
-            {/* Column 2: Paragraph text matching the reference layout */}
-            <div>
-              <p className="text-xs leading-relaxed text-white/80 md:text-sm md:leading-normal">
-                Moon is an astronomical body that orbits planet Earth and it's Earth's
-                only permanent natural satellite. Cross-matched across Chandrayaan-2's
-                OHRC, TMC-2 &amp; IIRS payloads with sub-pixel accuracy.
-              </p>
-            </div>
+          {/* Description Block */}
+          <div className="mt-8 max-w-xl">
+            <p className="text-xs leading-relaxed text-white/80 md:text-sm md:leading-normal">
+              Moon is an astronomical body that orbits planet Earth and it's Earth's
+              only permanent natural satellite. Cross-matched across Chandrayaan-2's
+              OHRC, TMC-2 &amp; IIRS payloads with sub-pixel accuracy.
+            </p>
           </div>
         </div>
       </div>
