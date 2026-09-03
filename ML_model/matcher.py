@@ -1,11 +1,46 @@
 import cv2
-import torch
-import kornia as K
-from kornia.feature import LoFTR
 import numpy as np
 import json
 import os
 import math
+
+def load_and_preprocess_image(img_path):
+    """
+    Loads an image. If it's a multi-band/hyperspectral cube (>3 channels),
+    it synthesizes a 1-channel pseudo-panchromatic image for LoFTR.
+    """
+    # Try to read with tifffile first (best for multi-band GeoTIFFs/IIRS data)
+    try:
+        import tifffile
+        img_raw = tifffile.imread(img_path)
+    except Exception:
+        # Fallback to OpenCV for standard JPG/PNG
+        img_raw = cv2.imread(img_path, cv2.IMREAD_UNCHANGED)
+        if img_raw is None:
+            raise ValueError(f"Could not read image: {img_path}")
+            
+    # Handle hyperspectral/multi-band cubes (H, W, C) or (C, H, W)
+    if len(img_raw.shape) == 3:
+        # If channels are first (C, H, W), transpose to (H, W, C)
+        if img_raw.shape[0] < img_raw.shape[1] and img_raw.shape[0] < img_raw.shape[2]:
+            img_raw = np.transpose(img_raw, (1, 2, 0))
+            
+        if img_raw.shape[2] > 3:
+            # Hyperspectral cube detected! Synthesize pseudo-panchromatic
+            img_float = img_raw.astype(np.float32)
+            # Average all bands to create a robust intensity map
+            pseudo_pan = np.mean(img_float, axis=2)
+            pseudo_pan = cv2.normalize(pseudo_pan, None, 0, 255, cv2.NORM_MINMAX)
+            return pseudo_pan.astype(np.uint8)
+        elif img_raw.shape[2] == 3:
+            # Standard RGB/BGR
+            return cv2.cvtColor(img_raw.astype(np.uint8), cv2.COLOR_BGR2GRAY)
+            
+    # If already 2D (H, W)
+    if len(img_raw.shape) == 2:
+        return img_raw.astype(np.uint8)
+        
+    raise ValueError(f"Unsupported image shape: {img_raw.shape}")
 
 def match_images(img_path1, img_path2, output_dir="output"):
     """
@@ -15,14 +50,21 @@ def match_images(img_path1, img_path2, output_dir="output"):
     3. Sub-pixel refinement via Phase Correlation.
     4. Homography computation and Registered Product generation.
     """
+    # LAZY IMPORTS: Prevents OOM crash on Render Free Tier (512MB RAM) during startup
+    import torch
+    import kornia as K
+    from kornia.feature import LoFTR
+    import gc
+
     os.makedirs(output_dir, exist_ok=True)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     # 1. Read original images
-    img1_orig = cv2.imread(img_path1, cv2.IMREAD_GRAYSCALE)
-    img2_orig = cv2.imread(img_path2, cv2.IMREAD_GRAYSCALE)
-    img1_color = cv2.imread(img_path1)
-    img2_color = cv2.imread(img_path2)
+    # Use IIRS-safe loader
+    img1_orig = load_and_preprocess_image(img_path1)
+    img2_orig = load_and_preprocess_image(img_path2)
+    img1_color = cv2.cvtColor(img1_orig, cv2.COLOR_GRAY2BGR)
+    img2_color = cv2.cvtColor(img2_orig, cv2.COLOR_GRAY2BGR)
     
     orig_h1, orig_w1 = img1_orig.shape
     orig_h2, orig_w2 = img2_orig.shape
@@ -192,6 +234,12 @@ def match_images(img_path1, img_path2, output_dir="output"):
     json_path = os.path.join(output_dir, "matches.json")
     with open(json_path, 'w') as f:
         json.dump(matches_data, f, indent=4)
+
+    # Explicit memory cleanup to prevent OOM on subsequent requests
+    del matcher, img1_tensor, img2_tensor, correspondences
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
     return {
         "metrics": metrics,
