@@ -292,6 +292,59 @@ def subpixel_phase_correlation(
     return shift_x, shift_y, peak_val, True
 
 
+def verify_spatial_quality_gate(
+    inlier_cells: List[Tuple[int, int]],
+    min_distinct_cells: int = 3,
+    max_single_cell_concentration: float = 0.60,
+) -> Tuple[bool, str, Dict[str, Any]]:
+    """
+    QUALITY GATE 4: Spatial Support & Concentration Check.
+    Verifies that verified inliers have genuine spatial support:
+    1. Inliers must span >= min_distinct_cells distinct grid cells.
+    2. No single cell may contain > max_single_cell_concentration (e.g. 60%) of all inliers.
+
+    Returns:
+        (is_valid, failure_reason, details_dict)
+    """
+    total_inliers = len(inlier_cells)
+    if total_inliers < 4:
+        return True, "Fewer than 4 inliers; minimum inlier threshold gate applies", {
+            "distinct_cells": len(set(inlier_cells)),
+            "concentration_ratio": 1.0 if inlier_cells else 0.0,
+            "max_in_single_cell": len(inlier_cells),
+            "total_inliers": total_inliers,
+        }
+
+    from collections import Counter
+    distinct_cells = len(set(inlier_cells))
+    cell_counts = Counter(inlier_cells)
+    max_in_single_cell = max(cell_counts.values()) if cell_counts else 0
+    concentration_ratio = max_in_single_cell / max(1, total_inliers)
+
+    details = {
+        "distinct_cells": distinct_cells,
+        "concentration_ratio": concentration_ratio,
+        "max_in_single_cell": max_in_single_cell,
+        "total_inliers": total_inliers,
+    }
+
+    if distinct_cells < min_distinct_cells:
+        reason = (
+            f"inliers are excessively concentrated ({distinct_cells} distinct cells occupied, "
+            f"required >= {min_distinct_cells})"
+        )
+        return False, reason, details
+
+    if concentration_ratio > max_single_cell_concentration:
+        reason = (
+            f"inliers are excessively concentrated (single cell concentration {concentration_ratio*100:.1f}%, "
+            f"maximum allowed is {max_single_cell_concentration*100:.1f}%)"
+        )
+        return False, reason, details
+
+    return True, "Spatial distribution gate passed", details
+
+
 # ---------------------------------------------------------------------------
 # 5. Primary Registration Pipeline
 # ---------------------------------------------------------------------------
@@ -578,25 +631,14 @@ def match_images_cfog(
         }
 
     # QUALITY GATE 4: Spatial Support & Concentration Check
-    # Verify inliers have genuine spatial support across >= 3 distinct cells
-    # and no single cell contains > 60% of all inlier points
     inlier_indices = np.where(inlier_mask.ravel() == 1)[0]
     inlier_cells = [selected_matches[i]["cell"] for i in inlier_indices if i < len(selected_matches)]
-    distinct_cells = len(set(inlier_cells))
+    is_spatial_valid, spatial_reason, spatial_info = verify_spatial_quality_gate(inlier_cells)
 
-    from collections import Counter
-    cell_counts = Counter(inlier_cells)
-    max_in_single_cell = max(cell_counts.values()) if cell_counts else 0
-    concentration_ratio = max_in_single_cell / max(1, len(inlier_indices))
-
-    if len(inlier_indices) >= 4 and (distinct_cells < 3 or concentration_ratio > 0.60):
+    if not is_spatial_valid:
         return {
             "status": "geometric_verification_failed",
-            "message": (
-                f"Transformation rejected by spatial quality gate: inliers are excessively concentrated "
-                f"({distinct_cells} distinct cells occupied, required >= 3; "
-                f"single cell concentration {concentration_ratio*100:.1f}%, maximum allowed is 60%)."
-            ),
+            "message": f"Transformation rejected by spatial quality gate: {spatial_reason}.",
             "match_count": len(pts1_arr),
             "inlier_count": len(inlier_indices),
             "metrics": None,

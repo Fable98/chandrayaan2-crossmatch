@@ -27,7 +27,7 @@ import pytest
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ML_model"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "backend"))
 
-from matcher_cfog import match_images_cfog
+from matcher_cfog import match_images_cfog, verify_spatial_quality_gate
 from metrics import compute_canonical_metrics, verify_transformation_quality
 from metadata import extract_sensor_metadata
 from fastapi.testclient import TestClient
@@ -225,17 +225,21 @@ def test_register_api_endpoint(test_client, synthetic_lunar_pair):
 
 
 # ---------------------------------------------------------------------------
-# Test 9: End-to-End Real 20x Scale Disparity Registration (OHRC vs TMC-2)
+# Test 9: Known-Ground-Truth Synthetic 20x Physical-Scale Integration Test (OHRC vs TMC-2)
 # ---------------------------------------------------------------------------
 def test_real_20x_scale_disparity_registration():
     """
-    Tests actual ~20x physical scale disparity:
+    Known-ground-truth synthetic 20x physical-scale integration test:
     - OHRC at 0.25 m/px (1024x1024 pixels, covering 256m x 256m physical footprint)
     - TMC-2 at 5.0 m/px (51x51 pixels, covering ~255m x 255m physical footprint)
     - Known physical ground displacement: +10.0 m in X, -5.0 m in Y
       In OHRC native: +40.0 px X, -20.0 px Y (+10m / 0.25m, -5m / 0.25m)
       In TMC-2 native: +2.0 px X, -1.0 px Y (+10m / 5.0m, -5m / 5.0m)
     - Verifies recovery of transformation across the 20x scale bridge.
+
+    Note: This test validates the scale-normalization and coordinate-mapping pipeline
+    under controlled known-ground-truth synthetic conditions. It does not constitute
+    independent validation on real Chandrayaan-2 imagery.
     """
     np.random.seed(42)
     h_ohrc, w_ohrc = 1024, 1024
@@ -331,24 +335,36 @@ def test_metadata_safety_rejects_unknown_without_gsd():
 
 
 # ---------------------------------------------------------------------------
-# Test 11: Spatial Quality Gate Rejects Clustered / Unbalanced Correspondences
+# Test 11: Spatial Quality Gate Directly Exercises Production Rejection Logic
 # ---------------------------------------------------------------------------
 def test_spatial_quality_gate_rejects_clustered_matches():
-    # 6 matches all packed into cell (0, 0)
-    clustered_matches = [
-        {"cell": (0, 0)} for _ in range(6)
-    ]
-    inlier_indices = list(range(6))
-    inlier_cells = [clustered_matches[i]["cell"] for i in inlier_indices]
-    distinct_cells = len(set(inlier_cells))
-    from collections import Counter
-    cell_counts = Counter(inlier_cells)
-    max_in_cell = max(cell_counts.values())
-    concentration = max_in_cell / len(inlier_indices)
+    """
+    Directly exercises the production verify_spatial_quality_gate function:
+    1. Rejects inliers spanning fewer than 3 distinct spatial cells.
+    2. Rejects inliers where a single cell contains > 60% of all points.
+    3. Accepts inliers with sufficient spatial dispersion across the grid.
+    """
+    # Case 1: 6 inliers spanning only 2 distinct cells -> REJECT (< 3 cells)
+    few_cells = [(0, 0), (0, 0), (0, 0), (1, 1), (1, 1), (1, 1)]
+    valid_few, reason_few, details_few = verify_spatial_quality_gate(few_cells)
+    assert valid_few is False
+    assert details_few["distinct_cells"] == 2
+    assert "distinct cells" in reason_few
 
-    # Gate logic verification
-    assert distinct_cells < 3
-    assert concentration > 0.60
+    # Case 2: 8 inliers across 4 cells, but 5 in cell (0, 0) (62.5% > 60%) -> REJECT
+    concentrated = [(0, 0), (0, 0), (0, 0), (0, 0), (0, 0), (1, 1), (2, 2), (3, 3)]
+    valid_conc, reason_conc, details_conc = verify_spatial_quality_gate(concentrated)
+    assert valid_conc is False
+    assert details_conc["concentration_ratio"] == 0.625
+    assert "single cell concentration" in reason_conc
+
+    # Case 3: 6 inliers uniformly distributed across 6 distinct cells -> ACCEPT
+    distributed = [(0, 0), (1, 1), (2, 2), (3, 3), (4, 4), (5, 5)]
+    valid_dist, reason_dist, details_dist = verify_spatial_quality_gate(distributed)
+    assert valid_dist is True
+    assert details_dist["distinct_cells"] == 6
+    assert details_dist["concentration_ratio"] <= 0.60
+    assert "passed" in reason_dist.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -358,8 +374,10 @@ def test_geotiff_output_validity(synthetic_lunar_pair):
     """
     Verifies that registered_source.tif is a genuine TIFF/GeoTIFF raster
     (not a renamed PNG/JPEG), matches reference spatial dimensions,
-    and all JSON sidecars are valid parseable JSON.
+    validates driver == 'GTiff' via rasterio, and confirms all JSON sidecars
+    are valid parseable JSON.
     """
+    import rasterio
     from PIL import Image
     p1, p2, _, _ = synthetic_lunar_pair
     with tempfile.TemporaryDirectory() as out_dir:
@@ -375,16 +393,13 @@ def test_geotiff_output_validity(synthetic_lunar_pair):
             assert im.format == "TIFF", f"File is not genuine TIFF: {im.format}"
             assert im.size == (512, 512), f"Dimensions mismatch: {im.size} vs (512, 512)"
 
-        # 2. Check GeoTIFF metadata via rasterio if installed
-        try:
-            import rasterio
-            with rasterio.open(str(tif_file)) as src:
-                assert src.width == 512
-                assert src.height == 512
-                assert src.count in (1, 3)
-                assert src.dtypes[0] == "uint8"
-        except ImportError:
-            pass
+        # 2. Check GeoTIFF metadata directly via rasterio (mandatory project dependency)
+        with rasterio.open(str(tif_file)) as src:
+            assert src.driver == "GTiff", f"Rasterio driver is not GTiff: {src.driver}"
+            assert src.width == 512
+            assert src.height == 512
+            assert src.count in (1, 3)
+            assert src.dtypes[0] == "uint8"
 
         # 3. Check JSON sidecars are valid
         for sidecar_key in ("matches", "metrics", "transform", "metadata"):

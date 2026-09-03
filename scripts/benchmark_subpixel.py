@@ -94,7 +94,7 @@ def apply_fourier_fractional_shift(
     """
     Shifts an image by exact sub-pixel amounts using the Fourier Shift Theorem:
     F{f(x - dx, y - dy)} = F{f(x, y)} * exp(-2j * pi * (u*dx/W + v*dy/H))
-    Guarantees mathematically exact fractional translation without interpolation artifacts.
+    Applies exact fractional translation via Fourier phase shifting without spatial resampling artifacts.
     """
     h, w = image.shape[:2]
     F = np.fft.fft2(image)

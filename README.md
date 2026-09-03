@@ -165,7 +165,7 @@ Evaluated across the demonstration Chandrayaan-2 lunar regions ([`scripts/benchm
 | :--- | :--- | :--- |
 | **OHRC ↔ TMC-2 Cross-Registration** | Delivered (Primary) | Primary CFOG/Phase Congruency engine in [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py) |
 | **Multi-Modal Hyperspectral (IIRS)** | Delivered (Co-Registration) | Multi-band reader, spectral mean extraction, and spatial overlay layer |
-| **Scale Disparity Handling** | Delivered | Common physical-GSD normalization in [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py) |
+| **Scale Disparity Handling** | Delivered | Common physical-GSD normalization in [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py); verified via known-ground-truth synthetic 20× physical-scale integration test in [`tests/test_registration_pipeline.py`](tests/test_registration_pipeline.py) |
 | **Sun-Angle / Illumination Robustness** | Delivered | 2D Log-Gabor Phase Congruency & CFOG frequency structural features |
 | **Spatially Distributed Matches** | Delivered | Grid binning & spatial distribution metrics in [`ML_model/metrics.py`](ML_model/metrics.py) |
 | **Sub-Pixel Refinement** | Delivered | 2D Fourier Phase Correlation benchmarked at ~0.24 px MAE across 240 trials |
