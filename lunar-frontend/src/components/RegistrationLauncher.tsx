@@ -106,7 +106,7 @@ export default function RegistrationLauncher() {
         onClick={() => setOpen(true)}
         className="rounded-lg border border-cyan-400/40 bg-cyan-500/10 px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider text-cyan-200 shadow-md transition hover:bg-cyan-500/25 hover:border-cyan-300"
       >
-        ✦ Live Registration
+        Live Registration
       </button>
 
       {open && (
@@ -127,7 +127,7 @@ export default function RegistrationLauncher() {
                 onClick={() => setOpen(false)}
                 className="rounded-md border border-slate-700 bg-slate-900/80 px-3 py-1 text-xs text-slate-300 transition hover:bg-slate-800"
               >
-                ✕ Close
+                Close
               </button>
             </div>
 
@@ -179,12 +179,12 @@ export default function RegistrationLauncher() {
                 >
                   {loading
                     ? "Executing Sub-Pixel Refinement & Homography..."
-                    : "✦ Run Dynamic Registration"}
+                    : "Run Dynamic Registration"}
                 </button>
 
                 {error && (
                   <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-200">
-                    ⚠ {error}
+                    {error}
                   </div>
                 )}
               </div>
@@ -233,7 +233,7 @@ export default function RegistrationLauncher() {
                       <span className="text-xs font-semibold uppercase tracking-wider text-cyan-200">
                         Registered Composite Product (50px Checkerboard Blend)
                       </span>
-                      <span className="text-[11px] text-emerald-400">✓ Alignment Verified</span>
+                      <span className="text-[11px] text-emerald-400">Alignment Verified</span>
                     </div>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -250,7 +250,7 @@ export default function RegistrationLauncher() {
                     onClick={() => setResult(null)}
                     className="rounded-lg border border-slate-700 bg-slate-800/80 px-4 py-2 text-xs font-semibold text-slate-200 transition hover:bg-slate-700"
                   >
-                    ← Register Another Pair
+                    Register Another Pair
                   </button>
 
                   {warpedUrl && (

@@ -68,12 +68,12 @@ export default function DossierModal({
             </div>
           </div>
 
-          {/* Triplet Imagery Triad */}
+          {/* Triplet Imagery Quad */}
           <div className="mb-8">
             <span className="mb-3 block font-mono text-xs font-bold uppercase tracking-wider text-[#9a958e]">
-              Multi-Sensor Imagery Triad
+              Multi-Sensor Payload Imagery (OHRC · TMC-2 · IIRS)
             </span>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {/* OHRC */}
               <div className="flex flex-col gap-2 border border-[#23211d] bg-[#121217] p-3">
                 <div className="relative aspect-square overflow-hidden bg-black">
@@ -103,6 +103,25 @@ export default function DossierModal({
                 <div className="font-mono text-[11px]">
                   <span className="text-white font-semibold">TMC-2 Reference</span>
                   <p className="text-[10px] text-[#6b665f]">~4–5 m/px · Stereo Fore/Aft/Nadir</p>
+                </div>
+              </div>
+
+              {/* IIRS */}
+              <div className="flex flex-col gap-2 border border-[#23211d] bg-[#121217] p-3">
+                <div className="relative aspect-square overflow-hidden bg-black">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={imageUrl(`/images/iirs/${triplet.id}`)}
+                    alt="IIRS infrared hyperspectral"
+                    className="h-full w-full object-cover contrast-[1.2] brightness-95"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src = imageUrl("/images/iirs/iirs_overlay.png");
+                    }}
+                  />
+                </div>
+                <div className="font-mono text-[11px]">
+                  <span className="text-white font-semibold">IIRS Hyperspectral</span>
+                  <p className="text-[10px] text-[#6b665f]">~70–80 m/px · 256 Spectral Bands</p>
                 </div>
               </div>
 

@@ -174,9 +174,9 @@ export default function AstralynxHero({ onOpenConsole }: Props) {
 
         {/* Smaller Subtext (2 lines, muted white/gray) */}
         <p className="mt-3.5 max-w-xl text-xs font-normal leading-relaxed text-white/85 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] sm:text-sm md:text-[0.9375rem] md:leading-normal">
-          Sun-angle and scale-invariant deep correspondence across Chandrayaan-2's{" "}
+          Illumination-robust and sub-pixel deep correspondence across Chandrayaan-2's{" "}
           <br className="hidden sm:inline" />
-          OHRC, TMC-2, and IIRS payloads, achieving sub-pixel co-registration.
+          OHRC, TMC-2, and IIRS payloads, achieving precision co-registration.
         </p>
 
         {/* Pill-Shaped CTA Button with Teal/Cyan Background */}

@@ -189,7 +189,7 @@ export default function Console({ onBackToHero }: Props = {}) {
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-[9999] flex items-center gap-3 rounded border border-[#d4af37] bg-[#121217] px-4 py-2.5 font-mono text-xs text-[#f3df9b] shadow-[0_0_30px_rgba(212,175,55,0.3)] animate-fade-in">
-          <span>🔖</span>
+          <span className="h-2 w-2 rounded-full bg-[#d4af37]" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -323,7 +323,9 @@ export default function Console({ onBackToHero }: Props = {}) {
 
             {/* Search Input */}
             <div className="mt-3 flex items-center gap-2 border-b border-[#23211d] pb-2 font-mono text-xs text-[#6b665f]">
-              <span>🔍</span>
+              <svg className="h-3.5 w-3.5 text-[#6b665f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
               <input
                 type="text"
                 value={searchQuery}
@@ -640,7 +642,9 @@ export default function Console({ onBackToHero }: Props = {}) {
                   }`}
                   title={savedQuoteBookmarked ? "Remove Bookmark" : "Save to References"}
                 >
-                  <span className="text-xs">🔖</span>
+                  <svg className="h-3.5 w-3.5" fill={savedQuoteBookmarked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                  </svg>
                 </button>
               </div>
 
@@ -811,7 +815,9 @@ export default function Console({ onBackToHero }: Props = {}) {
                 if (e.key === "Enter") openVaultWithFilter("all");
               }}
             >
-              <span className="text-2xl transition-transform duration-300 group-hover:scale-125">🗄️</span>
+              <svg className="h-6 w-6 text-[#d4af37] transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+              </svg>
               <span className="mt-3 font-mono text-xs font-bold uppercase tracking-[0.2em] text-[#d4af37]">
                 ACCESS THE VAULT
               </span>

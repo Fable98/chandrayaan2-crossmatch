@@ -33,7 +33,9 @@ export default function VaultModal({
         {/* Header Bar */}
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#23211d] bg-[#0e0e12] px-6 py-4">
           <div className="flex items-center gap-3">
-            <span className="text-xl">🗄️</span>
+            <svg className="h-5 w-5 text-[#d4af37]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+            </svg>
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-mono text-xs text-[#d4af37]">[ LUNAR GLASS VAULT ]</span>
@@ -89,7 +91,9 @@ export default function VaultModal({
 
           {/* Search */}
           <div className="flex items-center gap-2 border border-[#23211d] bg-[#08080a] px-3 py-1 font-mono text-xs text-[#6b665f]">
-            <span>🔍</span>
+            <svg className="h-3.5 w-3.5 text-[#6b665f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
             <input
               type="text"
               value={search}
@@ -116,8 +120,8 @@ export default function VaultModal({
                 badge = "TMC-2 4M";
                 targetView = "linked-cursor";
               } else if (filter === "iirs") {
-                thumbUrl = imageUrl(`/images/registered/${t.id}/blend_overlay.png`);
-                badge = "IIRS OVERLAY";
+                thumbUrl = imageUrl(`/images/iirs/${t.id}`);
+                badge = "IIRS 70M";
                 targetView = "map";
               } else if (filter === "qa") {
                 thumbUrl = imageUrl(`/images/registered/${t.id}/blend_overlay.png`);
@@ -149,7 +153,7 @@ export default function VaultModal({
                         alt={t.id}
                         className="h-full w-full object-cover contrast-[1.2] brightness-95 transition-transform duration-300 group-hover:scale-105"
                         onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).src = imageUrl(`/images/ohrc/${t.id}`);
+                          (e.currentTarget as HTMLImageElement).src = imageUrl(filter === "iirs" ? "/images/iirs/iirs_overlay.png" : `/images/ohrc/${t.id}`);
                         }}
                       />
                     </div>

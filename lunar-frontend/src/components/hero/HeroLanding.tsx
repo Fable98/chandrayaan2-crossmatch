@@ -101,7 +101,7 @@ export default function HeroLanding({ onLaunchConsole }: Props) {
           </h1>
 
           <p className="mt-3 max-w-xl text-sm font-medium text-slate-200/90 drop-shadow-[0_2px_12px_rgba(0,0,0,0.95)] md:text-base">
-            Sun-angle and scale-invariant correspondence across Chandrayaan-2's
+            Illumination-robust and sub-pixel correspondence across Chandrayaan-2's
             OHRC, TMC-2, and IIRS optical payloads.
           </p>
 
