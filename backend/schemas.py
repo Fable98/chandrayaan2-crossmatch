@@ -156,3 +156,16 @@ class HealthResponse(BaseModel):
     """Response for GET /health."""
     status: str
     triplets_loaded: int
+
+
+class RegisterRequest(BaseModel):
+    source_sensor: str
+    reference_sensor: str
+
+class RegisterResponse(BaseModel):
+    status: str
+    metrics: dict | None = None
+    homography: list[list[float]] | None = None
+    visual_url: str | None = None
+    warped_url: str | None = None
+    matches_url: str | None = None
