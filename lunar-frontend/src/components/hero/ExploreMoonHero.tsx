@@ -5,9 +5,10 @@ import Image from "next/image";
 
 interface Props {
   onOpenConsole?: () => void;
+  onOpenAbout?: () => void;
 }
 
-export default function ExploreMoonHero({ onOpenConsole }: Props) {
+export default function ExploreMoonHero({ onOpenConsole, onOpenAbout }: Props) {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -58,7 +59,7 @@ export default function ExploreMoonHero({ onOpenConsole }: Props) {
         {/* Top-Right: Nav Links */}
         <nav className="flex items-center gap-4 md:gap-5">
           <button
-            onClick={onOpenConsole}
+            onClick={onOpenAbout ?? onOpenConsole}
             className="text-xs font-normal tracking-wide text-ink-dim transition-colors hover:text-white"
           >
             About
@@ -110,24 +111,21 @@ export default function ExploreMoonHero({ onOpenConsole }: Props) {
               OHRC, TMC-2 &amp; IIRS payloads with sub-pixel accuracy.
             </p>
           </div>
-        </div>
-      </div>
 
-      {/* 4. Lower-Left Floating "Swipe >>" Pill Button (Over the Crescent Moon) */}
-      <div
-        className={`absolute bottom-10 left-6 z-30 transition-all duration-1000 delay-500 md:bottom-12 md:left-12 ${
-          isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-6"
-        }`}
-      >
-        <button
-          onClick={onOpenConsole}
-          className="group flex items-center gap-2 rounded-full border border-teal/40 bg-teal px-6 py-2.5 text-xs font-semibold text-black shadow-[0_0_28px_rgba(63,181,201,0.5)] backdrop-blur-md transition-all duration-200 hover:bg-[#52cde3] hover:scale-105 active:scale-95"
-        >
-          <span>Swipe</span>
-          <span className="transition-transform duration-200 group-hover:translate-x-1 font-bold">
-            &gt;&gt;
-          </span>
-        </button>
+          {/* Action Button: Dashboard >> */}
+          <div className="mt-8">
+            <button
+              onClick={onOpenConsole}
+              className="group inline-flex items-center justify-center gap-3 rounded-full border border-teal/50 bg-teal px-8 py-3 text-sm font-bold tracking-wide text-black shadow-[0_0_30px_rgba(63,181,201,0.5)] transition-all duration-200 hover:bg-[#52cde3] hover:shadow-[0_0_40px_rgba(63,181,201,0.7)] hover:scale-105 active:scale-95"
+              title="Launch Planetary Registration Dashboard"
+            >
+              <span>Dashboard</span>
+              <span className="transition-transform duration-200 group-hover:translate-x-1 font-bold">
+                &gt;&gt;
+              </span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* 5. Bottom Footer (Credits & Social Icons) */}
