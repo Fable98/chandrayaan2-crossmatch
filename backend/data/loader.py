@@ -25,10 +25,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+if str(REPO_ROOT / "ML_model") not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT / "ML_model"))
+
 try:
-    from lunar_project.src.ml.evaluation.metrics import compute_all_metrics
+    from metrics import compute_canonical_metrics
 except ImportError:
-    compute_all_metrics = None
+    compute_canonical_metrics = None
 
 
 def _first_existing(*paths: str | Path) -> str:
@@ -98,8 +101,14 @@ def _parse_ml_matches(
         return [], None
 
     # Collect pixel pairs for batch geo conversion
-    ohrc_pixels = [(m["image1_x"], m["image1_y"]) for m in raw_matches]
-    tmc_pixels = [(m["image2_x"], m["image2_y"]) for m in raw_matches]
+    ohrc_pixels = [
+        (float(m.get("image1_x", m.get("source_x"))), float(m.get("image1_y", m.get("source_y"))))
+        for m in raw_matches
+    ]
+    tmc_pixels = [
+        (float(m.get("image2_x", m.get("target_x"))), float(m.get("image2_y", m.get("target_y"))))
+        for m in raw_matches
+    ]
 
     # Convert pixels to lat/lon using the shared affine transform from bounds
     ohrc_latlons = pixel_to_latlon_from_bounds_batch(
@@ -113,11 +122,11 @@ def _parse_ml_matches(
     points = []
     for i, m in enumerate(raw_matches):
         points.append({
-            "ohrc_px": (m["image1_x"], m["image1_y"]),
-            "tmc_px": (m["image2_x"], m["image2_y"]),
+            "ohrc_px": (float(m.get("image1_x", m.get("source_x"))), float(m.get("image1_y", m.get("source_y")))),
+            "tmc_px": (float(m.get("image2_x", m.get("target_x"))), float(m.get("image2_y", m.get("target_y")))),
             "ohrc_latlon": ohrc_latlons[i],
             "tmc_latlon": tmc_latlons[i],
-            "confidence": m["confidence"],
+            "confidence": float(m.get("confidence", 1.0)),
         })
 
     # Re-derive homography from the inlier match points
@@ -346,11 +355,31 @@ def load_all() -> None:
         points, homography = _parse_ml_matches(raw_points, bounds)
 
         metrics_data = None
-        if compute_all_metrics and len(raw_points) >= 4:
+        if compute_canonical_metrics and len(raw_points) >= 4 and homography is not None:
             import numpy as np
-            src_pts = np.array([[m["image1_x"], m["image1_y"]] for m in raw_points])
-            dst_pts = np.array([[m["image2_x"], m["image2_y"]] for m in raw_points])
-            metrics_data = compute_all_metrics(src_pts, dst_pts, num_raw_matches=len(raw_points), image_size=IMAGE_SIZE)
+            src_pts = np.array([[float(m.get("image1_x", m.get("source_x"))), float(m.get("image1_y", m.get("source_y")))] for m in raw_points], dtype=np.float32)
+            dst_pts = np.array([[float(m.get("image2_x", m.get("target_x"))), float(m.get("image2_y", m.get("target_y")))] for m in raw_points], dtype=np.float32)
+            inlier_mask = np.ones((len(raw_points), 1), dtype=np.uint8)
+            canon = compute_canonical_metrics(src_pts, dst_pts, inlier_mask, np.array(homography))
+            metrics_data = {
+                "num_inliers": canon.get("inlier_count", len(raw_points)),
+                "num_raw_matches": canon.get("match_count", len(raw_points)),
+                "inlier_ratio": canon.get("inlier_ratio", 1.0),
+                "rmse_px": canon.get("fit_rmse_px", 0.0) or 0.0,
+                "fit_rmse_px": canon.get("fit_rmse_px"),
+                "validation_rmse_px": canon.get("validation_rmse_px"),
+                "validation_status": canon.get("validation_status"),
+                "mean_reprojection_error_px": canon.get("mean_reprojection_error_px", 0.0) or 0.0,
+                "median_reprojection_error_px": canon.get("median_reprojection_error_px", 0.0) or 0.0,
+                "max_reprojection_error_px": canon.get("max_reprojection_error_px", 0.0) or 0.0,
+                "sub_pixel_accurate": canon.get("sub_pixel_accurate", False),
+                "fraction_below_1px": canon.get("fraction_below_1px", 0.0) or 0.0,
+                "source_coverage_ratio": canon.get("spatial_coverage", 0.0),
+                "destination_coverage_ratio": canon.get("spatial_coverage", 0.0),
+                "combined_coverage_score": canon.get("spatial_coverage", 0.0),
+                "uniformity_score": canon.get("spatial_uniformity", 0.0),
+                "method": "CFOG + Phase Congruency",
+            }
 
         enriched[triplet_id] = {
             "triplet_id": triplet_id,

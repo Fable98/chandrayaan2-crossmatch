@@ -25,7 +25,8 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from scripts.register import register_region
-from lunar_project.src.ml.evaluation.metrics import compute_all_metrics
+sys.path.insert(0, str(REPO_ROOT / "ML_model"))
+from metrics import compute_canonical_metrics as compute_all_metrics
 
 REGISTRATION_OUT_DIR = REPO_ROOT / "registration_output"
 DATA_MATCHES_DIR.mkdir(parents=True, exist_ok=True)

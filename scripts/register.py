@@ -18,7 +18,7 @@ import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PROCESSED_DIR = REPO_ROOT / "data_preprocessing_pipeline" / "processed_triplets"
-MATCHES_DIR = REPO_ROOT / "processed_user" / "matches"
+MATCHES_DIR = REPO_ROOT / "data_preprocessing_pipeline" / "matches"
 REGISTRATION_OUT_DIR = REPO_ROOT / "registration_output"
 
 
@@ -101,8 +101,8 @@ def register_region(
     src_img = cv2.imread(str(ohrc_path))
     dst_img = cv2.imread(str(tmc_path))
 
-    src_pts = np.array([[m["image1_x"], m["image1_y"]] for m in matches], dtype=np.float32)
-    dst_pts = np.array([[m["image2_x"], m["image2_y"]] for m in matches], dtype=np.float32)
+    src_pts = np.array([[float(m.get("image1_x", m.get("source_x"))), float(m.get("image1_y", m.get("source_y")))] for m in matches], dtype=np.float32)
+    dst_pts = np.array([[float(m.get("image2_x", m.get("target_x"))), float(m.get("image2_y", m.get("target_y")))] for m in matches], dtype=np.float32)
 
     H, _ = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, 5.0)
     if H is None:

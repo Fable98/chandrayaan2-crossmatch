@@ -144,18 +144,20 @@ Evaluated across 240 trials spanning 8 directions (+X, -X, +Y, -Y, diag_+X_+Y, d
 * *Empirical Finding: On the tested synthetic lunar-terrain benchmark, the Fourier phase-correlation refinement achieved approximately 0.24 px MAE, with all tested trials below 0.5 px. Accuracy is displacement-dependent and the benchmark does not establish universal <0.2 px precision. Peak refinement uses local log-domain peak interpolation intended to reduce interpolation bias.*
 
 ### B. Multi-Region Mission Dataset Benchmark
-Evaluated across the demonstration Chandrayaan-2 lunar regions ([`scripts/benchmark_registration.py`](scripts/benchmark_registration.py)):
+Evaluated across all demonstration Chandrayaan-2 lunar regions and triplets ([`scripts/benchmark_registration.py`](scripts/benchmark_registration.py)):
 
 | Region ID | Status | Quality Tier | Inliers | Inlier Ratio | Fit RMSE (px) | Spatial Coverage | Runtime (s) |
 | :--- | :--- | :--- | :---: | :---: | :---: | :---: | :---: |
-| `region_001` | SUCCESS | LOW_CONFIDENCE | 7 | 9.1% | 1.85 | 7.0% | 0.17s |
-| `region_002` | SUCCESS | LOW_CONFIDENCE | 7 | 10.6% | 1.24 | 7.0% | 0.15s |
-| `region_003` | SUCCESS | LOW_CONFIDENCE | 6 | 7.8% | 1.77 | 6.0% | 0.15s |
-| `region_004` | SUCCESS | LOW_CONFIDENCE | 7 | 10.0% | 1.78 | 7.0% | 0.15s |
-| `region_005` | SUCCESS | LOW_CONFIDENCE | 6 | 13.3% | 1.40 | 6.0% | 0.15s |
+| `region_001` | SUCCESS | LOW_CONFIDENCE | 7 | 9.1% | 1.85 | 7.0% | 0.48s |
+| `region_002` | SUCCESS | LOW_CONFIDENCE | 7 | 10.6% | 1.24 | 7.0% | 0.16s |
+| `region_003` | SUCCESS | LOW_CONFIDENCE | 6 | 7.8% | 1.77 | 6.0% | 0.16s |
+| `region_004` | SUCCESS | LOW_CONFIDENCE | 7 | 10.0% | 1.78 | 7.0% | 0.16s |
+| `region_005` | SUCCESS | LOW_CONFIDENCE | 6 | 13.3% | 1.40 | 6.0% | 0.16s |
 | `region_006` | SUCCESS | LOW_CONFIDENCE | 6 | 10.7% | 1.65 | 6.0% | 0.16s |
+| `triplet_01_ch2_ohr_ncp_202` | SUCCESS | LOW_CONFIDENCE | 7 | 7.2% | 2.20 | 7.0% | 0.16s |
+| `triplet_new_2022` | SUCCESS | LOW_CONFIDENCE | 6 | 6.7% | 2.07 | 6.0% | 0.16s |
 
-*Key Demonstration: The pipeline produces geometrically verified low-confidence registrations on the six packaged demonstration regions. On small 512x512 tile crops, inliers are reliably 6–7 per region, correctly categorized as LOW_CONFIDENCE per our documented quality standards. All inliers pass spatial support gates without fabricating artificial correspondences.*
+*Key Demonstration: The pipeline produces geometrically verified low-confidence registrations across all 8 packaged demonstration regions and mission triplets. On small 512x512 tile crops, inliers are reliably 6–7 per region, correctly categorized as LOW_CONFIDENCE per our documented quality standards. All inliers pass spatial support gates without fabricating artificial correspondences.*
 
 ---
 
