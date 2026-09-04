@@ -6,9 +6,11 @@ import Image from "next/image";
 interface Props {
   onOpenConsole?: () => void;
   onOpenAbout?: () => void;
+  onLogout?: () => void;
+  userName?: string;
 }
 
-export default function ExploreMoonHero({ onOpenConsole, onOpenAbout }: Props) {
+export default function ExploreMoonHero({ onOpenConsole, onOpenAbout, onLogout, userName }: Props) {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -83,6 +85,22 @@ export default function ExploreMoonHero({ onOpenConsole, onOpenAbout }: Props) {
             <span>Console</span>
             <span>↗</span>
           </button>
+
+          {/* User / Logout */}
+          {userName && (
+            <div className="flex items-center gap-2 ml-2">
+              <div className="h-7 w-7 rounded-full bg-gradient-to-br from-teal/30 to-teal-dark/30 border border-teal/20 flex items-center justify-center text-xs font-bold text-teal">
+                {userName.charAt(0).toUpperCase()}
+              </div>
+              <button
+                onClick={onLogout}
+                className="text-xs font-normal tracking-wide text-ink-faint transition-colors hover:text-red-400"
+                title="Sign out"
+              >
+                Logout
+              </button>
+            </div>
+          )}
         </nav>
       </header>
 

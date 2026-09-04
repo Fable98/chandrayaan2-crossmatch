@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { api, ApiError, imageUrl } from "@/lib/api";
 import { footprintSizeKm } from "@/lib/geo";
 import type { TripletSummary, MatchPoint, IIRSOverlay, MatchMetrics } from "@/lib/types";
@@ -19,13 +20,19 @@ interface Props {
 }
 
 export default function Console({ onBackToHero }: Props = {}) {
+  const searchParams = useSearchParams();
+  const subviewParam = searchParams.get("subview") as View | null;
+  const modalParam = searchParams.get("modal");
+
   const [triplets, setTriplets] = useState<TripletSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [detail, setDetail] = useState<TripletSummary | null>(null);
   const [matches, setMatches] = useState<MatchPoint[]>([]);
   const [metrics, setMetrics] = useState<MatchMetrics | null>(null);
   const [iirsOverlay, setIirsOverlay] = useState<IIRSOverlay | null>(null);
-  const [view, setView] = useState<View>("registration");
+  const [view, setView] = useState<View>(
+    subviewParam === "linked-cursor" || subviewParam === "map" ? subviewParam : "registration"
+  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
@@ -42,13 +49,16 @@ export default function Console({ onBackToHero }: Props = {}) {
 
   const arenaRef = useRef<HTMLDivElement>(null);
 
-  // Initialize bookmark state from localStorage
+  // Handle modal query param for demo linkability
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem("sih26166_saved_ref99");
-      if (saved === "true") setSavedQuoteBookmarked(true);
-    } catch {}
-  }, []);
+    if (modalParam === "vault") {
+      setVaultOpen(true);
+    } else if (modalParam === "theory") {
+      setTheoryModalOpen(true);
+    } else if (modalParam === "dossier" && triplets.length > 0) {
+      handleOpenDossierModal(triplets[0]);
+    }
+  }, [modalParam, triplets]);
 
   // Load regions once on mount
   useEffect(() => {

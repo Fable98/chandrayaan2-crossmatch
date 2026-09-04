@@ -248,3 +248,4 @@ dynamic_runs/
 
 # --- OS ---
 .DS_Store
+backend/data/users.json

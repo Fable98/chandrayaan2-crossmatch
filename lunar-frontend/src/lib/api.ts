@@ -4,6 +4,7 @@ import type {
   MatchesResponse,
   IIRSOverlay,
 } from "./types";
+import { getAuthHeaders } from "./auth";
 
 // Point this at your running FastAPI instance. Override at build/run time
 // with NEXT_PUBLIC_API_BASE_URL if the backend isn't on localhost:8000 —
@@ -27,7 +28,12 @@ async function getJson<T>(path: string): Promise<T> {
   const url = `${API_BASE}${path}`;
   let res: Response;
   try {
-    res = await fetch(url, { cache: "no-store" });
+    res = await fetch(url, {
+      cache: "no-store",
+      headers: {
+        ...getAuthHeaders(),
+      },
+    });
   } catch (err) {
     throw new ApiError(
       `Could not reach the backend at ${API_BASE}. Is FastAPI running and is CORS configured for this origin?`,
@@ -40,6 +46,7 @@ async function getJson<T>(path: string): Promise<T> {
   }
   return res.json() as Promise<T>;
 }
+
 
 export function imageUrl(path: string): string {
   // Backend returns paths like "/images/ohrc/region_003" — join with the

@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from data import loader
-from routers import triplets, footprint, matches, images
+from routers import triplets, footprint, matches, images, auth
 from schemas import HealthResponse, RegisterResponse
 
 import shutil
@@ -91,6 +91,7 @@ app.include_router(triplets.router)
 app.include_router(footprint.router)
 app.include_router(matches.router)
 app.include_router(images.router)
+app.include_router(auth.router)
 
 
 # ---------------------------------------------------------------------------

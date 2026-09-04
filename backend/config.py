@@ -70,6 +70,20 @@ class Settings(BaseSettings):
         description="Override path for ML output directory (default: repo root / ML_model)",
     )
 
+    # JWT Authentication
+    JWT_SECRET_KEY: str = Field(
+        default="chandrayaan2-crossmatch-dev-secret-change-in-production",
+        description="Secret key for signing JWT tokens (override in production!)",
+    )
+    JWT_ALGORITHM: str = Field(
+        default="HS256",
+        description="Algorithm for JWT token encoding",
+    )
+    JWT_EXPIRY_MINUTES: int = Field(
+        default=1440,
+        description="JWT token expiry time in minutes (default: 24 hours)",
+    )
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Parse comma-separated ALLOWED_ORIGINS into a sanitized list of origins."""
