@@ -11,9 +11,13 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "ML_model"))
 sys.path.insert(0, str(REPO_ROOT))
+sys.path.insert(0, str(REPO_ROOT / "data" / "ingestion"))
 
 from matcher_cfog import apply_grid_nms
-from data.ingestion.pds4_reader import parse_pds4_or_vicar_label, PDS4ProductInfo
+try:
+    from data.ingestion.pds4_reader import parse_pds4_or_vicar_label, PDS4ProductInfo
+except (ImportError, ModuleNotFoundError):
+    from pds4_reader import parse_pds4_or_vicar_label, PDS4ProductInfo
 
 
 def test_grid_nms_enforces_spatial_uniformity_on_1000_clustered_points():

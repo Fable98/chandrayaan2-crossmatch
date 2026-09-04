@@ -93,15 +93,16 @@ def calculate_absolute_rmse_meters(
     # 1. Parse match_points into pixel errors or coordinate pairs
     pts1 = None
     pts2 = None
+    H_mat = None
     errors_px = None
 
     if isinstance(match_points, tuple) and len(match_points) == 3:
         # (src_pts, dst_pts, H)
-        src, dst, H = match_points
+        src, dst, H_mat = match_points
         pts1 = np.asarray(src, dtype=np.float64)
         pts2 = np.asarray(dst, dtype=np.float64)
-        if H is not None:
-            errors_px = calculate_reprojection_errors(pts1, pts2, H)
+        if H_mat is not None:
+            errors_px = calculate_reprojection_errors(pts1, pts2, H_mat)
         else:
             errors_px = np.linalg.norm(pts2 - pts1, axis=1)
     elif isinstance(match_points, (tuple, list)) and len(match_points) == 2 and isinstance(match_points[0], (np.ndarray, list)):
@@ -144,30 +145,54 @@ def calculate_absolute_rmse_meters(
     if errors_px is None or len(errors_px) == 0:
         return 0.0
 
-    # 2. Compute planar squared errors in meters
+    # 2. Compute planar squared errors in physical meters
+    pts1_warped = None
     if pts1 is not None and pts2 is not None and len(pts1) == len(pts2):
-        dx_m = (pts2[:, 0] - pts1[:, 0]) * gsd_x
-        dy_m = (pts2[:, 1] - pts1[:, 1]) * gsd_y
+        if H_mat is not None:
+            # Transform source coordinates into reference space via homography H
+            pts1_warped = cv2.perspectiveTransform(pts1.reshape(-1, 1, 2), H_mat).reshape(-1, 2)
+            dx_m = (pts1_warped[:, 0] - pts2[:, 0]) * gsd_x
+            dy_m = (pts1_warped[:, 1] - pts2[:, 1]) * gsd_y
+        else:
+            # Without H, residuals are direct pixel differences between paired points
+            pts1_warped = pts1
+            dx_m = (pts2[:, 0] - pts1[:, 0]) * gsd_x
+            dy_m = (pts2[:, 1] - pts1[:, 1]) * gsd_y
         planar_sq = dx_m**2 + dy_m**2
     else:
         avg_gsd = (gsd_x + gsd_y) / 2.0
+        dx_m = (errors_px / np.sqrt(2.0)) * gsd_x
+        dy_m = (errors_px / np.sqrt(2.0)) * gsd_y
         planar_sq = (errors_px * avg_gsd)**2
 
-    # 3. Topographic elevation correction if DEM is provided and non-empty
-    if dem_data is not None and pts1 is not None and pts2 is not None and dem_data.ndim == 2:
+    # 3. Topographic elevation correction (DEM is already in physical meters — DO NOT multiply by GSD!)
+    if dem_data is not None and pts2 is not None and dem_data.ndim == 2:
         dh, dw = dem_data.shape[:2]
-        # Sample elevations with bilinear interpolation / bounds clamping
         def sample_elev(pts: np.ndarray) -> np.ndarray:
             x_clamped = np.clip(pts[:, 0], 0, dw - 1).astype(np.int32)
             y_clamped = np.clip(pts[:, 1], 0, dh - 1).astype(np.int32)
             return dem_data[y_clamped, x_clamped].astype(np.float64)
 
-        z1 = sample_elev(pts1)
+        src_eval = pts1_warped if pts1_warped is not None else pts1
+        z1 = sample_elev(src_eval)
         z2 = sample_elev(pts2)
-        dz = z2 - z1
-        total_sq = planar_sq + dz**2
+        dz_m = z2 - z1
+        total_sq = planar_sq + dz_m**2
     else:
+        dz_m = np.zeros_like(dx_m)
         total_sq = planar_sq
+
+    # Diagnostic logging: isolate individual physical axis contributions
+    mean_dx = float(np.mean(np.abs(dx_m)))
+    mean_dy = float(np.mean(np.abs(dy_m)))
+    mean_dz = float(np.mean(np.abs(dz_m)))
+    logger.info(
+        "Absolute RMSE breakdown — mean |dx|: %.3fm, mean |dy|: %.3fm, mean |dz|: %.3fm (N=%d)",
+        mean_dx,
+        mean_dy,
+        mean_dz,
+        len(dx_m),
+    )
 
     rmse_meters = float(np.sqrt(np.mean(total_sq)))
     logger.debug("Calculated absolute RMSE: %.4f m (DEM topographic correction applied: %s)", rmse_meters, bool(dem_data is not None))
@@ -504,9 +529,11 @@ def compute_canonical_metrics(
         "absolute_rmse_m": abs_rmse_m,
         "validation_rmse_px": val_results["validation_rmse_px"],  # Kept for API backward compatibility
         "held_out_inlier_validation_rmse_px": val_results["validation_rmse_px"],
+        "held_out_validation_rmse_px": val_results["validation_rmse_px"],
         "validation_median_error_px": val_results["validation_median_error_px"],
         "validation_status": val_results["validation_status"],
         "quality_tier": quality_tier,
+        "confidence_tier": quality_tier,
         "mean_reprojection_error_px": round(mean_err, 4),
         "median_reprojection_error_px": round(median_err, 4),
         "max_reprojection_error_px": round(max_err, 4),

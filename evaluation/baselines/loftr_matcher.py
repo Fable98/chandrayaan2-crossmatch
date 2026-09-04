@@ -4,12 +4,23 @@ evaluation/baselines/loftr_matcher.py — Dense LoFTR Feature Matching Baseline 
 
 from __future__ import annotations
 
+import logging
 import time
 from pathlib import Path
 from typing import Dict, Any, Tuple, Optional
 import numpy as np
 import cv2
-import torch
+
+logger = logging.getLogger(__name__)
+
+try:
+    import torch
+    from kornia.feature import LoFTR
+    LOFTR_AVAILABLE = True
+except (ImportError, ModuleNotFoundError):
+    torch = None
+    LoFTR = None
+    LOFTR_AVAILABLE = False
 
 import sys
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
@@ -26,8 +37,16 @@ def match_loftr(
 ) -> Dict[str, Any]:
     """
     Standard LoFTR baseline matching wrapper using kornia.feature.LoFTR.
+    Falls back gracefully to NCC if PyTorch or Kornia is not available.
     """
     start_time = time.time()
+
+    if not LOFTR_AVAILABLE:
+        logger.warning("PyTorch/Kornia not installed. LoFTR baseline unavailable. Falling back to NCC.")
+        from baselines.ncc_matcher import match_ncc
+        res = match_ncc(img1, img2, gsd_m=gsd_m, dem=dem, ransac_thresh=ransac_thresh)
+        res["method"] = "Pure LoFTR (NCC Fallback)"
+        return res
 
     def to_u8_gray(item):
         if isinstance(item, (str, Path)):

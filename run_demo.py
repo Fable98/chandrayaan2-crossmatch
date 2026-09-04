@@ -176,6 +176,16 @@ def run_pipeline_demo(input_dir: str | Path, output_dir: str | Path, skip_ablati
     abs_rmse_str = f"{metrics.get('absolute_rmse_m'):.2f} m" if metrics.get("absolute_rmse_m") is not None else "N/A"
     fit_rmse_str = f"{metrics.get('fit_rmse_px'):.4f} px" if metrics.get("fit_rmse_px") is not None else "N/A"
 
+    confidence_tier = metrics.get("confidence_tier") or metrics.get("quality_tier", "ACCEPTED")
+    held_out_val_rmse = metrics.get("held_out_validation_rmse_px") or metrics.get("validation_rmse_px")
+    inlier_count = metrics.get("inlier_count", 0)
+
+    if confidence_tier == "LOW_CONFIDENCE" or inlier_count < 10:
+        val_rmse_str = f"{held_out_val_rmse:.4f}" if held_out_val_rmse is not None else "N/A (N<8)"
+        fit_rmse_display = f"**{fit_rmse_str}** *(LOW_CONFIDENCE: N={inlier_count}, Held-out Validation RMSE: {val_rmse_str} px)*"
+    else:
+        fit_rmse_display = f"**{fit_rmse_str}**"
+
     report_content = f"""# Chandrayaan-2 Registration Pipeline — Execution Summary Report
 
 **Execution Timestamp**: {time.strftime('%Y-%m-%d %H:%M:%S UTC', time.gmtime())}  
@@ -191,9 +201,9 @@ def run_pipeline_demo(input_dir: str | Path, output_dir: str | Path, skip_ablati
 | **Source Sensor** | OHRC (~0.25 m/px nominal) | Ultra-high resolution lander assessment |
 | **Reference Sensor** | TMC-2 (~5.0 m/px nominal) | Topographic stereo triplet mapping |
 | **Working Physical Scale** | 5.00 m/px | Common-GSD scale-space normalization |
-| **Verified Inlier Correspondences** | **{metrics.get('inlier_count', 0)}** | \u2265 4 verified tie-points |
+| **Verified Inlier Correspondences** | **{inlier_count}** | \u2265 4 verified tie-points |
 | **Inlier Ratio** | **{(metrics.get('inlier_ratio') or 0.0) * 100:.1f}%** | Robust to out-of-plane parallax |
-| **Planar Fit RMSE** | **{fit_rmse_str}** | Sub-pixel precision (< 2.0 px) |
+| **Planar Fit RMSE** | {fit_rmse_display} | Sub-pixel precision (< 2.0 px) |
 | **Absolute Selenodetic RMSE** | **{abs_rmse_str}** | Topographically corrected 3D distance |
 | **Spatial Uniformity Gate** | **PASSED** | Grid-based NMS (10x10 grid, max 4/cell) |
 | **Terrain Relief Compensation** | **ACTIVE** | DEM ray-intersection & piecewise affine |

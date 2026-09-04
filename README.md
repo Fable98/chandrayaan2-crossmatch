@@ -282,8 +282,13 @@ Post-RANSAC Lucas-Kanade refinement is implemented in [`refine_inliers_lucas_kan
 git clone https://github.com/Fable98/chandrayaan2-crossmatch.git
 cd chandrayaan2-crossmatch
 
-# 2. Install backend dependencies
+# 2. Install primary backend dependencies
 pip install -r backend/requirements.txt
+
+# (Optional) Deep Learning Baselines
+# Note: requirements-eval.txt is optional and only needed if running deep learning baselines (LoFTR/Kornia).
+# The primary structural CFOG & Phase Congruency pipeline runs with standard scientific Python.
+pip install -r requirements-eval.txt
 
 # 3. Install frontend dependencies
 cd lunar-frontend && npm install && cd ..

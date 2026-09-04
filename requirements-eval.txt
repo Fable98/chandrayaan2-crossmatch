@@ -1,0 +1,4 @@
+# Optional evaluation dependencies for deep learning baselines (e.g., Pure LoFTR)
+# Not required for primary CFOG / Phase Congruency registration pipeline
+torch>=2.0.0
+kornia>=0.7.0
