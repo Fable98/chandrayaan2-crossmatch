@@ -14,5 +14,22 @@
     "east_lon": 234.528638,
     "south_lat": 5.148811500000001,
     "north_lat": 5.35283875
+  },
+  "bounds_optical": {
+    "west_lon": 234.396774,
+    "east_lon": 234.528638,
+    "south_lat": 5.148811500000001,
+    "north_lat": 5.35283875
+  },
+  "bounds_iirs": {
+    "west_lon": 234.235888,
+    "east_lon": 234.904993,
+    "south_lat": 4.920825125,
+    "north_lat": 5.5808251250000005
+  },
+  "aoi_iirs_km": {
+    "width_km": 20.29,
+    "height_km": 20.01,
+    "detector_pixels_est": "285x281"
   }
 }
