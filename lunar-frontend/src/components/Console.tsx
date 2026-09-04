@@ -44,7 +44,6 @@ export default function Console({ onBackToHero }: Props = {}) {
   const [vaultInitialFilter, setVaultInitialFilter] = useState<PayloadFilter>("all");
   const [theoryModalOpen, setTheoryModalOpen] = useState(false);
   const [infoModalContent, setInfoModalContent] = useState<InfoModalContent | null>(null);
-  const [savedQuoteBookmarked, setSavedQuoteBookmarked] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const arenaRef = useRef<HTMLDivElement>(null);
@@ -101,15 +100,7 @@ export default function Console({ onBackToHero }: Props = {}) {
     }, 3200);
   };
 
-  const toggleBookmark = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const next = !savedQuoteBookmarked;
-    setSavedQuoteBookmarked(next);
-    try {
-      localStorage.setItem("sih26166_saved_ref99", next ? "true" : "false");
-    } catch {}
-    showToast(next ? "Quote saved to Archival References" : "Quote removed from References");
-  };
+
 
   const scrollToArena = () => {
     if (arenaRef.current) {
@@ -170,13 +161,7 @@ export default function Console({ onBackToHero }: Props = {}) {
     setVaultOpen(true);
   };
 
-  // Helper to find specific triplets for the dossier cards
-  const region001 = triplets.find((t) => t.id === "region_001") ?? triplets[0];
-  const region003 = triplets.find((t) => t.id === "region_003") ?? triplets[2] ?? triplets[0];
-  const antimeridianRegion =
-    triplets.find((t) => t.id === "triplet_new_2022") ??
-    triplets[triplets.length - 1] ??
-    triplets[0];
+
 
   if (error) {
     return (
@@ -598,39 +583,40 @@ export default function Console({ onBackToHero }: Props = {}) {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-            {/* Card 1: Dossier 01 (Polar Rim & Permanent Shadow) */}
-            {(() => {
-              const bounds = region001 ? footprintSizeKm(region001.bounds) : { widthKm: 3.2, heightKm: 3.8 };
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {triplets.map((t, i) => {
+              const { widthKm, heightKm } = footprintSizeKm(t.bounds);
               return (
                 <div
-                  onClick={() => region001 && handleOpenDossierModal(region001)}
-                  className="group relative flex min-h-[220px] cursor-pointer flex-col justify-between rounded-2xl border border-white/10 bg-[#0a0d14]/50 p-5 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-all duration-300 hover:border-[#d4af37]/50 hover:bg-[#121622]/70 hover:shadow-[0_8px_32px_rgba(212,175,55,0.15)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
+                  key={t.id}
+                  onClick={() => handleOpenDossierModal(t)}
+                  className="group relative flex min-h-[180px] cursor-pointer flex-col justify-between rounded-2xl border border-white/10 bg-[#0a0d14]/50 p-5 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-all duration-300 hover:border-[#d4af37]/50 hover:bg-[#121622]/70 hover:shadow-[0_8px_32px_rgba(212,175,55,0.15)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
                   tabIndex={0}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter" && region001) handleOpenDossierModal(region001);
+                    if (e.key === "Enter") handleOpenDossierModal(t);
                   }}
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#d4af37]">
-                      DOSSIER · 01
+                      DOSSIER · {String(i + 1).padStart(2, "0")}
                     </span>
                     <span className="font-mono text-[9px] text-[#6b665f] transition-colors group-hover:text-[#d4af37]">
                       CLICK TO OPEN ↗
                     </span>
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-white transition-colors group-hover:text-[#d4af37]">
-                      Polar Rim &amp; Permanent Shadow
+                    <h3 className="font-mono text-sm font-semibold text-white transition-colors group-hover:text-[#d4af37]">
+                      {t.id}
                     </h3>
                     <p className="mt-1 text-xs text-[#9a958e]">
-                      Sub-pixel alignment across extreme illumination disparity (&gt;160° solar angle).
+                      {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km footprint
+                      {t.dem_available && " · DEM available"}
                     </p>
                     <div className="mt-3 flex items-center gap-3 font-mono text-[10px]">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (region001) handleOpenDossierModal(region001);
+                          handleOpenDossierModal(t);
                         }}
                         className="rounded-md border border-[#d4af37]/30 bg-[#d4af37]/10 px-2 py-0.5 text-[#d4af37] backdrop-blur-sm hover:bg-[#d4af37]/20 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
                       >
@@ -639,7 +625,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (region001) handleSelectRegionAndScroll(region001.id, "registration");
+                          handleSelectRegionAndScroll(t.id, "registration");
                         }}
                         className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[#9a958e] backdrop-blur-sm hover:text-white hover:border-white/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
                       >
@@ -647,361 +633,24 @@ export default function Console({ onBackToHero }: Props = {}) {
                       </button>
                     </div>
                   </div>
-                  <span className="font-mono text-[10px] text-[#6b665f]">
-                    {region001?.id ?? "region_001"} · {bounds.widthKm.toFixed(1)} × {bounds.heightKm.toFixed(1)} km
-                  </span>
                 </div>
               );
-            })()}
-
-            {/* Card 2: Editorial Quote & Theory Link */}
-            <div className="relative flex min-h-[220px] flex-col justify-between rounded-2xl border border-white/10 bg-[#0a0d14]/50 p-5 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-all hover:border-white/20 hover:bg-[#121622]/70">
-              <div className="flex items-center justify-between">
-                <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#d4af37]">
-                  QUOTE / REF-99
-                </span>
-                <button
-                  onClick={toggleBookmark}
-                  className={`flex h-7 w-7 items-center justify-center rounded-lg border backdrop-blur-sm transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${
-                    savedQuoteBookmarked
-                      ? "border-[#d4af37] bg-[#d4af37] text-black shadow-[0_0_12px_rgba(212,175,55,0.5)]"
-                      : "border-white/15 bg-white/[0.04] text-[#9a958e] hover:border-[#d4af37] hover:text-[#d4af37]"
-                  }`}
-                  title={savedQuoteBookmarked ? "Remove Bookmark" : "Save to References"}
-                >
-                  <svg className="h-3.5 w-3.5" fill={savedQuoteBookmarked ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                  </svg>
-                </button>
-              </div>
-
-              <p className="font-serif text-sm italic leading-relaxed text-[#e8d5b5]">
-                "The grid is a conceptual framework, an intellectual construct. It is not an image."
-              </p>
-
-              <div className="flex items-center justify-between font-mono text-[10px]">
-                <button
-                  onClick={() => setTheoryModalOpen(true)}
-                  className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-0.5 text-[#9a958e] backdrop-blur-sm transition-colors hover:text-[#d4af37] hover:border-[#d4af37]/40 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                >
-                  THEORY OF HOMOGRAPHY ↗
-                </button>
-                <span className="text-[9px] text-[#6b665f]">
-                  {savedQuoteBookmarked ? "SAVED" : "REF-99"}
-                </span>
-              </div>
-            </div>
-
-            {/* Card 3: Field Note (Live Inliers & QA Link) */}
-            <div
-              onClick={() => {
-                setView("registration");
-                scrollToArena();
-              }}
-              className="group relative flex min-h-[220px] cursor-pointer flex-col justify-between rounded-2xl border border-white/10 bg-[#0a0d14]/50 p-5 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-all duration-300 hover:border-[#d4af37]/50 hover:bg-[#121622]/70 hover:shadow-[0_8px_32px_rgba(212,175,55,0.15)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  setView("registration");
-                  scrollToArena();
-                }
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="rounded-lg border border-[#d4af37]/30 bg-[#d4af37]/15 px-2 py-0.5 font-mono text-[9px] uppercase tracking-wider text-[#d4af37] backdrop-blur-sm">
-                  FIELD NOTE
-                </span>
-                <span className="font-mono text-[10px] font-semibold text-[#d4af37]">
-                  {metrics ? `${metrics.rmse_px.toFixed(3)} PX` : "0.419 PX"}
-                </span>
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-white transition-colors group-hover:text-[#d4af37]">
-                  Decay Rates &amp; Rim Continuity
-                </h3>
-                <p className="mt-1 text-xs text-[#9a958e]">
-                  Gradient and census transform features establish robust correspondence despite shadow reversals.
-                </p>
-                <div className="mt-2 font-mono text-[10px] text-[#d4af37] group-hover:underline">
-                  INSPECT INLIERS &amp; RMSE →
-                </div>
-              </div>
-              <span className="font-mono text-[10px] text-[#6b665f]">
-                RANSAC inliers: <span className="text-white font-semibold">{metrics?.num_inliers ?? 28}</span> (Live)
-              </span>
-            </div>
-
-            {/* Card 4: Long Read (Motion Studies in the Metropolis) */}
-            {(() => {
-              const target = region003;
-              const bounds = target ? footprintSizeKm(target.bounds) : { widthKm: 4.0, heightKm: 6.2 };
-              return (
-                <div
-                  onClick={() => target && handleOpenDossierModal(target)}
-                  className="group relative flex min-h-[220px] cursor-pointer flex-col justify-between rounded-2xl border border-white/10 bg-[#0a0d14]/50 p-5 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-all duration-300 hover:border-[#d4af37]/50 hover:bg-[#121622]/70 hover:shadow-[0_8px_32px_rgba(212,175,55,0.15)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && target) handleOpenDossierModal(target);
-                  }}
-                >
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#d4af37]">
-                    LONG READ
-                  </span>
-                  <div>
-                    <h3 className="text-sm font-semibold text-white transition-colors group-hover:text-[#d4af37]">
-                      Motion Studies in the Metropolis of Craters
-                    </h3>
-                    <p className="mt-1 text-xs text-[#9a958e]">
-                      Multi-modal registration between 0.25m OHRC and 70m IIRS hyperspectral imagery.
-                    </p>
-                    <div className="mt-3 flex items-center gap-3 font-mono text-[10px]">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (target) handleOpenDossierModal(target);
-                        }}
-                        className="rounded-md border border-[#d4af37]/30 bg-[#d4af37]/10 px-2 py-0.5 text-[#d4af37] backdrop-blur-sm hover:bg-[#d4af37]/20 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                      >
-                        READ DOSSIER →
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (target) handleSelectRegionAndScroll(target.id, "map");
-                        }}
-                        className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[#9a958e] backdrop-blur-sm hover:text-white hover:border-white/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                      >
-                        OPEN WORKSPACE →
-                      </button>
-                    </div>
-                  </div>
-                  <span className="font-mono text-[10px] text-[#6b665f]">
-                    {target?.id ?? "region_003"} · {bounds.widthKm.toFixed(1)} × {bounds.heightKm.toFixed(1)} km
-                  </span>
-                </div>
-              );
-            })()}
-
-            {/* Card 5: Antimeridian Far-Side Basin */}
-            {(() => {
-              const target = antimeridianRegion;
-              const bounds = target ? footprintSizeKm(target.bounds) : { widthKm: 4.0, heightKm: 24.7 };
-              return (
-                <div
-                  onClick={() => target && handleOpenDossierModal(target)}
-                  className="group relative flex min-h-[220px] cursor-pointer flex-col justify-between rounded-2xl border border-white/10 bg-[#0a0d14]/50 p-5 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-all duration-300 hover:border-[#d4af37]/50 hover:bg-[#121622]/70 hover:shadow-[0_8px_32px_rgba(212,175,55,0.15)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && target) handleOpenDossierModal(target);
-                  }}
-                >
-                  <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#d4af37]">
-                    DOSSIER · 08
-                  </span>
-                  <div>
-                    <h3 className="text-sm font-semibold text-white transition-colors group-hover:text-[#d4af37]">
-                      Antimeridian Far-Side Basin
-                    </h3>
-                    <p className="mt-1 text-xs text-[#9a958e]">
-                      Handling longitude wrap-around (180° / 360°) with continuous spatial projection.
-                    </p>
-                    <div className="mt-3 flex items-center gap-3 font-mono text-[10px]">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (target) handleOpenDossierModal(target);
-                        }}
-                        className="rounded-md border border-[#d4af37]/30 bg-[#d4af37]/10 px-2 py-0.5 text-[#d4af37] backdrop-blur-sm hover:bg-[#d4af37]/20 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                      >
-                        READ DOSSIER →
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (target) handleSelectRegionAndScroll(target.id, "linked-cursor");
-                        }}
-                        className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[#9a958e] backdrop-blur-sm hover:text-white hover:border-white/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                      >
-                        OPEN WORKSPACE →
-                      </button>
-                    </div>
-                  </div>
-                  <span className="font-mono text-[10px] text-[#6b665f]">
-                    {target?.id ?? "triplet_new_2022"} · {bounds.widthKm.toFixed(1)} × {bounds.heightKm.toFixed(1)} km
-                  </span>
-                </div>
-              );
-            })()}
-
-            {/* Card 6: Access The Vault */}
-            <div
-              onClick={() => openVaultWithFilter("all")}
-              className="group relative flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-2xl border border-white/15 bg-gradient-to-br from-[#0e1422]/60 to-[#0a0d14]/70 p-5 text-center shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-all duration-300 hover:border-[#d4af37]/60 hover:bg-[#161d2e]/80 hover:shadow-[0_8px_32px_rgba(212,175,55,0.2)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") openVaultWithFilter("all");
-              }}
-            >
-              <svg className="h-6 w-6 text-[#d4af37] transition-transform duration-300 group-hover:scale-110" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-              </svg>
-              <span className="mt-3 font-mono text-xs font-bold uppercase tracking-[0.2em] text-[#d4af37]">
-                ACCESS THE VAULT
-              </span>
-              <p className="mt-1 text-xs text-[#9a958e]">
-                View all registration products &amp; raw imagery across {triplets.length} regions
-              </p>
-              <span className="mt-3 font-mono text-[10px] text-[#d4af37] transition-transform group-hover:translate-x-1">
-                OPEN WORKSPACE →
-              </span>
-            </div>
+            })}
           </div>
         </section>
 
-        {/* 5. Archival Footer */}
-        <footer className="rounded-2xl border border-white/10 bg-[#0a0d14]/40 p-8 font-mono text-xs text-[#6b665f] shadow-[0_8px_32px_0_rgba(0,0,0,0.35)] backdrop-blur-xl">
-          <div className="flex flex-col justify-between gap-8 md:flex-row md:items-start">
-            {/* Left Statement */}
-            <div className="max-w-md">
-              <span className="text-[#d4af37]">[ ]</span>
-              <p className="mt-2 font-serif text-sm italic text-[#9a958e]">
-                "The investigation continues into the digital void, where sensor signals meet sub-pixel truth."
-              </p>
-              <p className="mt-4 text-[10px] text-[#4f4b45]">
-                ISRO Chandrayaan-2 · SIH26166 · Built with Next.js &amp; FastAPI
-              </p>
-            </div>
-
-            {/* Right Links Columns */}
-            <div className="flex flex-wrap gap-12 font-mono text-[11px]">
-              {/* Indices */}
-              <div className="flex flex-col gap-2">
-                <span className="font-bold uppercase tracking-wider text-[#d4af37]">INDICES</span>
-                <button
-                  onClick={() => openVaultWithFilter("all")}
-                  className="text-left text-[#9a958e] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                >
-                  ARCHIVES ↗
-                </button>
-                <button
-                  onClick={() => {
-                    setView("map");
-                    scrollToArena();
-                  }}
-                  className="text-left text-[#9a958e] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                >
-                  MAP
-                </button>
-                <button
-                  onClick={() => {
-                    setView("linked-cursor");
-                    scrollToArena();
-                  }}
-                  className="text-left text-[#9a958e] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                >
-                  CURSOR
-                </button>
-              </div>
-
-              {/* Payloads */}
-              <div className="flex flex-col gap-2">
-                <span className="font-bold uppercase tracking-wider text-[#d4af37]">PAYLOADS</span>
-                <button
-                  onClick={() => openVaultWithFilter("ohrc")}
-                  className="text-left text-[#9a958e] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                >
-                  OHRC (0.25m) ↗
-                </button>
-                <button
-                  onClick={() => openVaultWithFilter("tmc")}
-                  className="text-left text-[#9a958e] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                >
-                  TMC-2 (4m) ↗
-                </button>
-                <button
-                  onClick={() => openVaultWithFilter("iirs")}
-                  className="text-left text-[#9a958e] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                >
-                  IIRS (70m) ↗
-                </button>
-              </div>
-
-              {/* Legal / Provenance */}
-              <div className="flex flex-col gap-2">
-                <span className="font-bold uppercase tracking-wider text-[#d4af37]">LEGAL</span>
-                <button
-                  onClick={() =>
-                    setInfoModalContent({
-                      tag: "DATA GOVERNANCE",
-                      title: "ISRO Planetary Data System Provenance",
-                      subtitle: "Official Chandrayaan-2 PDS4 Archive Compliance",
-                      paragraphs: [
-                        "All imagery, telemetry, and ephemeris records are ingested directly from ISRO's ISSDC (Indian Space Science Data Centre) Chandrayaan-2 PDS4 repositories.",
-                        "Optical High Resolution Camera (OHRC) operates at 0.25–0.32 m/pixel, Terrain Mapping Camera-2 (TMC-2) operates at ~4–5 m/pixel in stereo triplets, and Imaging Infrared Spectrometer (IIRS) operates in the 0.8–5.0 µm hyperspectral range.",
-                        "All products derived via this cross-matching console conform to spatial reference standards on the Lunar Ellipsoid (IAU/IAG 2000 coordinate system).",
-                      ],
-                      specs: [
-                        { label: "Data Authority", value: "ISRO / ISSDC" },
-                        { label: "Coordinate Frame", value: "IAU 2000 Moon (Mean Earth/Polar)" },
-                        { label: "Optical Sensor", value: "CH2_OHRC (0.25m)" },
-                        { label: "Stereo Sensor", value: "CH2_TMC2 (4m)" },
-                        { label: "Hyperspectral", value: "CH2_IIRS (70m, 256 bands)" },
-                      ],
-                    })
-                  }
-                  className="text-left text-[#9a958e] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                >
-                  ISRO DATA ↗
-                </button>
-                <button
-                  onClick={() =>
-                    setInfoModalContent({
-                      tag: "HACKATHON CRITERIA",
-                      title: "SIH26166 Problem Statement Verification",
-                      subtitle: "Automated Multi-Sensor Lunar Image Cross-Matching",
-                      paragraphs: [
-                        "Problem Statement SIH26166 requires sub-pixel co-registration of high-resolution Chandrayaan-2 lunar imagery characterized by high scale disparity (16×) and severe illumination differences (>140° solar angle).",
-                        "Our implementation achieves verified sub-pixel accuracy (RMSE < 0.5 px) using semi-dense deep feature matching (LoFTR) coupled with iterative RANSAC planar homography estimation.",
-                        "The solution provides real-time dual-cursor coordinate projection, multi-band spectral overlay blending, and automated checkerboard quality assurance.",
-                      ],
-                      specs: [
-                        { label: "Problem Statement ID", value: "SIH26166" },
-                        { label: "Accuracy Target", value: "Sub-pixel (RMSE < 1.0 px)" },
-                        { label: "Achieved Accuracy", value: "RMSE 0.417 px (Verified)" },
-                        { label: "Validated Regions", value: "8 / 8 Pass" },
-                      ],
-                    })
-                  }
-                  className="text-left text-[#9a958e] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                >
-                  SIH26166 ↗
-                </button>
-                <button
-                  onClick={() =>
-                    setInfoModalContent({
-                      tag: "OPEN ARCHITECTURE",
-                      title: "Open Research & Algorithm Documentation",
-                      subtitle: "Transformer Feature Tracking & Robust Geometry",
-                      paragraphs: [
-                        "This platform is built on open planetary science and computer vision standards. Feature correspondence relies on Local Feature Transformers (LoFTR), eliminating traditional detector bottlenecks on lunar craters.",
-                        "Planar homography estimation and reprojection error optimization are implemented in Python via OpenCV and NumPy. Geospatial footprint bounds and tile services are served via FastAPI and Leaflet.",
-                      ],
-                      specs: [
-                        { label: "Matching Backbone", value: "LoFTR (Local Feature Transformer)" },
-                        { label: "Geometric Estimator", value: "RANSAC Homography" },
-                        { label: "Backend Stack", value: "Python 3.14 / FastAPI / Uvicorn" },
-                        { label: "Frontend Stack", value: "Next.js 14 / TypeScript / Tailwind" },
-                      ],
-                    })
-                  }
-                  className="text-left text-[#9a958e] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                >
-                  OPEN RESEARCH ↗
-                </button>
-              </div>
-            </div>
+        {/* 5. Minimal Footer */}
+        <footer className="rounded-2xl border border-white/10 bg-[#0a0d14]/40 p-6 font-mono text-xs text-[#6b665f] backdrop-blur-xl">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] text-[#4f4b45]">
+              ISRO Chandrayaan-2 · SIH26166 · Built with Next.js &amp; FastAPI
+            </span>
+            <span className="text-[10px] text-[#4f4b45]">
+              {triplets.length} regions loaded
+            </span>
           </div>
         </footer>
+
       </main>
 
       {/* 6. Active Modals */}
