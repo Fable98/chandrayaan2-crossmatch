@@ -133,23 +133,7 @@ export default function LoginPage({ onLoginSuccess }: Props) {
           isLoaded ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
         }`}
       >
-        {/* Astralynx Brand */}
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="h-8 w-8 rounded-full bg-gradient-to-br from-teal to-teal-dark flex items-center justify-center shadow-[0_0_20px_rgba(63,181,201,0.3)]">
-              <svg
-                className="h-4 w-4 text-black"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-              >
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-              </svg>
-            </div>
-          </div>
-          <span className="font-serif text-lg tracking-wide text-white/90 italic">
-            Astralynx
-          </span>
-        </div>
+        <div />
         <div />
       </header>
 
