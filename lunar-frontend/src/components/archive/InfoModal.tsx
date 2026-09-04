@@ -22,7 +22,7 @@ export default function InfoModal({ content, onClose }: Props) {
         {/* Header Bar */}
         <div className="flex items-center justify-between border-b border-[#4A4A4A] bg-[#282c30] px-6 py-4">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#6D8196]">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#4682B4]">
               {content.tag}
             </span>
             <span className="text-sm font-semibold text-[#FFFFE3]">

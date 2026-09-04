@@ -11,7 +11,7 @@ export default function TheoryModal({ onClose }: Props) {
         {/* Header Bar */}
         <div className="flex items-center justify-between border-b border-[#4A4A4A] bg-[#282c30] px-6 py-4">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#6D8196]">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#4682B4]">
               Methodology
             </span>
             <span className="text-sm font-semibold text-[#FFFFE3]">
@@ -45,7 +45,7 @@ export default function TheoryModal({ onClose }: Props) {
             </p>
 
             <div className="rounded-md border border-[#4A4A4A] bg-[#282c30] p-4 text-xs text-[#FFFFE3]">
-              <span className="text-[#6D8196] font-mono block mb-1">Planar Projective Transform:</span>
+              <span className="text-[#4682B4] font-mono block mb-1">Planar Projective Transform:</span>
               <span className="font-mono text-[#FFFFE3]">s · [x&apos;, y&apos;, 1]ᵀ = H · [x, y, 1]ᵀ</span>
               <p className="mt-2 text-[11px] text-[#CBCBCB]">
                 Where H is a 3×3 matrix with 8 degrees of freedom calculated via Random Sample Consensus (RANSAC) on dense Transformer-based correspondences (LoFTR).

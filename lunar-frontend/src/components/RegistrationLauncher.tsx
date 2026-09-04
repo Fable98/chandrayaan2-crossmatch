@@ -104,7 +104,7 @@ export default function RegistrationLauncher() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-md border border-[#4A4A4A] bg-[#282c30] px-3 py-1.5 text-xs font-medium text-[#CBCBCB] transition-colors hover:bg-[#4A4A4A] hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D8196]"
+        className="rounded-md border border-[#4A4A4A] bg-[#282c30] px-3 py-1.5 text-xs font-medium text-[#CBCBCB] transition-colors hover:bg-[#4A4A4A] hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4682B4]"
       >
         Live Registration
       </button>
@@ -175,7 +175,7 @@ export default function RegistrationLauncher() {
                   type="button"
                   onClick={runRegistration}
                   disabled={loading || !sourceFile || !referenceFile}
-                  className="w-full rounded-md bg-[#6D8196] px-4 py-2.5 text-xs font-semibold text-[#FFFFE3] transition-colors hover:bg-[#5a6d80] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="w-full rounded-md bg-[#4682B4] px-4 py-2.5 text-xs font-semibold text-[#FFFFE3] transition-colors hover:bg-[#3a6d96] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {loading
                     ? "Executing Registration & Sub-Pixel Refinement…"
@@ -258,7 +258,7 @@ export default function RegistrationLauncher() {
                       href={warpedUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-md border border-[#4A4A4A] bg-[#282c30] px-3.5 py-1.5 text-xs font-medium text-[#6D8196] transition-colors hover:bg-[#4A4A4A]"
+                      className="rounded-md border border-[#4A4A4A] bg-[#282c30] px-3.5 py-1.5 text-xs font-medium text-[#4682B4] transition-colors hover:bg-[#4A4A4A]"
                     >
                       View Warped Source
                     </a>
@@ -269,7 +269,7 @@ export default function RegistrationLauncher() {
                       href={matchesUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-md border border-[#4A4A4A] bg-[#282c30] px-3.5 py-1.5 text-xs font-medium text-[#6D8196] transition-colors hover:bg-[#4A4A4A]"
+                      className="rounded-md border border-[#4A4A4A] bg-[#282c30] px-3.5 py-1.5 text-xs font-medium text-[#4682B4] transition-colors hover:bg-[#4A4A4A]"
                     >
                       Download Match JSON
                     </a>

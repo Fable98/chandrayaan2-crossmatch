@@ -184,7 +184,7 @@ export default function Console({ onBackToHero }: Props = {}) {
       {/* Toast Notification */}
       {toastMessage && (
         <div className="fixed bottom-6 right-6 z-[9999] flex items-center gap-2 rounded-md border border-[#4A4A4A] bg-[#282c30] px-4 py-2.5 text-sm text-[#FFFFE3] shadow-lg">
-          <span className="h-2 w-2 rounded-full bg-[#6D8196]" />
+          <span className="h-2 w-2 rounded-full bg-[#4682B4]" />
           <span>{toastMessage}</span>
         </div>
       )}
@@ -195,7 +195,7 @@ export default function Console({ onBackToHero }: Props = {}) {
           {onBackToHero && (
             <button
               onClick={onBackToHero}
-              className="flex items-center gap-1.5 rounded-md border border-[#4A4A4A] bg-[#282c30] px-3 py-1.5 text-xs text-[#CBCBCB] transition-colors hover:bg-[#4A4A4A] hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D8196]"
+              className="flex items-center gap-1.5 rounded-md border border-[#4A4A4A] bg-[#282c30] px-3 py-1.5 text-xs text-[#CBCBCB] transition-colors hover:bg-[#4A4A4A] hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4682B4]"
             >
               <span>←</span>
               <span>Back</span>
@@ -212,9 +212,9 @@ export default function Console({ onBackToHero }: Props = {}) {
             <button
               key={v}
               onClick={() => { setView(v); scrollToArena(); }}
-              className={`rounded px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D8196] ${
+              className={`rounded px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4682B4] ${
                 view === v
-                  ? "bg-[#6D8196] text-[#FFFFE3]"
+                  ? "bg-[#4682B4] text-[#FFFFE3]"
                   : "text-[#a2a8b0] hover:text-[#CBCBCB]"
               }`}
             >
@@ -227,7 +227,7 @@ export default function Console({ onBackToHero }: Props = {}) {
           <RegistrationLauncher />
           <button
             onClick={() => openVaultWithFilter("all")}
-            className="flex items-center gap-2 rounded-md border border-[#4A4A4A] bg-[#282c30] px-3 py-1.5 text-xs text-[#CBCBCB] transition-colors hover:bg-[#4A4A4A] hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D8196]"
+            className="flex items-center gap-2 rounded-md border border-[#4A4A4A] bg-[#282c30] px-3 py-1.5 text-xs text-[#CBCBCB] transition-colors hover:bg-[#4A4A4A] hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4682B4]"
           >
             <span>{triplets.length} Regions</span>
           </button>
@@ -249,7 +249,7 @@ export default function Console({ onBackToHero }: Props = {}) {
           <div className="flex items-center gap-3 text-sm">
             <button
               onClick={() => openVaultWithFilter("all")}
-              className="rounded-md bg-[#282c30] px-3 py-1.5 text-xs text-[#6D8196] transition-colors hover:bg-[#4A4A4A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D8196]"
+              className="rounded-md bg-[#282c30] px-3 py-1.5 text-xs text-[#4682B4] transition-colors hover:bg-[#4A4A4A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4682B4]"
             >
               {triplets.length} validated tiles →
             </button>
@@ -267,13 +267,13 @@ export default function Console({ onBackToHero }: Props = {}) {
               <div className="flex items-center gap-1 text-xs">
                 <button
                   onClick={handlePrev}
-                  className="flex h-6 w-6 items-center justify-center rounded border border-[#4A4A4A] bg-[#282c30] text-[#a2a8b0] transition-colors hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#6D8196]"
+                  className="flex h-6 w-6 items-center justify-center rounded border border-[#4A4A4A] bg-[#282c30] text-[#a2a8b0] transition-colors hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#4682B4]"
                 >
                   &lt;
                 </button>
                 <button
                   onClick={handleNext}
-                  className="flex h-6 w-6 items-center justify-center rounded border border-[#4A4A4A] bg-[#282c30] text-[#a2a8b0] transition-colors hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#6D8196]"
+                  className="flex h-6 w-6 items-center justify-center rounded border border-[#4A4A4A] bg-[#282c30] text-[#a2a8b0] transition-colors hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#4682B4]"
                 >
                   &gt;
                 </button>
@@ -281,7 +281,7 @@ export default function Console({ onBackToHero }: Props = {}) {
             </div>
 
             {/* Search */}
-            <div className="mt-3 flex items-center gap-2 rounded-md border border-[#4A4A4A] bg-[#282c30] px-3 py-2 text-xs focus-within:border-[#6D8196]">
+            <div className="mt-3 flex items-center gap-2 rounded-md border border-[#4A4A4A] bg-[#282c30] px-3 py-2 text-xs focus-within:border-[#4682B4]">
               <svg className="h-3.5 w-3.5 text-[#a2a8b0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -303,9 +303,9 @@ export default function Console({ onBackToHero }: Props = {}) {
                   <button
                     key={t.id}
                     onClick={() => setSelectedId(t.id)}
-                    className={`flex w-full flex-col rounded-md p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D8196] ${
+                    className={`flex w-full flex-col rounded-md p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4682B4] ${
                       active
-                        ? "bg-[#333b44] border border-[#6D8196]"
+                        ? "bg-[#333b44] border border-[#4682B4]"
                         : "border border-transparent hover:bg-[#282c30]/50"
                     }`}
                   >
@@ -314,7 +314,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                         {String(i + 1).padStart(2, "0")}.
                       </span>
                       {t.dem_available && (
-                        <span className="rounded bg-[#334150] px-1.5 py-px text-[9px] text-[#6D8196]">
+                        <span className="rounded bg-[#334150] px-1.5 py-px text-[9px] text-[#4682B4]">
                           DEM
                         </span>
                       )}
@@ -341,7 +341,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                 {detail && (
                   <button
                     onClick={() => handleOpenDossierModal(detail)}
-                    className="rounded-md bg-[#282c30] px-2.5 py-1 text-[10px] text-[#6D8196] transition-colors hover:bg-[#4A4A4A] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#6D8196]"
+                    className="rounded-md bg-[#282c30] px-2.5 py-1 text-[10px] text-[#4682B4] transition-colors hover:bg-[#4A4A4A] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#4682B4]"
                   >
                     Report →
                   </button>
@@ -419,7 +419,7 @@ export default function Console({ onBackToHero }: Props = {}) {
             {/* Cycle View Button */}
             <button
               onClick={cycleView}
-              className="absolute bottom-4 right-4 z-30 flex h-9 w-9 items-center justify-center rounded-md bg-[#4A4A4A] text-[#FFFFE3] shadow-md transition-colors hover:bg-[#565c63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D8196]"
+              className="absolute bottom-4 right-4 z-30 flex h-9 w-9 items-center justify-center rounded-md bg-[#4A4A4A] text-[#FFFFE3] shadow-md transition-colors hover:bg-[#565c63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4682B4]"
               title="Cycle View"
             >
               <span className="text-sm">→</span>
@@ -472,7 +472,7 @@ export default function Console({ onBackToHero }: Props = {}) {
             <div className="mt-5">
               <button
                 onClick={cycleView}
-                className="flex w-full items-center justify-between rounded-md bg-[#282c30] p-3 text-xs text-[#CBCBCB] transition-colors hover:bg-[#4A4A4A] hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#6D8196]"
+                className="flex w-full items-center justify-between rounded-md bg-[#282c30] p-3 text-xs text-[#CBCBCB] transition-colors hover:bg-[#4A4A4A] hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#4682B4]"
               >
                 <span>Switch View ({view.replace("-", " ")})</span>
                 <span>→</span>
@@ -499,7 +499,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                 <div
                   key={t.id}
                   onClick={() => handleOpenDossierModal(t)}
-                  className="group cursor-pointer rounded-lg border border-[#4A4A4A] bg-[#202326] p-4 transition-colors hover:border-[#4A4A4A] hover:bg-[#282c30]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D8196]"
+                  className="group cursor-pointer rounded-lg border border-[#4A4A4A] bg-[#202326] p-4 transition-colors hover:border-[#4A4A4A] hover:bg-[#282c30]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4682B4]"
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleOpenDossierModal(t);
@@ -509,7 +509,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                     <span className="text-[10px] font-medium text-[#a2a8b0]">
                       #{String(i + 1).padStart(2, "0")}
                     </span>
-                    <span className="text-[10px] text-[#a2a8b0] group-hover:text-[#6D8196]">
+                    <span className="text-[10px] text-[#a2a8b0] group-hover:text-[#4682B4]">
                       Open →
                     </span>
                   </div>
@@ -523,13 +523,13 @@ export default function Console({ onBackToHero }: Props = {}) {
                   <div className="mt-3 flex items-center gap-2 text-[10px]">
                     <button
                       onClick={(e) => { e.stopPropagation(); handleOpenDossierModal(t); }}
-                      className="rounded bg-[#282c30] px-2 py-0.5 text-[#6D8196] hover:bg-[#4A4A4A] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#6D8196]"
+                      className="rounded bg-[#282c30] px-2 py-0.5 text-[#4682B4] hover:bg-[#4A4A4A] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#4682B4]"
                     >
                       Report
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleSelectRegionAndScroll(t.id, "registration"); }}
-                      className="rounded bg-[#282c30] px-2 py-0.5 text-[#CBCBCB] hover:bg-[#4A4A4A] hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#6D8196]"
+                      className="rounded bg-[#282c30] px-2 py-0.5 text-[#CBCBCB] hover:bg-[#4A4A4A] hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#4682B4]"
                     >
                       Workspace
                     </button>

@@ -25,7 +25,7 @@ export default function DossierModal({
         {/* Header Bar */}
         <div className="flex items-center justify-between border-b border-[#4A4A4A] bg-[#282c30] px-6 py-4">
           <div className="flex items-center gap-3">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#6D8196]">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#4682B4]">
               Region Report
             </span>
             <span className="text-sm font-semibold text-[#FFFFE3]">
@@ -135,7 +135,7 @@ export default function DossierModal({
                   />
                 </div>
                 <div className="text-xs">
-                  <span className="text-[#6D8196] font-medium">50% Blend Overlay</span>
+                  <span className="text-[#4682B4] font-medium">50% Blend Overlay</span>
                   <p className="text-[11px] text-[#a2a8b0]">Homography transformed</p>
                 </div>
               </div>
@@ -157,7 +157,7 @@ export default function DossierModal({
                 </div>
                 <div className="flex justify-between border-b border-[#4A4A4A] pb-1.5">
                   <span>Root Mean Square Error</span>
-                  <span className="font-medium text-[#6D8196]">
+                  <span className="font-medium text-[#4682B4]">
                     {metrics ? `${metrics.rmse_px.toFixed(3)} px` : "—"}
                   </span>
                 </div>
@@ -207,7 +207,7 @@ export default function DossierModal({
               onClose();
               onOpenWorkspace(triplet.id);
             }}
-            className="flex items-center gap-2 rounded-md bg-[#6D8196] px-4 py-2 text-xs font-semibold text-[#FFFFE3] transition-colors hover:bg-[#5a6d80]"
+            className="flex items-center gap-2 rounded-md bg-[#4682B4] px-4 py-2 text-xs font-semibold text-[#FFFFE3] transition-colors hover:bg-[#3a6d96]"
           >
             <span>Open in Workspace</span>
             <span>→</span>

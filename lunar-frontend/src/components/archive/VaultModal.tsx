@@ -35,7 +35,7 @@ export default function VaultModal({
           <div className="flex items-center gap-3">
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-[#6D8196]">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#4682B4]">
                   Datasets
                 </span>
                 <span className="text-sm font-semibold text-[#FFFFE3]">
@@ -138,7 +138,7 @@ export default function VaultModal({
                       <span className="text-[11px] text-[#a2a8b0]">
                         #{String(idx + 1).padStart(2, "0")}
                       </span>
-                      <span className="rounded bg-[#1a1d20] px-1.5 py-0.5 text-[10px] font-medium text-[#6D8196]">
+                      <span className="rounded bg-[#1a1d20] px-1.5 py-0.5 text-[10px] font-medium text-[#4682B4]">
                         {badge}
                       </span>
                     </div>
@@ -180,7 +180,7 @@ export default function VaultModal({
                         onClose();
                         onSelectRegion(t.id, targetView);
                       }}
-                      className="rounded bg-[#1a1d20] px-2.5 py-1 text-xs font-medium text-[#6D8196] transition-colors hover:bg-[#6D8196] hover:text-[#FFFFE3]"
+                      className="rounded bg-[#1a1d20] px-2.5 py-1 text-xs font-medium text-[#4682B4] transition-colors hover:bg-[#4682B4] hover:text-[#FFFFE3]"
                     >
                       Inspect →
                     </button>
@@ -226,7 +226,7 @@ function FilterButton({
       onClick={onClick}
       className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
         active
-          ? "bg-[#6D8196] text-[#FFFFE3]"
+          ? "bg-[#4682B4] text-[#FFFFE3]"
           : "bg-[#282c30] text-[#CBCBCB] hover:bg-[#4A4A4A] hover:text-[#FFFFE3]"
       }`}
     >
