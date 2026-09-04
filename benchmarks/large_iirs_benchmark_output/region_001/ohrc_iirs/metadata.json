@@ -56,8 +56,8 @@
     "direction": "inverted_from_BA",
     "measured_direction": "IIRS -> OHRC",
     "provenance": {
-        "source_path": "data_preprocessing_pipeline\\processed_triplets\\region_001\\ohrc_512.png",
-        "reference_path": "data_preprocessing_pipeline\\processed_triplets\\region_001\\iirs_512.png",
+        "source_path": "data_preprocessing_pipeline\\processed_triplets\\region_001\\ohrc_large_512.png",
+        "reference_path": "data_preprocessing_pipeline\\processed_triplets\\region_001\\iirs_large_512.png",
         "dem_path": null,
         "matcher": "CFOG_PhaseCongruency_v2.0",
         "direction": "inverted_from_BA",

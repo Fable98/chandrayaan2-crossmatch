@@ -236,10 +236,38 @@ def main():
                     "south_lat": float(large_s),
                     "north_lat": float(large_n),
                 }
+                # Calculate actual effective per-pixel GSD
+                tmc_iirs_eff_gsd_x = (width_km * 1000.0) / 512.0
+                tmc_iirs_eff_gsd_y = (height_km * 1000.0) / 512.0
+                eff_gsd_tmc_iirs = round((tmc_iirs_eff_gsd_x + tmc_iirs_eff_gsd_y) / 2.0, 4)
+
+                ohrc_w_km = (max(oxs_sub) - min(oxs_sub)) / 1000.0
+                ohrc_h_km = (max(oys_sub) - min(oys_sub)) / 1000.0
+                ohrc_eff_gsd_x = (ohrc_w_km * 1000.0) / 512.0
+                ohrc_eff_gsd_y = (ohrc_h_km * 1000.0) / 512.0
+                eff_gsd_ohrc = round((ohrc_eff_gsd_x + ohrc_eff_gsd_y) / 2.0, 4)
+
+                existing_meta["ohrc_large_effective_gsd_m"] = eff_gsd_ohrc
+                existing_meta["tmc2_large_effective_gsd_m"] = eff_gsd_tmc_iirs
+                existing_meta["iirs_large_effective_gsd_m"] = eff_gsd_tmc_iirs
+                existing_meta["ohrc_large_effective_gsd_xy_m"] = {
+                    "x": round(ohrc_eff_gsd_x, 4),
+                    "y": round(ohrc_eff_gsd_y, 4),
+                }
+                existing_meta["tmc2_large_effective_gsd_xy_m"] = {
+                    "x": round(tmc_iirs_eff_gsd_x, 4),
+                    "y": round(tmc_iirs_eff_gsd_y, 4),
+                }
+                existing_meta["iirs_large_effective_gsd_xy_m"] = {
+                    "x": round(tmc_iirs_eff_gsd_x, 4),
+                    "y": round(tmc_iirs_eff_gsd_y, 4),
+                }
+
                 existing_meta["aoi_iirs_km"] = {
                     "width_km": round(float(width_km), 2),
                     "height_km": round(float(height_km), 2),
                     "detector_pixels_est": f"{int(round(width_km * 1000 / i_meta.gsd_m))}x{int(round(height_km * 1000 / i_meta.gsd_m))}",
+                    "effective_gsd_m": eff_gsd_tmc_iirs,
                 }
 
                 with open(mf_path, "w", encoding="utf-8") as f:
