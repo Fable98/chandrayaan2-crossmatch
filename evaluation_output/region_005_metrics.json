@@ -41,7 +41,7 @@
             "fit_rmse_px": null,
             "forward_ohrc_to_iirs": {
                 "status": "composition_not_computable",
-                "message": "Missing verified homography for leg(s): BC (B -> C)",
+                "message": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
                 "quality_tier": "FAILED",
                 "match_count": 0,
                 "inlier_count": 0,
@@ -86,13 +86,14 @@
         }
     },
     "triplet_consistency": {
-        "status": "composition_not_computable",
-        "reason": "Missing verified homography for leg(s): BC (B -> C)",
+        "status": "cycle_not_computable",
+        "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
         "cycle_rmse_px": null,
         "cycle_mean_px": null,
         "cycle_closed_successfully": false,
         "failed_legs": [
-            "BC (B -> C)"
+            "BC (B -> C)",
+            "CA (C -> A)"
         ]
     }
 }

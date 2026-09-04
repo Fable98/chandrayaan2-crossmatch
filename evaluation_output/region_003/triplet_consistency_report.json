@@ -1,10 +1,77 @@
 {
     "status": "evaluated_composed",
     "reason": null,
-    "triplet_cycle_rmse_px": 2.7293,
-    "triplet_mean_cycle_error_px": 2.238,
+    "triplet_cycle_rmse_px": 0.0,
+    "triplet_mean_cycle_error_px": 0.0,
     "cycle_closed_successfully": true,
     "failed_legs": [],
+    "leg_derivations": {
+        "AB": "measured",
+        "BC": "measured",
+        "CA": "composed"
+    },
+    "legs": {
+        "AB": {
+            "derivation": "measured",
+            "homography": [
+                [
+                    0.13238339759266643,
+                    -0.1967438155256968,
+                    108.71632914324273
+                ],
+                [
+                    -0.5078440960784871,
+                    0.17648076608787186,
+                    246.5007434605242
+                ],
+                [
+                    -0.0012860658774098129,
+                    -0.00047142577592714424,
+                    1.0
+                ]
+            ]
+        },
+        "BC": {
+            "derivation": "measured",
+            "homography": [
+                [
+                    0.9437976799753265,
+                    0.02508189635905649,
+                    8.140214233399348
+                ],
+                [
+                    -0.019384021483889523,
+                    0.9643636097050149,
+                    13.974987672789915
+                ],
+                [
+                    -0.000109500180384948,
+                    4.584821817785957e-05,
+                    1.0
+                ]
+            ]
+        },
+        "CA": {
+            "derivation": "composed",
+            "homography": [
+                [
+                    -3.5853798324556774,
+                    -1.722133068395408,
+                    849.5643445670191
+                ],
+                [
+                    -2.319386872987199,
+                    -3.3127272620275603,
+                    1098.6698684523003
+                ],
+                [
+                    -0.005774654766482682,
+                    -0.003745629314631566,
+                    1.0
+                ]
+            ]
+        }
+    },
     "pair_AB_metrics": {
         "match_count": 77,
         "inlier_count": 6,
@@ -23,6 +90,7 @@
         "fraction_below_0_25px": 0.0,
         "spatial_coverage": 0.06,
         "spatial_uniformity": 0.0183,
+        "coverage_relative_to_inlier_count": 0.6667,
         "spatial_distribution": {
             "grid_rows": 10,
             "grid_cols": 10,
@@ -32,7 +100,10 @@
             "count_std": 0.2375,
             "count_mean": 0.06,
             "spatial_entropy": 0.3891,
-            "uniformity_score": 0.0183
+            "uniformity_score": 0.0183,
+            "adaptive_grid_size": 3,
+            "coverage_relative_to_inlier_count": 0.6667,
+            "adaptive_uniformity_score": 0.5392
         },
         "transform_quality": {
             "is_valid": true,
@@ -42,11 +113,140 @@
             "scale_ratio": 4.2766
         },
         "lk_refinement": {
-            "refined_count": 0,
+            "refined_count": 1,
             "total": 6,
             "fb_threshold": 0.5,
-            "max_shift_px": 3.0
-        }
+            "max_shift_px": 3.0,
+            "debug_points": [
+                {
+                    "point_index": 0,
+                    "src_pt": [
+                        486.0,
+                        128.0
+                    ],
+                    "dst_pt": [
+                        472.2405700683594,
+                        71.64619445800781
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.8087795972824097,
+                    "shift_mag": 5.908539295196533,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=0.8088 > 0.5)"
+                },
+                {
+                    "point_index": 1,
+                    "src_pt": [
+                        486.0,
+                        179.0
+                    ],
+                    "dst_pt": [
+                        472.0,
+                        107.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 1.3719850778579712,
+                    "shift_mag": 3.744223117828369,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=1.3720 > 0.5)"
+                },
+                {
+                    "point_index": 2,
+                    "src_pt": [
+                        230.0,
+                        230.0
+                    ],
+                    "dst_pt": [
+                        157.0,
+                        284.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 7.605287075042725,
+                    "shift_mag": 4.631331920623779,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=7.6053 > 0.5)"
+                },
+                {
+                    "point_index": 3,
+                    "src_pt": [
+                        25.0,
+                        281.0
+                    ],
+                    "dst_pt": [
+                        68.0,
+                        341.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 4.882992267608643,
+                    "shift_mag": 3.029801368713379,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=4.8830 > 0.5)"
+                },
+                {
+                    "point_index": 4,
+                    "src_pt": [
+                        486.0,
+                        384.0
+                    ],
+                    "dst_pt": [
+                        503.0,
+                        348.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.40359458327293396,
+                    "shift_mag": 0.777282178401947,
+                    "passed": true,
+                    "failure_gate": null
+                },
+                {
+                    "point_index": 5,
+                    "src_pt": [
+                        76.0,
+                        435.0
+                    ],
+                    "dst_pt": [
+                        48.0,
+                        408.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 3.6642184257507324,
+                    "shift_mag": 2.487011194229126,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=3.6642 > 0.5)"
+                }
+            ],
+            "step1_comparison": {
+                "fit_rmse_a_orig": 1.7724,
+                "fit_rmse_b_mixed": 1.7516,
+                "fit_rmse_c_refined_only": null,
+                "refined_count": 1,
+                "total_inliers": 6,
+                "err_a_per_point": [
+                    2.4056,
+                    2.4277,
+                    1.9301,
+                    1.7591,
+                    0.3123,
+                    0.5015
+                ],
+                "err_b_per_point": [
+                    2.3717,
+                    2.3798,
+                    1.935,
+                    1.7425,
+                    0.3061,
+                    0.4962
+                ],
+                "err_c_per_point": []
+            }
+        },
+        "derivation": "measured"
     },
     "pair_BC_metrics": {
         "match_count": 99,
@@ -66,6 +266,7 @@
         "fraction_below_0_25px": 0.0,
         "spatial_coverage": 0.17,
         "spatial_uniformity": 0.0876,
+        "coverage_relative_to_inlier_count": 0.52,
         "spatial_distribution": {
             "grid_rows": 10,
             "grid_cols": 10,
@@ -75,7 +276,10 @@
             "count_std": 0.3756,
             "count_mean": 0.17,
             "spatial_entropy": 0.6152,
-            "uniformity_score": 0.0876
+            "uniformity_score": 0.0876,
+            "adaptive_grid_size": 5,
+            "coverage_relative_to_inlier_count": 0.52,
+            "adaptive_uniformity_score": 0.3763
         },
         "transform_quality": {
             "is_valid": true,
@@ -83,9 +287,15 @@
             "determinant": 0.91086,
             "condition_number": 273.84,
             "scale_ratio": 1.0226
-        }
+        },
+        "derivation": "measured"
     },
-    "pair_CA_metrics": null,
+    "pair_CA_metrics": {
+        "derivation": "composed",
+        "status": "composed_from_AB_BC",
+        "inlier_count": 0,
+        "fit_rmse_px": null
+    },
     "composition": {
         "source": "A -> B -> C",
         "homography": [

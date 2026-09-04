@@ -14,12 +14,12 @@
     {
         "image1_x": 384.0,
         "image1_y": 25.0,
-        "image2_x": 381.0,
-        "image2_y": 46.0,
+        "image2_x": 379.59,
+        "image2_y": 46.47,
         "source_x": 384.0,
         "source_y": 25.0,
-        "target_x": 381.0,
-        "target_y": 46.0,
+        "target_x": 379.59,
+        "target_y": 46.47,
         "confidence": 0.3953,
         "is_inlier": true
     },
@@ -38,12 +38,12 @@
     {
         "image1_x": 76.0,
         "image1_y": 179.0,
-        "image2_x": 20.0,
-        "image2_y": 222.0,
+        "image2_x": 22.42,
+        "image2_y": 222.01,
         "source_x": 76.0,
         "source_y": 179.0,
-        "target_x": 20.0,
-        "target_y": 222.0,
+        "target_x": 22.42,
+        "target_y": 222.01,
         "confidence": 0.4353,
         "is_inlier": true
     },

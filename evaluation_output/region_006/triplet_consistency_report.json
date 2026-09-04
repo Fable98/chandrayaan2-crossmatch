@@ -90,6 +90,7 @@
         "fraction_below_0_25px": 0.0,
         "spatial_coverage": 0.06,
         "spatial_uniformity": 0.0183,
+        "coverage_relative_to_inlier_count": 0.5556,
         "spatial_distribution": {
             "grid_rows": 10,
             "grid_cols": 10,
@@ -99,7 +100,10 @@
             "count_std": 0.2375,
             "count_mean": 0.06,
             "spatial_entropy": 0.3891,
-            "uniformity_score": 0.0183
+            "uniformity_score": 0.0183,
+            "adaptive_grid_size": 3,
+            "coverage_relative_to_inlier_count": 0.5556,
+            "adaptive_uniformity_score": 0.4116
         },
         "transform_quality": {
             "is_valid": true,
@@ -109,10 +113,143 @@
             "scale_ratio": 1.9005
         },
         "lk_refinement": {
-            "refined_count": 0,
+            "refined_count": 4,
             "total": 6,
             "fb_threshold": 0.5,
-            "max_shift_px": 3.0
+            "max_shift_px": 3.0,
+            "debug_points": [
+                {
+                    "point_index": 0,
+                    "src_pt": [
+                        435.0,
+                        25.0
+                    ],
+                    "dst_pt": [
+                        365.0,
+                        58.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.4368806481361389,
+                    "shift_mag": 0.6360504031181335,
+                    "passed": true,
+                    "failure_gate": null
+                },
+                {
+                    "point_index": 1,
+                    "src_pt": [
+                        179.0,
+                        76.0
+                    ],
+                    "dst_pt": [
+                        119.0,
+                        36.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 2.2857444286346436,
+                    "shift_mag": 1.35186767578125,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=2.2857 > 0.5)"
+                },
+                {
+                    "point_index": 2,
+                    "src_pt": [
+                        179.0,
+                        281.0
+                    ],
+                    "dst_pt": [
+                        175.0,
+                        274.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.17024143040180206,
+                    "shift_mag": 0.7851095795631409,
+                    "passed": true,
+                    "failure_gate": null
+                },
+                {
+                    "point_index": 3,
+                    "src_pt": [
+                        281.0,
+                        281.0
+                    ],
+                    "dst_pt": [
+                        277.0,
+                        264.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.09798403829336166,
+                    "shift_mag": 0.3090652525424957,
+                    "passed": true,
+                    "failure_gate": null
+                },
+                {
+                    "point_index": 4,
+                    "src_pt": [
+                        76.0,
+                        332.0
+                    ],
+                    "dst_pt": [
+                        56.0,
+                        335.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.3975928723812103,
+                    "shift_mag": 0.14530590176582336,
+                    "passed": true,
+                    "failure_gate": null
+                },
+                {
+                    "point_index": 5,
+                    "src_pt": [
+                        384.0,
+                        332.0
+                    ],
+                    "dst_pt": [
+                        356.0,
+                        297.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 1.1559028625488281,
+                    "shift_mag": 1.6206108331680298,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=1.1559 > 0.5)"
+                }
+            ],
+            "step1_comparison": {
+                "fit_rmse_a_orig": 1.6526,
+                "fit_rmse_b_mixed": 5.3355,
+                "fit_rmse_c_refined_only": 0.0,
+                "refined_count": 4,
+                "total_inliers": 6,
+                "err_a_per_point": [
+                    0.6202,
+                    0.8159,
+                    3.3064,
+                    1.7617,
+                    0.9017,
+                    0.6981
+                ],
+                "err_b_per_point": [
+                    0.2107,
+                    0.1473,
+                    0.8782,
+                    1.9826,
+                    12.8484,
+                    0.9765
+                ],
+                "err_c_per_point": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            }
         },
         "derivation": "measured"
     },
@@ -134,6 +271,7 @@
         "fraction_below_0_25px": 0.125,
         "spatial_coverage": 0.08,
         "spatial_uniformity": 0.0289,
+        "coverage_relative_to_inlier_count": 0.6667,
         "spatial_distribution": {
             "grid_rows": 10,
             "grid_cols": 10,
@@ -143,7 +281,10 @@
             "count_std": 0.2713,
             "count_mean": 0.08,
             "spatial_entropy": 0.4515,
-            "uniformity_score": 0.0289
+            "uniformity_score": 0.0289,
+            "adaptive_grid_size": 3,
+            "coverage_relative_to_inlier_count": 0.6667,
+            "adaptive_uniformity_score": 0.4962
         },
         "transform_quality": {
             "is_valid": true,
@@ -179,10 +320,10 @@
                 1.0
             ]
         ],
-        "transform": "evaluation_output\\region_006\\composed_ohrc_to_iirs_transform.json",
-        "registered_raster": "evaluation_output\\region_006\\composed_registered_ohrc_to_iirs.png",
-        "registered_geotiff": "evaluation_output\\region_006\\composed_registered_ohrc_to_iirs.tif",
-        "checkerboard_qa": "evaluation_output\\region_006\\composed_checkerboard_qa.png",
-        "manifest": "evaluation_output\\region_006\\registered_products_manifest.json"
+        "transform": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
+        "registered_raster": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
+        "registered_geotiff": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
+        "checkerboard_qa": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\composed_checkerboard_qa.png",
+        "manifest": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\registered_products_manifest.json"
     }
 }

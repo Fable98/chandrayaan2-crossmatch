@@ -986,32 +986,78 @@ def match_images_cfog(
         )
 
         if lk_stats["refined_count"] > 0:
-            # Re-estimate homography from refined correspondences
-            H_refined, mask_refined = cv2.findHomography(
+            # (a) ORIGINAL baseline: pre-refinement point set and homography
+            err_a = calculate_reprojection_errors(lk_src, lk_dst, H_final)
+            rmse_a = float(np.sqrt(np.mean(err_a**2)))
+
+            # (b) MIXED refined+unrefined point set with a homography re-fit on all of them
+            H_b, mask_b = cv2.findHomography(
                 refined_src, refined_dst, cv2.RANSAC, ransacReprojThreshold=5.0
             )
-            if H_refined is not None and mask_refined is not None and np.sum(mask_refined) >= 4:
-                tx_check_r = verify_transformation_quality(H_refined, (orig_h2, orig_w2))
-                if tx_check_r["is_valid"]:
-                    err_orig = calculate_reprojection_errors(lk_src, lk_dst, H_final)
-                    err_new_all = calculate_reprojection_errors(lk_src, refined_dst, H_refined)
-                    rmse_orig = float(np.sqrt(np.mean(err_orig**2)))
-                    rmse_new = float(np.sqrt(np.mean(err_new_all**2)))
-                    # Only accept H_refined if all inliers remain verified and overall RMSE improves or stays stable
-                    if np.all(err_new_all <= 5.0) and rmse_new <= rmse_orig * 1.05:
-                        H_final = H_refined
-                    # Update pts arrays with refined coordinates for metrics
-                    pts1_arr[inlier_idx_lk] = refined_src
-                    pts2_arr[inlier_idx_lk] = refined_dst
-                    # Update records
-                    for j, idx in enumerate(inlier_idx_lk):
-                        if idx < len(refinement_records):
-                            if lk_stats.get("debug_points", []) and j < len(lk_stats["debug_points"]) and lk_stats["debug_points"][j]["passed"]:
-                                refinement_records[idx]["target_x"] = round(float(refined_dst[j, 0]), 2)
-                                refinement_records[idx]["target_y"] = round(float(refined_dst[j, 1]), 2)
-                                refinement_records[idx]["image2_x"] = round(float(refined_dst[j, 0]), 2)
-                                refinement_records[idx]["image2_y"] = round(float(refined_dst[j, 1]), 2)
-                                refinement_records[idx]["lk_refined"] = True
+            rmse_b = None
+            err_b = None
+            if H_b is not None:
+                err_b = calculate_reprojection_errors(refined_src, refined_dst, H_b)
+                rmse_b = float(np.sqrt(np.mean(err_b**2)))
+
+            # (c) ONLY successfully-refined points
+            debug_pts = lk_stats.get("debug_points", [])
+            passed_mask = np.array([pt.get("passed", False) for pt in debug_pts], dtype=bool)
+            n_passed = int(np.sum(passed_mask))
+            rmse_c = None
+            err_c = None
+            if n_passed >= 4:
+                src_c = refined_src[passed_mask]
+                dst_c = refined_dst[passed_mask]
+                H_c, _ = cv2.findHomography(src_c, dst_c, cv2.RANSAC, ransacReprojThreshold=5.0)
+                if H_c is None:
+                    H_c, _ = cv2.findHomography(src_c, dst_c, 0)
+                if H_c is not None:
+                    err_c = calculate_reprojection_errors(src_c, dst_c, H_c)
+                    rmse_c = float(np.sqrt(np.mean(err_c**2)))
+
+            # Record Step 1 comparison
+            lk_stats["step1_comparison"] = {
+                "fit_rmse_a_orig": round(rmse_a, 4),
+                "fit_rmse_b_mixed": round(rmse_b, 4) if rmse_b is not None else None,
+                "fit_rmse_c_refined_only": round(rmse_c, 4) if rmse_c is not None else None,
+                "refined_count": n_passed,
+                "total_inliers": len(lk_src),
+                "err_a_per_point": [round(float(e), 4) for e in err_a],
+                "err_b_per_point": [round(float(e), 4) for e in err_b] if err_b is not None else [],
+                "err_c_per_point": [round(float(e), 4) for e in err_c] if err_c is not None else [],
+            }
+
+            # Step 3 Fix (Option B):
+            # Only attempt re-fit if fraction of refined points is >= 50% and count >= 4.
+            # Re-fitting across mixed refined+coarse points or low-refined subsets destabilizes the model.
+            refined_fraction = n_passed / max(1, len(lk_src))
+            re_fit_accepted = False
+
+            if n_passed >= 4 and refined_fraction >= 0.50 and H_c is not None:
+                tx_check_c = verify_transformation_quality(H_c, (orig_h2, orig_w2))
+                if tx_check_c["is_valid"] and rmse_c is not None and rmse_c < rmse_a:
+                    # Verified improvement: adopt refined homography and update inliers to refined subset
+                    H_final = H_c
+                    re_fit_accepted = True
+
+                    refined_inlier_indices = inlier_idx_lk[passed_mask]
+                    new_inlier_mask = np.zeros_like(inlier_mask)
+                    new_inlier_mask[refined_inlier_indices] = 1
+                    inlier_mask = new_inlier_mask
+
+                    pts1_arr[refined_inlier_indices] = src_c
+                    pts2_arr[refined_inlier_indices] = dst_c
+
+            # Update match records with refined coordinates for downstream use
+            for j, idx in enumerate(inlier_idx_lk):
+                if idx < len(refinement_records):
+                    if debug_pts and j < len(debug_pts) and debug_pts[j]["passed"]:
+                        refinement_records[idx]["target_x"] = round(float(refined_dst[j, 0]), 2)
+                        refinement_records[idx]["target_y"] = round(float(refined_dst[j, 1]), 2)
+                        refinement_records[idx]["image2_x"] = round(float(refined_dst[j, 0]), 2)
+                        refinement_records[idx]["image2_y"] = round(float(refined_dst[j, 1]), 2)
+                        refinement_records[idx]["lk_refined"] = True
 
     # 9. Compute Canonical Master Metrics
     metrics = compute_canonical_metrics(

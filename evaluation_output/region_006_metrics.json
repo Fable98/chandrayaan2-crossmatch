@@ -38,7 +38,7 @@
         "ohrc_iirs": {
             "status": "composed",
             "inlier_count": 0,
-            "fit_rmse_px": 2.4524,
+            "fit_rmse_px": 0.0,
             "forward_ohrc_to_iirs": {
                 "status": "composed",
                 "message": null,
@@ -46,7 +46,7 @@
                 "match_count": 0,
                 "inlier_count": 0,
                 "inlier_ratio": 1.0,
-                "fit_rmse_px": 2.4524,
+                "fit_rmse_px": 0.0,
                 "spatial_coverage": 1.0,
                 "spatial_uniformity": 1.0
             },
@@ -95,25 +95,25 @@
                 "spatial_uniformity": 0.0289
             },
             "reverse_iirs_to_tmc": {
-                "status": "geometric_verification_failed",
-                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
-                "quality_tier": "FAILED",
+                "status": "success",
+                "message": null,
+                "quality_tier": "LOW_CONFIDENCE",
                 "match_count": 120,
-                "inlier_count": 7,
-                "inlier_ratio": 0.0,
-                "fit_rmse_px": null,
-                "spatial_coverage": 0.0,
-                "spatial_uniformity": 0.0
+                "inlier_count": 4,
+                "inlier_ratio": 0.0333,
+                "fit_rmse_px": 0.9126,
+                "spatial_coverage": 0.04,
+                "spatial_uniformity": 0.0092
             },
-            "bidirectional_agreement": false,
-            "directional_note": "Forward (TMC->IIRS) produced 'success' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
+            "bidirectional_agreement": true,
+            "directional_note": null
         }
     },
     "triplet_consistency": {
         "status": "evaluated_composed",
         "reason": null,
-        "cycle_rmse_px": 2.4524,
-        "cycle_mean_px": 2.011,
+        "cycle_rmse_px": 0.0,
+        "cycle_mean_px": 0.0,
         "cycle_closed_successfully": true,
         "failed_legs": []
     }

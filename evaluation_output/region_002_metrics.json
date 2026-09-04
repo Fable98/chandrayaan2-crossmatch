@@ -36,22 +36,22 @@
             "spatial_uniformity": 0.0235
         },
         "ohrc_iirs": {
-            "status": "composed",
+            "status": "composition_not_computable",
             "inlier_count": 0,
-            "fit_rmse_px": 3.1229,
+            "fit_rmse_px": 91.2788,
             "forward_ohrc_to_iirs": {
-                "status": "composed",
+                "status": "composition_not_computable",
                 "message": null,
-                "quality_tier": "COMPOSED_CHAIN",
+                "quality_tier": "FAILED",
                 "match_count": 0,
                 "inlier_count": 0,
-                "inlier_ratio": 1.0,
-                "fit_rmse_px": 3.1229,
-                "spatial_coverage": 1.0,
-                "spatial_uniformity": 1.0
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": 91.2788,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
             },
             "reverse_iirs_to_ohrc": null,
-            "bidirectional_agreement": true,
+            "bidirectional_agreement": false,
             "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
             "composition": {
                 "source": "A -> B -> C",
@@ -110,11 +110,11 @@
         }
     },
     "triplet_consistency": {
-        "status": "evaluated_composed",
+        "status": "evaluated",
         "reason": null,
-        "cycle_rmse_px": 3.1229,
-        "cycle_mean_px": 2.5608,
-        "cycle_closed_successfully": true,
+        "cycle_rmse_px": 91.2788,
+        "cycle_mean_px": 78.0294,
+        "cycle_closed_successfully": false,
         "failed_legs": []
     }
 }

@@ -62,12 +62,12 @@
     {
         "image1_x": 25.0,
         "image1_y": 435.0,
-        "image2_x": 53.0,
-        "image2_y": 402.0,
+        "image2_x": 50.61,
+        "image2_y": 401.78,
         "source_x": 25.0,
         "source_y": 435.0,
-        "target_x": 53.0,
-        "target_y": 402.0,
+        "target_x": 50.61,
+        "target_y": 401.78,
         "confidence": 0.5113,
         "is_inlier": true
     },
