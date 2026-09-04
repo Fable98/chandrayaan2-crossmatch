@@ -7,5 +7,28 @@
     "east_lon": 336.589455,
     "south_lat": -3.416904,
     "north_lat": -2.576048
+  },
+  "region_id": "triplet_01_ch2_ohr_ncp_202",
+  "ohrc_gsd_m": 0.25,
+  "tmc2_gsd_m": 5.4,
+  "iirs_gsd_m": 69.04,
+  "ohrc_sun_azimuth_deg": 269.646098,
+  "tmc2_sun_azimuth_deg": 108.866212,
+  "bounds_optical": {
+    "west_lon": 336.484646,
+    "east_lon": 336.589455,
+    "south_lat": -3.416904,
+    "north_lat": -2.576048
+  },
+  "bounds_iirs": {
+    "west_lon": 336.484986,
+    "east_lon": 337.156567,
+    "south_lat": -3.3264760000000004,
+    "north_lat": -2.6664760000000003
+  },
+  "aoi_iirs_km": {
+    "width_km": 20.36,
+    "height_km": 20.01,
+    "detector_pixels_est": "295x290"
   }
 }
