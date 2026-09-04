@@ -30,6 +30,16 @@ const config: Config = {
         "gold-light": "#f3df9b",
         "gold-cream": "#e8d5b5",
         "gold-dim": "#2c2619",
+        inkwash: {
+          charcoal: "#4A4A4A",
+          silver: "#CBCBCB",
+          cream: "#FFFFE3",
+          slate: "#6D8196",
+          "slate-hover": "#5a6d80",
+          base: "#1a1d20",
+          surface: "#24272a",
+          elevated: "#2e3236",
+        },
       },
       fontFamily: {
         sans: ["var(--font-inter)", "var(--font-plex-sans)", "system-ui", "sans-serif"],

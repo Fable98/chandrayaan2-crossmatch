@@ -180,42 +180,42 @@ export default function Console({ onBackToHero }: Props = {}) {
   }
 
   return (
-    <div className="min-h-screen bg-[#111827] font-sans text-[#e5e7eb]">
+    <div className="min-h-screen bg-[#1a1d20] font-sans text-[#FFFFE3]">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-[9999] flex items-center gap-2 rounded-md border border-[#374151] bg-[#1f2937] px-4 py-2.5 text-sm text-[#e5e7eb] shadow-lg">
-          <span className="h-2 w-2 rounded-full bg-[#60a5fa]" />
+        <div className="fixed bottom-6 right-6 z-[9999] flex items-center gap-2 rounded-md border border-[#4A4A4A] bg-[#282c30] px-4 py-2.5 text-sm text-[#FFFFE3] shadow-lg">
+          <span className="h-2 w-2 rounded-full bg-[#6D8196]" />
           <span>{toastMessage}</span>
         </div>
       )}
 
       {/* Top Navigation Bar */}
-      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-[#1f2937] bg-[#111827] px-6 md:px-10">
+      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-[#4A4A4A] bg-[#1a1d20] px-6 md:px-10">
         <div className="flex items-center gap-4">
           {onBackToHero && (
             <button
               onClick={onBackToHero}
-              className="flex items-center gap-1.5 rounded-md border border-[#374151] bg-[#1f2937] px-3 py-1.5 text-xs text-[#9ca3af] transition-colors hover:bg-[#374151] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa]"
+              className="flex items-center gap-1.5 rounded-md border border-[#4A4A4A] bg-[#282c30] px-3 py-1.5 text-xs text-[#CBCBCB] transition-colors hover:bg-[#4A4A4A] hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D8196]"
             >
               <span>←</span>
               <span>Back</span>
             </button>
           )}
-          <span className="text-sm font-semibold tracking-wide text-white">
+          <span className="text-sm font-semibold tracking-wide text-[#FFFFE3]">
             Chandrayaan-2 Console
           </span>
         </div>
 
         {/* Center Nav Tabs */}
-        <nav className="hidden items-center gap-1 rounded-md border border-[#1f2937] bg-[#0d1117] p-0.5 md:flex">
+        <nav className="hidden items-center gap-1 rounded-md border border-[#4A4A4A] bg-[#202326] p-0.5 md:flex">
           {(["map", "linked-cursor", "registration"] as View[]).map((v) => (
             <button
               key={v}
               onClick={() => { setView(v); scrollToArena(); }}
-              className={`rounded px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa] ${
+              className={`rounded px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D8196] ${
                 view === v
-                  ? "bg-[#1f2937] text-white"
-                  : "text-[#6b7280] hover:text-[#d1d5db]"
+                  ? "bg-[#6D8196] text-[#FFFFE3]"
+                  : "text-[#a2a8b0] hover:text-[#CBCBCB]"
               }`}
             >
               {v === "map" ? "Map" : v === "linked-cursor" ? "Linked Cursor" : "Registration QA"}
@@ -227,7 +227,7 @@ export default function Console({ onBackToHero }: Props = {}) {
           <RegistrationLauncher />
           <button
             onClick={() => openVaultWithFilter("all")}
-            className="flex items-center gap-2 rounded-md border border-[#374151] bg-[#1f2937] px-3 py-1.5 text-xs text-[#9ca3af] transition-colors hover:bg-[#374151] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa]"
+            className="flex items-center gap-2 rounded-md border border-[#4A4A4A] bg-[#282c30] px-3 py-1.5 text-xs text-[#CBCBCB] transition-colors hover:bg-[#4A4A4A] hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D8196]"
           >
             <span>{triplets.length} Regions</span>
           </button>
@@ -237,19 +237,19 @@ export default function Console({ onBackToHero }: Props = {}) {
       {/* Main Body */}
       <main className="mx-auto max-w-[1400px] px-6 py-8 md:px-10">
         {/* Page Header */}
-        <section className="mb-8 flex flex-col justify-between gap-3 border-b border-[#1f2937] pb-6 md:flex-row md:items-end">
+        <section className="mb-8 flex flex-col justify-between gap-3 border-b border-[#4A4A4A] pb-6 md:flex-row md:items-end">
           <div>
-            <h1 className="text-2xl font-semibold text-white">
+            <h1 className="text-2xl font-semibold text-[#FFFFE3]">
               Multi-Sensor Registration Dashboard
             </h1>
-            <p className="mt-1 text-sm text-[#6b7280]">
+            <p className="mt-1 text-sm text-[#a2a8b0]">
               ISRO Chandrayaan-2 · OHRC, TMC-2, IIRS cross-matching console
             </p>
           </div>
           <div className="flex items-center gap-3 text-sm">
             <button
               onClick={() => openVaultWithFilter("all")}
-              className="rounded-md bg-[#1f2937] px-3 py-1.5 text-xs text-[#60a5fa] transition-colors hover:bg-[#374151] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa]"
+              className="rounded-md bg-[#282c30] px-3 py-1.5 text-xs text-[#6D8196] transition-colors hover:bg-[#4A4A4A] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D8196]"
             >
               {triplets.length} validated tiles →
             </button>
@@ -259,21 +259,21 @@ export default function Console({ onBackToHero }: Props = {}) {
         {/* Inspection Arena */}
         <section ref={arenaRef} className="mb-10 grid grid-cols-1 gap-5 lg:grid-cols-12 scroll-mt-16">
           {/* Left: Region List */}
-          <div className="flex flex-col rounded-lg border border-[#1f2937] bg-[#0d1117] p-4 lg:col-span-3">
-            <div className="flex items-center justify-between border-b border-[#1f2937] pb-3">
-              <span className="text-xs font-semibold text-[#d1d5db]">
+          <div className="flex flex-col rounded-lg border border-[#4A4A4A] bg-[#202326] p-4 lg:col-span-3">
+            <div className="flex items-center justify-between border-b border-[#4A4A4A] pb-3">
+              <span className="text-xs font-semibold text-[#CBCBCB]">
                 Regions
               </span>
               <div className="flex items-center gap-1 text-xs">
                 <button
                   onClick={handlePrev}
-                  className="flex h-6 w-6 items-center justify-center rounded border border-[#374151] bg-[#1f2937] text-[#6b7280] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#60a5fa]"
+                  className="flex h-6 w-6 items-center justify-center rounded border border-[#4A4A4A] bg-[#282c30] text-[#a2a8b0] transition-colors hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#6D8196]"
                 >
                   &lt;
                 </button>
                 <button
                   onClick={handleNext}
-                  className="flex h-6 w-6 items-center justify-center rounded border border-[#374151] bg-[#1f2937] text-[#6b7280] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#60a5fa]"
+                  className="flex h-6 w-6 items-center justify-center rounded border border-[#4A4A4A] bg-[#282c30] text-[#a2a8b0] transition-colors hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#6D8196]"
                 >
                   &gt;
                 </button>
@@ -281,8 +281,8 @@ export default function Console({ onBackToHero }: Props = {}) {
             </div>
 
             {/* Search */}
-            <div className="mt-3 flex items-center gap-2 rounded-md border border-[#374151] bg-[#1f2937] px-3 py-2 text-xs focus-within:border-[#60a5fa]">
-              <svg className="h-3.5 w-3.5 text-[#6b7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="mt-3 flex items-center gap-2 rounded-md border border-[#4A4A4A] bg-[#282c30] px-3 py-2 text-xs focus-within:border-[#6D8196]">
+              <svg className="h-3.5 w-3.5 text-[#a2a8b0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
@@ -290,7 +290,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search regions..."
-                className="w-full bg-transparent text-xs text-white placeholder-[#6b7280] focus:outline-none"
+                className="w-full bg-transparent text-xs text-[#FFFFE3] placeholder-[#7a818a] focus:outline-none"
               />
             </div>
 
@@ -303,26 +303,26 @@ export default function Console({ onBackToHero }: Props = {}) {
                   <button
                     key={t.id}
                     onClick={() => setSelectedId(t.id)}
-                    className={`flex w-full flex-col rounded-md p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa] ${
+                    className={`flex w-full flex-col rounded-md p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D8196] ${
                       active
-                        ? "bg-[#1f2937] border border-[#374151]"
-                        : "border border-transparent hover:bg-[#1f2937]/50"
+                        ? "bg-[#333b44] border border-[#6D8196]"
+                        : "border border-transparent hover:bg-[#282c30]/50"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-[#6b7280]">
+                      <span className="text-[10px] text-[#a2a8b0]">
                         {String(i + 1).padStart(2, "0")}.
                       </span>
                       {t.dem_available && (
-                        <span className="rounded bg-[#1e3a5f] px-1.5 py-px text-[9px] text-[#60a5fa]">
+                        <span className="rounded bg-[#334150] px-1.5 py-px text-[9px] text-[#6D8196]">
                           DEM
                         </span>
                       )}
                     </div>
-                    <span className={`text-xs font-medium ${active ? "text-white" : "text-[#d1d5db]"}`}>
+                    <span className={`text-xs font-medium ${active ? "text-[#FFFFE3]" : "text-[#CBCBCB]"}`}>
                       {t.id}
                     </span>
-                    <span className="mt-0.5 text-[10px] text-[#6b7280]">
+                    <span className="mt-0.5 text-[10px] text-[#a2a8b0]">
                       {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km
                     </span>
                   </button>
@@ -332,21 +332,21 @@ export default function Console({ onBackToHero }: Props = {}) {
           </div>
 
           {/* Center: Viewer */}
-          <div className="relative flex min-h-[460px] flex-col overflow-hidden rounded-lg border border-[#1f2937] bg-[#0d1117] p-5 lg:col-span-6">
+          <div className="relative flex min-h-[460px] flex-col overflow-hidden rounded-lg border border-[#4A4A4A] bg-[#202326] p-5 lg:col-span-6">
             <div className="mb-4 flex items-center justify-between">
-              <span className="text-xs text-[#6b7280]">
+              <span className="text-xs text-[#a2a8b0]">
                 {currentIndex >= 0 ? `#${currentIndex + 1}` : "—"} / {detail?.id ?? "Select a region"}
               </span>
               <div className="flex items-center gap-2">
                 {detail && (
                   <button
                     onClick={() => handleOpenDossierModal(detail)}
-                    className="rounded-md bg-[#1f2937] px-2.5 py-1 text-[10px] text-[#60a5fa] transition-colors hover:bg-[#374151] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#60a5fa]"
+                    className="rounded-md bg-[#282c30] px-2.5 py-1 text-[10px] text-[#6D8196] transition-colors hover:bg-[#4A4A4A] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#6D8196]"
                   >
                     Report →
                   </button>
                 )}
-                <span className="rounded-md bg-[#1f2937] px-2 py-0.5 text-[10px] text-[#6b7280]">
+                <span className="rounded-md bg-[#282c30] px-2 py-0.5 text-[10px] text-[#a2a8b0]">
                   {view.replace("-", " ")}
                 </span>
               </div>
@@ -354,12 +354,12 @@ export default function Console({ onBackToHero }: Props = {}) {
 
             <div className="relative flex-1 overflow-hidden">
               {loading && (
-                <div className="flex h-full items-center justify-center text-sm text-[#6b7280]">
+                <div className="flex h-full items-center justify-center text-sm text-[#a2a8b0]">
                   Loading regions…
                 </div>
               )}
               {!loading && !detail && (
-                <div className="flex h-full items-center justify-center text-sm text-[#6b7280]">
+                <div className="flex h-full items-center justify-center text-sm text-[#a2a8b0]">
                   No region selected.
                 </div>
               )}
@@ -374,7 +374,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                       { src: `/images/registered/${detail.id}/checkerboard_qa.png`, fallback: `/images/tmc/${detail.id}`, label: "Checkerboard" },
                     ].map((img, idx) => (
                       <div key={idx} className="flex flex-col gap-1.5">
-                        <div className="relative aspect-square overflow-hidden rounded-md border border-[#1f2937] bg-black">
+                        <div className="relative aspect-square overflow-hidden rounded-md border border-[#4A4A4A] bg-black">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={imageUrl(img.src)}
@@ -385,17 +385,17 @@ export default function Console({ onBackToHero }: Props = {}) {
                             }}
                           />
                         </div>
-                        <span className="text-[10px] text-[#6b7280]">{idx + 1}. {img.label}</span>
+                        <span className="text-[10px] text-[#a2a8b0]">{idx + 1}. {img.label}</span>
                       </div>
                     ))}
                   </div>
 
-                  <div className="mt-4 flex flex-wrap items-center justify-between rounded-md border border-[#1f2937] bg-[#1f2937] p-3 text-xs">
-                    <span className="text-[#9ca3af]">
-                      Status: <span className="text-white font-medium">{metrics?.sub_pixel_accurate ? "Sub-Pixel Verified (< 0.5 px)" : "Standard Match"}</span>
+                  <div className="mt-4 flex flex-wrap items-center justify-between rounded-md border border-[#4A4A4A] bg-[#282c30] p-3 text-xs">
+                    <span className="text-[#CBCBCB]">
+                      Status: <span className="text-[#FFFFE3] font-medium">{metrics?.sub_pixel_accurate ? "Sub-Pixel Verified (< 0.5 px)" : "Standard Match"}</span>
                     </span>
-                    <span className="text-[#6b7280]">
-                      Inliers: <span className="text-white font-medium">{metrics?.num_inliers ?? 0}</span>
+                    <span className="text-[#a2a8b0]">
+                      Inliers: <span className="text-[#FFFFE3] font-medium">{metrics?.num_inliers ?? 0}</span>
                     </span>
                   </div>
                 </div>
@@ -410,7 +410,7 @@ export default function Console({ onBackToHero }: Props = {}) {
 
               {/* Map View */}
               {detail && view === "map" && (
-                <div className="h-full min-h-[380px] rounded-md overflow-hidden border border-[#1f2937]">
+                <div className="h-full min-h-[380px] rounded-md overflow-hidden border border-[#4A4A4A]">
                   <MapPanel triplet={detail} iirsOverlay={iirsOverlay} />
                 </div>
               )}
@@ -419,7 +419,7 @@ export default function Console({ onBackToHero }: Props = {}) {
             {/* Cycle View Button */}
             <button
               onClick={cycleView}
-              className="absolute bottom-4 right-4 z-30 flex h-9 w-9 items-center justify-center rounded-md bg-[#374151] text-white shadow-md transition-colors hover:bg-[#4b5563] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa]"
+              className="absolute bottom-4 right-4 z-30 flex h-9 w-9 items-center justify-center rounded-md bg-[#4A4A4A] text-[#FFFFE3] shadow-md transition-colors hover:bg-[#565c63] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D8196]"
               title="Cycle View"
             >
               <span className="text-sm">→</span>
@@ -427,42 +427,42 @@ export default function Console({ onBackToHero }: Props = {}) {
           </div>
 
           {/* Right: Metrics Sidebar */}
-          <div className="flex flex-col justify-between rounded-lg border border-[#1f2937] bg-[#0d1117] p-5 lg:col-span-3">
+          <div className="flex flex-col justify-between rounded-lg border border-[#4A4A4A] bg-[#202326] p-5 lg:col-span-3">
             <div>
-              <span className="text-xs font-semibold text-[#d1d5db]">
+              <span className="text-xs font-semibold text-[#CBCBCB]">
                 Metrics
               </span>
-              <p className="mt-2 text-xs leading-relaxed text-[#6b7280]">
+              <p className="mt-2 text-xs leading-relaxed text-[#a2a8b0]">
                 Registration quality metrics for the currently selected region.
               </p>
 
               <div className="mt-5 space-y-3 text-xs">
-                <div className="rounded-md border border-[#1f2937] bg-[#1f2937] p-3">
-                  <div className="flex items-center justify-between text-[10px] text-[#6b7280]">
+                <div className="rounded-md border border-[#4A4A4A] bg-[#282c30] p-3">
+                  <div className="flex items-center justify-between text-[10px] text-[#a2a8b0]">
                     <span>RMSE</span>
                     <span>Accuracy</span>
                   </div>
-                  <p className="mt-1 text-sm font-medium text-white">
+                  <p className="mt-1 text-sm font-medium text-[#FFFFE3]">
                     {metrics ? `${metrics.rmse_px.toFixed(3)} px` : "—"}
                   </p>
                 </div>
 
-                <div className="rounded-md border border-[#1f2937] bg-[#1f2937] p-3">
-                  <div className="flex items-center justify-between text-[10px] text-[#6b7280]">
+                <div className="rounded-md border border-[#4A4A4A] bg-[#282c30] p-3">
+                  <div className="flex items-center justify-between text-[10px] text-[#a2a8b0]">
                     <span>Coverage</span>
                     <span>Spatial</span>
                   </div>
-                  <p className="mt-1 text-sm font-medium text-white">
+                  <p className="mt-1 text-sm font-medium text-[#FFFFE3]">
                     {metrics ? `${(metrics.combined_coverage_score * 100).toFixed(0)}%` : "—"}
                   </p>
                 </div>
 
-                <div className="rounded-md border border-[#1f2937] bg-[#1f2937] p-3">
-                  <div className="flex items-center justify-between text-[10px] text-[#6b7280]">
+                <div className="rounded-md border border-[#4A4A4A] bg-[#282c30] p-3">
+                  <div className="flex items-center justify-between text-[10px] text-[#a2a8b0]">
                     <span>Scale</span>
                     <span>OHRC → TMC</span>
                   </div>
-                  <p className="mt-1 text-sm font-medium text-white">
+                  <p className="mt-1 text-sm font-medium text-[#FFFFE3]">
                     16× (0.25m → 4m)
                   </p>
                 </div>
@@ -472,7 +472,7 @@ export default function Console({ onBackToHero }: Props = {}) {
             <div className="mt-5">
               <button
                 onClick={cycleView}
-                className="flex w-full items-center justify-between rounded-md bg-[#1f2937] p-3 text-xs text-[#9ca3af] transition-colors hover:bg-[#374151] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#60a5fa]"
+                className="flex w-full items-center justify-between rounded-md bg-[#282c30] p-3 text-xs text-[#CBCBCB] transition-colors hover:bg-[#4A4A4A] hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#6D8196]"
               >
                 <span>Switch View ({view.replace("-", " ")})</span>
                 <span>→</span>
@@ -484,10 +484,10 @@ export default function Console({ onBackToHero }: Props = {}) {
         {/* Region Cards */}
         <section className="mb-10">
           <div className="mb-4 flex items-center justify-between">
-            <span className="text-xs font-semibold text-[#d1d5db]">
+            <span className="text-xs font-semibold text-[#CBCBCB]">
               All Regions
             </span>
-            <span className="text-xs text-[#6b7280]">
+            <span className="text-xs text-[#a2a8b0]">
               {triplets.length} datasets
             </span>
           </div>
@@ -499,37 +499,37 @@ export default function Console({ onBackToHero }: Props = {}) {
                 <div
                   key={t.id}
                   onClick={() => handleOpenDossierModal(t)}
-                  className="group cursor-pointer rounded-lg border border-[#1f2937] bg-[#0d1117] p-4 transition-colors hover:border-[#374151] hover:bg-[#1f2937]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa]"
+                  className="group cursor-pointer rounded-lg border border-[#4A4A4A] bg-[#202326] p-4 transition-colors hover:border-[#4A4A4A] hover:bg-[#282c30]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#6D8196]"
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleOpenDossierModal(t);
                   }}
                 >
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-[10px] font-medium text-[#6b7280]">
+                    <span className="text-[10px] font-medium text-[#a2a8b0]">
                       #{String(i + 1).padStart(2, "0")}
                     </span>
-                    <span className="text-[10px] text-[#6b7280] group-hover:text-[#60a5fa]">
+                    <span className="text-[10px] text-[#a2a8b0] group-hover:text-[#6D8196]">
                       Open →
                     </span>
                   </div>
-                  <h3 className="text-sm font-medium text-white">
+                  <h3 className="text-sm font-medium text-[#FFFFE3]">
                     {t.id}
                   </h3>
-                  <p className="mt-1 text-xs text-[#6b7280]">
+                  <p className="mt-1 text-xs text-[#a2a8b0]">
                     {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km
                     {t.dem_available && " · DEM"}
                   </p>
                   <div className="mt-3 flex items-center gap-2 text-[10px]">
                     <button
                       onClick={(e) => { e.stopPropagation(); handleOpenDossierModal(t); }}
-                      className="rounded bg-[#1f2937] px-2 py-0.5 text-[#60a5fa] hover:bg-[#374151] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#60a5fa]"
+                      className="rounded bg-[#282c30] px-2 py-0.5 text-[#6D8196] hover:bg-[#4A4A4A] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#6D8196]"
                     >
                       Report
                     </button>
                     <button
                       onClick={(e) => { e.stopPropagation(); handleSelectRegionAndScroll(t.id, "registration"); }}
-                      className="rounded bg-[#1f2937] px-2 py-0.5 text-[#9ca3af] hover:bg-[#374151] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#60a5fa]"
+                      className="rounded bg-[#282c30] px-2 py-0.5 text-[#CBCBCB] hover:bg-[#4A4A4A] hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#6D8196]"
                     >
                       Workspace
                     </button>
@@ -541,7 +541,7 @@ export default function Console({ onBackToHero }: Props = {}) {
         </section>
 
         {/* Footer */}
-        <footer className="border-t border-[#1f2937] pt-6 pb-4 text-xs text-[#4b5563]">
+        <footer className="border-t border-[#4A4A4A] pt-6 pb-4 text-xs text-[#565c63]">
           <div className="flex items-center justify-between">
             <span>ISRO Chandrayaan-2 · SIH26166 · Next.js + FastAPI</span>
             <span>{triplets.length} regions loaded</span>
