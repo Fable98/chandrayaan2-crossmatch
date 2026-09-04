@@ -23,7 +23,7 @@ import numpy as np
 import cv2
 
 from metadata import extract_sensor_metadata, SensorMetadata
-from metrics import compute_canonical_metrics, verify_transformation_quality
+from metrics import compute_canonical_metrics, verify_transformation_quality, calculate_reprojection_errors
 
 
 # ---------------------------------------------------------------------------
@@ -389,24 +389,24 @@ def verify_spatial_quality_gate(
 
 
 def refine_inliers_lucas_kanade(
-    work_gray1: np.ndarray,
-    work_gray2: np.ndarray,
+    work_feat1: np.ndarray,
+    work_feat2: np.ndarray,
     inlier_src: np.ndarray,
     inlier_dst: np.ndarray,
     scale_factor1: float,
     scale_factor2: float,
-    win_size: int = 21,
+    win_size: int = 15,
     max_shift_px: float = 3.0,
     fb_threshold: float = 0.5,
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
     """
     Post-RANSAC Lucas-Kanade optical flow refinement for sub-pixel accuracy.
     Refines each inlier match position via iterative LK optical flow with
-    forward-backward consistency verification.
+    forward-backward consistency verification on structural feature maps.
 
     Args:
-        work_gray1: Working-scale source grayscale image [0, 1].
-        work_gray2: Working-scale reference grayscale image [0, 1].
+        work_feat1: Working-scale source structural feature map (e.g. Phase Congruency) [0, 1].
+        work_feat2: Working-scale reference structural feature map [0, 1].
         inlier_src: (N, 2) native-space source points.
         inlier_dst: (N, 2) native-space destination points.
         scale_factor1: Conversion from native px to working px for source.
@@ -422,67 +422,97 @@ def refine_inliers_lucas_kanade(
     if n == 0:
         return inlier_src.copy(), inlier_dst.copy(), {"refined_count": 0, "total": 0}
 
-    # Convert to uint8 for LK
-    img1_u8 = (np.clip(work_gray1, 0.0, 1.0) * 255.0).astype(np.uint8)
-    img2_u8 = (np.clip(work_gray2, 0.0, 1.0) * 255.0).astype(np.uint8)
+    # Convert normalized structural feature representations to uint8 for OpenCV LK
+    img1_u8 = (np.clip(work_feat1, 0.0, 1.0) * 255.0).astype(np.uint8)
+    img2_u8 = (np.clip(work_feat2, 0.0, 1.0) * 255.0).astype(np.uint8)
 
     # Map native-space dst points into working-scale space
     work_dst = inlier_dst.copy()
     work_dst[:, 0] /= scale_factor2
     work_dst[:, 1] /= scale_factor2
-
     pts_fwd = work_dst.reshape(-1, 1, 2).astype(np.float32)
 
-    lk_params = dict(
-        winSize=(win_size, win_size),
-        maxLevel=3,
-        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01),
-    )
-
-    # Forward flow: img2 predicted -> img2 refined
-    # Actually we refine dst positions by flowing from img1 to img2
     work_src_pts = inlier_src.copy()
     work_src_pts[:, 0] /= scale_factor1
     work_src_pts[:, 1] /= scale_factor1
     pts_src_lk = work_src_pts.reshape(-1, 1, 2).astype(np.float32)
 
-    # Forward: source -> target
-    refined_fwd, status_fwd, _ = cv2.calcOpticalFlowPyrLK(
-        img1_u8, img2_u8, pts_src_lk, pts_fwd, **lk_params
+    # CRITICAL: Preserve copies of initial target and source points before LK
+    # because cv2.calcOpticalFlowPyrLK mutates the nextPts array in place!
+    initial_target = pts_fwd.copy()
+    initial_source = pts_src_lk.copy()
+
+    lk_params = dict(
+        winSize=(win_size, win_size),
+        maxLevel=0,  # Pure native-resolution sub-pixel refinement around initial flow guess
+        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01),
+        flags=cv2.OPTFLOW_USE_INITIAL_FLOW,  # Track starting from coarse match position
     )
-    # Backward: refined target -> source (for consistency check)
+
+    # Forward: source -> target starting from initial coarse match position
+    fwd_guess = pts_fwd.copy()
+    refined_fwd, status_fwd, _ = cv2.calcOpticalFlowPyrLK(
+        img1_u8, img2_u8, pts_src_lk, fwd_guess, **lk_params
+    )
+
+    # Backward: refined target -> source starting from initial source position
+    bwd_guess = pts_src_lk.copy()
     refined_bwd, status_bwd, _ = cv2.calcOpticalFlowPyrLK(
-        img2_u8, img1_u8, refined_fwd, pts_src_lk.copy(), **lk_params
+        img2_u8, img1_u8, refined_fwd, bwd_guess, **lk_params
     )
 
     refined_dst = inlier_dst.copy()
     refined_count = 0
+    debug_points: List[Dict[str, Any]] = []
 
     for i in range(n):
-        if status_fwd[i, 0] != 1 or status_bwd[i, 0] != 1:
-            continue
+        s_fwd = int(status_fwd[i, 0]) if status_fwd is not None and i < len(status_fwd) else 0
+        s_bwd = int(status_bwd[i, 0]) if status_bwd is not None and i < len(status_bwd) else 0
 
-        # Forward-backward consistency check
-        fb_err = float(np.linalg.norm(refined_bwd[i, 0] - pts_src_lk[i, 0]))
-        if fb_err > fb_threshold:
-            continue
+        fb_err: Optional[float] = None
+        if refined_bwd is not None and i < len(refined_bwd):
+            fb_err = float(np.linalg.norm(refined_bwd[i, 0] - initial_source[i, 0]))
 
-        # Check shift magnitude
-        shift = refined_fwd[i, 0] - pts_fwd[i, 0]
-        shift_mag = float(np.linalg.norm(shift))
-        if shift_mag > max_shift_px:
-            continue
+        shift_mag: Optional[float] = None
+        if refined_fwd is not None and i < len(refined_fwd):
+            shift = refined_fwd[i, 0] - initial_target[i, 0]
+            shift_mag = float(np.linalg.norm(shift))
 
-        # Accept refinement — convert back to native space
-        refined_dst[i, 0] = float(refined_fwd[i, 0, 0]) * scale_factor2
-        refined_dst[i, 1] = float(refined_fwd[i, 0, 1]) * scale_factor2
-        refined_count += 1
+        pt_record: Dict[str, Any] = {
+            "point_index": i,
+            "src_pt": [float(inlier_src[i, 0]), float(inlier_src[i, 1])],
+            "dst_pt": [float(inlier_dst[i, 0]), float(inlier_dst[i, 1])],
+            "status_fwd": s_fwd,
+            "status_bwd": s_bwd,
+            "fb_err": fb_err,
+            "shift_mag": shift_mag,
+            "passed": False,
+            "failure_gate": None,
+        }
+
+        if s_fwd != 1:
+            pt_record["failure_gate"] = "fwd_non_convergence"
+        elif s_bwd != 1:
+            pt_record["failure_gate"] = "bwd_non_convergence"
+        elif fb_err is not None and fb_err > fb_threshold:
+            pt_record["failure_gate"] = f"fb_threshold_exceeded (fb_err={fb_err:.4f} > {fb_threshold})"
+        elif shift_mag is not None and shift_mag > max_shift_px:
+            pt_record["failure_gate"] = f"max_shift_exceeded (shift_mag={shift_mag:.4f} > {max_shift_px})"
+        else:
+            pt_record["passed"] = True
+            # Accept refinement — convert back to native space
+            refined_dst[i, 0] = float(refined_fwd[i, 0, 0]) * scale_factor2
+            refined_dst[i, 1] = float(refined_fwd[i, 0, 1]) * scale_factor2
+            refined_count += 1
+
+        debug_points.append(pt_record)
 
     stats = {
         "refined_count": refined_count,
         "total": n,
         "fb_threshold": fb_threshold,
         "max_shift_px": max_shift_px,
+        "debug_points": debug_points,
     }
     return inlier_src.copy(), refined_dst, stats
 
@@ -952,7 +982,7 @@ def match_images_cfog(
         lk_dst = pts2_arr[inlier_idx_lk]
 
         refined_src, refined_dst, lk_stats = refine_inliers_lucas_kanade(
-            comp1_gray, comp2_gray, lk_src, lk_dst, scale_factor1, scale_factor2
+            pc1, pc2, lk_src, lk_dst, scale_factor1, scale_factor2
         )
 
         if lk_stats["refined_count"] > 0:
@@ -963,18 +993,25 @@ def match_images_cfog(
             if H_refined is not None and mask_refined is not None and np.sum(mask_refined) >= 4:
                 tx_check_r = verify_transformation_quality(H_refined, (orig_h2, orig_w2))
                 if tx_check_r["is_valid"]:
-                    H_final = H_refined
+                    err_orig = calculate_reprojection_errors(lk_src, lk_dst, H_final)
+                    err_new_all = calculate_reprojection_errors(lk_src, refined_dst, H_refined)
+                    rmse_orig = float(np.sqrt(np.mean(err_orig**2)))
+                    rmse_new = float(np.sqrt(np.mean(err_new_all**2)))
+                    # Only accept H_refined if all inliers remain verified and overall RMSE improves or stays stable
+                    if np.all(err_new_all <= 5.0) and rmse_new <= rmse_orig * 1.05:
+                        H_final = H_refined
                     # Update pts arrays with refined coordinates for metrics
                     pts1_arr[inlier_idx_lk] = refined_src
                     pts2_arr[inlier_idx_lk] = refined_dst
                     # Update records
                     for j, idx in enumerate(inlier_idx_lk):
                         if idx < len(refinement_records):
-                            refinement_records[idx]["target_x"] = round(float(refined_dst[j, 0]), 2)
-                            refinement_records[idx]["target_y"] = round(float(refined_dst[j, 1]), 2)
-                            refinement_records[idx]["image2_x"] = round(float(refined_dst[j, 0]), 2)
-                            refinement_records[idx]["image2_y"] = round(float(refined_dst[j, 1]), 2)
-                            refinement_records[idx]["lk_refined"] = True
+                            if lk_stats.get("debug_points", []) and j < len(lk_stats["debug_points"]) and lk_stats["debug_points"][j]["passed"]:
+                                refinement_records[idx]["target_x"] = round(float(refined_dst[j, 0]), 2)
+                                refinement_records[idx]["target_y"] = round(float(refined_dst[j, 1]), 2)
+                                refinement_records[idx]["image2_x"] = round(float(refined_dst[j, 0]), 2)
+                                refinement_records[idx]["image2_y"] = round(float(refined_dst[j, 1]), 2)
+                                refinement_records[idx]["lk_refined"] = True
 
     # 9. Compute Canonical Master Metrics
     metrics = compute_canonical_metrics(

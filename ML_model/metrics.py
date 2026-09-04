@@ -323,8 +323,24 @@ def compute_canonical_metrics(
     # Held-Out Inlier Correspondence Validation
     val_results = evaluate_held_out_validation(inliers_src, inliers_dst)
 
-    # Spatial Distribution
+    # Spatial Distribution (Fixed Grid, default 10x10)
     dist_metrics = calculate_spatial_distribution(inliers_src, image_shape, grid_size)
+
+    # Adaptive spatial coverage relative to inlier count (honest metric for small-N cases)
+    if inlier_count > 0:
+        adaptive_grid = max(2, int(np.ceil(np.sqrt(inlier_count))))
+        adaptive_dist = calculate_spatial_distribution(inliers_src, image_shape, grid_size=adaptive_grid)
+        coverage_relative = adaptive_dist["coverage"]
+        adaptive_uniformity = adaptive_dist["uniformity_score"]
+    else:
+        adaptive_grid = 2
+        adaptive_dist = calculate_spatial_distribution(inliers_src, image_shape, grid_size=2)
+        coverage_relative = 0.0
+        adaptive_uniformity = 0.0
+
+    dist_metrics["adaptive_grid_size"] = adaptive_grid
+    dist_metrics["coverage_relative_to_inlier_count"] = coverage_relative
+    dist_metrics["adaptive_uniformity_score"] = adaptive_uniformity
 
     # Transform Quality
     tx_quality = verify_transformation_quality(H, image_shape)
@@ -358,6 +374,7 @@ def compute_canonical_metrics(
         "fraction_below_0_25px": round(frac_025, 4),
         "spatial_coverage": dist_metrics["coverage"],
         "spatial_uniformity": dist_metrics["uniformity_score"],
+        "coverage_relative_to_inlier_count": round(coverage_relative, 4),
         "spatial_distribution": dist_metrics,
         "transform_quality": tx_quality,
     }

@@ -118,8 +118,10 @@ All metrics in the repository are computed via a single canonical module ([`ML_m
    *(Note: Synthetic benchmarks provide known ground-truth validation; real-image metrics provide held-out inlier correspondence validation).*
 3. **Inlier Ratio (`inlier_ratio`)**:
    $$\text{Ratio} = \frac{N_{inliers}}{\max(1, N_{raw\_matches})}$$
-4. **Spatial Coverage (`spatial_coverage`)**:
-   $$\text{Coverage} = \frac{\text{Occupied Grid Cells}}{\text{Total Grid Cells (e.g. 100)}}$$
+4. **Spatial Coverage (`spatial_coverage`) & Inlier-Adaptive Relative Coverage (`coverage_relative_to_inlier_count`)**:
+   - **Fixed-Grid Coverage (`spatial_coverage`)**: $\text{Coverage} = \frac{\text{Occupied Cells}}{\text{Total Grid Cells (100)}}$.  
+     *(Note: The fixed 10×10 metric is structurally capped at $\frac{N_{inliers}}{100}$ (e.g. 6–7% maximum) for demo-scale 512×512 crops with <20 inliers, per the documented `LOW_CONFIDENCE` tier definition).*
+   - **Inlier-Adaptive Relative Coverage (`coverage_relative_to_inlier_count`)**: Evaluates spatial dispersion against an adaptive grid sized to $\lceil\sqrt{N_{inliers}}\rceil \times \lceil\sqrt{N_{inliers}}\rceil$ (e.g. 3×3 for 6–9 inliers). This provides an honest measure of whether inliers span distinct spatial sectors rather than clustering in a single sub-region, without being artificially suppressed by a 100-cell denominator on small-N crops. Both metrics are reported side-by-side in `metrics.json`.
 5. **Spatial Uniformity Score (`spatial_uniformity`)**:
    Combines grid coverage with match count dispersion: $\text{Score} = \text{Coverage} \times \exp(-0.3 \cdot \frac{\sigma}{\mu + \epsilon})$.
 6. **Registration Quality Tiers**:
