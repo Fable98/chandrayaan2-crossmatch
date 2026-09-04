@@ -180,175 +180,122 @@ export default function Console({ onBackToHero }: Props = {}) {
   }
 
   return (
-    <div className="relative min-h-screen bg-[#07090e] font-sans text-[#f0f2f5] selection:bg-[#2c2619] selection:text-[#f3df9b]">
-      {/* Deep Space Starfield Background Layer */}
-      <div
-        className="fixed inset-0 pointer-events-none z-0 bg-cover bg-center bg-no-repeat"
-        style={{
-          backgroundImage: "url('/starfield-bg.png')",
-        }}
-      />
-      {/* Subtle cosmic vignette for deep contrast & readability */}
-      <div className="fixed inset-0 pointer-events-none z-0 bg-black/40 backdrop-brightness-[0.95]" />
+    <div className="min-h-screen bg-[#111827] font-sans text-[#e5e7eb]">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed bottom-6 right-6 z-[9999] flex items-center gap-2 rounded-md border border-[#374151] bg-[#1f2937] px-4 py-2.5 text-sm text-[#e5e7eb] shadow-lg">
+          <span className="h-2 w-2 rounded-full bg-[#60a5fa]" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
 
-      <div className="relative z-10">
-        {/* Toast Notification */}
-        {toastMessage && (
-          <div className="fixed bottom-6 right-6 z-[9999] flex items-center gap-3 rounded-xl border border-[#d4af37]/60 bg-[#0d1017]/85 px-4 py-2.5 font-mono text-xs text-[#f3df9b] shadow-[0_8px_32px_rgba(212,175,55,0.3)] backdrop-blur-xl animate-fade-in">
-            <span className="h-2 w-2 rounded-full bg-[#d4af37] shadow-[0_0_8px_#d4af37]" />
-            <span>{toastMessage}</span>
-          </div>
-        )}
-
-        {/* 1. Obsidian Top Navigation Bar */}
-        <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-white/10 bg-[#07090e]/60 px-6 backdrop-blur-xl shadow-[0_4px_30px_rgba(0,0,0,0.5)] md:px-12">
-          {/* Left: Editorial Archive Brand + Back Link */}
-          <div className="flex items-center gap-4">
-            {onBackToHero && (
-              <button
-                onClick={onBackToHero}
-                className="flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/[0.05] px-3 py-1.5 font-mono text-xs text-[#d4af37] backdrop-blur-md transition-all duration-200 hover:border-[#d4af37]/60 hover:bg-[#d4af37]/15 hover:text-[#f3df9b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
-              >
-                <span>←</span>
-                <span>HERO</span>
-              </button>
-            )}
-            <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.03] px-3 py-1 backdrop-blur-sm">
-              <span className="font-mono text-xs text-[#d4af37]">[ ]</span>
-              <span className="text-xs font-bold uppercase tracking-[0.25em] text-[#e8d5b5]">
-                CHANDRAYAAN-2 ARCHIVES
-              </span>
-            </div>
-          </div>
-
-          {/* Center: Nav Modes (FUSED MAP / LINKED CURSOR / REGISTRATION QA) */}
-          <nav className="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-1 backdrop-blur-md md:flex">
+      {/* Top Navigation Bar */}
+      <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-[#1f2937] bg-[#111827] px-6 md:px-10">
+        <div className="flex items-center gap-4">
+          {onBackToHero && (
             <button
-              onClick={() => {
-                setView("map");
-                scrollToArena();
-              }}
-              className={`rounded-lg px-3.5 py-1 text-xs font-semibold uppercase tracking-[0.18em] transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37] ${
-                view === "map"
-                  ? "border border-[#d4af37]/40 bg-[#d4af37]/20 text-[#f3df9b] shadow-[0_0_12px_rgba(212,175,55,0.25)]"
-                  : "text-[#9a958e] hover:bg-white/[0.05] hover:text-white"
+              onClick={onBackToHero}
+              className="flex items-center gap-1.5 rounded-md border border-[#374151] bg-[#1f2937] px-3 py-1.5 text-xs text-[#9ca3af] transition-colors hover:bg-[#374151] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa]"
+            >
+              <span>←</span>
+              <span>Back</span>
+            </button>
+          )}
+          <span className="text-sm font-semibold tracking-wide text-white">
+            Chandrayaan-2 Console
+          </span>
+        </div>
+
+        {/* Center Nav Tabs */}
+        <nav className="hidden items-center gap-1 rounded-md border border-[#1f2937] bg-[#0d1117] p-0.5 md:flex">
+          {(["map", "linked-cursor", "registration"] as View[]).map((v) => (
+            <button
+              key={v}
+              onClick={() => { setView(v); scrollToArena(); }}
+              className={`rounded px-3 py-1 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa] ${
+                view === v
+                  ? "bg-[#1f2937] text-white"
+                  : "text-[#6b7280] hover:text-[#d1d5db]"
               }`}
             >
-              FUSED MAP
+              {v === "map" ? "Map" : v === "linked-cursor" ? "Linked Cursor" : "Registration QA"}
             </button>
-            <button
-              onClick={() => {
-                setView("linked-cursor");
-                scrollToArena();
-              }}
-              className={`rounded-lg px-3.5 py-1 text-xs font-semibold uppercase tracking-[0.18em] transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37] ${
-                view === "linked-cursor"
-                  ? "border border-[#d4af37]/40 bg-[#d4af37]/20 text-[#f3df9b] shadow-[0_0_12px_rgba(212,175,55,0.25)]"
-                  : "text-[#9a958e] hover:bg-white/[0.05] hover:text-white"
-              }`}
-            >
-              LINKED CURSOR
-            </button>
-            <button
-              onClick={() => {
-                setView("registration");
-                scrollToArena();
-              }}
-              className={`rounded-lg px-3.5 py-1 text-xs font-semibold uppercase tracking-[0.18em] transition-all focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37] ${
-                view === "registration"
-                  ? "border border-[#d4af37]/40 bg-[#d4af37]/20 text-[#f3df9b] shadow-[0_0_12px_rgba(212,175,55,0.25)]"
-                  : "text-[#9a958e] hover:bg-white/[0.05] hover:text-white"
-              }`}
-            >
-              REGISTRATION QA
-            </button>
-          </nav>
+          ))}
+        </nav>
 
-          {/* Right: Vault Quick Access / Region Counter / Live Registration */}
-          <div className="flex items-center gap-3">
-            <RegistrationLauncher />
-            <button
-              onClick={() => openVaultWithFilter("all")}
-              className="flex items-center gap-2 rounded-lg border border-white/15 bg-white/[0.05] px-3.5 py-1.5 font-mono text-xs text-[#d4af37] backdrop-blur-md transition-all hover:border-[#d4af37]/60 hover:bg-[#d4af37]/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
-              title="Open Full Archive Vault"
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37] shadow-[0_0_6px_#d4af37]" />
-              <span>{triplets.length < 10 ? `0${triplets.length}` : triplets.length} TILES READY</span>
-            </button>
-          </div>
-        </header>
+        <div className="flex items-center gap-3">
+          <RegistrationLauncher />
+          <button
+            onClick={() => openVaultWithFilter("all")}
+            className="flex items-center gap-2 rounded-md border border-[#374151] bg-[#1f2937] px-3 py-1.5 text-xs text-[#9ca3af] transition-colors hover:bg-[#374151] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa]"
+          >
+            <span>{triplets.length} Regions</span>
+          </button>
+        </div>
+      </header>
 
       {/* Main Body */}
-      <main className="mx-auto max-w-[1440px] px-6 py-10 md:px-12">
-        {/* 2. Headline Area: EXPLORING the silent FRONTIERS */}
-        <section className="mb-10 flex flex-col justify-between gap-4 border-b border-white/10 pb-8 md:flex-row md:items-end">
+      <main className="mx-auto max-w-[1400px] px-6 py-8 md:px-10">
+        {/* Page Header */}
+        <section className="mb-8 flex flex-col justify-between gap-3 border-b border-[#1f2937] pb-6 md:flex-row md:items-end">
           <div>
-            <span className="font-mono text-xs uppercase tracking-[0.25em] text-[#9a958e]">
-              EXPLORING
-            </span>
-            <h1 className="mt-1 font-serif text-5xl font-normal italic tracking-tight text-[#e8d5b5] sm:text-6xl md:text-7xl">
-              the silent
+            <h1 className="text-2xl font-semibold text-white">
+              Multi-Sensor Registration Dashboard
             </h1>
-            <span className="mt-1 block text-3xl font-bold uppercase tracking-[0.2em] text-white sm:text-4xl drop-shadow-[0_0_20px_rgba(255,255,255,0.15)]">
-              FRONTIERS
-            </span>
+            <p className="mt-1 text-sm text-[#6b7280]">
+              ISRO Chandrayaan-2 · OHRC, TMC-2, IIRS cross-matching console
+            </p>
           </div>
-
-          <div className="flex flex-col items-start font-mono text-xs text-[#9a958e] md:items-end">
+          <div className="flex items-center gap-3 text-sm">
             <button
               onClick={() => openVaultWithFilter("all")}
-              className="rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[#d4af37] backdrop-blur-sm transition-all hover:border-[#d4af37]/50 hover:bg-[#d4af37]/10 hover:text-[#f3df9b] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+              className="rounded-md bg-[#1f2937] px-3 py-1.5 text-xs text-[#60a5fa] transition-colors hover:bg-[#374151] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa]"
             >
-              {triplets.length < 10 ? `0${triplets.length}` : triplets.length} — VALIDATED TILES ↗
+              {triplets.length} validated tiles →
             </button>
-            <span className="mt-1 text-[11px] text-[#6b665f]">
-              ISRO CHANDRAYAAN-2 · SIH26166
-            </span>
           </div>
         </section>
 
-        {/* 3. Featured Inspection Arena (FIG. 01 / LUNA) */}
-        <section ref={arenaRef} className="mb-14 grid grid-cols-1 gap-6 lg:grid-cols-12 scroll-mt-20">
-          {/* Left Column: Tiles / Articles Navigation */}
-          <div className="flex flex-col rounded-2xl border border-white/10 bg-[#0a0d14]/55 p-5 shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] backdrop-blur-xl lg:col-span-3">
-            <div className="flex items-center justify-between border-b border-white/10 pb-3">
-              <span className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-white">
-                TILES.
+        {/* Inspection Arena */}
+        <section ref={arenaRef} className="mb-10 grid grid-cols-1 gap-5 lg:grid-cols-12 scroll-mt-16">
+          {/* Left: Region List */}
+          <div className="flex flex-col rounded-lg border border-[#1f2937] bg-[#0d1117] p-4 lg:col-span-3">
+            <div className="flex items-center justify-between border-b border-[#1f2937] pb-3">
+              <span className="text-xs font-semibold text-[#d1d5db]">
+                Regions
               </span>
-              <div className="flex items-center gap-1 font-mono text-xs">
+              <div className="flex items-center gap-1 text-xs">
                 <button
                   onClick={handlePrev}
-                  className="flex h-6 w-6 items-center justify-center rounded border border-white/15 bg-white/[0.04] text-[#9a958e] backdrop-blur-sm transition-colors hover:border-[#d4af37] hover:bg-[#d4af37]/10 hover:text-[#d4af37] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                  title="Previous Region"
+                  className="flex h-6 w-6 items-center justify-center rounded border border-[#374151] bg-[#1f2937] text-[#6b7280] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#60a5fa]"
                 >
                   &lt;
                 </button>
                 <button
                   onClick={handleNext}
-                  className="flex h-6 w-6 items-center justify-center rounded border border-white/15 bg-white/[0.04] text-[#9a958e] backdrop-blur-sm transition-colors hover:border-[#d4af37] hover:bg-[#d4af37]/10 hover:text-[#d4af37] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                  title="Next Region"
+                  className="flex h-6 w-6 items-center justify-center rounded border border-[#374151] bg-[#1f2937] text-[#6b7280] transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#60a5fa]"
                 >
                   &gt;
                 </button>
               </div>
             </div>
 
-            {/* Search Input Box */}
-            <div className="mt-3 flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-2 font-mono text-xs text-[#6b665f] backdrop-blur-md focus-within:border-[#d4af37]/50 focus-within:bg-white/[0.07]">
-              <svg className="h-3.5 w-3.5 text-[#6b665f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            {/* Search */}
+            <div className="mt-3 flex items-center gap-2 rounded-md border border-[#374151] bg-[#1f2937] px-3 py-2 text-xs focus-within:border-[#60a5fa]">
+              <svg className="h-3.5 w-3.5 text-[#6b7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="SEARCH TILES..."
-                className="w-full bg-transparent text-xs text-white placeholder-[#6b665f] focus:outline-none"
+                placeholder="Search regions..."
+                className="w-full bg-transparent text-xs text-white placeholder-[#6b7280] focus:outline-none"
               />
             </div>
 
             {/* Region List */}
-            <div className="mt-4 flex-1 space-y-1.5 overflow-y-auto max-h-[380px] pr-1">
+            <div className="mt-3 flex-1 space-y-1 overflow-y-auto max-h-[380px]">
               {filteredTriplets.map((t, i) => {
                 const active = t.id === selectedId;
                 const { widthKm, heightKm } = footprintSizeKm(t.bounds);
@@ -356,30 +303,26 @@ export default function Console({ onBackToHero }: Props = {}) {
                   <button
                     key={t.id}
                     onClick={() => setSelectedId(t.id)}
-                    className={`group flex w-full flex-col rounded-lg p-2.5 text-left transition-all backdrop-blur-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${
+                    className={`flex w-full flex-col rounded-md p-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa] ${
                       active
-                        ? "border border-[#d4af37]/50 bg-[#d4af37]/15 shadow-[0_0_15px_rgba(212,175,55,0.15)]"
-                        : "border border-white/[0.04] bg-white/[0.02] hover:border-white/15 hover:bg-white/[0.06]"
+                        ? "bg-[#1f2937] border border-[#374151]"
+                        : "border border-transparent hover:bg-[#1f2937]/50"
                     }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-[10px] text-[#6b665f]">
-                        {i + 1 < 10 ? `0${i + 1}` : i + 1}.
+                      <span className="text-[10px] text-[#6b7280]">
+                        {String(i + 1).padStart(2, "0")}.
                       </span>
                       {t.dem_available && (
-                        <span className="rounded border border-[#d4af37]/30 bg-[#d4af37]/15 px-1.5 py-0.2 font-mono text-[9px] text-[#d4af37]">
+                        <span className="rounded bg-[#1e3a5f] px-1.5 py-px text-[9px] text-[#60a5fa]">
                           DEM
                         </span>
                       )}
                     </div>
-                    <span
-                      className={`font-mono text-xs font-medium transition-colors ${
-                        active ? "text-[#d4af37] font-semibold" : "text-[#e8d5b5] group-hover:text-white"
-                      }`}
-                    >
+                    <span className={`text-xs font-medium ${active ? "text-white" : "text-[#d1d5db]"}`}>
                       {t.id}
                     </span>
-                    <span className="mt-0.5 font-mono text-[10px] text-[#6b665f]">
+                    <span className="mt-0.5 text-[10px] text-[#6b7280]">
                       {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km
                     </span>
                   </button>
@@ -388,250 +331,208 @@ export default function Console({ onBackToHero }: Props = {}) {
             </div>
           </div>
 
-          {/* Center Column: Featured Interactive Card with [ FIG. 01 / LUNA ] & Circular Gold Button */}
-          <div className="relative flex min-h-[460px] flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0a0d14]/55 p-6 shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] backdrop-blur-xl lg:col-span-6">
-            {/* Top Badge: FIG. 01 / LUNA */}
+          {/* Center: Viewer */}
+          <div className="relative flex min-h-[460px] flex-col overflow-hidden rounded-lg border border-[#1f2937] bg-[#0d1117] p-5 lg:col-span-6">
             <div className="mb-4 flex items-center justify-between">
-              <span className="rounded-lg border border-white/15 bg-white/[0.05] px-3 py-1 font-mono text-[10px] uppercase tracking-wider text-[#d4af37] backdrop-blur-md">
-                [ FIG. {currentIndex >= 0 ? (currentIndex + 1 < 10 ? `0${currentIndex + 1}` : currentIndex + 1) : "01"} / {detail?.id ?? "LUNA"} ]
+              <span className="text-xs text-[#6b7280]">
+                {currentIndex >= 0 ? `#${currentIndex + 1}` : "—"} / {detail?.id ?? "Select a region"}
               </span>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
                 {detail && (
                   <button
                     onClick={() => handleOpenDossierModal(detail)}
-                    className="rounded-md border border-[#d4af37]/30 bg-[#d4af37]/10 px-2.5 py-1 font-mono text-[10px] text-[#d4af37] backdrop-blur-sm transition-all hover:bg-[#d4af37]/20 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+                    className="rounded-md bg-[#1f2937] px-2.5 py-1 text-[10px] text-[#60a5fa] transition-colors hover:bg-[#374151] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#60a5fa]"
                   >
-                    REPORT ↗
+                    Report →
                   </button>
                 )}
-                <span className="rounded-md border border-white/10 bg-white/[0.03] px-2 py-0.5 font-mono text-[10px] uppercase text-[#9a958e] backdrop-blur-sm">
+                <span className="rounded-md bg-[#1f2937] px-2 py-0.5 text-[10px] text-[#6b7280]">
                   {view.replace("-", " ")}
                 </span>
               </div>
             </div>
 
-            {/* Active Workspace View */}
             <div className="relative flex-1 overflow-hidden">
               {loading && (
-                <div className="flex h-full items-center justify-center font-mono text-xs text-[#9a958e]">
-                  Loading archival tiles from backend…
+                <div className="flex h-full items-center justify-center text-sm text-[#6b7280]">
+                  Loading regions…
                 </div>
               )}
               {!loading && !detail && (
-                <div className="flex h-full items-center justify-center font-mono text-xs text-[#9a958e]">
+                <div className="flex h-full items-center justify-center text-sm text-[#6b7280]">
                   No region selected.
                 </div>
               )}
 
-              {/* View 1: Geometric Registration QA */}
+              {/* Registration QA View */}
               {detail && view === "registration" && (
                 <div className="flex h-full flex-col justify-between">
                   <div className="grid grid-cols-3 gap-3">
-                    <div className="flex flex-col gap-1.5">
-                      <div className="relative aspect-square overflow-hidden rounded-xl border border-white/15 bg-black/40 shadow-inner backdrop-blur-sm">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={imageUrl(`/images/registered/${detail.id}/registered_ohrc.png`)}
-                          alt="Warped OHRC"
-                          className="h-full w-full object-cover contrast-[1.2] brightness-95"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).src = imageUrl(`/images/ohrc/${detail.id}`);
-                          }}
-                        />
+                    {[
+                      { src: `/images/registered/${detail.id}/registered_ohrc.png`, fallback: `/images/ohrc/${detail.id}`, label: "Warped OHRC" },
+                      { src: `/images/registered/${detail.id}/blend_overlay.png`, fallback: `/images/tmc/${detail.id}`, label: "Blend 50%" },
+                      { src: `/images/registered/${detail.id}/checkerboard_qa.png`, fallback: `/images/tmc/${detail.id}`, label: "Checkerboard" },
+                    ].map((img, idx) => (
+                      <div key={idx} className="flex flex-col gap-1.5">
+                        <div className="relative aspect-square overflow-hidden rounded-md border border-[#1f2937] bg-black">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={imageUrl(img.src)}
+                            alt={img.label}
+                            className="h-full w-full object-cover"
+                            onError={(e) => {
+                              (e.currentTarget as HTMLImageElement).src = imageUrl(img.fallback);
+                            }}
+                          />
+                        </div>
+                        <span className="text-[10px] text-[#6b7280]">{idx + 1}. {img.label}</span>
                       </div>
-                      <span className="font-mono text-[10px] text-[#9a958e]">1. Warped OHRC</span>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <div className="relative aspect-square overflow-hidden rounded-xl border border-white/15 bg-black/40 shadow-inner backdrop-blur-sm">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={imageUrl(`/images/registered/${detail.id}/blend_overlay.png`)}
-                          alt="Blend 50%"
-                          className="h-full w-full object-cover contrast-[1.2] brightness-95"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).src = imageUrl(`/images/tmc/${detail.id}`);
-                          }}
-                        />
-                      </div>
-                      <span className="font-mono text-[10px] text-[#9a958e]">2. Blend 50%</span>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <div className="relative aspect-square overflow-hidden rounded-xl border border-white/15 bg-black/40 shadow-inner backdrop-blur-sm">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={imageUrl(`/images/registered/${detail.id}/checkerboard_qa.png`)}
-                          alt="Checkerboard"
-                          className="h-full w-full object-cover contrast-[1.2] brightness-95"
-                          onError={(e) => {
-                            (e.currentTarget as HTMLImageElement).src = imageUrl(`/images/tmc/${detail.id}`);
-                          }}
-                        />
-                      </div>
-                      <span className="font-mono text-[10px] text-[#9a958e]">3. Checkerboard</span>
-                    </div>
+                    ))}
                   </div>
 
-                  <div className="mt-4 flex flex-wrap items-center justify-between rounded-xl border border-white/10 bg-white/[0.03] p-3.5 pr-16 font-mono text-[11px] backdrop-blur-md">
-                    <span className="text-[#9a958e]">
-                      Status: <span className="text-[#d4af37] font-semibold">{metrics?.sub_pixel_accurate ? "Sub-Pixel Verified (< 0.5 px)" : "Standard Match"}</span>
+                  <div className="mt-4 flex flex-wrap items-center justify-between rounded-md border border-[#1f2937] bg-[#1f2937] p-3 text-xs">
+                    <span className="text-[#9ca3af]">
+                      Status: <span className="text-white font-medium">{metrics?.sub_pixel_accurate ? "Sub-Pixel Verified (< 0.5 px)" : "Standard Match"}</span>
                     </span>
-                    <span className="text-[#6b665f]">
-                      Inliers: <span className="text-white font-semibold">{metrics?.num_inliers ?? 0}</span>
+                    <span className="text-[#6b7280]">
+                      Inliers: <span className="text-white font-medium">{metrics?.num_inliers ?? 0}</span>
                     </span>
                   </div>
                 </div>
               )}
 
-              {/* View 2: Linked Cursor Pane */}
+              {/* Linked Cursor View */}
               {detail && view === "linked-cursor" && (
                 <div className="h-full">
                   <LinkedCursorPanel tripletId={detail.id} points={matches} />
                 </div>
               )}
 
-              {/* View 3: Fused Map Pane */}
+              {/* Map View */}
               {detail && view === "map" && (
-                <div className="h-full min-h-[380px] rounded-xl overflow-hidden border border-white/10">
+                <div className="h-full min-h-[380px] rounded-md overflow-hidden border border-[#1f2937]">
                   <MapPanel triplet={detail} iirsOverlay={iirsOverlay} />
                 </div>
               )}
             </div>
 
-            {/* Circular Gold Floating Action Button (Cycle View Mode) */}
+            {/* Cycle View Button */}
             <button
               onClick={cycleView}
-              className="absolute bottom-5 right-5 z-30 flex h-10 w-10 items-center justify-center rounded-full bg-[#d4af37] text-black shadow-[0_0_25px_rgba(212,175,55,0.45)] backdrop-blur-sm transition-all duration-300 hover:scale-110 hover:bg-[#f3df9b] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-              title="Cycle Inspection View"
+              className="absolute bottom-4 right-4 z-30 flex h-9 w-9 items-center justify-center rounded-md bg-[#374151] text-white shadow-md transition-colors hover:bg-[#4b5563] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa]"
+              title="Cycle View"
             >
-              <span className="text-base font-bold">→</span>
+              <span className="text-sm">→</span>
             </button>
           </div>
 
-          {/* Right Column: ■ FROM THE ARCHIVE */}
-          <div className="flex flex-col justify-between rounded-2xl border border-white/10 bg-[#0a0d14]/55 p-6 shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] backdrop-blur-xl lg:col-span-3">
+          {/* Right: Metrics Sidebar */}
+          <div className="flex flex-col justify-between rounded-lg border border-[#1f2937] bg-[#0d1117] p-5 lg:col-span-3">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37] shadow-[0_0_6px_#d4af37]" />
-                <span className="font-mono text-xs font-bold uppercase tracking-[0.2em] text-[#d4af37]">
-                  FROM THE ARCHIVE
-                </span>
-              </div>
-
-              <p className="mt-3 text-xs leading-relaxed text-[#9a958e]">
-                The latest dispatch from the outer rim of human understanding. We
-                dissect multi-sensor signal noise across Chandrayaan-2 to find
-                geometric truth in the void.
+              <span className="text-xs font-semibold text-[#d1d5db]">
+                Metrics
+              </span>
+              <p className="mt-2 text-xs leading-relaxed text-[#6b7280]">
+                Registration quality metrics for the currently selected region.
               </p>
 
-              {/* Volumes & Metrics List - Light Glassmorphic Text Boxes */}
-              <div className="mt-6 space-y-3 font-mono text-xs">
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 backdrop-blur-md transition-all hover:border-white/20 hover:bg-white/[0.05]">
-                  <div className="flex items-center justify-between text-[10px] text-[#6b665f]">
-                    <span>VOL. 01.1</span>
-                    <span>RMSE ACCURACY</span>
+              <div className="mt-5 space-y-3 text-xs">
+                <div className="rounded-md border border-[#1f2937] bg-[#1f2937] p-3">
+                  <div className="flex items-center justify-between text-[10px] text-[#6b7280]">
+                    <span>RMSE</span>
+                    <span>Accuracy</span>
                   </div>
-                  <p className="mt-1 font-sans text-sm font-semibold text-[#e8d5b5]">
-                    {metrics ? `${metrics.rmse_px.toFixed(3)} px` : "0.419 px"}
+                  <p className="mt-1 text-sm font-medium text-white">
+                    {metrics ? `${metrics.rmse_px.toFixed(3)} px` : "—"}
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 backdrop-blur-md transition-all hover:border-white/20 hover:bg-white/[0.05]">
-                  <div className="flex items-center justify-between text-[10px] text-[#6b665f]">
-                    <span>VOL. 01.2</span>
-                    <span>FEATURE COVERAGE</span>
+                <div className="rounded-md border border-[#1f2937] bg-[#1f2937] p-3">
+                  <div className="flex items-center justify-between text-[10px] text-[#6b7280]">
+                    <span>Coverage</span>
+                    <span>Spatial</span>
                   </div>
-                  <p className="mt-1 font-sans text-sm font-semibold text-[#e8d5b5]">
-                    {metrics ? `${(metrics.combined_coverage_score * 100).toFixed(0)}% Occupied` : "23% Occupied"}
+                  <p className="mt-1 text-sm font-medium text-white">
+                    {metrics ? `${(metrics.combined_coverage_score * 100).toFixed(0)}%` : "—"}
                   </p>
                 </div>
 
-                <div className="rounded-xl border border-white/10 bg-white/[0.03] p-3 backdrop-blur-md transition-all hover:border-white/20 hover:bg-white/[0.05]">
-                  <div className="flex items-center justify-between text-[10px] text-[#6b665f]">
-                    <span>VOL. 01.3</span>
-                    <span>SCALE RATIO</span>
+                <div className="rounded-md border border-[#1f2937] bg-[#1f2937] p-3">
+                  <div className="flex items-center justify-between text-[10px] text-[#6b7280]">
+                    <span>Scale</span>
+                    <span>OHRC → TMC</span>
                   </div>
-                  <p className="mt-1 font-sans text-sm font-semibold text-[#e8d5b5]">
-                    16× (0.25m OHRC → 4m TMC)
+                  <p className="mt-1 text-sm font-medium text-white">
+                    16× (0.25m → 4m)
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Quick Link */}
-            <div className="mt-6">
+            <div className="mt-5">
               <button
                 onClick={cycleView}
-                className="group flex w-full items-center justify-between rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/10 p-3 text-xs font-semibold text-[#d4af37] backdrop-blur-md transition-all duration-200 hover:border-[#d4af37]/60 hover:bg-[#d4af37]/20 hover:text-[#f3df9b] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+                className="flex w-full items-center justify-between rounded-md bg-[#1f2937] p-3 text-xs text-[#9ca3af] transition-colors hover:bg-[#374151] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#60a5fa]"
               >
-                <span>Switch View Mode ({view})</span>
-                <span className="transition-transform duration-200 group-hover:translate-x-1">→</span>
+                <span>Switch View ({view.replace("-", " ")})</span>
+                <span>→</span>
               </button>
             </div>
           </div>
         </section>
 
-        {/* 4. INDEX / DOSSIER (6-Card Archival Grid) */}
-        <section className="mb-14">
+        {/* Region Cards */}
+        <section className="mb-10">
           <div className="mb-4 flex items-center justify-between">
-            <span className="font-mono text-xs font-bold uppercase tracking-[0.25em] text-[#9a958e]">
-              INDEX / DOSSIER
+            <span className="text-xs font-semibold text-[#d1d5db]">
+              All Regions
             </span>
-            <span className="font-mono text-xs text-[#6b665f]">
-              {triplets.length} DOCUMENTED REGIONS
+            <span className="text-xs text-[#6b7280]">
+              {triplets.length} datasets
             </span>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-3">
             {triplets.map((t, i) => {
               const { widthKm, heightKm } = footprintSizeKm(t.bounds);
               return (
                 <div
                   key={t.id}
                   onClick={() => handleOpenDossierModal(t)}
-                  className="group relative flex min-h-[180px] cursor-pointer flex-col justify-between rounded-2xl border border-white/10 bg-[#0a0d14]/50 p-5 shadow-[0_8px_24px_rgba(0,0,0,0.4)] backdrop-blur-xl transition-all duration-300 hover:border-[#d4af37]/50 hover:bg-[#121622]/70 hover:shadow-[0_8px_32px_rgba(212,175,55,0.15)] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
+                  className="group cursor-pointer rounded-lg border border-[#1f2937] bg-[#0d1117] p-4 transition-colors hover:border-[#374151] hover:bg-[#1f2937]/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60a5fa]"
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleOpenDossierModal(t);
                   }}
                 >
-                  <div className="flex items-center justify-between">
-                    <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-[#d4af37]">
-                      DOSSIER · {String(i + 1).padStart(2, "0")}
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-medium text-[#6b7280]">
+                      #{String(i + 1).padStart(2, "0")}
                     </span>
-                    <span className="font-mono text-[9px] text-[#6b665f] transition-colors group-hover:text-[#d4af37]">
-                      CLICK TO OPEN ↗
+                    <span className="text-[10px] text-[#6b7280] group-hover:text-[#60a5fa]">
+                      Open →
                     </span>
                   </div>
-                  <div>
-                    <h3 className="font-mono text-sm font-semibold text-white transition-colors group-hover:text-[#d4af37]">
-                      {t.id}
-                    </h3>
-                    <p className="mt-1 text-xs text-[#9a958e]">
-                      {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km footprint
-                      {t.dem_available && " · DEM available"}
-                    </p>
-                    <div className="mt-3 flex items-center gap-3 font-mono text-[10px]">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenDossierModal(t);
-                        }}
-                        className="rounded-md border border-[#d4af37]/30 bg-[#d4af37]/10 px-2 py-0.5 text-[#d4af37] backdrop-blur-sm hover:bg-[#d4af37]/20 hover:underline focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                      >
-                        READ DOSSIER →
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleSelectRegionAndScroll(t.id, "registration");
-                        }}
-                        className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[#9a958e] backdrop-blur-sm hover:text-white hover:border-white/20 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
-                      >
-                        OPEN WORKSPACE →
-                      </button>
-                    </div>
+                  <h3 className="text-sm font-medium text-white">
+                    {t.id}
+                  </h3>
+                  <p className="mt-1 text-xs text-[#6b7280]">
+                    {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km
+                    {t.dem_available && " · DEM"}
+                  </p>
+                  <div className="mt-3 flex items-center gap-2 text-[10px]">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleOpenDossierModal(t); }}
+                      className="rounded bg-[#1f2937] px-2 py-0.5 text-[#60a5fa] hover:bg-[#374151] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#60a5fa]"
+                    >
+                      Report
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleSelectRegionAndScroll(t.id, "registration"); }}
+                      className="rounded bg-[#1f2937] px-2 py-0.5 text-[#9ca3af] hover:bg-[#374151] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#60a5fa]"
+                    >
+                      Workspace
+                    </button>
                   </div>
                 </div>
               );
@@ -639,22 +540,16 @@ export default function Console({ onBackToHero }: Props = {}) {
           </div>
         </section>
 
-        {/* 5. Minimal Footer */}
-        <footer className="rounded-2xl border border-white/10 bg-[#0a0d14]/40 p-6 font-mono text-xs text-[#6b665f] backdrop-blur-xl">
+        {/* Footer */}
+        <footer className="border-t border-[#1f2937] pt-6 pb-4 text-xs text-[#4b5563]">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] text-[#4f4b45]">
-              ISRO Chandrayaan-2 · SIH26166 · Built with Next.js &amp; FastAPI
-            </span>
-            <span className="text-[10px] text-[#4f4b45]">
-              {triplets.length} regions loaded
-            </span>
+            <span>ISRO Chandrayaan-2 · SIH26166 · Next.js + FastAPI</span>
+            <span>{triplets.length} regions loaded</span>
           </div>
         </footer>
-
       </main>
 
-      {/* 6. Active Modals */}
-      {/* Dossier Report Modal */}
+      {/* Modals */}
       {activeDossierTriplet && (
         <DossierModal
           triplet={activeDossierTriplet}
@@ -663,8 +558,6 @@ export default function Console({ onBackToHero }: Props = {}) {
           onOpenWorkspace={(id) => handleSelectRegionAndScroll(id, "registration")}
         />
       )}
-
-      {/* Vault Archive Modal */}
       {vaultOpen && (
         <VaultModal
           triplets={triplets}
@@ -673,20 +566,15 @@ export default function Console({ onBackToHero }: Props = {}) {
           onSelectRegion={(id, preferredView) => handleSelectRegionAndScroll(id, preferredView)}
         />
       )}
-
-      {/* Theory Dossier Modal */}
       {theoryModalOpen && (
         <TheoryModal onClose={() => setTheoryModalOpen(false)} />
       )}
-
-      {/* General Info / Legal Modal */}
       {infoModalContent && (
         <InfoModal
           content={infoModalContent}
           onClose={() => setInfoModalContent(null)}
         />
       )}
-      </div>
     </div>
   );
 }

@@ -28,44 +28,43 @@ export default function VaultModal({
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-      <div className="relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#080b12]/90 text-[#f0f2f5] shadow-[0_20px_60px_rgba(0,0,0,0.9)] backdrop-blur-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="relative flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-[#374151] bg-[#111827] text-[#e5e7eb] shadow-xl">
         {/* Header Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 bg-white/[0.03] px-6 py-4 backdrop-blur-md">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#1f2937] bg-[#1f2937] px-6 py-4">
           <div className="flex items-center gap-3">
-            <svg className="h-5 w-5 text-[#d4af37]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
-            </svg>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs text-[#d4af37]">[ LUNAR GLASS VAULT ]</span>
-                <span className="font-mono text-xs font-bold uppercase tracking-wider text-white">
-                  ALL REGISTRATION PRODUCTS &amp; RAW SENSORS
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#60a5fa]">
+                  Datasets
+                </span>
+                <span className="text-sm font-semibold text-white">
+                  All Regions &amp; Sensor Products
                 </span>
               </div>
-              <p className="font-mono text-[10px] text-[#6b665f]">
-                {triplets.length} validated regions · Chandrayaan-2 multi-spectral repository
+              <p className="mt-0.5 text-xs text-[#9ca3af]">
+                {triplets.length} validated regions · Chandrayaan-2 multi-sensor archive
               </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/15 bg-white/[0.04] font-mono text-xs text-[#9a958e] backdrop-blur-sm transition-colors hover:border-[#d4af37] hover:text-[#d4af37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
-            title="Close Vault"
+            className="flex h-7 w-7 items-center justify-center rounded border border-[#374151] bg-[#111827] text-xs text-[#9ca3af] transition-colors hover:border-[#4b5563] hover:text-white"
+            title="Close"
           >
             ✕
           </button>
         </div>
 
         {/* Filter & Search Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#23211d] bg-[#121217] px-6 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#1f2937] bg-[#111827] px-6 py-3">
           {/* Filter Pills */}
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             <FilterButton
               active={filter === "all"}
               onClick={() => setFilter("all")}
-              label="ALL PAYLOADS"
+              label="All Payloads"
             />
             <FilterButton
               active={filter === "ohrc"}
@@ -85,73 +84,72 @@ export default function VaultModal({
             <FilterButton
               active={filter === "qa"}
               onClick={() => setFilter("qa")}
-              label="REGISTRATION QA"
+              label="Registration QA"
             />
           </div>
 
           {/* Search */}
-          <div className="flex items-center gap-2 border border-[#23211d] bg-[#08080a] px-3 py-1 font-mono text-xs text-[#6b665f]">
-            <svg className="h-3.5 w-3.5 text-[#6b665f]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex items-center gap-2 rounded-md border border-[#374151] bg-[#1f2937] px-3 py-1.5 text-xs text-[#9ca3af]">
+            <svg className="h-3.5 w-3.5 text-[#6b7280]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="FILTER REGIONS..."
-              className="w-40 bg-transparent text-xs text-white placeholder-[#4f4b45] focus:outline-none sm:w-56"
+              placeholder="Search regions…"
+              className="w-40 bg-transparent text-xs text-white placeholder-[#6b7280] focus:outline-none sm:w-56"
             />
           </div>
         </div>
 
         {/* Vault Grid Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {filteredTriplets.map((t, idx) => {
               const { widthKm, heightKm } = footprintSizeKm(t.bounds);
 
-              // Decide thumbnail based on filter
               let thumbUrl = imageUrl(`/images/ohrc/${t.id}`);
-              let badge = "OHRC 0.25M";
+              let badge = "OHRC 0.25m";
               let targetView: "registration" | "linked-cursor" | "map" = "linked-cursor";
 
               if (filter === "tmc") {
                 thumbUrl = imageUrl(`/images/tmc/${t.id}`);
-                badge = "TMC-2 4M";
+                badge = "TMC-2 4m";
                 targetView = "linked-cursor";
               } else if (filter === "iirs") {
                 thumbUrl = imageUrl(`/images/iirs/${t.id}`);
-                badge = "IIRS 70M";
+                badge = "IIRS 70m";
                 targetView = "map";
               } else if (filter === "qa") {
                 thumbUrl = imageUrl(`/images/registered/${t.id}/blend_overlay.png`);
-                badge = "CO-REG QA";
+                badge = "Co-Reg QA";
                 targetView = "registration";
               }
 
               return (
                 <div
                   key={t.id}
-                  className="group flex flex-col justify-between border border-[#23211d] bg-[#0d0d11] p-4 transition-all duration-200 hover:border-[#d4af37] hover:bg-[#14141a]"
+                  className="group flex flex-col justify-between rounded-lg border border-[#1f2937] bg-[#1f2937] p-4 transition-colors hover:border-[#374151]"
                 >
                   <div>
                     {/* Top line */}
                     <div className="mb-2 flex items-center justify-between">
-                      <span className="font-mono text-[10px] text-[#6b665f]">
-                        {idx + 1 < 10 ? `0${idx + 1}` : idx + 1}.
+                      <span className="text-[11px] text-[#6b7280]">
+                        #{String(idx + 1).padStart(2, "0")}
                       </span>
-                      <span className="rounded border border-[#38342d] bg-[#121217] px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-wider text-[#d4af37]">
+                      <span className="rounded bg-[#111827] px-1.5 py-0.5 text-[10px] font-medium text-[#60a5fa]">
                         {badge}
                       </span>
                     </div>
 
                     {/* Image Preview */}
-                    <div className="relative aspect-square overflow-hidden border border-[#23211d] bg-black">
+                    <div className="relative aspect-square overflow-hidden rounded border border-[#374151] bg-black">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={thumbUrl}
                         alt={t.id}
-                        className="h-full w-full object-cover contrast-[1.2] brightness-95 transition-transform duration-300 group-hover:scale-105"
+                        className="h-full w-full object-cover"
                         onError={(e) => {
                           (e.currentTarget as HTMLImageElement).src = imageUrl(filter === "iirs" ? "/images/iirs/iirs_overlay.png" : `/images/ohrc/${t.id}`);
                         }}
@@ -160,31 +158,31 @@ export default function VaultModal({
 
                     {/* Region Metadata */}
                     <div className="mt-3">
-                      <h4 className="font-mono text-xs font-semibold text-white group-hover:text-[#d4af37] transition-colors">
+                      <h4 className="text-xs font-semibold text-white">
                         {t.id}
                       </h4>
-                      <p className="mt-1 font-mono text-[10px] text-[#9a958e]">
+                      <p className="mt-0.5 text-xs text-[#9ca3af]">
                         {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km
                       </p>
-                      <p className="mt-0.5 font-mono text-[9px] text-[#6b665f]">
+                      <p className="mt-0.5 text-[11px] text-[#6b7280]">
                         {t.bounds.west_lon.toFixed(2)}°E, {t.bounds.north_lat.toFixed(2)}°N
                       </p>
                     </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="mt-4 pt-3 border-t border-[#1e1c18] flex items-center justify-between">
-                    <span className="font-mono text-[9px] text-[#d4af37]">
-                      {t.dem_available ? "DEM READY" : "STEREO"}
+                  <div className="mt-4 pt-3 border-t border-[#374151] flex items-center justify-between">
+                    <span className="text-[10px] text-[#9ca3af]">
+                      {t.dem_available ? "DEM available" : "Stereo"}
                     </span>
                     <button
                       onClick={() => {
                         onClose();
                         onSelectRegion(t.id, targetView);
                       }}
-                      className="border border-[#38342d] bg-[#121217] px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-white transition-colors hover:border-[#d4af37] hover:bg-[#d4af37] hover:text-black focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+                      className="rounded bg-[#111827] px-2.5 py-1 text-xs font-medium text-[#60a5fa] transition-colors hover:bg-[#2563eb] hover:text-white"
                     >
-                      INSPECT →
+                      Inspect →
                     </button>
                   </div>
                 </div>
@@ -193,20 +191,20 @@ export default function VaultModal({
           </div>
 
           {filteredTriplets.length === 0 && (
-            <div className="py-20 text-center font-mono text-xs text-[#9a958e]">
+            <div className="py-20 text-center text-xs text-[#9ca3af]">
               No regions matching "{search}".
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-[#23211d] bg-[#0e0e12] px-6 py-3 font-mono text-[11px] text-[#6b665f]">
-          <span>Obsidian Archive Repository · GeoTIFF &amp; PDS4 Data Standard</span>
+        <div className="flex items-center justify-between border-t border-[#1f2937] bg-[#1f2937] px-6 py-3 text-xs text-[#9ca3af]">
+          <span>Chandrayaan-2 Cross-Match Repository</span>
           <button
             onClick={onClose}
-            className="text-[#9a958e] hover:text-[#d4af37] transition-colors"
+            className="hover:text-white transition-colors"
           >
-            Close Archive ✕
+            Close ✕
           </button>
         </div>
       </div>
@@ -226,10 +224,10 @@ function FilterButton({
   return (
     <button
       onClick={onClick}
-      className={`rounded border px-3 py-1 font-mono text-xs transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37] ${
+      className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
         active
-          ? "border-[#d4af37] bg-[#2c2619] font-semibold text-[#f3df9b]"
-          : "border-[#23211d] bg-[#08080a] text-[#9a958e] hover:border-[#38342d] hover:text-white"
+          ? "bg-[#2563eb] text-white"
+          : "bg-[#1f2937] text-[#9ca3af] hover:bg-[#374151] hover:text-white"
       }`}
     >
       {label}

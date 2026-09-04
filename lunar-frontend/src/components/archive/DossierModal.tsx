@@ -20,166 +20,162 @@ export default function DossierModal({
   const { widthKm, heightKm } = footprintSizeKm(triplet.bounds);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
-      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#0a0d14]/85 text-[#f0f2f5] shadow-[0_20px_60px_rgba(0,0,0,0.9)] backdrop-blur-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="relative flex max-h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-lg border border-[#374151] bg-[#111827] text-[#e5e7eb] shadow-xl">
         {/* Header Bar */}
-        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-6 py-4 backdrop-blur-md">
+        <div className="flex items-center justify-between border-b border-[#1f2937] bg-[#1f2937] px-6 py-4">
           <div className="flex items-center gap-3">
-            <span className="font-mono text-xs text-[#d4af37]">[ DOSSIER REPORT ]</span>
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-white">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#60a5fa]">
+              Region Report
+            </span>
+            <span className="text-sm font-semibold text-white">
               {triplet.id}
             </span>
-            <span className="rounded-md border border-white/15 bg-white/[0.05] px-2 py-0.5 font-mono text-[10px] text-[#d4af37]">
+            <span className="rounded bg-[#111827] px-2 py-0.5 text-xs text-[#9ca3af]">
               {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km
             </span>
           </div>
 
           <button
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/15 bg-white/[0.04] font-mono text-xs text-[#9a958e] backdrop-blur-sm transition-colors hover:border-[#d4af37] hover:text-[#d4af37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
-            title="Close Dossier"
+            className="flex h-7 w-7 items-center justify-center rounded border border-[#374151] bg-[#111827] text-xs text-[#9ca3af] transition-colors hover:border-[#4b5563] hover:text-white"
+            title="Close"
           >
             ✕
           </button>
         </div>
 
         {/* Content Body */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-8">
+        <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
           {/* Top Metadata Block */}
-          <div className="mb-6 flex flex-col justify-between gap-4 border-b border-[#23211d] pb-6 sm:flex-row sm:items-baseline">
+          <div className="flex flex-col justify-between gap-4 border-b border-[#1f2937] pb-6 sm:flex-row sm:items-baseline">
             <div>
-              <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-[#d4af37]">
-                SCIENTIFIC ARCHIVAL RECORD
+              <span className="text-xs font-medium uppercase tracking-wider text-[#6b7280]">
+                Coordinates
               </span>
-              <h2 className="mt-1 font-serif text-3xl italic text-[#e8d5b5]">
-                {triplet.id === "region_001"
-                  ? "Polar Rim & Permanent Shadow"
-                  : triplet.id === "triplet_new_2022"
-                  ? "Antimeridian Far-Side Basin"
-                  : triplet.id === "region_003"
-                  ? "Motion Studies in the Metropolis of Craters"
-                  : `Cratered Terrain · ${triplet.id}`}
+              <h2 className="mt-1 text-lg font-semibold text-white">
+                Region {triplet.id}
               </h2>
             </div>
 
-            <div className="font-mono text-xs text-[#9a958e]">
-              <div>LON: {triplet.bounds.west_lon.toFixed(4)}° to {triplet.bounds.east_lon.toFixed(4)}°</div>
-              <div>LAT: {triplet.bounds.south_lat.toFixed(4)}° to {triplet.bounds.north_lat.toFixed(4)}°</div>
+            <div className="text-xs text-[#9ca3af]">
+              <div>Lon: {triplet.bounds.west_lon.toFixed(4)}° to {triplet.bounds.east_lon.toFixed(4)}°</div>
+              <div>Lat: {triplet.bounds.south_lat.toFixed(4)}° to {triplet.bounds.north_lat.toFixed(4)}°</div>
             </div>
           </div>
 
           {/* Triplet Imagery Quad */}
-          <div className="mb-8">
-            <span className="mb-3 block font-mono text-xs font-bold uppercase tracking-wider text-[#9a958e]">
-              Multi-Sensor Payload Imagery (OHRC · TMC-2 · IIRS)
+          <div>
+            <span className="mb-3 block text-xs font-medium text-[#d1d5db]">
+              Sensor Imagery (OHRC · TMC-2 · IIRS)
             </span>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {/* OHRC */}
-              <div className="flex flex-col gap-2 border border-[#23211d] bg-[#121217] p-3">
-                <div className="relative aspect-square overflow-hidden bg-black">
+              <div className="flex flex-col gap-2 rounded-md border border-[#1f2937] bg-[#1f2937] p-3">
+                <div className="relative aspect-square overflow-hidden rounded bg-black">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={imageUrl(`/images/ohrc/${triplet.id}`)}
                     alt="OHRC high resolution"
-                    className="h-full w-full object-cover contrast-[1.2] brightness-95"
+                    className="h-full w-full object-cover"
                   />
                 </div>
-                <div className="font-mono text-[11px]">
-                  <span className="text-white font-semibold">OHRC Primary</span>
-                  <p className="text-[10px] text-[#6b665f]">0.25–0.32 m/px · Optical Narrow Angle</p>
+                <div className="text-xs">
+                  <span className="text-white font-medium">OHRC Primary</span>
+                  <p className="text-[11px] text-[#6b7280]">0.25–0.32 m/px</p>
                 </div>
               </div>
 
               {/* TMC-2 */}
-              <div className="flex flex-col gap-2 border border-[#23211d] bg-[#121217] p-3">
-                <div className="relative aspect-square overflow-hidden bg-black">
+              <div className="flex flex-col gap-2 rounded-md border border-[#1f2937] bg-[#1f2937] p-3">
+                <div className="relative aspect-square overflow-hidden rounded bg-black">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={imageUrl(`/images/tmc/${triplet.id}`)}
                     alt="TMC-2 terrain stereo"
-                    className="h-full w-full object-cover contrast-[1.2] brightness-95"
+                    className="h-full w-full object-cover"
                   />
                 </div>
-                <div className="font-mono text-[11px]">
-                  <span className="text-white font-semibold">TMC-2 Reference</span>
-                  <p className="text-[10px] text-[#6b665f]">~4–5 m/px · Stereo Fore/Aft/Nadir</p>
+                <div className="text-xs">
+                  <span className="text-white font-medium">TMC-2 Reference</span>
+                  <p className="text-[11px] text-[#6b7280]">~4–5 m/px stereo</p>
                 </div>
               </div>
 
               {/* IIRS */}
-              <div className="flex flex-col gap-2 border border-[#23211d] bg-[#121217] p-3">
-                <div className="relative aspect-square overflow-hidden bg-black">
+              <div className="flex flex-col gap-2 rounded-md border border-[#1f2937] bg-[#1f2937] p-3">
+                <div className="relative aspect-square overflow-hidden rounded bg-black">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={imageUrl(`/images/iirs/${triplet.id}`)}
                     alt="IIRS infrared hyperspectral"
-                    className="h-full w-full object-cover contrast-[1.2] brightness-95"
+                    className="h-full w-full object-cover"
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).src = imageUrl("/images/iirs/iirs_overlay.png");
                     }}
                   />
                 </div>
-                <div className="font-mono text-[11px]">
-                  <span className="text-white font-semibold">IIRS Hyperspectral</span>
-                  <p className="text-[10px] text-[#6b665f]">~70–80 m/px · 256 Spectral Bands</p>
+                <div className="text-xs">
+                  <span className="text-white font-medium">IIRS Hyperspectral</span>
+                  <p className="text-[11px] text-[#6b7280]">~70–80 m/px</p>
                 </div>
               </div>
 
               {/* Registered Blend */}
-              <div className="flex flex-col gap-2 border border-[#23211d] bg-[#121217] p-3">
-                <div className="relative aspect-square overflow-hidden bg-black">
+              <div className="flex flex-col gap-2 rounded-md border border-[#1f2937] bg-[#1f2937] p-3">
+                <div className="relative aspect-square overflow-hidden rounded bg-black">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={imageUrl(`/images/registered/${triplet.id}/blend_overlay.png`)}
                     alt="Co-registered 50% Blend"
-                    className="h-full w-full object-cover contrast-[1.2] brightness-95"
+                    className="h-full w-full object-cover"
                     onError={(e) => {
                       (e.currentTarget as HTMLImageElement).src = imageUrl(`/images/tmc/${triplet.id}`);
                     }}
                   />
                 </div>
-                <div className="font-mono text-[11px]">
-                  <span className="text-[#d4af37] font-semibold">50% Blend Overlay</span>
-                  <p className="text-[10px] text-[#6b665f]">Sub-pixel Homography Transformed</p>
+                <div className="text-xs">
+                  <span className="text-[#60a5fa] font-medium">50% Blend Overlay</span>
+                  <p className="text-[11px] text-[#6b7280]">Homography transformed</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Scientific Metrics & Analysis */}
-          <div className="mb-8 grid grid-cols-1 gap-6 border-y border-[#23211d] py-6 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-6 border-t border-[#1f2937] pt-6 sm:grid-cols-2">
             <div>
-              <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-[#d4af37]">
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-[#d1d5db]">
                 Registration Telemetry
               </h4>
-              <div className="mt-3 space-y-2 font-mono text-xs text-[#9a958e]">
-                <div className="flex justify-between border-b border-[#1b1915] pb-1">
+              <div className="mt-3 space-y-2 text-xs text-[#9ca3af]">
+                <div className="flex justify-between border-b border-[#1f2937] pb-1.5">
                   <span>Sub-Pixel Status</span>
-                  <span className="font-semibold text-white">
+                  <span className="font-medium text-white">
                     {metrics?.sub_pixel_accurate ? "Verified (< 0.5 px)" : "Standard Alignment"}
                   </span>
                 </div>
-                <div className="flex justify-between border-b border-[#1b1915] pb-1">
+                <div className="flex justify-between border-b border-[#1f2937] pb-1.5">
                   <span>Root Mean Square Error</span>
-                  <span className="font-semibold text-[#d4af37]">
-                    {metrics ? `${metrics.rmse_px.toFixed(3)} px` : "0.419 px"}
+                  <span className="font-medium text-[#60a5fa]">
+                    {metrics ? `${metrics.rmse_px.toFixed(3)} px` : "—"}
                   </span>
                 </div>
-                <div className="flex justify-between border-b border-[#1b1915] pb-1">
+                <div className="flex justify-between border-b border-[#1f2937] pb-1.5">
                   <span>Post-RANSAC Inliers</span>
-                  <span className="font-semibold text-white">
-                    {metrics?.num_inliers ?? 28} matches
+                  <span className="font-medium text-white">
+                    {metrics?.num_inliers ?? "—"} matches
                   </span>
                 </div>
-                <div className="flex justify-between border-b border-[#1b1915] pb-1">
+                <div className="flex justify-between border-b border-[#1f2937] pb-1.5">
                   <span>Combined Coverage Score</span>
-                  <span className="font-semibold text-white">
-                    {metrics ? `${(metrics.combined_coverage_score * 100).toFixed(1)}%` : "23.2%"}
+                  <span className="font-medium text-white">
+                    {metrics ? `${(metrics.combined_coverage_score * 100).toFixed(1)}%` : "—"}
                   </span>
                 </div>
                 <div className="flex justify-between pb-1">
                   <span>Elevation Layer</span>
-                  <span className="font-semibold text-white">
+                  <span className="font-medium text-white">
                     {triplet.dem_available ? "DEM Available (TMC DTM)" : "Interpolated"}
                   </span>
                 </div>
@@ -187,23 +183,23 @@ export default function DossierModal({
             </div>
 
             <div>
-              <h4 className="font-mono text-xs font-bold uppercase tracking-wider text-[#d4af37]">
-                Morphological Description
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-[#d1d5db]">
+                Registration Method
               </h4>
-              <p className="mt-3 text-xs leading-relaxed text-[#9a958e]">
-                This region exhibits extreme illumination shifts with solar incidence angles differing by over 140° between observation passes. Co-registration is achieved via deep feature dense correspondence (LoFTR) coupled with iterative robust RANSAC estimation to reject shadow-boundary illusions and retain sub-pixel geometric continuity.
+              <p className="mt-3 text-xs leading-relaxed text-[#9ca3af]">
+                Co-registration is performed using deep feature correspondence (LoFTR) coupled with iterative robust RANSAC estimation and phase-correlation sub-pixel refinement to eliminate parallax errors and illumination variations across passes.
               </p>
             </div>
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="flex items-center justify-between border-t border-[#23211d] bg-[#121217] px-6 py-4">
+        <div className="flex items-center justify-between border-t border-[#1f2937] bg-[#1f2937] px-6 py-4">
           <button
             onClick={onClose}
-            className="border border-[#23211d] bg-[#0d0d11] px-4 py-2 font-mono text-xs text-[#9a958e] transition-colors hover:border-[#38342d] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
+            className="rounded-md border border-[#374151] bg-[#111827] px-4 py-2 text-xs text-[#9ca3af] transition-colors hover:bg-[#374151] hover:text-white"
           >
-            ← Close Dossier
+            Close
           </button>
 
           <button
@@ -211,9 +207,9 @@ export default function DossierModal({
               onClose();
               onOpenWorkspace(triplet.id);
             }}
-            className="flex items-center gap-2 border border-[#d4af37] bg-[#d4af37] px-5 py-2 font-mono text-xs font-bold uppercase tracking-wider text-black shadow-[0_0_20px_rgba(212,175,55,0.3)] transition-all hover:bg-[#f3df9b] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
+            className="flex items-center gap-2 rounded-md bg-[#2563eb] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#1d4ed8]"
           >
-            <span>Open in Interactive Workspace</span>
+            <span>Open in Workspace</span>
             <span>→</span>
           </button>
         </div>

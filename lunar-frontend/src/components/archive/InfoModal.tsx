@@ -17,21 +17,23 @@ interface Props {
 
 export default function InfoModal({ content, onClose }: Props) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-md">
-      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-white/15 bg-[#080b12]/90 text-[#f0f2f5] shadow-[0_20px_60px_rgba(0,0,0,0.9)] backdrop-blur-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-[#374151] bg-[#111827] text-[#e5e7eb] shadow-xl">
         {/* Header Bar */}
-        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] px-6 py-4 backdrop-blur-md">
+        <div className="flex items-center justify-between border-b border-[#1f2937] bg-[#1f2937] px-6 py-4">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-xs text-[#d4af37]">[ {content.tag} ]</span>
-            <span className="font-mono text-xs font-bold uppercase tracking-wider text-white">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#60a5fa]">
+              {content.tag}
+            </span>
+            <span className="text-sm font-semibold text-white">
               {content.title}
             </span>
           </div>
 
           <button
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/15 bg-white/[0.04] font-mono text-xs text-[#9a958e] backdrop-blur-sm transition-colors hover:border-[#d4af37] hover:text-[#d4af37] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]"
-            title="Close Info"
+            className="flex h-7 w-7 items-center justify-center rounded border border-[#374151] bg-[#111827] text-xs text-[#9ca3af] transition-colors hover:border-[#4b5563] hover:text-white"
+            title="Close"
           >
             ✕
           </button>
@@ -40,26 +42,26 @@ export default function InfoModal({ content, onClose }: Props) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
           <div>
-            <h3 className="font-serif text-2xl italic text-[#e8d5b5]">
+            <h3 className="text-base font-semibold text-white">
               {content.subtitle}
             </h3>
           </div>
 
-          <div className="space-y-4 text-xs leading-relaxed text-[#9a958e]">
+          <div className="space-y-4 text-xs leading-relaxed text-[#9ca3af]">
             {content.paragraphs.map((p, idx) => (
               <p key={idx}>{p}</p>
             ))}
           </div>
 
           {content.specs && (
-            <div className="border border-[#23211d] bg-[#121217] p-4">
-              <span className="font-mono text-[10px] uppercase tracking-wider text-[#d4af37] block mb-2">
-                Technical Specifications &amp; Provenance
+            <div className="rounded-md border border-[#374151] bg-[#1f2937] p-4">
+              <span className="text-xs font-medium uppercase tracking-wider text-[#d1d5db] block mb-3">
+                Technical Specifications &amp; Details
               </span>
-              <div className="space-y-2 font-mono text-xs">
+              <div className="space-y-2 text-xs">
                 {content.specs.map((s, idx) => (
-                  <div key={idx} className="flex justify-between border-b border-[#1f1d18] pb-1">
-                    <span className="text-[#6b665f]">{s.label}</span>
+                  <div key={idx} className="flex justify-between border-b border-[#374151] pb-1.5">
+                    <span className="text-[#9ca3af]">{s.label}</span>
                     <span className="text-white font-medium">{s.value}</span>
                   </div>
                 ))}
@@ -69,11 +71,11 @@ export default function InfoModal({ content, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-[#23211d] bg-[#121217] px-6 py-3 font-mono text-[11px]">
-          <span className="text-[#6b665f]">ISRO Chandrayaan-2 Cross-Match</span>
+        <div className="flex items-center justify-between border-t border-[#1f2937] bg-[#1f2937] px-6 py-3 text-xs">
+          <span className="text-[#9ca3af]">ISRO Chandrayaan-2 Cross-Match</span>
           <button
             onClick={onClose}
-            className="border border-[#38342d] bg-[#0d0d11] px-4 py-1.5 text-[#d4af37] hover:bg-[#2c2619] transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#d4af37]"
+            className="rounded border border-[#374151] bg-[#111827] px-4 py-1.5 text-xs text-[#d1d5db] hover:bg-[#374151] transition-colors"
           >
             Close ✕
           </button>
