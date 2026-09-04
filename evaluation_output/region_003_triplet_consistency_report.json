@@ -35,18 +35,18 @@
             "derivation": "measured",
             "homography": [
                 [
-                    0.9437976799753265,
-                    0.02508189635905649,
-                    8.140214233399348
+                    -4.022637443045419,
+                    0.011174371983566968,
+                    482.7977353729883
                 ],
                 [
-                    -0.019384021483889523,
-                    0.9643636097050149,
-                    13.974987672789915
+                    -0.011174371983566968,
+                    -4.022637443045419,
+                    2236.2705049161714
                 ],
                 [
-                    -0.000109500180384948,
-                    4.584821817785957e-05,
+                    0.0,
+                    0.0,
                     1.0
                 ]
             ]
@@ -55,18 +55,18 @@
             "derivation": "composed",
             "homography": [
                 [
-                    -3.5853798324556774,
-                    -1.722133068395408,
-                    849.5643445670191
+                    -0.4675839355537844,
+                    -0.23405349434818543,
+                    313.58872772755694
                 ],
                 [
-                    -2.319386872987199,
-                    -3.3127272620275603,
-                    1098.6698684523003
+                    -0.30406961310926955,
+                    -0.43630289461613625,
+                    557.1946875737973
                 ],
                 [
-                    -0.005774654766482682,
-                    -0.003745629314631566,
+                    -0.000744689997636615,
+                    -0.0005066926432034029,
                     1.0
                 ]
             ]
@@ -249,45 +249,47 @@
         "derivation": "measured"
     },
     "pair_BC_metrics": {
-        "match_count": 99,
-        "inlier_count": 17,
-        "inlier_ratio": 0.1717,
-        "fit_rmse_px": 2.0755,
-        "validation_rmse_px": 4.1088,
-        "held_out_inlier_validation_rmse_px": 4.1088,
-        "validation_median_error_px": 4.2464,
-        "validation_status": "evaluated",
-        "quality_tier": "ACCEPTED",
-        "mean_reprojection_error_px": 1.8529,
-        "median_reprojection_error_px": 1.5101,
-        "max_reprojection_error_px": 3.859,
-        "fraction_below_1px": 0.1176,
-        "fraction_below_0_5px": 0.0,
-        "fraction_below_0_25px": 0.0,
-        "spatial_coverage": 0.17,
-        "spatial_uniformity": 0.0876,
-        "coverage_relative_to_inlier_count": 0.52,
+        "match_count": 133,
+        "inlier_count": 4,
+        "inlier_ratio": 0.0301,
+        "fit_rmse_px": 0.2782,
+        "validation_rmse_px": null,
+        "held_out_inlier_validation_rmse_px": null,
+        "validation_median_error_px": null,
+        "validation_status": "insufficient_points_for_holdout",
+        "quality_tier": "LOW_CONFIDENCE",
+        "mean_reprojection_error_px": 0.2602,
+        "median_reprojection_error_px": 0.2807,
+        "max_reprojection_error_px": 0.3709,
+        "fraction_below_1px": 1.0,
+        "fraction_below_0_5px": 1.0,
+        "fraction_below_0_25px": 0.5,
+        "spatial_coverage": 0.02,
+        "spatial_uniformity": 0.0019,
+        "coverage_relative_to_inlier_count": 0.25,
         "spatial_distribution": {
             "grid_rows": 10,
             "grid_cols": 10,
             "total_cells": 100,
-            "occupied_cells": 17,
-            "coverage": 0.17,
-            "count_std": 0.3756,
-            "count_mean": 0.17,
-            "spatial_entropy": 0.6152,
-            "uniformity_score": 0.0876,
-            "adaptive_grid_size": 5,
-            "coverage_relative_to_inlier_count": 0.52,
-            "adaptive_uniformity_score": 0.3763
+            "occupied_cells": 2,
+            "coverage": 0.02,
+            "count_std": 0.3137,
+            "count_mean": 0.04,
+            "spatial_entropy": 0.1221,
+            "uniformity_score": 0.0019,
+            "adaptive_grid_size": 2,
+            "coverage_relative_to_inlier_count": 0.25,
+            "adaptive_uniformity_score": 0.1487
         },
         "transform_quality": {
             "is_valid": true,
             "reason": "OK",
-            "determinant": 0.91086,
-            "condition_number": 273.84,
-            "scale_ratio": 1.0226
+            "determinant": 16.181737,
+            "condition_number": 1301135.51,
+            "scale_ratio": 1.0
         },
+        "direction": "inverted_from_BA",
+        "measured_direction": "IIRS -> TMC-2",
         "derivation": "measured"
     },
     "pair_CA_metrics": {
@@ -300,18 +302,18 @@
         "source": "A -> B -> C",
         "homography": [
             [
-                0.10179796643100945,
-                -0.18520904217816692,
-                116.99967137684723
+                -1.159114943987001,
+                0.5657978037354202,
+                48.22585009258398
             ],
             [
-                -0.5105930478497706,
-                0.1675181318272649,
-                249.7345241789307
+                -0.8345978142449727,
+                -1.7619552070253557,
+                1243.4725478307992
             ],
             [
-                -0.0013246441758041057,
-                -0.0004420574529053251,
+                -0.0012860658774098129,
+                -0.00047142577592714424,
                 1.0
             ]
         ],

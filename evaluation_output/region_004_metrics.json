@@ -27,6 +27,8 @@
         "ohrc_tmc": {
             "status": "success",
             "message": null,
+            "direction": "native",
+            "measured_direction": null,
             "quality_tier": "LOW_CONFIDENCE",
             "match_count": 70,
             "inlier_count": 7,
@@ -57,18 +59,18 @@
                 "source": "A -> B -> C",
                 "homography": [
                     [
-                        2.160819217516023,
-                        -0.5338351119901107,
-                        14.995346834609851
+                        11.653894908060485,
+                        -5.4623641155093585,
+                        102.06706090905678
                     ],
                     [
-                        0.046814611658573015,
-                        1.4068876819316267,
-                        18.59869911042873
+                        -5.377950681626991,
+                        11.181246245760475,
+                        -1034.23012394495
                     ],
                     [
-                        0.00166176255080062,
-                        4.8294561337289275e-05,
+                        0.021513347076717655,
+                        -0.009850828493355222,
                         1.0
                     ]
                 ],
@@ -81,22 +83,26 @@
         },
         "tmc_iirs": {
             "status": "success",
-            "inlier_count": 14,
-            "fit_rmse_px": 2.8082,
+            "inlier_count": 7,
+            "fit_rmse_px": 22.714,
             "forward_tmc_to_iirs": {
                 "status": "success",
                 "message": null,
-                "quality_tier": "ACCEPTED",
-                "match_count": 96,
-                "inlier_count": 14,
-                "inlier_ratio": 0.1458,
-                "fit_rmse_px": 2.8082,
-                "spatial_coverage": 0.14,
-                "spatial_uniformity": 0.0666
+                "direction": "native",
+                "measured_direction": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 131,
+                "inlier_count": 7,
+                "inlier_ratio": 0.0534,
+                "fit_rmse_px": 22.714,
+                "spatial_coverage": 0.04,
+                "spatial_uniformity": 0.0063
             },
             "reverse_iirs_to_tmc": {
                 "status": "success",
                 "message": null,
+                "direction": "native",
+                "measured_direction": null,
                 "quality_tier": "LOW_CONFIDENCE",
                 "match_count": 131,
                 "inlier_count": 7,

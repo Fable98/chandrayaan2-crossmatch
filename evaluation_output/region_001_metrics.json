@@ -27,6 +27,8 @@
         "ohrc_tmc": {
             "status": "success",
             "message": null,
+            "direction": "native",
+            "measured_direction": null,
             "quality_tier": "LOW_CONFIDENCE",
             "match_count": 77,
             "inlier_count": 6,
@@ -36,39 +38,39 @@
             "spatial_uniformity": 0.0183
         },
         "ohrc_iirs": {
-            "status": "composition_not_computable",
+            "status": "composed",
             "inlier_count": 0,
-            "fit_rmse_px": 148.2628,
+            "fit_rmse_px": 0.0,
             "forward_ohrc_to_iirs": {
-                "status": "composition_not_computable",
+                "status": "composed",
                 "message": null,
-                "quality_tier": "FAILED",
+                "quality_tier": "COMPOSED_CHAIN",
                 "match_count": 0,
                 "inlier_count": 0,
-                "inlier_ratio": 0.0,
-                "fit_rmse_px": 148.2628,
-                "spatial_coverage": 0.0,
-                "spatial_uniformity": 0.0
+                "inlier_ratio": 1.0,
+                "fit_rmse_px": 0.0,
+                "spatial_coverage": 1.0,
+                "spatial_uniformity": 1.0
             },
             "reverse_iirs_to_ohrc": null,
-            "bidirectional_agreement": false,
+            "bidirectional_agreement": true,
             "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
             "composition": {
                 "source": "A -> B -> C",
                 "homography": [
                     [
-                        0.6405409776737332,
-                        0.08838859614036901,
-                        35.570072703607444
+                        0.2784995948000991,
+                        -0.36672312958073083,
+                        55.3201138325423
                     ],
                     [
-                        -0.2387147023799763,
-                        0.6675829710003617,
-                        90.28690197641829
+                        0.07308980411026318,
+                        0.1952707244068111,
+                        -39.006298370474774
                     ],
                     [
-                        -0.0003130289327756154,
-                        -0.0003396655264088022,
+                        -0.0005998351109673445,
+                        -0.003509828003522816,
                         1.0
                     ]
                 ],
@@ -81,22 +83,26 @@
         },
         "tmc_iirs": {
             "status": "success",
-            "inlier_count": 10,
-            "fit_rmse_px": 2.3647,
+            "inlier_count": 0,
+            "fit_rmse_px": null,
             "forward_tmc_to_iirs": {
                 "status": "success",
                 "message": null,
-                "quality_tier": "ACCEPTED",
-                "match_count": 96,
-                "inlier_count": 10,
-                "inlier_ratio": 0.1042,
-                "fit_rmse_px": 2.3647,
-                "spatial_coverage": 0.1,
-                "spatial_uniformity": 0.0407
+                "direction": "native",
+                "measured_direction": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 0,
+                "inlier_count": 0,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
             },
             "reverse_iirs_to_tmc": {
                 "status": "geometric_verification_failed",
                 "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "direction": "native",
+                "measured_direction": null,
                 "quality_tier": "FAILED",
                 "match_count": 128,
                 "inlier_count": 6,
@@ -110,11 +116,11 @@
         }
     },
     "triplet_consistency": {
-        "status": "evaluated",
+        "status": "evaluated_composed",
         "reason": null,
-        "cycle_rmse_px": 148.2628,
-        "cycle_mean_px": 135.123,
-        "cycle_closed_successfully": false,
+        "cycle_rmse_px": 0.0,
+        "cycle_mean_px": 0.0,
+        "cycle_closed_successfully": true,
         "failed_legs": []
     }
 }

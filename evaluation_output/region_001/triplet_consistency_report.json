@@ -1,13 +1,13 @@
 {
-    "status": "evaluated",
+    "status": "evaluated_composed",
     "reason": null,
-    "triplet_cycle_rmse_px": 148.2628,
-    "triplet_mean_cycle_error_px": 135.123,
-    "cycle_closed_successfully": false,
+    "triplet_cycle_rmse_px": 0.0,
+    "triplet_mean_cycle_error_px": 0.0,
+    "cycle_closed_successfully": true,
     "failed_legs": [],
     "leg_derivations": {
         "AB": "measured",
-        "BC": "measured",
+        "BC": "composed",
         "CA": "measured"
     },
     "legs": {
@@ -32,21 +32,21 @@
             ]
         },
         "BC": {
-            "derivation": "measured",
+            "derivation": "composed",
             "homography": [
                 [
-                    0.9468882623561208,
-                    0.026438023000100695,
-                    4.928468739294187
+                    0.1744574488908909,
+                    -0.3622817292826053,
+                    66.18432544122528
                 ],
                 [
-                    0.01013514866710897,
-                    0.9840102740629815,
-                    -0.29403900755772017
+                    0.11685458096896906,
+                    0.16434239495392858,
+                    -45.45579347537516
                 ],
                 [
-                    -8.37688051136988e-05,
-                    -3.445809414489339e-06,
+                    -0.0013093470010276805,
+                    -0.002953448621559242,
                     1.0
                 ]
             ]
@@ -275,46 +275,10 @@
         "derivation": "measured"
     },
     "pair_BC_metrics": {
-        "match_count": 96,
-        "inlier_count": 10,
-        "inlier_ratio": 0.1042,
-        "fit_rmse_px": 2.3647,
-        "validation_rmse_px": 3.5044,
-        "held_out_inlier_validation_rmse_px": 3.5044,
-        "validation_median_error_px": 3.4624,
-        "validation_status": "evaluated",
-        "quality_tier": "ACCEPTED",
-        "mean_reprojection_error_px": 1.989,
-        "median_reprojection_error_px": 1.6117,
-        "max_reprojection_error_px": 4.8976,
-        "fraction_below_1px": 0.2,
-        "fraction_below_0_5px": 0.0,
-        "fraction_below_0_25px": 0.0,
-        "spatial_coverage": 0.1,
-        "spatial_uniformity": 0.0407,
-        "coverage_relative_to_inlier_count": 0.5625,
-        "spatial_distribution": {
-            "grid_rows": 10,
-            "grid_cols": 10,
-            "total_cells": 100,
-            "occupied_cells": 10,
-            "coverage": 0.1,
-            "count_std": 0.3,
-            "count_mean": 0.1,
-            "spatial_entropy": 0.5,
-            "uniformity_score": 0.0407,
-            "adaptive_grid_size": 4,
-            "coverage_relative_to_inlier_count": 0.5625,
-            "adaptive_uniformity_score": 0.4218
-        },
-        "transform_quality": {
-            "is_valid": true,
-            "reason": "OK",
-            "determinant": 0.931886,
-            "condition_number": 27.76,
-            "scale_ratio": 1.0555
-        },
-        "derivation": "measured"
+        "derivation": "composed",
+        "status": "composed_from_CA_AB",
+        "inlier_count": 0,
+        "fit_rmse_px": null
     },
     "pair_CA_metrics": {
         "match_count": 132,
@@ -362,18 +326,18 @@
         "source": "A -> B -> C",
         "homography": [
             [
-                0.6405409776737332,
-                0.08838859614036901,
-                35.570072703607444
+                0.2784995948000991,
+                -0.36672312958073083,
+                55.3201138325423
             ],
             [
-                -0.2387147023799763,
-                0.6675829710003617,
-                90.28690197641829
+                0.07308980411026318,
+                0.1952707244068111,
+                -39.006298370474774
             ],
             [
-                -0.0003130289327756154,
-                -0.0003396655264088022,
+                -0.0005998351109673445,
+                -0.003509828003522816,
                 1.0
             ]
         ],

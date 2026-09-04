@@ -27,6 +27,8 @@
         "ohrc_tmc": {
             "status": "success",
             "message": null,
+            "direction": "native",
+            "measured_direction": null,
             "quality_tier": "LOW_CONFIDENCE",
             "match_count": 45,
             "inlier_count": 6,
@@ -62,6 +64,8 @@
             "forward_tmc_to_iirs": {
                 "status": "failed",
                 "message": null,
+                "direction": "native",
+                "measured_direction": null,
                 "quality_tier": "FAILED",
                 "match_count": 0,
                 "inlier_count": 0,
@@ -73,6 +77,8 @@
             "reverse_iirs_to_tmc": {
                 "status": "geometric_verification_failed",
                 "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "direction": "native",
+                "measured_direction": null,
                 "quality_tier": "FAILED",
                 "match_count": 114,
                 "inlier_count": 6,

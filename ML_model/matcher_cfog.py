@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import json
 import math
+import shutil
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any, List
 
@@ -535,6 +536,7 @@ def match_images_cfog(
     grid_size: int = 10,
     max_matches_per_cell: int = 4,
     patch_size_m: float = 160.0,  # Physical patch width in meters
+    _is_inverted_call: bool = False,
 ) -> Dict[str, Any]:
     """
     Executes the primary cross-sensor registration pipeline:
@@ -596,6 +598,292 @@ def match_images_cfog(
     # Resample to working scale with area averaging
     work1_gray = cv2.resize(raw1_gray, (work_w1, work_h1), interpolation=cv2.INTER_AREA)
     work2_gray = cv2.resize(raw2_gray, (work_w2, work_h2), interpolation=cv2.INTER_AREA)
+
+    # Direction-Invariance Check for Multimodal (IIRS-involving) Pairs:
+    # Always match using the LARGER working-scale canvas as Image 1 (template source).
+    # If the caller requested the reverse direction, run in the better-conditioned
+    # direction and return the inverted homography.
+    sensors = {str(meta1.sensor).upper(), str(meta2.sensor).upper(), str(source_sensor).upper(), str(reference_sensor).upper()}
+    multimodal_pair = "IIRS" in sensors
+
+    area1 = work_w1 * work_h1
+    area2 = work_w2 * work_h2
+
+    if multimodal_pair and not _is_inverted_call and area2 > area1:
+        inv_temp_dir = Path(output_dir) / "_inv_temp" if output_dir else None
+        res_ba = match_images_cfog(
+            img_path1=img_path2,
+            img_path2=img_path1,
+            dem_path=dem_path,
+            output_dir=inv_temp_dir or output_dir,
+            source_sensor=meta2.sensor,
+            reference_sensor=meta1.sensor,
+            explicit_gsd1=meta2.gsd_m,
+            explicit_gsd2=meta1.gsd_m,
+            explicit_emission1=meta2.emission_angle_deg,
+            explicit_emission2=meta1.emission_angle_deg,
+            grid_size=grid_size,
+            max_matches_per_cell=max_matches_per_cell,
+            patch_size_m=patch_size_m,
+            _is_inverted_call=True,
+        )
+
+        if inv_temp_dir and inv_temp_dir.exists():
+            shutil.rmtree(str(inv_temp_dir), ignore_errors=True)
+
+        if res_ba.get("status") != "success" or res_ba.get("homography") is None:
+            fail_meta = {
+                "source": meta1.to_dict(),
+                "reference": meta2.to_dict(),
+                "working_scale": {"working_gsd_m": working_gsd},
+                "direction": "inverted_from_BA",
+                "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+            }
+            return {
+                "status": res_ba.get("status", "failed"),
+                "message": f"Optimal-direction match ({meta2.sensor} -> {meta1.sensor}) produced: {res_ba.get('message')}",
+                "direction": "inverted_from_BA",
+                "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+                "match_count": res_ba.get("match_count", 0),
+                "inlier_count": res_ba.get("inlier_count", 0),
+                "metrics": None,
+                "homography": None,
+                "metadata": fail_meta,
+                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
+                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
+                "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+                "matches": [],
+                "all_matches": [],
+                "outputs": {},
+            }
+
+        # Invert measured homography H_ba -> H_ab
+        H_ba = np.array(res_ba["homography"], dtype=np.float64)
+        try:
+            H_ab = np.linalg.inv(H_ba)
+            if abs(H_ab[2, 2]) > 1e-12:
+                H_ab = H_ab / H_ab[2, 2]
+        except np.linalg.LinAlgError:
+            return {
+                "status": "degenerate_matrix",
+                "message": "Inversion of measured BA homography failed (singular matrix).",
+                "direction": "inverted_from_BA",
+                "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+                "match_count": 0,
+                "inlier_count": 0,
+                "metrics": None,
+                "homography": None,
+                "metadata": {
+                    "source": meta1.to_dict(),
+                    "reference": meta2.to_dict(),
+                    "working_scale": {"working_gsd_m": working_gsd},
+                    "direction": "inverted_from_BA",
+                    "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+                },
+                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
+                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
+                "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+                "matches": [],
+                "all_matches": [],
+                "outputs": {},
+            }
+
+        tx_check = verify_transformation_quality(H_ab, (orig_h2, orig_w2))
+        if not tx_check["is_valid"]:
+            return {
+                "status": "geometric_verification_failed",
+                "message": f"Inverted transformation rejected by quality gate: {tx_check['reason']}",
+                "direction": "inverted_from_BA",
+                "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+                "match_count": res_ba.get("match_count", 0),
+                "inlier_count": res_ba.get("inlier_count", 0),
+                "metrics": None,
+                "homography": None,
+                "metadata": {
+                    "source": meta1.to_dict(),
+                    "reference": meta2.to_dict(),
+                    "working_scale": {"working_gsd_m": working_gsd},
+                    "direction": "inverted_from_BA",
+                    "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+                },
+                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
+                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
+                "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+                "matches": [],
+                "all_matches": [],
+                "outputs": {},
+            }
+
+        # Invert correspondences: target of BA becomes source of AB, source of BA becomes target of AB
+        inverted_all_matches = []
+        pts1_list = []
+        pts2_list = []
+        for m in res_ba.get("all_matches", []):
+            x1 = float(m["target_x"])
+            y1 = float(m["target_y"])
+            x2 = float(m["source_x"])
+            y2 = float(m["source_y"])
+            inv_m = {
+                "source_x": x1,
+                "source_y": y1,
+                "target_x": x2,
+                "target_y": y2,
+                "image1_x": x1,
+                "image1_y": y1,
+                "image2_x": x2,
+                "image2_y": y2,
+                "confidence": float(m.get("confidence", 0.0)),
+                "is_inlier": bool(m.get("is_inlier", False)),
+                "is_refined": bool(m.get("is_refined", False)),
+                "lk_refined": bool(m.get("lk_refined", False)),
+            }
+            inverted_all_matches.append(inv_m)
+            pts1_list.append([x1, y1])
+            pts2_list.append([x2, y2])
+
+        pts1_arr = np.array(pts1_list, dtype=np.float32) if pts1_list else np.empty((0, 2), dtype=np.float32)
+        pts2_arr = np.array(pts2_list, dtype=np.float32) if pts2_list else np.empty((0, 2), dtype=np.float32)
+        inlier_mask_arr = np.array([1 if m.get("is_inlier") else 0 for m in res_ba.get("all_matches", [])], dtype=np.uint8)
+
+        inlier_count = int(np.sum(inlier_mask_arr))
+        if inlier_count < 4:
+            return {
+                "status": "geometric_verification_failed",
+                "message": f"Optimal-direction match has fewer than 4 verified inliers ({inlier_count} found).",
+                "direction": "inverted_from_BA",
+                "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+                "match_count": len(pts1_arr),
+                "inlier_count": inlier_count,
+                "metrics": None,
+                "homography": None,
+                "metadata": {
+                    "source": meta1.to_dict(),
+                    "reference": meta2.to_dict(),
+                    "working_scale": {"working_gsd_m": working_gsd},
+                    "direction": "inverted_from_BA",
+                    "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+                },
+                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
+                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
+                "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+                "matches": [],
+                "all_matches": inverted_all_matches,
+                "outputs": {},
+            }
+
+        metrics = compute_canonical_metrics(
+            pts1_arr, pts2_arr, inlier_mask_arr, H_ab, (orig_h2, orig_w2), grid_size
+        )
+        metrics["direction"] = "inverted_from_BA"
+        metrics["measured_direction"] = f"{meta2.sensor} -> {meta1.sensor}"
+
+        warped_source = cv2.warpPerspective(
+            raw1_color, H_ab, (orig_w2, orig_h2), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0)
+        )
+
+        tif_path = out_path / "registered_source.tif"
+        written_tif = False
+        try:
+            import rasterio
+            from rasterio.transform import from_origin
+            profile = {
+                "driver": "GTiff",
+                "height": orig_h2,
+                "width": orig_w2,
+                "count": 3 if warped_source.ndim == 3 else 1,
+                "dtype": "uint8",
+                "nodata": 0,
+                "crs": raster_meta2.get("crs") or "+proj=eqc +lat_ts=0 +lon_0=0 +a=1737400 +b=1737400 +units=m +no_defs +type=crs",
+                "transform": raster_meta2.get("transform") or from_origin(0, orig_h2, meta2.gsd_m, meta2.gsd_m),
+            }
+            with rasterio.open(str(tif_path), "w", **profile) as dst:
+                if warped_source.ndim == 3:
+                    for b in range(3):
+                        dst.write(warped_source[:, :, 2 - b], b + 1)
+                else:
+                    dst.write(warped_source, 1)
+            written_tif = True
+        except Exception:
+            pass
+        if not written_tif:
+            cv2.imwrite(str(tif_path), warped_source)
+
+        preview_path = out_path / "registered_preview.png"
+        cv2.imwrite(str(preview_path), warped_source)
+
+        block_size = 50
+        blended = np.zeros_like(raw2_color)
+        for y in range(0, orig_h2, block_size):
+            for x in range(0, orig_w2, block_size):
+                if ((x // block_size) + (y // block_size)) % 2 == 0:
+                    blended[y : y + block_size, x : x + block_size] = warped_source[y : y + block_size, x : x + block_size]
+                else:
+                    blended[y : y + block_size, x : x + block_size] = raw2_color[y : y + block_size, x : x + block_size]
+        checker_path = out_path / "registered_checkerboard.png"
+        cv2.imwrite(str(checker_path), blended)
+
+        matches_path = out_path / "matches.json"
+        with open(matches_path, "w") as f:
+            json.dump([m for m in inverted_all_matches if m.get("is_inlier", False)], f, indent=4)
+
+        metrics_path = out_path / "metrics.json"
+        with open(metrics_path, "w") as f:
+            json.dump(metrics, f, indent=4)
+
+        transform_path = out_path / "transform.json"
+        transform_data = {
+            "model": "homography",
+            "matrix": H_ab.tolist(),
+            "quality": tx_check,
+            "direction": "inverted_from_BA",
+            "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+        }
+        with open(transform_path, "w") as f:
+            json.dump(transform_data, f, indent=4)
+
+        metadata_path = out_path / "metadata.json"
+        full_metadata = {
+            "source": meta1.to_dict(),
+            "reference": meta2.to_dict(),
+            "working_scale": {"working_gsd_m": working_gsd, "method": "common_physical_gsd_normalization"},
+            "terrain_correction": {"source": None, "reference": None},
+            "direction": "inverted_from_BA",
+            "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+            "provenance": {
+                "source_path": str(img_path1),
+                "reference_path": str(img_path2),
+                "dem_path": str(dem_path) if dem_path else None,
+                "matcher": "CFOG_PhaseCongruency_v2.0",
+                "direction": "inverted_from_BA",
+                "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+            },
+        }
+        with open(metadata_path, "w") as f:
+            json.dump(full_metadata, f, indent=4)
+
+        return {
+            "status": "success",
+            "direction": "inverted_from_BA",
+            "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+            "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
+            "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
+            "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+            "metrics": metrics,
+            "homography": H_ab.tolist(),
+            "terrain_correction": full_metadata["terrain_correction"],
+            "spatial_attempts": res_ba.get("spatial_attempts", 0),
+            "matches": [m for m in inverted_all_matches if m.get("is_inlier", False)],
+            "all_matches": inverted_all_matches,
+            "outputs": {
+                "registered_raster": str(tif_path),
+                "preview": str(preview_path),
+                "checkerboard": str(checker_path),
+                "matches": str(matches_path),
+                "metrics": str(metrics_path),
+                "transform": str(transform_path),
+                "metadata": str(metadata_path),
+            },
+        }
 
     # 4. DEM Relief Compensation
     dem_arr = None
@@ -1139,6 +1427,7 @@ def match_images_cfog(
         "model": "homography",
         "matrix": H_final.tolist(),
         "quality": tx_check,
+        "direction": "native",
     }
     with open(transform_path, "w") as f:
         json.dump(transform_data, f, indent=4)
@@ -1156,6 +1445,7 @@ def match_images_cfog(
             "source": terrain_info1,
             "reference": terrain_info2,
         },
+        "direction": "native",
         "provenance": {
             "source_path": str(img_path1),
             "reference_path": str(img_path2),
@@ -1163,6 +1453,7 @@ def match_images_cfog(
             "matcher": "CFOG_PhaseCongruency_v2.0",
             "spatial_attempts": spatial_attempts,
             "coarse_matcher": "mutual_information" if multimodal_pair else "normalized_correlation",
+            "direction": "native",
         },
     }
     with open(metadata_path, "w") as f:
@@ -1170,6 +1461,7 @@ def match_images_cfog(
 
     return {
         "status": "success",
+        "direction": "native",
         "source": {
             "sensor": meta1.sensor,
             "width": orig_w1,

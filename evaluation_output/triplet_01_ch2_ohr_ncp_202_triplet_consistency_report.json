@@ -1,76 +1,17 @@
 {
-    "status": "evaluated_composed",
-    "reason": null,
-    "triplet_cycle_rmse_px": 0.0,
-    "triplet_mean_cycle_error_px": 0.0,
-    "cycle_closed_successfully": true,
-    "failed_legs": [],
+    "status": "cycle_not_computable",
+    "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+    "triplet_cycle_rmse_px": null,
+    "triplet_mean_cycle_error_px": null,
+    "cycle_closed_successfully": false,
+    "failed_legs": [
+        "BC (B -> C)",
+        "CA (C -> A)"
+    ],
     "leg_derivations": {
         "AB": "measured",
-        "BC": "measured",
-        "CA": "composed"
-    },
-    "legs": {
-        "AB": {
-            "derivation": "measured",
-            "homography": [
-                [
-                    0.6268268721727432,
-                    -0.19260261978089002,
-                    94.05135334739597
-                ],
-                [
-                    0.19374570918046,
-                    0.4657999480717893,
-                    -13.080602856572147
-                ],
-                [
-                    0.0002766300494551529,
-                    -0.0012053535395684738,
-                    1.0
-                ]
-            ]
-        },
-        "BC": {
-            "derivation": "measured",
-            "homography": [
-                [
-                    0.9698297376674248,
-                    -0.05884569761591136,
-                    21.529128908314842
-                ],
-                [
-                    -0.0024700296300855726,
-                    0.8895255442681138,
-                    18.260964234467973
-                ],
-                [
-                    2.6760620586505347e-06,
-                    -0.00015735779329306728,
-                    1.0
-                ]
-            ]
-        },
-        "CA": {
-            "derivation": "composed",
-            "homography": [
-                [
-                    1.4410728670819157,
-                    0.34245688027766924,
-                    -165.38734322202546
-                ],
-                [
-                    -0.6263083000030736,
-                    2.064415581981244,
-                    57.762426771431265
-                ],
-                [
-                    -0.0011556097221821985,
-                    0.0025499724678453074,
-                    1.0
-                ]
-            ]
-        }
+        "BC": "failed",
+        "CA": "failed"
     },
     "pair_AB_metrics": {
         "match_count": 97,
@@ -264,80 +205,9 @@
                 ],
                 "err_c_per_point": []
             }
-        },
-        "derivation": "measured"
+        }
     },
-    "pair_BC_metrics": {
-        "match_count": 94,
-        "inlier_count": 10,
-        "inlier_ratio": 0.1064,
-        "fit_rmse_px": 1.7541,
-        "validation_rmse_px": 3.6048,
-        "held_out_inlier_validation_rmse_px": 3.6048,
-        "validation_median_error_px": 3.5719,
-        "validation_status": "evaluated",
-        "quality_tier": "ACCEPTED",
-        "mean_reprojection_error_px": 1.5602,
-        "median_reprojection_error_px": 1.909,
-        "max_reprojection_error_px": 2.7867,
-        "fraction_below_1px": 0.4,
-        "fraction_below_0_5px": 0.1,
-        "fraction_below_0_25px": 0.0,
-        "spatial_coverage": 0.1,
-        "spatial_uniformity": 0.0407,
-        "coverage_relative_to_inlier_count": 0.5,
-        "spatial_distribution": {
-            "grid_rows": 10,
-            "grid_cols": 10,
-            "total_cells": 100,
-            "occupied_cells": 10,
-            "coverage": 0.1,
-            "count_std": 0.3,
-            "count_mean": 0.1,
-            "spatial_entropy": 0.5,
-            "uniformity_score": 0.0407,
-            "adaptive_grid_size": 4,
-            "coverage_relative_to_inlier_count": 0.5,
-            "adaptive_uniformity_score": 0.358
-        },
-        "transform_quality": {
-            "is_valid": true,
-            "reason": "OK",
-            "determinant": 0.865284,
-            "condition_number": 880.24,
-            "scale_ratio": 1.1149
-        },
-        "derivation": "measured"
-    },
-    "pair_CA_metrics": {
-        "derivation": "composed",
-        "status": "composed_from_AB_BC",
-        "inlier_count": 0,
-        "fit_rmse_px": null
-    },
-    "composition": {
-        "source": "A -> B -> C",
-        "homography": [
-            [
-                0.6010813324429811,
-                -0.23959880432014202,
-                113.25105302216438
-            ],
-            [
-                0.17543973823514186,
-                0.3919004699000708,
-                6.378390007985367
-            ],
-            [
-                0.0002472489293277397,
-                -0.0012762181160764052,
-                1.0
-            ]
-        ],
-        "transform": "benchmarks\\registration_benchmark_output\\triplet_01_ch2_ohr_ncp_202\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
-        "registered_raster": "benchmarks\\registration_benchmark_output\\triplet_01_ch2_ohr_ncp_202\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
-        "registered_geotiff": "benchmarks\\registration_benchmark_output\\triplet_01_ch2_ohr_ncp_202\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
-        "checkerboard_qa": "benchmarks\\registration_benchmark_output\\triplet_01_ch2_ohr_ncp_202\\triplet_cycle\\composed_checkerboard_qa.png",
-        "manifest": "benchmarks\\registration_benchmark_output\\triplet_01_ch2_ohr_ncp_202\\triplet_cycle\\registered_products_manifest.json"
-    }
+    "pair_BC_metrics": null,
+    "pair_CA_metrics": null,
+    "composition": null
 }
