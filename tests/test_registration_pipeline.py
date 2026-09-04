@@ -368,6 +368,18 @@ def test_spatial_quality_gate_rejects_clustered_matches():
 
 
 # ---------------------------------------------------------------------------
+# Test 12: Fit RMSE Is Part of Transformation Acceptance
+# ---------------------------------------------------------------------------
+def test_transformation_quality_rejects_excessive_fit_rmse():
+    accepted = verify_transformation_quality(np.eye(3), fit_rmse_px=5.0)
+    rejected = verify_transformation_quality(np.eye(3), fit_rmse_px=5.01)
+
+    assert accepted["is_valid"] is True
+    assert rejected["is_valid"] is False
+    assert "fit RMSE" in rejected["reason"]
+
+
+# ---------------------------------------------------------------------------
 # Test 12: GeoTIFF & Product Package Authenticity & Validity
 # ---------------------------------------------------------------------------
 def test_geotiff_output_validity(synthetic_lunar_pair):

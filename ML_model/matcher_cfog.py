@@ -777,6 +777,35 @@ def match_images_cfog(
         metrics["direction"] = "inverted_from_BA"
         metrics["measured_direction"] = f"{meta2.sensor} -> {meta1.sensor}"
 
+        fit_rmse = metrics.get("fit_rmse_px")
+        tx_check = verify_transformation_quality(
+            H_ab, (orig_h2, orig_w2), fit_rmse_px=fit_rmse
+        )
+        if not tx_check["is_valid"]:
+            return {
+                "status": "geometric_verification_failed",
+                "message": f"Inverted transformation rejected by quality gate: {tx_check['reason']}",
+                "direction": "inverted_from_BA",
+                "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+                "match_count": len(pts1_arr),
+                "inlier_count": inlier_count,
+                "metrics": None,
+                "homography": None,
+                "metadata": {
+                    "source": meta1.to_dict(),
+                    "reference": meta2.to_dict(),
+                    "working_scale": {"working_gsd_m": working_gsd},
+                    "direction": "inverted_from_BA",
+                    "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+                },
+                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
+                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
+                "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+                "matches": [],
+                "all_matches": inverted_all_matches,
+                "outputs": {},
+            }
+
         warped_source = cv2.warpPerspective(
             raw1_color, H_ab, (orig_w2, orig_h2), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0)
         )
@@ -1353,6 +1382,26 @@ def match_images_cfog(
     )
     if lk_stats:
         metrics["lk_refinement"] = lk_stats
+
+    fit_rmse = metrics.get("fit_rmse_px")
+    tx_check = verify_transformation_quality(
+        H_final, (orig_h2, orig_w2), fit_rmse_px=fit_rmse
+    )
+    if not tx_check["is_valid"]:
+        return {
+            "status": "geometric_verification_failed",
+            "message": f"Transformation rejected by quality gate: {tx_check['reason']}",
+            "direction": "native",
+            "match_count": len(pts1_arr),
+            "inlier_count": int(np.sum(inlier_mask)),
+            "metrics": None,
+            "homography": None,
+            "metadata": {
+                "source": meta1.to_dict(),
+                "reference": meta2.to_dict(),
+                "working_scale": {"working_gsd_m": working_gsd},
+            },
+        }
 
     # 10. Generate Output Products
     # A. Warped source image into reference space

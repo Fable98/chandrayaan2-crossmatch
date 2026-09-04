@@ -1,0 +1,457 @@
+{
+  "benchmark_name": "Large-AOI OHRC/TMC-2 <-> IIRS registration",
+  "large_aoi_acceptance": "status=success, inlier_count>=4, fit_rmse_px<=5.0",
+  "datasets": [
+    {
+      "dataset_id": "region_001",
+      "effective_gsd_m": {
+        "ohrc": 15.9883,
+        "tmc2": 39.4316,
+        "iirs": 39.4316,
+        "axis_specific": {
+          "ohrc": null,
+          "tmc2": null,
+          "iirs": null
+        }
+      },
+      "pairs": {
+        "ohrc_iirs": {
+          "existing_3_8km": {
+            "status": "composed",
+            "inlier_count": 0,
+            "fit_rmse_px": 0.0,
+            "quality_tier": "COMPOSED_CHAIN"
+          },
+          "large_aoi": {
+            "status": "success",
+            "message": null,
+            "direction": "inverted_from_BA",
+            "measured_direction": "IIRS -> OHRC",
+            "inlier_count": 7,
+            "fit_rmse_px": 2.1046,
+            "match_count": 142,
+            "quality_tier": "LOW_CONFIDENCE",
+            "trustworthy": true,
+            "elapsed_seconds": 3.01
+          }
+        },
+        "tmc_iirs": {
+          "existing_3_8km": {
+            "status": "success",
+            "inlier_count": 0,
+            "fit_rmse_px": null,
+            "quality_tier": "LOW_CONFIDENCE"
+          },
+          "large_aoi": {
+            "status": "geometric_verification_failed",
+            "message": "Optimal-direction match (IIRS -> TMC-2) produced: Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+            "direction": "inverted_from_BA",
+            "measured_direction": "IIRS -> TMC-2",
+            "inlier_count": 7,
+            "fit_rmse_px": null,
+            "match_count": 148,
+            "quality_tier": null,
+            "trustworthy": false,
+            "elapsed_seconds": 2.71
+          }
+        }
+      }
+    },
+    {
+      "dataset_id": "region_002",
+      "effective_gsd_m": {
+        "ohrc": 20.9683,
+        "tmc2": 39.4316,
+        "iirs": 39.4316,
+        "axis_specific": {
+          "ohrc": null,
+          "tmc2": null,
+          "iirs": null
+        }
+      },
+      "pairs": {
+        "ohrc_iirs": {
+          "existing_3_8km": {
+            "status": "composed",
+            "inlier_count": 0,
+            "fit_rmse_px": 0.0,
+            "quality_tier": "COMPOSED_CHAIN"
+          },
+          "large_aoi": {
+            "status": "geometric_verification_failed",
+            "message": "Optimal-direction match (IIRS -> OHRC) produced: Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+            "direction": "inverted_from_BA",
+            "measured_direction": "IIRS -> OHRC",
+            "inlier_count": 7,
+            "fit_rmse_px": null,
+            "match_count": 135,
+            "quality_tier": null,
+            "trustworthy": false,
+            "elapsed_seconds": 2.51
+          }
+        },
+        "tmc_iirs": {
+          "existing_3_8km": {
+            "status": "success",
+            "inlier_count": 0,
+            "fit_rmse_px": null,
+            "quality_tier": "LOW_CONFIDENCE"
+          },
+          "large_aoi": {
+            "status": "geometric_verification_failed",
+            "message": "Optimal-direction match (IIRS -> TMC-2) produced: Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+            "direction": "inverted_from_BA",
+            "measured_direction": "IIRS -> TMC-2",
+            "inlier_count": 4,
+            "fit_rmse_px": null,
+            "match_count": 149,
+            "quality_tier": null,
+            "trustworthy": false,
+            "elapsed_seconds": 2.68
+          }
+        }
+      }
+    },
+    {
+      "dataset_id": "region_003",
+      "effective_gsd_m": {
+        "ohrc": 22.648,
+        "tmc2": 39.4316,
+        "iirs": 39.4316,
+        "axis_specific": {
+          "ohrc": null,
+          "tmc2": null,
+          "iirs": null
+        }
+      },
+      "pairs": {
+        "ohrc_iirs": {
+          "existing_3_8km": {
+            "status": "composed",
+            "inlier_count": 0,
+            "fit_rmse_px": 0.0,
+            "quality_tier": "COMPOSED_CHAIN"
+          },
+          "large_aoi": {
+            "status": "geometric_verification_failed",
+            "message": "Optimal-direction match (IIRS -> OHRC) produced: Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+            "direction": "inverted_from_BA",
+            "measured_direction": "IIRS -> OHRC",
+            "inlier_count": 8,
+            "fit_rmse_px": null,
+            "match_count": 141,
+            "quality_tier": null,
+            "trustworthy": false,
+            "elapsed_seconds": 2.65
+          }
+        },
+        "tmc_iirs": {
+          "existing_3_8km": {
+            "status": "success",
+            "inlier_count": 4,
+            "fit_rmse_px": 0.2782,
+            "quality_tier": "LOW_CONFIDENCE"
+          },
+          "large_aoi": {
+            "status": "geometric_verification_failed",
+            "message": "Optimal-direction match (IIRS -> TMC-2) produced: Robust geometric verification failed to estimate a valid transformation from verified correspondences.",
+            "direction": "inverted_from_BA",
+            "measured_direction": "IIRS -> TMC-2",
+            "inlier_count": 3,
+            "fit_rmse_px": null,
+            "match_count": 154,
+            "quality_tier": null,
+            "trustworthy": false,
+            "elapsed_seconds": 2.68
+          }
+        }
+      }
+    },
+    {
+      "dataset_id": "region_004",
+      "effective_gsd_m": {
+        "ohrc": 19.7233,
+        "tmc2": 39.4316,
+        "iirs": 39.4316,
+        "axis_specific": {
+          "ohrc": null,
+          "tmc2": null,
+          "iirs": null
+        }
+      },
+      "pairs": {
+        "ohrc_iirs": {
+          "existing_3_8km": {
+            "status": "composed",
+            "inlier_count": 0,
+            "fit_rmse_px": 0.0,
+            "quality_tier": "COMPOSED_CHAIN"
+          },
+          "large_aoi": {
+            "status": "geometric_verification_failed",
+            "message": "Optimal-direction match (IIRS -> OHRC) produced: Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+            "direction": "inverted_from_BA",
+            "measured_direction": "IIRS -> OHRC",
+            "inlier_count": 5,
+            "fit_rmse_px": null,
+            "match_count": 142,
+            "quality_tier": null,
+            "trustworthy": false,
+            "elapsed_seconds": 2.53
+          }
+        },
+        "tmc_iirs": {
+          "existing_3_8km": {
+            "status": "success",
+            "inlier_count": 7,
+            "fit_rmse_px": 22.714,
+            "quality_tier": "LOW_CONFIDENCE"
+          },
+          "large_aoi": {
+            "status": "geometric_verification_failed",
+            "message": "Optimal-direction match (IIRS -> TMC-2) produced: Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+            "direction": "inverted_from_BA",
+            "measured_direction": "IIRS -> TMC-2",
+            "inlier_count": 6,
+            "fit_rmse_px": null,
+            "match_count": 141,
+            "quality_tier": null,
+            "trustworthy": false,
+            "elapsed_seconds": 2.65
+          }
+        }
+      }
+    },
+    {
+      "dataset_id": "region_005",
+      "effective_gsd_m": {
+        "ohrc": 20.323,
+        "tmc2": 39.3583,
+        "iirs": 39.3583,
+        "axis_specific": {
+          "ohrc": null,
+          "tmc2": null,
+          "iirs": null
+        }
+      },
+      "pairs": {
+        "ohrc_iirs": {
+          "existing_3_8km": {
+            "status": "composition_not_computable",
+            "inlier_count": 0,
+            "fit_rmse_px": null,
+            "quality_tier": "FAILED"
+          },
+          "large_aoi": {
+            "status": "geometric_verification_failed",
+            "message": "Optimal-direction match (IIRS -> OHRC) produced: Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+            "direction": "inverted_from_BA",
+            "measured_direction": "IIRS -> OHRC",
+            "inlier_count": 8,
+            "fit_rmse_px": null,
+            "match_count": 117,
+            "quality_tier": null,
+            "trustworthy": false,
+            "elapsed_seconds": 2.29
+          }
+        },
+        "tmc_iirs": {
+          "existing_3_8km": {
+            "status": "failed",
+            "inlier_count": 0,
+            "fit_rmse_px": null,
+            "quality_tier": "FAILED"
+          },
+          "large_aoi": {
+            "status": "geometric_verification_failed",
+            "message": "Optimal-direction match (IIRS -> TMC-2) produced: Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+            "direction": "inverted_from_BA",
+            "measured_direction": "IIRS -> TMC-2",
+            "inlier_count": 6,
+            "fit_rmse_px": null,
+            "match_count": 121,
+            "quality_tier": null,
+            "trustworthy": false,
+            "elapsed_seconds": 2.41
+          }
+        }
+      }
+    },
+    {
+      "dataset_id": "region_006",
+      "effective_gsd_m": {
+        "ohrc": 22.7397,
+        "tmc2": 39.3583,
+        "iirs": 39.3583,
+        "axis_specific": {
+          "ohrc": null,
+          "tmc2": null,
+          "iirs": null
+        }
+      },
+      "pairs": {
+        "ohrc_iirs": {
+          "existing_3_8km": {
+            "status": "composed",
+            "inlier_count": 0,
+            "fit_rmse_px": 0.0,
+            "quality_tier": "COMPOSED_CHAIN"
+          },
+          "large_aoi": {
+            "status": "geometric_verification_failed",
+            "message": "Optimal-direction match (IIRS -> OHRC) produced: Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+            "direction": "inverted_from_BA",
+            "measured_direction": "IIRS -> OHRC",
+            "inlier_count": 4,
+            "fit_rmse_px": null,
+            "match_count": 123,
+            "quality_tier": null,
+            "trustworthy": false,
+            "elapsed_seconds": 2.34
+          }
+        },
+        "tmc_iirs": {
+          "existing_3_8km": {
+            "status": "success",
+            "inlier_count": 4,
+            "fit_rmse_px": 3.9935,
+            "quality_tier": "LOW_CONFIDENCE"
+          },
+          "large_aoi": {
+            "status": "geometric_verification_failed",
+            "message": "Optimal-direction match (IIRS -> TMC-2) produced: Robust geometric verification failed to estimate a valid transformation from verified correspondences.",
+            "direction": "inverted_from_BA",
+            "measured_direction": "IIRS -> TMC-2",
+            "inlier_count": 3,
+            "fit_rmse_px": null,
+            "match_count": 118,
+            "quality_tier": null,
+            "trustworthy": false,
+            "elapsed_seconds": 2.37
+          }
+        }
+      }
+    },
+    {
+      "dataset_id": "triplet_01_ch2_ohr_ncp_202",
+      "effective_gsd_m": {
+        "ohrc": 22.648,
+        "tmc2": 39.4316,
+        "iirs": 39.4316,
+        "axis_specific": {
+          "ohrc": null,
+          "tmc2": null,
+          "iirs": null
+        }
+      },
+      "pairs": {
+        "ohrc_iirs": {
+          "existing_3_8km": {
+            "status": "composition_not_computable",
+            "inlier_count": 0,
+            "fit_rmse_px": null,
+            "quality_tier": "FAILED"
+          },
+          "large_aoi": {
+            "status": "geometric_verification_failed",
+            "message": "Optimal-direction match (IIRS -> OHRC) produced: Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+            "direction": "inverted_from_BA",
+            "measured_direction": "IIRS -> OHRC",
+            "inlier_count": 9,
+            "fit_rmse_px": null,
+            "match_count": 139,
+            "quality_tier": null,
+            "trustworthy": false,
+            "elapsed_seconds": 2.83
+          }
+        },
+        "tmc_iirs": {
+          "existing_3_8km": {
+            "status": "failed",
+            "inlier_count": 0,
+            "fit_rmse_px": null,
+            "quality_tier": "FAILED"
+          },
+          "large_aoi": {
+            "status": "geometric_verification_failed",
+            "message": "Inverted transformation rejected by quality gate: Excessive fit RMSE (6.81px > 5.0px)",
+            "direction": "inverted_from_BA",
+            "measured_direction": "IIRS -> TMC-2",
+            "inlier_count": 6,
+            "fit_rmse_px": null,
+            "match_count": 151,
+            "quality_tier": null,
+            "trustworthy": false,
+            "elapsed_seconds": 3.11
+          }
+        }
+      }
+    },
+    {
+      "dataset_id": "triplet_new_2022",
+      "effective_gsd_m": {
+        "ohrc": 23.4492,
+        "tmc2": 39.3583,
+        "iirs": 39.3583,
+        "axis_specific": {
+          "ohrc": null,
+          "tmc2": null,
+          "iirs": null
+        }
+      },
+      "pairs": {
+        "ohrc_iirs": {
+          "existing_3_8km": {
+            "status": "composition_not_computable",
+            "inlier_count": 0,
+            "fit_rmse_px": null,
+            "quality_tier": "FAILED"
+          },
+          "large_aoi": {
+            "status": "geometric_verification_failed",
+            "message": "Optimal-direction match (IIRS -> OHRC) produced: Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+            "direction": "inverted_from_BA",
+            "measured_direction": "IIRS -> OHRC",
+            "inlier_count": 4,
+            "fit_rmse_px": null,
+            "match_count": 124,
+            "quality_tier": null,
+            "trustworthy": false,
+            "elapsed_seconds": 2.29
+          }
+        },
+        "tmc_iirs": {
+          "existing_3_8km": {
+            "status": "failed",
+            "inlier_count": 0,
+            "fit_rmse_px": null,
+            "quality_tier": "FAILED"
+          },
+          "large_aoi": {
+            "status": "geometric_verification_failed",
+            "message": "Optimal-direction match (IIRS -> TMC-2) produced: Robust geometric verification failed to estimate a valid transformation from verified correspondences.",
+            "direction": "inverted_from_BA",
+            "measured_direction": "IIRS -> TMC-2",
+            "inlier_count": 3,
+            "fit_rmse_px": null,
+            "match_count": 120,
+            "quality_tier": null,
+            "trustworthy": false,
+            "elapsed_seconds": 2.32
+          }
+        }
+      }
+    }
+  ],
+  "dataset_count": 8,
+  "trustworthy_counts": {
+    "ohrc_iirs": 1,
+    "tmc_iirs": 0
+  },
+  "trustworthy_total_legs": 1,
+  "trustworthy_dataset_counts": {
+    "existing_3_8km": 2,
+    "large_aoi": 1
+  },
+  "trustworthy_dataset_delta": -1
+}

@@ -204,12 +204,15 @@ def calculate_spatial_distribution(
 def verify_transformation_quality(
     H: np.ndarray,
     image_shape: Tuple[int, int] = (512, 512),
+    fit_rmse_px: Optional[float] = None,
+    max_rmse_threshold: float = 5.0,
 ) -> Dict[str, Any]:
     """
     Sanity checks estimated homography/affine matrix for pathological behavior:
     - Extreme perspective distortion (determinant near 0 or negative).
     - Unrealistic scaling (>10x or <0.1x).
     - Ill-conditioned matrix (singular / degenerate).
+    - Excessive fit RMSE (>5.0px threshold).
     """
     H_mat = np.asarray(H, dtype=np.float64)
     if H_mat.shape != (3, 3):
@@ -232,8 +235,13 @@ def verify_transformation_quality(
         # Check projectivity terms (bottom row h31, h32)
         proj_strength = float(np.sqrt(H_mat[2, 0]**2 + H_mat[2, 1]**2))
 
-        # A valid lunar transform should preserve orientation (det > 0) and not collapse scale
-        is_valid = (
+        # Check fit RMSE threshold if provided
+        rmse_valid = True
+        if fit_rmse_px is not None:
+            rmse_valid = bool(fit_rmse_px <= max_rmse_threshold)
+
+        # A valid lunar transform should preserve orientation (det > 0), not collapse scale, and have acceptable fit RMSE
+        matrix_valid = (
             np.isfinite(cond)
             and cond < 1e7
             and det > 1e-4
@@ -241,7 +249,14 @@ def verify_transformation_quality(
             and proj_strength < 0.05
         )
 
-        reason = "OK" if is_valid else "Pathological projective distortion or ill-conditioned matrix"
+        is_valid = matrix_valid and rmse_valid
+
+        if not matrix_valid:
+            reason = "Pathological projective distortion or ill-conditioned matrix"
+        elif not rmse_valid:
+            reason = f"Excessive fit RMSE ({round(fit_rmse_px, 2)}px > {max_rmse_threshold}px)"
+        else:
+            reason = "OK"
 
         return {
             "is_valid": bool(is_valid),
@@ -249,6 +264,7 @@ def verify_transformation_quality(
             "determinant": round(det, 6),
             "condition_number": round(cond, 2),
             "scale_ratio": round(scale_ratio, 4),
+            "fit_rmse_px": round(fit_rmse_px, 4) if fit_rmse_px is not None else None,
         }
     except Exception as e:
         return {

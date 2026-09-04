@@ -30,6 +30,10 @@
   "aoi_iirs_km": {
     "width_km": 20.36,
     "height_km": 20.01,
-    "detector_pixels_est": "295x290"
-  }
+    "detector_pixels_est": "295x290",
+    "effective_gsd_m": 39.4316
+  },
+  "ohrc_large_effective_gsd_m": 20.9683,
+  "tmc2_large_effective_gsd_m": 39.4316,
+  "iirs_large_effective_gsd_m": 39.4316
 }

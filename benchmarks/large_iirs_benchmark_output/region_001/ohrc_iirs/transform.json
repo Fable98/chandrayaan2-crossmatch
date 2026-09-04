@@ -1,0 +1,30 @@
+{
+    "model": "homography",
+    "matrix": [
+        [
+            1.0474659615107205,
+            0.46840396712594323,
+            -127.80688973973663
+        ],
+        [
+            -0.2968389867290026,
+            1.219502278744236,
+            -26.06852063862667
+        ],
+        [
+            -0.0007454264509847328,
+            0.0005508395324853798,
+            1.0
+        ]
+    ],
+    "quality": {
+        "is_valid": true,
+        "reason": "OK",
+        "determinant": 1.345286,
+        "condition_number": 15299.75,
+        "scale_ratio": 1.226,
+        "fit_rmse_px": 2.1046
+    },
+    "direction": "inverted_from_BA",
+    "measured_direction": "IIRS -> OHRC"
+}
