@@ -30,15 +30,11 @@ const config: Config = {
         "gold-light": "#f3df9b",
         "gold-cream": "#e8d5b5",
         "gold-dim": "#2c2619",
-        inkwash: {
-          charcoal: "#4A4A4A",
-          silver: "#CBCBCB",
-          cream: "#FFFFE3",
-          slate: "#4682B4",
-          "slate-hover": "#3a6d96",
-          base: "#1a1d20",
-          surface: "#24272a",
-          elevated: "#2e3236",
+        lunar: {
+          midnight: "#091540",
+          cobalt: "#1B2CC1",
+          periwinkle: "#7692FF",
+          sky: "#ABD2FA",
         },
       },
       fontFamily: {

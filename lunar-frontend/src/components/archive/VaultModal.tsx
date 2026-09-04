@@ -29,20 +29,20 @@ export default function VaultModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-      <div className="relative flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-[#4A4A4A] bg-[#1a1d20] text-[#FFFFE3] shadow-xl">
+      <div className="relative flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-lg border border-[#1f326e] bg-[#091540] text-white shadow-xl">
         {/* Header Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#4A4A4A] bg-[#282c30] px-6 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#1f326e] bg-[#12235c] px-6 py-4">
           <div className="flex items-center gap-3">
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold uppercase tracking-wider text-[#4682B4]">
+                <span className="text-xs font-semibold uppercase tracking-wider text-[#7692FF]">
                   Datasets
                 </span>
-                <span className="text-sm font-semibold text-[#FFFFE3]">
+                <span className="text-sm font-semibold text-white">
                   All Regions &amp; Sensor Products
                 </span>
               </div>
-              <p className="mt-0.5 text-xs text-[#CBCBCB]">
+              <p className="mt-0.5 text-xs text-[#ABD2FA]">
                 {triplets.length} validated regions · Chandrayaan-2 multi-sensor archive
               </p>
             </div>
@@ -50,7 +50,7 @@ export default function VaultModal({
 
           <button
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded border border-[#4A4A4A] bg-[#1a1d20] text-xs text-[#CBCBCB] transition-colors hover:border-[#565c63] hover:text-[#FFFFE3]"
+            className="flex h-7 w-7 items-center justify-center rounded border border-[#1f326e] bg-[#091540] text-xs text-[#ABD2FA] transition-colors hover:border-[#283e84] hover:text-white"
             title="Close"
           >
             ✕
@@ -58,7 +58,7 @@ export default function VaultModal({
         </div>
 
         {/* Filter & Search Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#4A4A4A] bg-[#1a1d20] px-6 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#1f326e] bg-[#091540] px-6 py-3">
           {/* Filter Pills */}
           <div className="flex flex-wrap gap-1.5">
             <FilterButton
@@ -89,8 +89,8 @@ export default function VaultModal({
           </div>
 
           {/* Search */}
-          <div className="flex items-center gap-2 rounded-md border border-[#4A4A4A] bg-[#282c30] px-3 py-1.5 text-xs text-[#CBCBCB]">
-            <svg className="h-3.5 w-3.5 text-[#a2a8b0]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="flex items-center gap-2 rounded-md border border-[#1f326e] bg-[#12235c] px-3 py-1.5 text-xs text-[#ABD2FA]">
+            <svg className="h-3.5 w-3.5 text-[#7692FF]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
             <input
@@ -98,7 +98,7 @@ export default function VaultModal({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search regions…"
-              className="w-40 bg-transparent text-xs text-[#FFFFE3] placeholder-[#7a818a] focus:outline-none sm:w-56"
+              className="w-40 bg-transparent text-xs text-white placeholder-[#7692FF]/50 focus:outline-none sm:w-56"
             />
           </div>
         </div>
@@ -130,21 +130,21 @@ export default function VaultModal({
               return (
                 <div
                   key={t.id}
-                  className="group flex flex-col justify-between rounded-lg border border-[#4A4A4A] bg-[#282c30] p-4 transition-colors hover:border-[#4A4A4A]"
+                  className="group flex flex-col justify-between rounded-lg border border-[#1f326e] bg-[#12235c] p-4 transition-colors hover:border-[#1f326e]"
                 >
                   <div>
                     {/* Top line */}
                     <div className="mb-2 flex items-center justify-between">
-                      <span className="text-[11px] text-[#a2a8b0]">
+                      <span className="text-[11px] text-[#7692FF]">
                         #{String(idx + 1).padStart(2, "0")}
                       </span>
-                      <span className="rounded bg-[#1a1d20] px-1.5 py-0.5 text-[10px] font-medium text-[#4682B4]">
+                      <span className="rounded bg-[#091540] px-1.5 py-0.5 text-[10px] font-medium text-[#7692FF]">
                         {badge}
                       </span>
                     </div>
 
                     {/* Image Preview */}
-                    <div className="relative aspect-square overflow-hidden rounded border border-[#4A4A4A] bg-black">
+                    <div className="relative aspect-square overflow-hidden rounded border border-[#1f326e] bg-black">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={thumbUrl}
@@ -158,21 +158,21 @@ export default function VaultModal({
 
                     {/* Region Metadata */}
                     <div className="mt-3">
-                      <h4 className="text-xs font-semibold text-[#FFFFE3]">
+                      <h4 className="text-xs font-semibold text-white">
                         {t.id}
                       </h4>
-                      <p className="mt-0.5 text-xs text-[#CBCBCB]">
+                      <p className="mt-0.5 text-xs text-[#ABD2FA]">
                         {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km
                       </p>
-                      <p className="mt-0.5 text-[11px] text-[#a2a8b0]">
+                      <p className="mt-0.5 text-[11px] text-[#7692FF]">
                         {t.bounds.west_lon.toFixed(2)}°E, {t.bounds.north_lat.toFixed(2)}°N
                       </p>
                     </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="mt-4 pt-3 border-t border-[#4A4A4A] flex items-center justify-between">
-                    <span className="text-[10px] text-[#CBCBCB]">
+                  <div className="mt-4 pt-3 border-t border-[#1f326e] flex items-center justify-between">
+                    <span className="text-[10px] text-[#ABD2FA]">
                       {t.dem_available ? "DEM available" : "Stereo"}
                     </span>
                     <button
@@ -180,7 +180,7 @@ export default function VaultModal({
                         onClose();
                         onSelectRegion(t.id, targetView);
                       }}
-                      className="rounded bg-[#1a1d20] px-2.5 py-1 text-xs font-medium text-[#4682B4] transition-colors hover:bg-[#4682B4] hover:text-[#FFFFE3]"
+                      className="rounded bg-[#091540] px-2.5 py-1 text-xs font-medium text-[#7692FF] transition-colors hover:bg-[#1B2CC1] hover:text-white"
                     >
                       Inspect →
                     </button>
@@ -191,18 +191,18 @@ export default function VaultModal({
           </div>
 
           {filteredTriplets.length === 0 && (
-            <div className="py-20 text-center text-xs text-[#CBCBCB]">
+            <div className="py-20 text-center text-xs text-[#ABD2FA]">
               No regions matching "{search}".
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-[#4A4A4A] bg-[#282c30] px-6 py-3 text-xs text-[#CBCBCB]">
+        <div className="flex items-center justify-between border-t border-[#1f326e] bg-[#12235c] px-6 py-3 text-xs text-[#ABD2FA]">
           <span>Chandrayaan-2 Cross-Match Repository</span>
           <button
             onClick={onClose}
-            className="hover:text-[#FFFFE3] transition-colors"
+            className="hover:text-white transition-colors"
           >
             Close ✕
           </button>
@@ -226,8 +226,8 @@ function FilterButton({
       onClick={onClick}
       className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
         active
-          ? "bg-[#4682B4] text-[#FFFFE3]"
-          : "bg-[#282c30] text-[#CBCBCB] hover:bg-[#4A4A4A] hover:text-[#FFFFE3]"
+          ? "bg-[#1B2CC1] text-white"
+          : "bg-[#12235c] text-[#ABD2FA] hover:bg-[#1f326e] hover:text-white"
       }`}
     >
       {label}

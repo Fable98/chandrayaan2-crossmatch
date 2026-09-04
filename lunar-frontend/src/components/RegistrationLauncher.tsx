@@ -104,20 +104,20 @@ export default function RegistrationLauncher() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="rounded-md border border-[#4A4A4A] bg-[#282c30] px-3 py-1.5 text-xs font-medium text-[#CBCBCB] transition-colors hover:bg-[#4A4A4A] hover:text-[#FFFFE3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#4682B4]"
+        className="rounded-md border border-[#1f326e] bg-[#12235c] px-3 py-1.5 text-xs font-medium text-[#ABD2FA] transition-colors hover:bg-[#1f326e] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7692FF]"
       >
         Live Registration
       </button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-lg border border-[#4A4A4A] bg-[#1a1d20] p-6 text-[#FFFFE3] shadow-xl">
-            <div className="mb-6 flex items-start justify-between gap-4 border-b border-[#4A4A4A] pb-4">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-lg border border-[#1f326e] bg-[#091540] p-6 text-white shadow-xl">
+            <div className="mb-6 flex items-start justify-between gap-4 border-b border-[#1f326e] pb-4">
               <div>
-                <h2 className="text-base font-semibold text-[#FFFFE3]">
+                <h2 className="text-base font-semibold text-white">
                   Cross-Sensor Registration Pipeline
                 </h2>
-                <p className="mt-1 text-xs text-[#CBCBCB]">
+                <p className="mt-1 text-xs text-[#ABD2FA]">
                   Upload arbitrary sensor images (OHRC, TMC-2, IIRS). Runs sub-pixel LoFTR matching,
                   spatial uniformity filtering, phase-correlation refinement, and composite generation.
                 </p>
@@ -125,7 +125,7 @@ export default function RegistrationLauncher() {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-md border border-[#4A4A4A] bg-[#282c30] px-3 py-1.5 text-xs text-[#CBCBCB] transition-colors hover:bg-[#4A4A4A] hover:text-[#FFFFE3]"
+                className="rounded-md border border-[#1f326e] bg-[#12235c] px-3 py-1.5 text-xs text-[#ABD2FA] transition-colors hover:bg-[#1f326e] hover:text-white"
               >
                 Close
               </button>
@@ -134,8 +134,8 @@ export default function RegistrationLauncher() {
             {!result ? (
               <div className="space-y-4">
                 <div className="grid gap-4 md:grid-cols-2">
-                  <label className="block rounded-lg border border-[#4A4A4A] bg-[#282c30] p-4 transition-colors hover:border-[#565c63]">
-                    <span className="text-xs font-medium text-[#CBCBCB]">
+                  <label className="block rounded-lg border border-[#1f326e] bg-[#12235c] p-4 transition-colors hover:border-[#283e84]">
+                    <span className="text-xs font-medium text-[#ABD2FA]">
                       Source Image (Moving / OHRC)
                     </span>
                     <input
@@ -144,15 +144,15 @@ export default function RegistrationLauncher() {
                       onChange={(event) =>
                         setSourceFile(event.target.files?.[0] || null)
                       }
-                      className="mt-3 block w-full text-xs text-[#CBCBCB] file:mr-4 file:rounded-md file:border file:border-[#4A4A4A] file:bg-[#1a1d20] file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[#FFFFE3] hover:file:bg-[#4A4A4A] cursor-pointer"
+                      className="mt-3 block w-full text-xs text-[#ABD2FA] file:mr-4 file:rounded-md file:border file:border-[#1f326e] file:bg-[#091540] file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-[#1f326e] cursor-pointer"
                     />
-                    <span className="mt-2 block truncate text-[11px] text-[#a2a8b0]">
+                    <span className="mt-2 block truncate text-[11px] text-[#7692FF]">
                       {sourceFile ? sourceFile.name : "No source image selected"}
                     </span>
                   </label>
 
-                  <label className="block rounded-lg border border-[#4A4A4A] bg-[#282c30] p-4 transition-colors hover:border-[#565c63]">
-                    <span className="text-xs font-medium text-[#CBCBCB]">
+                  <label className="block rounded-lg border border-[#1f326e] bg-[#12235c] p-4 transition-colors hover:border-[#283e84]">
+                    <span className="text-xs font-medium text-[#ABD2FA]">
                       Reference Image (Fixed / TMC-2)
                     </span>
                     <input
@@ -161,9 +161,9 @@ export default function RegistrationLauncher() {
                       onChange={(event) =>
                         setReferenceFile(event.target.files?.[0] || null)
                       }
-                      className="mt-3 block w-full text-xs text-[#CBCBCB] file:mr-4 file:rounded-md file:border file:border-[#4A4A4A] file:bg-[#1a1d20] file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-[#FFFFE3] hover:file:bg-[#4A4A4A] cursor-pointer"
+                      className="mt-3 block w-full text-xs text-[#ABD2FA] file:mr-4 file:rounded-md file:border file:border-[#1f326e] file:bg-[#091540] file:px-3 file:py-1.5 file:text-xs file:font-medium file:text-white hover:file:bg-[#1f326e] cursor-pointer"
                     />
-                    <span className="mt-2 block truncate text-[11px] text-[#a2a8b0]">
+                    <span className="mt-2 block truncate text-[11px] text-[#7692FF]">
                       {referenceFile
                         ? referenceFile.name
                         : "No reference image selected"}
@@ -175,7 +175,7 @@ export default function RegistrationLauncher() {
                   type="button"
                   onClick={runRegistration}
                   disabled={loading || !sourceFile || !referenceFile}
-                  className="w-full rounded-md bg-[#4682B4] px-4 py-2.5 text-xs font-semibold text-[#FFFFE3] transition-colors hover:bg-[#3a6d96] disabled:cursor-not-allowed disabled:opacity-40"
+                  className="w-full rounded-md bg-[#1B2CC1] px-4 py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[#2539db] disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {loading
                     ? "Executing Registration & Sub-Pixel Refinement…"
@@ -191,46 +191,46 @@ export default function RegistrationLauncher() {
             ) : (
               <div className="space-y-4">
                 <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
-                  <div className="rounded-md border border-[#4A4A4A] bg-[#282c30] p-3">
-                    <div className="text-[10px] uppercase tracking-wider text-[#a2a8b0]">RMSE</div>
-                    <div className="mt-1 text-base font-semibold text-[#FFFFE3]">
+                  <div className="rounded-md border border-[#1f326e] bg-[#12235c] p-3">
+                    <div className="text-[10px] uppercase tracking-wider text-[#7692FF]">RMSE</div>
+                    <div className="mt-1 text-base font-semibold text-white">
                       {formatMetric(result.metrics?.rmse_px)} px
                     </div>
                   </div>
 
-                  <div className="rounded-md border border-[#4A4A4A] bg-[#282c30] p-3">
-                    <div className="text-[10px] uppercase tracking-wider text-[#a2a8b0]">Inliers</div>
-                    <div className="mt-1 text-base font-semibold text-[#FFFFE3]">
+                  <div className="rounded-md border border-[#1f326e] bg-[#12235c] p-3">
+                    <div className="text-[10px] uppercase tracking-wider text-[#7692FF]">Inliers</div>
+                    <div className="mt-1 text-base font-semibold text-white">
                       {result.metrics?.num_inliers ?? "-"}
                     </div>
                   </div>
 
-                  <div className="rounded-md border border-[#4A4A4A] bg-[#282c30] p-3">
-                    <div className="text-[10px] uppercase tracking-wider text-[#a2a8b0]">Inlier Ratio</div>
-                    <div className="mt-1 text-base font-semibold text-[#FFFFE3]">
+                  <div className="rounded-md border border-[#1f326e] bg-[#12235c] p-3">
+                    <div className="text-[10px] uppercase tracking-wider text-[#7692FF]">Inlier Ratio</div>
+                    <div className="mt-1 text-base font-semibold text-white">
                       {formatMetric(result.metrics?.inlier_ratio ? result.metrics.inlier_ratio * 100 : 0, 1)}%
                     </div>
                   </div>
 
-                  <div className="rounded-md border border-[#4A4A4A] bg-[#282c30] p-3">
-                    <div className="text-[10px] uppercase tracking-wider text-[#a2a8b0]">Uniformity</div>
-                    <div className="mt-1 text-base font-semibold text-[#FFFFE3]">
+                  <div className="rounded-md border border-[#1f326e] bg-[#12235c] p-3">
+                    <div className="text-[10px] uppercase tracking-wider text-[#7692FF]">Uniformity</div>
+                    <div className="mt-1 text-base font-semibold text-white">
                       {formatMetric(result.metrics?.uniformity_score ? result.metrics.uniformity_score * 100 : 0, 1)}%
                     </div>
                   </div>
 
-                  <div className="rounded-md border border-[#4A4A4A] bg-[#282c30] p-3">
-                    <div className="text-[10px] uppercase tracking-wider text-[#a2a8b0]">Status</div>
-                    <div className={`mt-1 text-base font-semibold ${result.metrics?.sub_pixel_accurate ? "text-[#10b981]" : "text-[#CBCBCB]"}`}>
+                  <div className="rounded-md border border-[#1f326e] bg-[#12235c] p-3">
+                    <div className="text-[10px] uppercase tracking-wider text-[#7692FF]">Status</div>
+                    <div className={`mt-1 text-base font-semibold ${result.metrics?.sub_pixel_accurate ? "text-[#10b981]" : "text-[#ABD2FA]"}`}>
                       {result.metrics?.sub_pixel_accurate ? "Sub-Pixel" : "Standard"}
                     </div>
                   </div>
                 </div>
 
                 {visualUrl && (
-                  <div className="rounded-md border border-[#4A4A4A] bg-[#282c30] p-4">
+                  <div className="rounded-md border border-[#1f326e] bg-[#12235c] p-4">
                     <div className="mb-2 flex items-center justify-between">
-                      <span className="text-xs font-medium text-[#CBCBCB]">
+                      <span className="text-xs font-medium text-[#ABD2FA]">
                         Composite Product (Checkerboard Blend)
                       </span>
                       <span className="text-[11px] text-[#10b981]">Aligned</span>
@@ -239,7 +239,7 @@ export default function RegistrationLauncher() {
                     <img
                       src={visualUrl}
                       alt="Registered checkerboard product"
-                      className="w-full max-h-[450px] object-contain rounded border border-[#4A4A4A] bg-black"
+                      className="w-full max-h-[450px] object-contain rounded border border-[#1f326e] bg-black"
                     />
                   </div>
                 )}
@@ -248,7 +248,7 @@ export default function RegistrationLauncher() {
                   <button
                     type="button"
                     onClick={() => setResult(null)}
-                    className="rounded-md border border-[#4A4A4A] bg-[#282c30] px-3.5 py-1.5 text-xs font-medium text-[#CBCBCB] transition-colors hover:bg-[#4A4A4A] hover:text-[#FFFFE3]"
+                    className="rounded-md border border-[#1f326e] bg-[#12235c] px-3.5 py-1.5 text-xs font-medium text-[#ABD2FA] transition-colors hover:bg-[#1f326e] hover:text-white"
                   >
                     Register Another Pair
                   </button>
@@ -258,7 +258,7 @@ export default function RegistrationLauncher() {
                       href={warpedUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-md border border-[#4A4A4A] bg-[#282c30] px-3.5 py-1.5 text-xs font-medium text-[#4682B4] transition-colors hover:bg-[#4A4A4A]"
+                      className="rounded-md border border-[#1f326e] bg-[#12235c] px-3.5 py-1.5 text-xs font-medium text-[#7692FF] transition-colors hover:bg-[#1f326e]"
                     >
                       View Warped Source
                     </a>
@@ -269,7 +269,7 @@ export default function RegistrationLauncher() {
                       href={matchesUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-md border border-[#4A4A4A] bg-[#282c30] px-3.5 py-1.5 text-xs font-medium text-[#4682B4] transition-colors hover:bg-[#4A4A4A]"
+                      className="rounded-md border border-[#1f326e] bg-[#12235c] px-3.5 py-1.5 text-xs font-medium text-[#7692FF] transition-colors hover:bg-[#1f326e]"
                     >
                       Download Match JSON
                     </a>
