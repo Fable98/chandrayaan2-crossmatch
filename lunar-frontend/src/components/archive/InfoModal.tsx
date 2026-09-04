@@ -17,22 +17,22 @@ interface Props {
 
 export default function InfoModal({ content, onClose }: Props) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-2xl animate-fade-in">
-      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-3xl border border-white/15 bg-[#0c0e24]/90 text-white shadow-[0_30px_90px_rgba(0,0,0,0.9)] ring-1 ring-white/10">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm animate-fade-in">
+      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white text-slate-800 shadow-2xl">
         {/* Header Bar */}
-        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.02] px-6 py-4 backdrop-blur-md">
-          <div className="flex items-center gap-2">
-            <span className="rounded-full border border-purple-400/30 bg-purple-500/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-purple-300">
+        <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4">
+          <div className="flex items-center gap-2.5">
+            <span className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#4F46E5]">
               {content.tag}
             </span>
-            <span className="text-sm font-bold text-white">
+            <span className="text-sm font-bold text-slate-900">
               {content.title}
             </span>
           </div>
 
           <button
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-full border border-white/10 bg-white/[0.04] text-xs text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-xs text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
             title="Close"
           >
             ✕
@@ -42,27 +42,27 @@ export default function InfoModal({ content, onClose }: Props) {
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
           <div>
-            <h3 className="text-lg font-bold text-white">
+            <h3 className="text-lg font-bold text-slate-900">
               {content.subtitle}
             </h3>
           </div>
 
-          <div className="space-y-4 text-xs leading-relaxed text-slate-300">
+          <div className="space-y-4 text-xs leading-relaxed text-slate-600">
             {content.paragraphs.map((p, idx) => (
               <p key={idx}>{p}</p>
             ))}
           </div>
 
           {content.specs && (
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-              <span className="text-xs font-semibold uppercase tracking-wider text-purple-300 block mb-3">
+            <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-4">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-3">
                 Technical Specifications &amp; Details
               </span>
               <div className="space-y-2 text-xs font-mono">
                 {content.specs.map((s, idx) => (
-                  <div key={idx} className="flex justify-between border-b border-white/[0.05] pb-2">
-                    <span className="text-slate-400 font-sans">{s.label}</span>
-                    <span className="text-white font-bold">{s.value}</span>
+                  <div key={idx} className="flex justify-between border-b border-slate-200/50 pb-2">
+                    <span className="text-slate-500 font-sans">{s.label}</span>
+                    <span className="text-slate-900 font-bold">{s.value}</span>
                   </div>
                 ))}
               </div>
@@ -71,13 +71,13 @@ export default function InfoModal({ content, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-white/10 bg-white/[0.02] px-6 py-3 text-xs">
-          <span className="text-slate-400">ISRO Chandrayaan-2 Cross-Match</span>
+        <div className="flex items-center justify-between border-t border-slate-100 bg-slate-50/50 px-6 py-3 text-xs">
+          <span className="text-slate-500 font-medium">ISRO Chandrayaan-2 Cross-Match</span>
           <button
             onClick={onClose}
-            className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-1.5 text-xs text-slate-300 hover:bg-white/[0.08] transition"
+            className="rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] px-4 py-1.5 text-xs font-semibold text-white transition shadow-sm"
           >
-            Close ✕
+            Done
           </button>
         </div>
       </div>

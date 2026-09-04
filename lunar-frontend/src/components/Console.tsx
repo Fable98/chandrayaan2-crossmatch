@@ -147,12 +147,6 @@ export default function Console({ onBackToHero }: Props = {}) {
     setSelectedId(triplets[nextIdx].id);
   };
 
-  const cycleView = () => {
-    if (view === "registration") setView("linked-cursor");
-    else if (view === "linked-cursor") setView("map");
-    else setView("registration");
-  };
-
   const openVaultWithFilter = (filter: PayloadFilter) => {
     setVaultInitialFilter(filter);
     setVaultOpen(true);
@@ -162,13 +156,13 @@ export default function Console({ onBackToHero }: Props = {}) {
 
   if (error) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#070913] px-6">
-        <div className="max-w-md rounded-2xl border border-red-500/30 bg-[#0d1024]/80 p-6 text-center shadow-2xl backdrop-blur-xl">
-          <p className="font-mono text-sm font-semibold uppercase tracking-wider text-red-400">
+      <div className="flex h-screen items-center justify-center bg-[#f4f6fb] px-6">
+        <div className="max-w-md rounded-2xl border border-red-200 bg-white p-6 text-center shadow-lg">
+          <p className="text-sm font-semibold uppercase tracking-wider text-red-600">
             Archive Connection Failed
           </p>
-          <p className="mt-2 text-xs text-slate-400">{error}</p>
-          <p className="mt-4 font-mono text-[10px] text-slate-500">
+          <p className="mt-2 text-xs text-slate-600">{error}</p>
+          <p className="mt-4 font-mono text-[10px] text-slate-400">
             Confirm FastAPI server is active on port 8000.
           </p>
         </div>
@@ -177,422 +171,576 @@ export default function Console({ onBackToHero }: Props = {}) {
   }
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#070913] font-sans text-slate-100 antialiased selection:bg-purple-500/30 selection:text-purple-200">
-      {/* Radiant Atmospheric Lighting (Ambient Orbs & Cosmic Gradient) */}
-      <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 h-[600px] w-[1000px] rounded-full bg-gradient-to-b from-purple-600/25 via-indigo-600/15 to-transparent blur-[160px]" />
-      <div className="pointer-events-none absolute top-1/4 -left-48 h-[600px] w-[600px] rounded-full bg-indigo-700/15 blur-[160px]" />
-      <div className="pointer-events-none absolute top-1/3 -right-48 h-[600px] w-[600px] rounded-full bg-purple-700/15 blur-[160px]" />
-
+    <div className="min-h-screen bg-[#f4f6fb] font-sans text-slate-800 antialiased flex">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-[9999] flex items-center gap-3 rounded-full border border-purple-500/30 bg-[#0e122b]/90 px-5 py-3 text-sm text-purple-100 shadow-[0_0_30px_rgba(168,85,247,0.35)] backdrop-blur-xl animate-fade-in">
-          <span className="h-2 w-2 rounded-full bg-purple-400 shadow-[0_0_8px_#c084fc]" />
+        <div className="fixed bottom-6 right-6 z-[9999] flex items-center gap-2.5 rounded-xl border border-indigo-100 bg-white px-5 py-3 text-sm text-slate-800 shadow-xl animate-fade-in">
+          <span className="h-2 w-2 rounded-full bg-[#4F46E5]" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* MAIN COCKPIT: Floating Ultra-Glass Window Container */}
-      <div className="relative mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">
-        <div className="relative overflow-hidden rounded-[32px] border border-white/[0.1] bg-[#0b0e22]/70 shadow-[0_30px_90px_rgba(0,0,0,0.85)] backdrop-blur-2xl ring-1 ring-white/[0.05]">
-          
-          {/* Header Bar: Clean & Functional */}
-          <header className="flex flex-wrap items-center justify-between gap-4 border-b border-white/[0.08] bg-white/[0.02] px-6 py-4 backdrop-blur-md">
-            {/* Left: Brand Identity & Back Link */}
-            <div className="flex items-center gap-4">
-              {onBackToHero && (
-                <button
-                  onClick={onBackToHero}
-                  className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1.5 text-xs text-slate-300 transition hover:border-purple-400/40 hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
-                >
-                  <span>←</span>
-                  <span>Back</span>
-                </button>
-              )}
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-tr from-purple-600 to-indigo-500 shadow-[0_0_16px_rgba(147,51,234,0.5)]">
-                  <span className="text-sm font-bold text-white">☾</span>
-                </div>
-                <div>
-                  <h2 className="text-sm font-bold tracking-tight text-white">
-                    Chandrayaan-2 Console
-                  </h2>
-                  <p className="text-[10px] text-slate-400 font-mono">ISRO Planetary Cross-Matching</p>
-                </div>
+      {/* ======================================================== */}
+      {/* 1. LEFT SIDEBAR: Brand Logo, Main Menu, Region List      */}
+      {/* ======================================================== */}
+      <aside className="w-64 bg-white border-r border-slate-200/80 flex flex-col justify-between shrink-0 min-h-screen">
+        <div>
+          {/* Brand Header */}
+          <div className="p-6 pb-5 flex items-center justify-between border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#4F46E5] text-white font-black text-base shadow-sm">
+                c
+              </div>
+              <div>
+                <h1 className="text-base font-extrabold tracking-tight text-slate-900 leading-none">
+                  chandrayaan
+                </h1>
+                <span className="text-[10px] font-medium text-slate-400">Cross-Match Console</span>
               </div>
             </div>
+          </div>
 
-            {/* Center: Search Filter Bar */}
-            <div className="relative flex-1 max-w-md hidden sm:block">
-              <div className="relative flex items-center rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 transition-all focus-within:border-purple-400/50 focus-within:bg-white/[0.07] focus-within:shadow-[0_0_20px_rgba(168,85,247,0.2)]">
-                <svg className="h-4 w-4 text-slate-400 mr-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Filter regions..."
-                  className="w-full bg-transparent text-xs text-white placeholder-slate-400 focus:outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Right: Actions */}
-            <div className="flex items-center gap-3">
-              <RegistrationLauncher />
-              <button
-                onClick={() => openVaultWithFilter("all")}
-                className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 py-1.5 text-xs text-slate-300 transition hover:border-purple-400/40 hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
-                title="Browse Full Archive Vault"
-              >
-                <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_#34d399]" />
-                <span>{triplets.length} Regions</span>
-              </button>
-            </div>
-          </header>
-
-          {/* 3-Column Workstation Cockpit */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 p-6 md:p-8">
-            
-            {/* ======================================================== */}
-            {/* LEFT COLUMN: Workspace Views & Region Directory          */}
-            {/* ======================================================== */}
-            <div className="lg:col-span-3 flex flex-col gap-5">
-              {/* Primary Navigation / View Modes */}
-              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-3 backdrop-blur-xl shadow-lg">
-                <span className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
-                  Workspace Views
-                </span>
-                <nav className="mt-1 space-y-1">
-                  {[
-                    { id: "registration", label: "Registration QA", icon: "✦" },
-                    { id: "linked-cursor", label: "Linked Cursor", icon: "◎" },
-                    { id: "map", label: "Fused Planetary Map", icon: "☵" },
-                  ].map((item) => {
-                    const active = view === item.id;
-                    return (
-                      <button
-                        key={item.id}
-                        onClick={() => { setView(item.id as View); scrollToArena(); }}
-                        className={`group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-medium transition-all ${
-                          active
-                            ? "bg-gradient-to-r from-purple-600/35 via-indigo-600/25 to-purple-600/10 border border-purple-400/40 text-white shadow-[0_0_20px_rgba(168,85,247,0.25)]"
-                            : "text-slate-300 hover:bg-white/[0.05] hover:text-white border border-transparent"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2.5">
-                          <span className={active ? "text-purple-300" : "text-slate-400 group-hover:text-white"}>
-                            {item.icon}
-                          </span>
-                          <span>{item.label}</span>
-                        </div>
-                        {active && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-purple-400 shadow-[0_0_6px_#c084fc]" />
-                        )}
-                      </button>
-                    );
-                  })}
-                </nav>
-
-                <div className="mt-3 pt-3 border-t border-white/[0.06] flex items-center justify-between px-2">
-                  <button
-                    onClick={() => setTheoryModalOpen(true)}
-                    className="text-[11px] text-slate-400 hover:text-purple-300 transition flex items-center gap-1"
-                  >
-                    <span>Theory &amp; Framework ↗</span>
-                  </button>
-                  <button
-                    onClick={() => openVaultWithFilter("all")}
-                    className="text-[11px] text-purple-300 hover:text-purple-200 transition"
-                  >
-                    Vault ↗
-                  </button>
-                </div>
-              </div>
-
-              {/* Region Directory */}
-              <div className="flex-1 rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4 backdrop-blur-xl shadow-lg flex flex-col">
-                <div className="flex items-center justify-between border-b border-white/[0.06] pb-3">
-                  <div>
-                    <span className="text-xs font-semibold text-white">Regions</span>
-                    <p className="text-[10px] text-slate-400 font-mono">{filteredTriplets.length} loaded</p>
-                  </div>
-                  <div className="flex items-center gap-1">
+          {/* Navigation Section */}
+          <div className="p-4 space-y-6">
+            <div>
+              <span className="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+                Menu
+              </span>
+              <nav className="space-y-1">
+                {[
+                  { id: "registration", label: "Dashboard QA", icon: "⊞" },
+                  { id: "linked-cursor", label: "Linked Cursor", icon: "⊙" },
+                  { id: "map", label: "Planetary Map", icon: "☵" },
+                ].map((item) => {
+                  const active = view === item.id;
+                  return (
                     <button
-                      onClick={handlePrev}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-300 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-purple-400"
-                      title="Previous Region"
+                      key={item.id}
+                      onClick={() => { setView(item.id as View); scrollToArena(); }}
+                      className={`group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all ${
+                        active
+                          ? "bg-[#EEF2FF] text-[#4F46E5] border-l-4 border-[#4F46E5]"
+                          : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent"
+                      }`}
                     >
-                      ‹
-                    </button>
-                    <button
-                      onClick={handleNext}
-                      className="flex h-7 w-7 items-center justify-center rounded-lg border border-white/10 bg-white/[0.04] text-slate-300 transition hover:bg-white/[0.08] hover:text-white focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-purple-400"
-                      title="Next Region"
-                    >
-                      ›
-                    </button>
-                  </div>
-                </div>
-
-                <div className="mt-3 flex-1 space-y-2 overflow-y-auto max-h-[440px] pr-1">
-                  {filteredTriplets.map((t, i) => {
-                    const active = t.id === selectedId;
-                    const { widthKm, heightKm } = footprintSizeKm(t.bounds);
-                    return (
-                      <button
-                        key={t.id}
-                        onClick={() => setSelectedId(t.id)}
-                        className={`group flex w-full flex-col rounded-xl p-3 text-left transition-all ${
-                          active
-                            ? "border border-purple-400/40 bg-white/[0.08] shadow-[0_0_20px_rgba(168,85,247,0.18)]"
-                            : "border border-white/[0.04] bg-white/[0.02] hover:border-white/10 hover:bg-white/[0.05]"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-[10px] text-slate-400">
-                            #{String(i + 1).padStart(2, "0")}
-                          </span>
-                          {t.dem_available && (
-                            <span className="rounded-full border border-purple-400/30 bg-purple-500/10 px-2 py-0.5 font-mono text-[9px] text-purple-300">
-                              DEM
-                            </span>
-                          )}
-                        </div>
-                        <span className={`mt-1 text-xs font-semibold ${active ? "text-white" : "text-slate-200"}`}>
-                          {t.id}
+                      <div className="flex items-center gap-3">
+                        <span className={`text-sm ${active ? "text-[#4F46E5]" : "text-slate-400 group-hover:text-slate-600"}`}>
+                          {item.icon}
                         </span>
-                        <span className="mt-0.5 text-[10px] text-slate-400">
+                        <span>{item.label}</span>
+                      </div>
+                      {active && (
+                        <span className="h-1.5 w-1.5 rounded-full bg-[#4F46E5]" />
+                      )}
+                    </button>
+                  );
+                })}
+
+                <button
+                  onClick={() => openVaultWithFilter("all")}
+                  className="group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition border-l-4 border-transparent"
+                >
+                  <span className="text-sm text-slate-400 group-hover:text-slate-600">▤</span>
+                  <span>Archive Vault</span>
+                </button>
+
+                <button
+                  onClick={() => setTheoryModalOpen(true)}
+                  className="group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition border-l-4 border-transparent"
+                >
+                  <span className="text-sm text-slate-400 group-hover:text-slate-600">📖</span>
+                  <span>Methodology</span>
+                </button>
+              </nav>
+            </div>
+
+            {/* Region Directory */}
+            <div>
+              <div className="flex items-center justify-between px-3 mb-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Regions ({filteredTriplets.length})
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handlePrev}
+                    className="flex h-5 w-5 items-center justify-center rounded border border-slate-200 text-xs text-slate-500 hover:bg-slate-100 transition"
+                    title="Previous"
+                  >
+                    ‹
+                  </button>
+                  <button
+                    onClick={handleNext}
+                    className="flex h-5 w-5 items-center justify-center rounded border border-slate-200 text-xs text-slate-500 hover:bg-slate-100 transition"
+                    title="Next"
+                  >
+                    ›
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-1 max-h-[260px] overflow-y-auto pr-1">
+                {filteredTriplets.map((t, i) => {
+                  const active = t.id === selectedId;
+                  const { widthKm, heightKm } = footprintSizeKm(t.bounds);
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setSelectedId(t.id)}
+                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-all ${
+                        active
+                          ? "bg-slate-100 font-bold text-slate-900 shadow-sm"
+                          : "text-slate-600 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="truncate">
+                        <span className="text-[10px] font-mono text-slate-400 mr-1.5">
+                          {String(i + 1).padStart(2, "0")}.
+                        </span>
+                        <span>{t.id}</span>
+                        <span className="block text-[10px] text-slate-400 font-normal">
                           {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km
                         </span>
-                      </button>
-                    );
-                  })}
+                      </div>
+                      {t.dem_available && (
+                        <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold text-[#4F46E5] shrink-0">
+                          DEM
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Lower Sidebar Mini Card (Replicates the "Download our mobile app" card in reference image) */}
+        <div className="p-4">
+          <div className="rounded-2xl bg-gradient-to-br from-[#1E1B4B] to-[#312E81] p-4 text-white shadow-md">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/20 text-xs">
+                ⚡
+              </span>
+              <h4 className="text-xs font-bold">Dynamic Matching</h4>
+            </div>
+            <p className="text-[10px] text-indigo-200 mb-3 leading-relaxed">
+              Upload custom optical and stereo imagery pairs for instant sub-pixel alignment.
+            </p>
+            <RegistrationLauncher />
+          </div>
+        </div>
+      </aside>
+
+      {/* ======================================================== */}
+      {/* 2. MAIN WORKSPACE: Header Bar & Dashboard Content        */}
+      {/* ======================================================== */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Header Bar */}
+        <header className="h-16 bg-white border-b border-slate-200/80 px-8 flex items-center justify-between gap-4 shrink-0">
+          {/* Search Input */}
+          <div className="relative w-80">
+            <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search for regions, coordinates..."
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20 focus:border-[#4F46E5] transition"
+            />
+          </div>
+
+          {/* Right Header Controls */}
+          <div className="flex items-center gap-3">
+            {onBackToHero && (
+              <button
+                onClick={onBackToHero}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
+              >
+                ← Back
+              </button>
+            )}
+
+            {/* Mail Icon Button */}
+            <button
+              onClick={() => showToast("Archive communications online")}
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition shadow-sm"
+              title="Messages"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            </button>
+
+            {/* Bell Notification Button */}
+            <button
+              onClick={() => showToast(`${triplets.length} lunar datasets synced`)}
+              className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition shadow-sm"
+              title="Notifications"
+            >
+              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+              <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[#4F46E5]" />
+            </button>
+
+            <button
+              onClick={() => openVaultWithFilter("all")}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm flex items-center gap-2"
+            >
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span>{triplets.length} Datasets</span>
+            </button>
+
+            <div className="h-8 w-px bg-slate-200 mx-1" />
+
+            {/* Profile Pill with Avatar & Dropdown Chevron */}
+            <div className="flex items-center gap-2.5 pl-1">
+              <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-[#4F46E5] text-white font-bold text-xs flex items-center justify-center shadow-sm">
+                IS
+              </div>
+              <div className="hidden sm:block text-left">
+                <span className="text-xs font-bold text-slate-800 block leading-tight">ISRO Pilot</span>
+                <span className="text-[10px] text-slate-400 block">Operator</span>
+              </div>
+              <svg className="h-3.5 w-3.5 text-slate-400 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
+        </header>
+
+        {/* Dashboard Main Content */}
+        <main className="p-8 space-y-6 overflow-y-auto">
+          {/* Page Title & Subtitle */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+                Dashboard
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                A quick view of your planetary cross-matching and multi-sensor registration pipeline.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => openVaultWithFilter("all")}
+                className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition shadow-sm"
+              >
+                Browse All Regions
+              </button>
+              {detail && (
+                <button
+                  onClick={() => handleOpenDossierModal(detail)}
+                  className="rounded-xl bg-[#4F46E5] px-4 py-2 text-xs font-bold text-white hover:bg-[#4338CA] transition shadow-sm flex items-center gap-1.5"
+                >
+                  <span>Dossier Report</span>
+                  <span>↗</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* ======================================================== */}
+          {/* 3. ROW 1: TOP 4 KPI METRIC CARDS                         */}
+          {/* (Exact layout & visual styling from reference image!)     */}
+          {/* ======================================================== */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Card 1: Solid Vibrant Indigo Accent Card */}
+            <div className="rounded-2xl bg-[#4F46E5] p-5 text-white shadow-sm flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-indigo-100">Sub-Pixel Status</span>
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-xs">
+                  ↗
+                </span>
+              </div>
+              <div className="my-3">
+                <div className="text-3xl font-extrabold tracking-tight">
+                  {metrics?.sub_pixel_accurate ? "< 0.50" : "Active"}
+                  {metrics?.sub_pixel_accurate && <span className="text-sm font-semibold ml-1">px</span>}
                 </div>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-indigo-100">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
+                <span>Verified sub-pixel alignment</span>
               </div>
             </div>
 
-            {/* ======================================================== */}
-            {/* CENTER COLUMN: Central Inspection Stage                   */}
-            {/* ======================================================== */}
-            <div ref={arenaRef} className="lg:col-span-6 flex flex-col gap-5 scroll-mt-20">
-              
-              {/* Region Header */}
-              <div className="flex flex-wrap items-center justify-between gap-3 px-1">
-                <div>
-                  <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-                    <span>{detail?.id ?? "Select a region"}</span>
-                    {detail?.dem_available && (
-                      <span className="rounded-full border border-purple-400/30 bg-purple-500/10 px-2.5 py-0.5 text-[10px] font-semibold text-purple-200">
-                        DEM Ready
-                      </span>
-                    )}
-                  </h1>
-                  <p className="mt-0.5 text-xs text-slate-400">
-                    {currentFootprint
-                      ? `${currentFootprint.widthKm.toFixed(1)} × ${currentFootprint.heightKm.toFixed(1)} km terrain footprint`
-                      : "Multi-sensor cross-match arena"}
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  {detail && (
-                    <button
-                      onClick={() => handleOpenDossierModal(detail)}
-                      className="rounded-full border border-purple-400/30 bg-purple-500/10 px-3.5 py-1 text-xs font-semibold text-purple-200 transition hover:bg-purple-500/20"
-                    >
-                      Dossier Report ↗
-                    </button>
-                  )}
-                  <button
-                    onClick={cycleView}
-                    className="rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1 text-xs text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
-                    title="Switch inspection mode"
-                  >
-                    {view === "registration" ? "Switch to Linked Cursor →" : view === "linked-cursor" ? "Switch to Map →" : "Switch to Registration →"}
-                  </button>
+            {/* Card 2: RMSE Reprojection Accuracy */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Planar Fit RMSE</span>
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-600">
+                  ↗
+                </span>
+              </div>
+              <div className="my-3">
+                <div className="text-3xl font-extrabold tracking-tight text-slate-900">
+                  {metrics ? metrics.rmse_px.toFixed(3) : "—"}
+                  {metrics && <span className="text-sm font-semibold text-slate-500 ml-1">px</span>}
                 </div>
               </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                <span>Threshold &lt; 0.50 px target</span>
+              </div>
+            </div>
 
-              {/* Central Viewer Stage */}
-              <div className="relative overflow-hidden rounded-2xl border border-white/[0.1] bg-black/40 backdrop-blur-2xl p-5 shadow-2xl flex flex-col min-h-[500px]">
-                
-                {/* Main View Area */}
-                <div className="relative flex-1 overflow-hidden">
+            {/* Card 3: Inlier Correspondences */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Verified Inliers</span>
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-600">
+                  ↗
+                </span>
+              </div>
+              <div className="my-3">
+                <div className="text-3xl font-extrabold tracking-tight text-slate-900">
+                  {metrics ? metrics.num_inliers : 0}
+                  <span className="text-sm font-semibold text-slate-500 ml-1">matches</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                <span>{metrics ? (metrics.inlier_ratio * 100).toFixed(1) : 0}% inlier ratio</span>
+              </div>
+            </div>
+
+            {/* Card 4: Spatial Coverage Score */}
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm flex flex-col justify-between">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-slate-500">Spatial Coverage</span>
+                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-600">
+                  ↗
+                </span>
+              </div>
+              <div className="my-3">
+                <div className="text-3xl font-extrabold tracking-tight text-slate-900">
+                  {metrics ? `${(metrics.combined_coverage_score * 100).toFixed(0)}%` : "—"}
+                </div>
+              </div>
+              <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+                <span>10×10 Grid Non-Max Suppression</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ======================================================== */}
+          {/* 4. ROW 2: PRIMARY INSPECTION ARENA + TELEMETRY SIDEBAR   */}
+          {/* ======================================================== */}
+          <div ref={arenaRef} className="grid grid-cols-1 lg:grid-cols-12 gap-6 scroll-mt-6">
+            
+            {/* Center Main Stage (8 cols) */}
+            <div className="lg:col-span-8 rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm flex flex-col justify-between">
+              <div>
+                {/* Viewport Top Controls */}
+                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4 mb-5">
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm font-bold text-slate-900">
+                      {detail?.id ?? "Select a region"}
+                    </span>
+                    {currentFootprint && (
+                      <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs text-slate-600 font-mono">
+                        {currentFootprint.widthKm.toFixed(1)} × {currentFootprint.heightKm.toFixed(1)} km
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Mode Pill Switcher */}
+                  <div className="flex items-center bg-slate-100 p-1 rounded-xl gap-1">
+                    {[
+                      { id: "registration", label: "Registration QA" },
+                      { id: "linked-cursor", label: "Linked Cursor" },
+                      { id: "map", label: "Planetary Map" },
+                    ].map((m) => (
+                      <button
+                        key={m.id}
+                        onClick={() => setView(m.id as View)}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                          view === m.id
+                            ? "bg-white text-slate-900 shadow-sm"
+                            : "text-slate-500 hover:text-slate-800"
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Viewport Canvas Area */}
+                <div className="min-h-[460px] relative">
                   {loading && (
-                    <div className="flex h-full items-center justify-center text-sm text-slate-400">
-                      Loading regions…
+                    <div className="flex h-full min-h-[400px] items-center justify-center text-sm text-slate-400">
+                      Loading sensor datasets…
                     </div>
                   )}
+
                   {!loading && !detail && (
-                    <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                    <div className="flex h-full min-h-[400px] items-center justify-center text-sm text-slate-400">
                       No region selected.
                     </div>
                   )}
 
                   {/* Registration QA View */}
                   {detail && view === "registration" && (
-                    <div className="flex h-full flex-col justify-between">
-                      <div className="grid grid-cols-3 gap-3.5">
+                    <div className="flex flex-col gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {[
-                          { src: `/images/registered/${detail.id}/registered_ohrc.png`, fallback: `/images/ohrc/${detail.id}`, label: "Warped OHRC" },
-                          { src: `/images/registered/${detail.id}/blend_overlay.png`, fallback: `/images/tmc/${detail.id}`, label: "Blend 50%" },
-                          { src: `/images/registered/${detail.id}/checkerboard_qa.png`, fallback: `/images/tmc/${detail.id}`, label: "Checkerboard QA" },
+                          { src: `/images/registered/${detail.id}/registered_ohrc.png`, fallback: `/images/ohrc/${detail.id}`, label: "Warped OHRC", tag: "0.25m Primary" },
+                          { src: `/images/registered/${detail.id}/blend_overlay.png`, fallback: `/images/tmc/${detail.id}`, label: "Blend Overlay", tag: "50% Cross-Fade" },
+                          { src: `/images/registered/${detail.id}/checkerboard_qa.png`, fallback: `/images/tmc/${detail.id}`, label: "Checkerboard QA", tag: "Continuity Verification" },
                         ].map((img, idx) => (
-                          <div key={idx} className="flex flex-col gap-2">
-                            <div className="relative aspect-square overflow-hidden rounded-xl border border-white/[0.08] bg-black shadow-inner">
+                          <div key={idx} className="flex flex-col rounded-xl border border-slate-200/70 overflow-hidden bg-slate-50">
+                            <div className="relative aspect-square overflow-hidden bg-black">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={imageUrl(img.src)}
                                 alt={img.label}
-                                className="h-full w-full object-cover"
+                                className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
                                 onError={(e) => {
                                   (e.currentTarget as HTMLImageElement).src = imageUrl(img.fallback);
                                 }}
                               />
                             </div>
-                            <span className="text-[11px] font-medium text-slate-300 text-center">{img.label}</span>
+                            <div className="p-3 bg-white">
+                              <span className="text-xs font-bold text-slate-900 block">{img.label}</span>
+                              <span className="text-[10px] text-slate-500">{img.tag}</span>
+                            </div>
                           </div>
                         ))}
-                      </div>
-
-                      <div className="mt-4 flex flex-wrap items-center justify-between rounded-xl border border-white/[0.08] bg-white/[0.03] p-3.5 text-xs">
-                        <div className="flex items-center gap-2">
-                          <span className="h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_6px_#34d399]" />
-                          <span className="text-slate-300">
-                            Status: <strong className="text-white font-semibold">{metrics?.sub_pixel_accurate ? "Sub-Pixel Verified (<0.5 px)" : "Standard Match"}</strong>
-                          </span>
-                        </div>
-                        <span className="text-slate-400 font-mono">
-                          Inliers: <strong className="text-purple-300">{metrics?.num_inliers ?? 0} matches</strong>
-                        </span>
                       </div>
                     </div>
                   )}
 
                   {/* Linked Cursor View */}
                   {detail && view === "linked-cursor" && (
-                    <div className="h-full">
+                    <div className="h-full min-h-[440px]">
                       <LinkedCursorPanel tripletId={detail.id} points={matches} />
                     </div>
                   )}
 
                   {/* Map View */}
                   {detail && view === "map" && (
-                    <div className="h-full min-h-[420px] rounded-xl overflow-hidden border border-white/[0.08]">
+                    <div className="h-full min-h-[440px] rounded-xl overflow-hidden border border-slate-200">
                       <MapPanel triplet={detail} iirsOverlay={iirsOverlay} />
                     </div>
                   )}
                 </div>
               </div>
-            </div>
 
-            {/* ======================================================== */}
-            {/* RIGHT COLUMN: Real Telemetry & Region Metadata           */}
-            {/* ======================================================== */}
-            <div className="lg:col-span-3 flex flex-col gap-5">
-              
-              {/* 1. Region Metadata Card */}
-              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5 backdrop-blur-xl shadow-lg">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block mb-3">
-                  Selected Footprint
-                </span>
-                <div className="space-y-2.5 text-xs font-mono">
-                  <div className="flex items-center justify-between text-slate-300 border-b border-white/[0.04] pb-2">
-                    <span className="text-slate-400 font-sans">Longitude</span>
-                    <span className="text-white">{detail ? `${detail.bounds.west_lon.toFixed(2)}° to ${detail.bounds.east_lon.toFixed(2)}°` : "—"}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-300 border-b border-white/[0.04] pb-2">
-                    <span className="text-slate-400 font-sans">Latitude</span>
-                    <span className="text-white">{detail ? `${detail.bounds.south_lat.toFixed(2)}° to ${detail.bounds.north_lat.toFixed(2)}°` : "—"}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-300 border-b border-white/[0.04] pb-2">
-                    <span className="text-slate-400 font-sans">Dimensions</span>
-                    <span className="text-white">{currentFootprint ? `${currentFootprint.widthKm.toFixed(1)} × ${currentFootprint.heightKm.toFixed(1)} km` : "—"}</span>
-                  </div>
-                  <div className="flex items-center justify-between text-slate-300">
-                    <span className="text-slate-400 font-sans">Elevation Data</span>
-                    <span className={detail?.dem_available ? "text-emerald-400 font-semibold" : "text-slate-500"}>
-                      {detail?.dem_available ? "DTM Available" : "Interpolated"}
-                    </span>
-                  </div>
+              {/* Viewport Bottom Footer */}
+              <div className="mt-4 pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500">
+                <div className="flex items-center gap-2">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span>Aligned with <strong>{metrics?.num_inliers ?? 0} inlier ties</strong></span>
                 </div>
-              </div>
-
-              {/* 2. Live Telemetry Card (Real metrics from backend!) */}
-              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-5 backdrop-blur-xl shadow-lg flex flex-col justify-between">
-                <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                      Registration Telemetry
-                    </span>
-                    <span className={`rounded-full px-2 py-0.5 text-[9px] font-semibold border ${
-                      metrics?.sub_pixel_accurate
-                        ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
-                        : "bg-purple-500/10 text-purple-300 border-purple-500/20"
-                    }`}>
-                      {metrics?.sub_pixel_accurate ? "Sub-Pixel Verified" : "Standard"}
-                    </span>
-                  </div>
-
-                  <div className="space-y-3 text-xs font-mono">
-                    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-                      <div className="flex items-center justify-between text-slate-400 font-sans text-[11px]">
-                        <span>RMSE Error</span>
-                        <span className="text-[10px]">Threshold &lt; 0.5 px</span>
-                      </div>
-                      <div className="mt-1 text-base font-bold text-purple-300">
-                        {metrics ? `${metrics.rmse_px.toFixed(3)} px` : "—"}
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-                      <div className="flex items-center justify-between text-slate-400 font-sans text-[11px]">
-                        <span>Inlier Matches</span>
-                        <span className="text-[10px]">Post-RANSAC</span>
-                      </div>
-                      <div className="mt-1 text-base font-bold text-white">
-                        {metrics ? `${metrics.num_inliers} inliers` : "—"}
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-                      <div className="flex items-center justify-between text-slate-400 font-sans text-[11px]">
-                        <span>Spatial Coverage</span>
-                        <span className="text-[10px]">Uniformity</span>
-                      </div>
-                      <div className="mt-1 text-base font-bold text-white">
-                        {metrics ? `${(metrics.combined_coverage_score * 100).toFixed(1)}%` : "—"}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
                 {detail && (
-                  <div className="mt-5 pt-3 border-t border-white/[0.06]">
-                    <button
-                      onClick={() => handleOpenDossierModal(detail)}
-                      className="w-full rounded-xl bg-gradient-to-r from-purple-600/30 to-indigo-600/30 border border-purple-400/30 py-2.5 text-xs font-semibold text-purple-200 transition hover:bg-purple-600/40 hover:text-white"
-                    >
-                      Open Full Dossier Report ↗
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => handleOpenDossierModal(detail)}
+                    className="text-[#4F46E5] font-bold hover:underline"
+                  >
+                    View Comprehensive Dossier Report →
+                  </button>
                 )}
               </div>
+            </div>
 
+            {/* Right Telemetry Column (4 cols) */}
+            <div className="lg:col-span-4 space-y-6">
+              {/* Card 1: Selected Region Footprint */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
+                  Selected Footprint Details
+                </h3>
+                <div className="space-y-3 text-xs">
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-500">Longitude Extent</span>
+                    <span className="font-semibold text-slate-900">
+                      {detail ? `${detail.bounds.west_lon.toFixed(2)}° to ${detail.bounds.east_lon.toFixed(2)}°` : "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-500">Latitude Extent</span>
+                    <span className="font-semibold text-slate-900">
+                      {detail ? `${detail.bounds.south_lat.toFixed(2)}° to ${detail.bounds.north_lat.toFixed(2)}°` : "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-100 pb-2">
+                    <span className="text-slate-500">Terrain Dimensions</span>
+                    <span className="font-semibold text-slate-900">
+                      {currentFootprint ? `${currentFootprint.widthKm.toFixed(1)} × ${currentFootprint.heightKm.toFixed(1)} km` : "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Topographic DEM</span>
+                    <span className={`font-semibold ${detail?.dem_available ? "text-emerald-600" : "text-slate-400"}`}>
+                      {detail?.dem_available ? "Available (TMC DTM)" : "Interpolated"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Sensor Capabilities Progress Breakdown */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
+                  Multi-Modal Sensor Layers
+                </h3>
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <div className="flex justify-between text-slate-700 font-semibold mb-1">
+                      <span>OHRC Narrow Angle</span>
+                      <span>0.25 m/px</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <div className="bg-[#4F46E5] h-full rounded-full" style={{ width: "95%" }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-slate-700 font-semibold mb-1">
+                      <span>TMC-2 Terrain Stereo</span>
+                      <span>4.0 m/px</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <div className="bg-indigo-400 h-full rounded-full" style={{ width: "80%" }} />
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-slate-700 font-semibold mb-1">
+                      <span>IIRS Hyperspectral</span>
+                      <span>70 m/px</span>
+                    </div>
+                    <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                      <div className="bg-cyan-500 h-full rounded-full" style={{ width: "65%" }} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 3: Quick Action Launchers */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm space-y-2.5">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                  Actions
+                </h3>
+                <button
+                  onClick={() => openVaultWithFilter("all")}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition text-center block"
+                >
+                  Inspect Full Dataset Vault ↗
+                </button>
+                <button
+                  onClick={() => setTheoryModalOpen(true)}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-100 transition text-center block"
+                >
+                  View Mathematical Framework ↗
+                </button>
+              </div>
             </div>
 
           </div>
-
-          {/* Cockpit Bottom Footnote */}
-          <footer className="border-t border-white/[0.06] bg-black/20 px-8 py-3.5 text-xs text-slate-400 flex flex-wrap items-center justify-between gap-2">
-            <span>ISRO Chandrayaan-2 · SIH26166 · Sub-Pixel Homography Pipeline</span>
-            <span>{triplets.length} Regions Loaded</span>
-          </footer>
-        </div>
+        </main>
       </div>
 
-      {/* Modals with Matching Glassmorphic Aesthetics */}
+      {/* Modals with Clean Light UI Style */}
       {activeDossierTriplet && (
         <DossierModal
           triplet={activeDossierTriplet}

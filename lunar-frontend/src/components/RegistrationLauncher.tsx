@@ -104,21 +104,21 @@ export default function RegistrationLauncher() {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 px-4 py-1.5 text-xs font-semibold text-white shadow-[0_0_20px_rgba(168,85,247,0.35)] transition-all hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-purple-400"
+        className="w-full rounded-xl bg-white/20 hover:bg-white/30 text-white font-semibold text-xs py-2 px-3 transition-colors flex items-center justify-center gap-1.5 shadow-sm"
       >
         <span>+</span>
         <span>Live Registration</span>
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-2xl animate-fade-in">
-          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-3xl border border-white/15 bg-[#0c0e24]/90 p-6 md:p-8 text-white shadow-[0_30px_90px_rgba(0,0,0,0.9)] ring-1 ring-white/10">
-            <div className="mb-6 flex items-start justify-between gap-4 border-b border-white/10 pb-5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm animate-fade-in">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-slate-200/80 bg-white p-6 md:p-8 text-slate-800 shadow-2xl">
+            <div className="mb-6 flex items-start justify-between gap-4 border-b border-slate-100 pb-5">
               <div>
-                <h2 className="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+                <h2 className="text-lg font-bold tracking-tight text-slate-900 flex items-center gap-2">
                   <span>✦ Cross-Sensor Registration Pipeline</span>
                 </h2>
-                <p className="mt-1 text-xs text-slate-300">
+                <p className="mt-1 text-xs text-slate-500">
                   Upload arbitrary sensor images (OHRC, TMC-2, IIRS). Executes sub-pixel LoFTR matching,
                   phase-correlation refinement, and composite product generation.
                 </p>
@@ -126,7 +126,7 @@ export default function RegistrationLauncher() {
               <button
                 type="button"
                 onClick={() => setOpen(false)}
-                className="rounded-full border border-white/10 bg-white/[0.04] px-3.5 py-1 text-xs text-slate-300 transition hover:bg-white/[0.08] hover:text-white"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1 text-xs text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
               >
                 Close ✕
               </button>
@@ -135,8 +135,8 @@ export default function RegistrationLauncher() {
             {!result ? (
               <div className="space-y-5">
                 <div className="grid gap-4 md:grid-cols-2">
-                  <label className="block rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-all hover:border-purple-400/40 hover:bg-white/[0.05]">
-                    <span className="text-xs font-semibold text-purple-200 uppercase tracking-wider block">
+                  <label className="block rounded-xl border border-slate-200 bg-slate-50 p-5 transition-all hover:border-[#4F46E5]/40 hover:bg-slate-100/60 cursor-pointer">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
                       Source Image (Moving / OHRC)
                     </span>
                     <input
@@ -145,15 +145,15 @@ export default function RegistrationLauncher() {
                       onChange={(event) =>
                         setSourceFile(event.target.files?.[0] || null)
                       }
-                      className="mt-3 block w-full text-xs text-slate-300 file:mr-4 file:rounded-full file:border-0 file:bg-purple-600/30 file:px-4 file:py-1.5 file:text-xs file:font-semibold file:text-purple-200 hover:file:bg-purple-600/50 cursor-pointer"
+                      className="mt-3 block w-full text-xs text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-1.5 file:text-xs file:font-semibold file:text-[#4F46E5] hover:file:bg-indigo-100 cursor-pointer"
                     />
                     <span className="mt-2.5 block truncate text-[11px] text-slate-400">
                       {sourceFile ? sourceFile.name : "No source image selected"}
                     </span>
                   </label>
 
-                  <label className="block rounded-2xl border border-white/10 bg-white/[0.03] p-5 transition-all hover:border-purple-400/40 hover:bg-white/[0.05]">
-                    <span className="text-xs font-semibold text-purple-200 uppercase tracking-wider block">
+                  <label className="block rounded-xl border border-slate-200 bg-slate-50 p-5 transition-all hover:border-[#4F46E5]/40 hover:bg-slate-100/60 cursor-pointer">
+                    <span className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
                       Reference Image (Fixed / TMC-2)
                     </span>
                     <input
@@ -162,7 +162,7 @@ export default function RegistrationLauncher() {
                       onChange={(event) =>
                         setReferenceFile(event.target.files?.[0] || null)
                       }
-                      className="mt-3 block w-full text-xs text-slate-300 file:mr-4 file:rounded-full file:border-0 file:bg-purple-600/30 file:px-4 file:py-1.5 file:text-xs file:font-semibold file:text-purple-200 hover:file:bg-purple-600/50 cursor-pointer"
+                      className="mt-3 block w-full text-xs text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-indigo-50 file:px-4 file:py-1.5 file:text-xs file:font-semibold file:text-[#4F46E5] hover:file:bg-indigo-100 cursor-pointer"
                     />
                     <span className="mt-2.5 block truncate text-[11px] text-slate-400">
                       {referenceFile
@@ -176,7 +176,7 @@ export default function RegistrationLauncher() {
                   type="button"
                   onClick={runRegistration}
                   disabled={loading || !sourceFile || !referenceFile}
-                  className="w-full rounded-2xl bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-[0_0_30px_rgba(168,85,247,0.35)] transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-40"
+                  className="w-full rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-white shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {loading
                     ? "Executing Sub-Pixel Refinement & Homography..."
@@ -184,7 +184,7 @@ export default function RegistrationLauncher() {
                 </button>
 
                 {error && (
-                  <div className="rounded-2xl border border-red-500/30 bg-red-950/30 p-4 text-xs text-red-200">
+                  <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-xs text-red-700">
                     {error}
                   </div>
                 )}
@@ -192,55 +192,55 @@ export default function RegistrationLauncher() {
             ) : (
               <div className="space-y-5">
                 <div className="grid gap-3 grid-cols-2 md:grid-cols-5">
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400">RMSE</div>
-                    <div className="mt-1 text-lg font-bold text-purple-300">
+                    <div className="mt-1 text-lg font-bold text-[#4F46E5]">
                       {formatMetric(result.metrics?.rmse_px)} px
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Inliers</div>
-                    <div className="mt-1 text-lg font-bold text-white">
+                    <div className="mt-1 text-lg font-bold text-slate-900">
                       {result.metrics?.num_inliers ?? "-"}
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Inlier Ratio</div>
-                    <div className="mt-1 text-lg font-bold text-white">
+                    <div className="mt-1 text-lg font-bold text-slate-900">
                       {formatMetric(result.metrics?.inlier_ratio ? result.metrics.inlier_ratio * 100 : 0, 1)}%
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Uniformity</div>
-                    <div className="mt-1 text-lg font-bold text-white">
+                    <div className="mt-1 text-lg font-bold text-slate-900">
                       {formatMetric(result.metrics?.uniformity_score ? result.metrics.uniformity_score * 100 : 0, 1)}%
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <div className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Status</div>
-                    <div className="mt-1 text-base font-bold text-emerald-400">
+                    <div className="mt-1 text-base font-bold text-emerald-600">
                       {result.metrics?.sub_pixel_accurate ? "Verified (<1px)" : "Marginal"}
                     </div>
                   </div>
                 </div>
 
                 {visualUrl && (
-                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
                     <div className="mb-2.5 flex items-center justify-between">
-                      <span className="text-xs font-semibold uppercase tracking-wider text-purple-200">
+                      <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
                         Registered Composite Product (50px Checkerboard Blend)
                       </span>
-                      <span className="text-[11px] font-semibold text-emerald-400">Alignment Verified</span>
+                      <span className="text-[11px] font-bold text-emerald-600">Alignment Verified</span>
                     </div>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={visualUrl}
                       alt="Registered checkerboard product"
-                      className="w-full max-h-[450px] object-contain rounded-xl border border-white/10 bg-black"
+                      className="w-full max-h-[450px] object-contain rounded-xl border border-slate-100 bg-black"
                     />
                   </div>
                 )}
@@ -249,7 +249,7 @@ export default function RegistrationLauncher() {
                   <button
                     type="button"
                     onClick={() => setResult(null)}
-                    className="rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs font-semibold text-slate-200 transition hover:bg-white/[0.08]"
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
                   >
                     Register Another Pair
                   </button>
@@ -259,7 +259,7 @@ export default function RegistrationLauncher() {
                       href={warpedUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-full border border-purple-400/30 bg-purple-500/10 px-4 py-2 text-xs font-semibold text-purple-200 transition hover:bg-purple-500/25"
+                      className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-2 text-xs font-semibold text-[#4F46E5] transition hover:bg-indigo-100"
                     >
                       View Warped Source
                     </a>
@@ -270,7 +270,7 @@ export default function RegistrationLauncher() {
                       href={matchesUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-full border border-purple-400/30 bg-purple-500/10 px-4 py-2 text-xs font-semibold text-purple-200 transition hover:bg-purple-500/25"
+                      className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-2 text-xs font-semibold text-[#4F46E5] transition hover:bg-indigo-100"
                     >
                       Download Match JSON
                     </a>
