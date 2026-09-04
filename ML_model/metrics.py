@@ -57,6 +57,119 @@ def calculate_reprojection_errors(
     return errors
 
 
+def calculate_absolute_rmse_meters(
+    match_points: Any,
+    gsd: float | Tuple[float, float],
+    dem_data: Optional[np.ndarray] = None,
+) -> float:
+    """
+    Calculates Absolute Root Mean Square Error (RMSE) in real-world lunar topography meters.
+    
+    Projects pixel residuals into real-world lunar topography distances using Ground Sample
+    Distance (GSD) and local Digital Elevation Model (DEM) elevation variations.
+
+    Args:
+        match_points: Correspondences or residuals. Can be:
+            - List of dicts with 'source_x', 'source_y', 'target_x', 'target_y' (or image1_x/y, image2_x/y)
+            - Tuple/list (src_pts, dst_pts) where each is (N, 2)
+            - Tuple/list (src_pts, dst_pts, H) where src_pts is reprojected through H
+            - (N, 4) numpy array [x1, y1, x2, y2]
+            - (N, 2) numpy array of pixel residuals [dx, dy]
+            - (N,) numpy array of Euclidean pixel residual errors
+        gsd: Ground Sample Distance in meters per pixel (float or (gsd_x, gsd_y)).
+        dem_data: Optional (H, W) 2D array of DEM surface heights in meters.
+
+    Returns:
+        float: Absolute RMSE in meters.
+    """
+    if isinstance(gsd, (int, float)):
+        gsd_x = gsd_y = float(gsd)
+    else:
+        gsd_x, gsd_y = float(gsd[0]), float(gsd[1])
+
+    # 1. Parse match_points into pixel errors or coordinate pairs
+    pts1 = None
+    pts2 = None
+    errors_px = None
+
+    if isinstance(match_points, tuple) and len(match_points) == 3:
+        # (src_pts, dst_pts, H)
+        src, dst, H = match_points
+        pts1 = np.asarray(src, dtype=np.float64)
+        pts2 = np.asarray(dst, dtype=np.float64)
+        if H is not None:
+            errors_px = calculate_reprojection_errors(pts1, pts2, H)
+        else:
+            errors_px = np.linalg.norm(pts2 - pts1, axis=1)
+    elif isinstance(match_points, (tuple, list)) and len(match_points) == 2 and isinstance(match_points[0], (np.ndarray, list)):
+        # (src_pts, dst_pts)
+        pts1 = np.asarray(match_points[0], dtype=np.float64)
+        pts2 = np.asarray(match_points[1], dtype=np.float64)
+        if len(pts1) == 0:
+            return 0.0
+        errors_px = np.linalg.norm(pts2 - pts1, axis=1)
+    elif isinstance(match_points, list) and len(match_points) > 0 and isinstance(match_points[0], dict):
+        # List of match dicts
+        p1_list = []
+        p2_list = []
+        for m in match_points:
+            x1 = m.get("source_x", m.get("image1_x", m.get("x1", 0.0)))
+            y1 = m.get("source_y", m.get("image1_y", m.get("y1", 0.0)))
+            x2 = m.get("target_x", m.get("image2_x", m.get("x2", x1)))
+            y2 = m.get("target_y", m.get("image2_y", m.get("y2", y1)))
+            p1_list.append([x1, y1])
+            p2_list.append([x2, y2])
+        pts1 = np.asarray(p1_list, dtype=np.float64)
+        pts2 = np.asarray(p2_list, dtype=np.float64)
+        errors_px = np.linalg.norm(pts2 - pts1, axis=1)
+    elif isinstance(match_points, np.ndarray):
+        if match_points.ndim == 2 and match_points.shape[1] == 4:
+            pts1 = match_points[:, :2]
+            pts2 = match_points[:, 2:]
+            errors_px = np.linalg.norm(pts2 - pts1, axis=1)
+        elif match_points.ndim == 2 and match_points.shape[1] == 2:
+            # Already residuals [dx, dy]
+            errors_px = np.linalg.norm(match_points, axis=1)
+        elif match_points.ndim == 1:
+            # 1D array of pixel error magnitudes
+            errors_px = np.asarray(match_points, dtype=np.float64)
+        else:
+            return 0.0
+    else:
+        return 0.0
+
+    if errors_px is None or len(errors_px) == 0:
+        return 0.0
+
+    # 2. Compute planar squared errors in meters
+    if pts1 is not None and pts2 is not None and len(pts1) == len(pts2):
+        dx_m = (pts2[:, 0] - pts1[:, 0]) * gsd_x
+        dy_m = (pts2[:, 1] - pts1[:, 1]) * gsd_y
+        planar_sq = dx_m**2 + dy_m**2
+    else:
+        avg_gsd = (gsd_x + gsd_y) / 2.0
+        planar_sq = (errors_px * avg_gsd)**2
+
+    # 3. Topographic elevation correction if DEM is provided and non-empty
+    if dem_data is not None and pts1 is not None and pts2 is not None and dem_data.ndim == 2:
+        dh, dw = dem_data.shape[:2]
+        # Sample elevations with bilinear interpolation / bounds clamping
+        def sample_elev(pts: np.ndarray) -> np.ndarray:
+            x_clamped = np.clip(pts[:, 0], 0, dw - 1).astype(np.int32)
+            y_clamped = np.clip(pts[:, 1], 0, dh - 1).astype(np.int32)
+            return dem_data[y_clamped, x_clamped].astype(np.float64)
+
+        z1 = sample_elev(pts1)
+        z2 = sample_elev(pts2)
+        dz = z2 - z1
+        total_sq = planar_sq + dz**2
+    else:
+        total_sq = planar_sq
+
+    rmse_meters = float(np.sqrt(np.mean(total_sq)))
+    return round(rmse_meters, 4)
+
+
 # ---------------------------------------------------------------------------
 # 2. Fit RMSE vs. Held-Out Validation RMSE
 # ---------------------------------------------------------------------------
@@ -286,6 +399,8 @@ def compute_canonical_metrics(
     H: Optional[np.ndarray],
     image_shape: Tuple[int, int] = (512, 512),
     grid_size: int = 10,
+    gsd_m: Optional[float] = None,
+    dem_data: Optional[np.ndarray] = None,
 ) -> Dict[str, Any]:
     """
     Single canonical entry point to compute all registration metrics across the repository.
@@ -372,11 +487,17 @@ def compute_canonical_metrics(
     else:
         quality_tier = "LOW_CONFIDENCE"
 
+    # Absolute RMSE in meters
+    abs_rmse_m = None
+    if gsd_m is not None and inlier_count > 0:
+        abs_rmse_m = calculate_absolute_rmse_meters((inliers_src, inliers_dst, H), gsd_m, dem_data=dem_data)
+
     return {
         "match_count": raw_count,
         "inlier_count": inlier_count,
         "inlier_ratio": round(inlier_ratio, 4),
         "fit_rmse_px": round(fit_rmse, 4),
+        "absolute_rmse_m": abs_rmse_m,
         "validation_rmse_px": val_results["validation_rmse_px"],  # Kept for API backward compatibility
         "held_out_inlier_validation_rmse_px": val_results["validation_rmse_px"],
         "validation_median_error_px": val_results["validation_median_error_px"],

@@ -23,8 +23,14 @@ import cv2
 
 # Add project roots
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ML_model"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from matcher_cfog import match_images_cfog
-from metrics import compute_triplet_consistency
+from metrics import compute_triplet_consistency, calculate_absolute_rmse_meters
+
+try:
+    from data.ingestion.lro_basemap import fetch_lro_basemap
+except Exception:
+    fetch_lro_basemap = None
 
 
 def compose_homographies(h_ab: np.ndarray, h_bc: np.ndarray) -> np.ndarray:
@@ -113,6 +119,8 @@ def evaluate_triplet_consistency(
     sensor_a: str = "OHRC",
     sensor_b: str = "TMC-2",
     sensor_c: str = "IIRS",
+    lro_basemap: str | Path | None = None,
+    lro_bbox: Optional[Tuple[float, float, float, float]] = None,
 ) -> Dict[str, Any]:
     """
     Executes closed-loop triplet registration:
@@ -346,9 +354,65 @@ def evaluate_triplet_consistency(
                 "registered_raster": str(registered_path) if registered_path else None,
                 "registered_geotiff": str(tif_path) if tif_path else None,
                 "checkerboard_qa": str(checker_path) if checker_path else None,
-                "manifest": str(manifest_path),
             },
         }
+
+    # 4. External Reference Basemap Registration Stage (Master CH2 -> LRO Basemap)
+    res_basemap = None
+    lro_path_to_use = lro_basemap
+    if lro_path_to_use is None and fetch_lro_basemap is not None:
+        try:
+            bbox = lro_bbox or (-10.0, -9.0, 30.0, 31.0)
+            _, lro_meta = fetch_lro_basemap(bbox, out_dir=out_base / "LRO_BASEMAP_CACHE")
+            lro_path_to_use = lro_meta.get("image_path")
+        except Exception:
+            lro_path_to_use = None
+
+    if lro_path_to_use and Path(lro_path_to_use).exists():
+        try:
+            master_img = image_b_path if Path(image_b_path).exists() else image_a_path
+            master_sensor = sensor_b if Path(image_b_path).exists() else sensor_a
+            res_basemap = match_images_cfog(
+                master_img,
+                lro_path_to_use,
+                dem_path=dem_path,
+                output_dir=out_base / "LRO_BASEMAP",
+                source_sensor=master_sensor,
+                reference_sensor="LRO_WAC",
+            )
+        except Exception as e:
+            res_basemap = {"status": "failed", "message": str(e), "metrics": None}
+
+    # Extract required evaluation output metrics
+    intra_ch2_pixel_rmse = round(float(cycle_rmse), 4) if (not failed_legs and 'cycle_rmse' in locals() and cycle_rmse is not None) else None
+
+    basemap_pixel_rmse = None
+    abs_rmse_meters = None
+    if res_basemap and res_basemap.get("status") == "success" and res_basemap.get("metrics"):
+        basemap_pixel_rmse = res_basemap["metrics"].get("fit_rmse_px")
+        abs_rmse_meters = res_basemap["metrics"].get("absolute_rmse_m")
+
+    # If basemap registration was not run or failed, compute absolute RMSE for intra-CH2 using GSD and DEM
+    if abs_rmse_meters is None and intra_ch2_pixel_rmse is not None:
+        dem_arr = None
+        if dem_path and Path(dem_path).exists():
+            try:
+                dem_arr = cv2.imread(str(dem_path), cv2.IMREAD_UNCHANGED)
+            except Exception:
+                pass
+        abs_rmse_meters = calculate_absolute_rmse_meters(
+            intra_ch2_pixel_rmse, gsd=5.0, dem_data=dem_arr
+        )
+
+    evaluation_report["Intra-CH2 Pixel RMSE"] = intra_ch2_pixel_rmse
+    evaluation_report["Basemap Pixel RMSE"] = basemap_pixel_rmse
+    evaluation_report["Absolute RMSE (Meters)"] = abs_rmse_meters
+    evaluation_report["basemap_registration"] = {
+        "status": res_basemap.get("status") if res_basemap else "skipped",
+        "basemap_pixel_rmse": basemap_pixel_rmse,
+        "absolute_rmse_m": abs_rmse_meters,
+        "inlier_count": res_basemap.get("metrics", {}).get("inlier_count") if (res_basemap and res_basemap.get("metrics")) else 0,
+    }
 
     report_path = out_base / "triplet_consistency_report.json"
     with open(report_path, "w") as f:

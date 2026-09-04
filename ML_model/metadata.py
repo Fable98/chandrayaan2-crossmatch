@@ -47,6 +47,14 @@ class SensorMetadata:
             "provenance": self.provenance,
         }
 
+    @property
+    def emission_deg(self) -> Optional[float]:
+        return self.emission_angle_deg
+
+    @property
+    def azimuth_deg(self) -> Optional[float]:
+        return self.sun_azimuth_deg
+
 
 # Standard physical sensor specifications per Chandrayaan-2 mission documentation
 # Used only as fallback when product header or API parameters are unavailable

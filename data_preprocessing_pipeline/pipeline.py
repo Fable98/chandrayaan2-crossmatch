@@ -72,9 +72,13 @@ def load_raw_lunar_image(path: Path | str) -> Tuple[np.ndarray, Dict[str, Any]]:
         import rasterio
         with rasterio.open(str(p)) as src:
             if src.count > 3:
-                # Hyperspectral cube: average bands into 1-channel pseudo-panchromatic
+                # Hyperspectral cube: extract structural PC1 + band ratios
                 bands = src.read().astype(np.float32)
-                arr = np.mean(bands, axis=0)
+                try:
+                    from spectral import enhance_iirs_structural_features
+                    arr = enhance_iirs_structural_features(bands)
+                except Exception:
+                    arr = np.mean(bands, axis=0)
             elif src.count >= 3:
                 rgb = np.dstack([src.read(i) for i in (1, 2, 3)]).astype(np.float32)
                 arr = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
@@ -102,7 +106,11 @@ def load_raw_lunar_image(path: Path | str) -> Tuple[np.ndarray, Dict[str, Any]]:
         raise ValueError(f"Could not read image file: {p}")
 
     if raw.ndim == 3 and raw.shape[2] > 3:
-        arr = np.mean(raw.astype(np.float32), axis=2)
+        try:
+            from spectral import enhance_iirs_structural_features
+            arr = enhance_iirs_structural_features(raw)
+        except Exception:
+            arr = np.mean(raw.astype(np.float32), axis=2)
     elif raw.ndim == 3 and raw.shape[2] == 3:
         arr = cv2.cvtColor(raw, cv2.COLOR_BGR2GRAY).astype(np.float32)
     else:
@@ -144,18 +152,29 @@ def apply_dem_relief_compensation(
         dem_res = dem.astype(np.float32)
 
     dem_rel = (dem_res - float(np.mean(dem_res))).astype(np.float32)
-    e_rad = np.radians(emission_deg)
-    psi_rad = np.radians(azimuth_deg)
-
-    scale = float(np.tan(e_rad) / max(gsd_m, 1e-3))
-    dx = (dem_rel * (scale * np.cos(psi_rad))).astype(np.float32)
-    dy = (dem_rel * (scale * np.sin(psi_rad))).astype(np.float32)
-
-    x_coords, y_coords = np.meshgrid(
-        np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32)
-    )
-    map_x = (x_coords + dx).astype(np.float32)
-    map_y = (y_coords + dy).astype(np.float32)
+    
+    # Rigorous ray-intersection
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ML_model"))
+        from geometry import dem_ray_intersection
+        grid_x, grid_y = np.meshgrid(np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32))
+        pts = np.column_stack([grid_x.ravel(), grid_y.ravel()])
+        _, relief_dxdy = dem_ray_intersection(
+            pts, dem_res, emission_deg=emission_deg, azimuth_deg=azimuth_deg, gsd_m=gsd_m
+        )
+        map_x = (grid_x + relief_dxdy[:, 0].reshape(h, w)).astype(np.float32)
+        map_y = (grid_y + relief_dxdy[:, 1].reshape(h, w)).astype(np.float32)
+    except Exception:
+        e_rad = np.radians(emission_deg)
+        psi_rad = np.radians(azimuth_deg)
+        scale = float(np.tan(e_rad) / max(gsd_m, 1e-3))
+        dx = (dem_rel * (scale * np.cos(psi_rad))).astype(np.float32)
+        dy = (dem_rel * (scale * np.sin(psi_rad))).astype(np.float32)
+        x_coords, y_coords = np.meshgrid(
+            np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32)
+        )
+        map_x = (x_coords + dx).astype(np.float32)
+        map_y = (y_coords + dy).astype(np.float32)
 
     compensated = cv2.remap(
         image,

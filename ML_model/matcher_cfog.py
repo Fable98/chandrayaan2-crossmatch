@@ -25,6 +25,8 @@ import cv2
 
 from metadata import extract_sensor_metadata, SensorMetadata
 from metrics import compute_canonical_metrics, verify_transformation_quality, calculate_reprojection_errors
+from geometry import warp_piecewise_affine, warp_thin_plate_splines, dem_ray_intersection, ransac_dem_aware_fit
+from spectral import enhance_iirs_structural_features, quantify_iirs_residuals
 
 
 # ---------------------------------------------------------------------------
@@ -50,9 +52,9 @@ def load_as_float_and_color(path: str | Path) -> Tuple[np.ndarray, np.ndarray, D
             raster_meta["count"] = src.count
 
             if src.count > 3:
-                # Hyperspectral cube (e.g. IIRS): Average spectral bands for structural representation
+                # Hyperspectral cube (e.g. IIRS): Spectral feature engineering (PC1 + band ratio)
                 bands = src.read().astype(np.float32)
-                gray = np.nanmean(bands, axis=0)
+                gray = enhance_iirs_structural_features(bands)
             elif src.count >= 3:
                 rgb = np.dstack([src.read(i) for i in (1, 2, 3)]).astype(np.float32)
                 gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
@@ -77,7 +79,7 @@ def load_as_float_and_color(path: str | Path) -> Tuple[np.ndarray, np.ndarray, D
         raise ValueError(f"Could not read image: {path_str}")
 
     if raw.ndim == 3 and raw.shape[2] > 3:
-        gray = np.mean(raw.astype(np.float32), axis=2)
+        gray = enhance_iirs_structural_features(raw)
         color = raw[:, :, :3].copy()
     elif raw.ndim == 3 and raw.shape[2] == 3:
         gray = cv2.cvtColor(raw, cv2.COLOR_BGR2GRAY).astype(np.float32)
@@ -336,6 +338,68 @@ def detect_blob_centroids(image: np.ndarray, min_area: int = 3) -> np.ndarray:
     return np.asarray(found, dtype=np.float32).reshape(-1, 2)
 
 
+def apply_grid_nms(
+    matches: List[Dict[str, Any]] | np.ndarray,
+    image_shape: Tuple[int, int] = (512, 512),
+    grid_dims: Tuple[int, int] = (10, 10),
+    max_per_cell: int = 4,
+) -> List[Dict[str, Any]] | np.ndarray:
+    """
+    Applies Grid-based Non-Maximum Suppression (Grid NMS) to candidate correspondences.
+    
+    Divides the image area into grid_dims[0] x grid_dims[1] cells (e.g. 10x10).
+    Enforces a strict cap of at most max_per_cell best matches per cell (sorted by confidence/score).
+    Guarantees uniform spatial distribution across the entire scene and prevents
+    clustering exclusively on prominent crater rims.
+    """
+    if matches is None or len(matches) == 0:
+        return matches
+
+    is_dict_list = isinstance(matches, list) and len(matches) > 0 and isinstance(matches[0], dict)
+    h, w = image_shape[:2]
+    gw, gh = grid_dims
+    cell_w = max(1.0, float(w) / float(gw))
+    cell_h = max(1.0, float(h) / float(gh))
+
+    grid_bins: Dict[Tuple[int, int], List[Any]] = {}
+
+    if is_dict_list:
+        for m in matches:
+            x = float(m.get("work_x1", m.get("source_x", m.get("image1_x", 0.0))))
+            y = float(m.get("work_y1", m.get("source_y", m.get("image1_y", 0.0))))
+            gx = min(gw - 1, max(0, int(x / cell_w)))
+            gy = min(gh - 1, max(0, int(y / cell_h)))
+            grid_bins.setdefault((gx, gy), []).append(m)
+
+        selected = []
+        for cell_key, items in grid_bins.items():
+            sorted_items = sorted(
+                items,
+                key=lambda it: float(it.get("score", it.get("confidence", 1.0))),
+                reverse=True,
+            )
+            selected.extend(sorted_items[:max_per_cell])
+        return selected
+    else:
+        # Array of points or pairs
+        arr = np.asarray(matches)
+        for i in range(len(arr)):
+            pt = arr[i]
+            x = float(pt[0])
+            y = float(pt[1])
+            gx = min(gw - 1, max(0, int(x / cell_w)))
+            gy = min(gh - 1, max(0, int(y / cell_h)))
+            grid_bins.setdefault((gx, gy), []).append((i, pt))
+
+        selected_indices = []
+        for cell_key, items in grid_bins.items():
+            # Keep at most max_per_cell
+            for idx, _ in items[:max_per_cell]:
+                selected_indices.append(idx)
+        selected_indices.sort()
+        return arr[selected_indices]
+
+
 def verify_spatial_quality_gate(
     inlier_cells: List[Tuple[int, int]],
     min_distinct_cells: int = 3,
@@ -560,6 +624,15 @@ def match_images_cfog(
     raw1_gray, raw1_color, raster_meta1 = load_as_float_and_color(img_path1)
     raw2_gray, raw2_color, raster_meta2 = load_as_float_and_color(img_path2)
 
+    dem_arr = None
+    if dem_path and Path(dem_path).exists():
+        try:
+            raw_dem = cv2.imread(str(dem_path), cv2.IMREAD_UNCHANGED)
+            if raw_dem is not None:
+                dem_arr = raw_dem.astype(np.float32)
+        except Exception:
+            dem_arr = None
+
     orig_h1, orig_w1 = raw1_gray.shape[:2]
     orig_h2, orig_w2 = raw2_gray.shape[:2]
 
@@ -772,7 +845,8 @@ def match_images_cfog(
             }
 
         metrics = compute_canonical_metrics(
-            pts1_arr, pts2_arr, inlier_mask_arr, H_ab, (orig_h2, orig_w2), grid_size
+            pts1_arr, pts2_arr, inlier_mask_arr, H_ab, (orig_h2, orig_w2), grid_size,
+            gsd_m=working_gsd, dem_data=dem_arr
         )
         metrics["direction"] = "inverted_from_BA"
         metrics["measured_direction"] = f"{meta2.sensor} -> {meta1.sensor}"
@@ -806,9 +880,15 @@ def match_images_cfog(
                 "outputs": {},
             }
 
-        warped_source = cv2.warpPerspective(
-            raw1_color, H_ab, (orig_w2, orig_h2), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0)
-        )
+        if len(pts1_arr) >= 4:
+            warped_source = warp_piecewise_affine(
+                raw1_color, pts1_arr, pts2_arr, (orig_h2, orig_w2),
+                tile_size=256, global_H=H_ab
+            )
+        else:
+            warped_source = cv2.warpPerspective(
+                raw1_color, H_ab, (orig_w2, orig_h2), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0)
+            )
 
         tif_path = out_path / "registered_source.tif"
         written_tif = False
@@ -1136,6 +1216,14 @@ def match_images_cfog(
         "mandatory_fill_count": mandatory_fill_count,
     }
 
+    # Enforce Spatial Uniformity via Grid-based Non-Maximum Suppression (Grid NMS)
+    selected_matches = apply_grid_nms(
+        selected_matches,
+        image_shape=(work_h1, work_w1),
+        grid_dims=(grid_size, grid_size),
+        max_per_cell=max_matches_per_cell,
+    )
+
     # QUALITY GATE 1: Insufficient Genuine Matches
     # ZERO FAKE CORRESPONDENCES ALLOWED. Fail cleanly if real matches < 4.
     if len(selected_matches) < 4:
@@ -1215,9 +1303,17 @@ def match_images_cfog(
     pts2_arr = np.array(native_pts2, dtype=np.float32)
 
     # 8. Robust Geometric Estimation (RANSAC)
-    H_final, inlier_mask = cv2.findHomography(
-        pts1_arr, pts2_arr, cv2.RANSAC, ransacReprojThreshold=5.0
-    )
+    em1 = meta1.emission_deg if meta1.emission_deg is not None else 0.0
+    az1 = meta1.azimuth_deg if meta1.azimuth_deg is not None else 0.0
+    if dem_arr is not None and abs(em1) > 1e-2:
+        H_final, inlier_mask, _ = ransac_dem_aware_fit(
+            pts1_arr, pts2_arr, dem=dem_arr, emission_deg=em1,
+            azimuth_deg=az1, gsd_m=working_gsd
+        )
+    else:
+        H_final, inlier_mask = cv2.findHomography(
+            pts1_arr, pts2_arr, cv2.RANSAC, ransacReprojThreshold=5.0
+        )
 
     if H_final is not None and inlier_mask is not None and np.sum(inlier_mask) >= 4:
         try:
@@ -1378,7 +1474,8 @@ def match_images_cfog(
 
     # 9. Compute Canonical Master Metrics
     metrics = compute_canonical_metrics(
-        pts1_arr, pts2_arr, inlier_mask, H_final, (orig_h2, orig_w2), grid_size
+        pts1_arr, pts2_arr, inlier_mask, H_final, (orig_h2, orig_w2), grid_size,
+        gsd_m=working_gsd, dem_data=dem_arr
     )
     if lk_stats:
         metrics["lk_refinement"] = lk_stats
@@ -1404,10 +1501,17 @@ def match_images_cfog(
         }
 
     # 10. Generate Output Products
-    # A. Warped source image into reference space
-    warped_source = cv2.warpPerspective(
-        raw1_color, H_final, (orig_w2, orig_h2), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0)
-    )
+    # A. Warped source image into reference space via Piecewise Affine / TPS
+    curr_inliers = np.where(inlier_mask.ravel() == 1)[0] if inlier_mask is not None else []
+    if len(curr_inliers) >= 4:
+        warped_source = warp_piecewise_affine(
+            raw1_color, pts1_arr[curr_inliers], pts2_arr[curr_inliers],
+            (orig_h2, orig_w2), tile_size=256, global_H=H_final
+        )
+    else:
+        warped_source = cv2.warpPerspective(
+            raw1_color, H_final, (orig_w2, orig_h2), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0)
+        )
 
     # B. Export Registered GeoTIFF Raster
     tif_path = out_path / "registered_source.tif"
