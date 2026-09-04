@@ -1,0 +1,7 @@
+{
+  "python.analysis.extraPaths": [
+    "${workspaceFolder}/ML_model",
+    "${workspaceFolder}",
+    "${workspaceFolder}/data_preprocessing_pipeline"
+  ]
+}
