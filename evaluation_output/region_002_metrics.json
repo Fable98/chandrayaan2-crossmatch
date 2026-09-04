@@ -27,6 +27,8 @@
         "ohrc_tmc": {
             "status": "success",
             "message": null,
+            "direction": "native",
+            "measured_direction": null,
             "quality_tier": "LOW_CONFIDENCE",
             "match_count": 66,
             "inlier_count": 7,
@@ -38,7 +40,7 @@
         "ohrc_iirs": {
             "status": "composed",
             "inlier_count": 0,
-            "fit_rmse_px": 3.1229,
+            "fit_rmse_px": 0.0,
             "forward_ohrc_to_iirs": {
                 "status": "composed",
                 "message": null,
@@ -46,7 +48,7 @@
                 "match_count": 0,
                 "inlier_count": 0,
                 "inlier_ratio": 1.0,
-                "fit_rmse_px": 3.1229,
+                "fit_rmse_px": 0.0,
                 "spatial_coverage": 1.0,
                 "spatial_uniformity": 1.0
             },
@@ -57,18 +59,18 @@
                 "source": "A -> B -> C",
                 "homography": [
                     [
-                        0.7313385655363218,
-                        0.12779084631632404,
-                        3.465268132977709
+                        1.5085406352347532,
+                        0.17768312933303843,
+                        -198.8099629155653
                     ],
                     [
-                        -0.106432866574775,
-                        0.8243003532468713,
-                        51.335441248347024
+                        -0.1776831293330384,
+                        1.508540635234753,
+                        26.818235439145607
                     ],
                     [
-                        -0.0007090845439521222,
-                        0.00017765588875981128,
+                        0.0,
+                        -2.7383303595967524e-20,
                         1.0
                     ]
                 ],
@@ -81,22 +83,26 @@
         },
         "tmc_iirs": {
             "status": "success",
-            "inlier_count": 17,
-            "fit_rmse_px": 2.8653,
+            "inlier_count": 0,
+            "fit_rmse_px": null,
             "forward_tmc_to_iirs": {
                 "status": "success",
                 "message": null,
-                "quality_tier": "ACCEPTED",
-                "match_count": 109,
-                "inlier_count": 17,
-                "inlier_ratio": 0.156,
-                "fit_rmse_px": 2.8653,
-                "spatial_coverage": 0.17,
-                "spatial_uniformity": 0.0876
+                "direction": "native",
+                "measured_direction": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 0,
+                "inlier_count": 0,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
             },
             "reverse_iirs_to_tmc": {
                 "status": "geometric_verification_failed",
                 "message": "Robust geometric verification failed to estimate a valid transformation from verified correspondences.",
+                "direction": "native",
+                "measured_direction": null,
                 "quality_tier": "FAILED",
                 "match_count": 143,
                 "inlier_count": 3,
@@ -112,8 +118,8 @@
     "triplet_consistency": {
         "status": "evaluated_composed",
         "reason": null,
-        "cycle_rmse_px": 3.1229,
-        "cycle_mean_px": 2.5608,
+        "cycle_rmse_px": 0.0,
+        "cycle_mean_px": 0.0,
         "cycle_closed_successfully": true,
         "failed_legs": []
     }

@@ -27,6 +27,8 @@
         "ohrc_tmc": {
             "status": "success",
             "message": null,
+            "direction": "native",
+            "measured_direction": null,
             "quality_tier": "LOW_CONFIDENCE",
             "match_count": 90,
             "inlier_count": 6,
@@ -41,7 +43,7 @@
             "fit_rmse_px": null,
             "forward_ohrc_to_iirs": {
                 "status": "composition_not_computable",
-                "message": "Missing verified homography for leg(s): BC (B -> C)",
+                "message": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
                 "quality_tier": "FAILED",
                 "match_count": 0,
                 "inlier_count": 0,
@@ -62,6 +64,8 @@
             "forward_tmc_to_iirs": {
                 "status": "failed",
                 "message": null,
+                "direction": "native",
+                "measured_direction": null,
                 "quality_tier": "FAILED",
                 "match_count": 0,
                 "inlier_count": 0,
@@ -73,6 +77,8 @@
             "reverse_iirs_to_tmc": {
                 "status": "geometric_verification_failed",
                 "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "direction": "native",
+                "measured_direction": null,
                 "quality_tier": "FAILED",
                 "match_count": 115,
                 "inlier_count": 8,
@@ -86,13 +92,14 @@
         }
     },
     "triplet_consistency": {
-        "status": "composition_not_computable",
-        "reason": "Missing verified homography for leg(s): BC (B -> C)",
+        "status": "cycle_not_computable",
+        "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
         "cycle_rmse_px": null,
         "cycle_mean_px": null,
         "cycle_closed_successfully": false,
         "failed_legs": [
-            "BC (B -> C)"
+            "BC (B -> C)",
+            "CA (C -> A)"
         ]
     }
 }

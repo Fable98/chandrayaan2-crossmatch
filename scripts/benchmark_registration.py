@@ -37,6 +37,8 @@ def _summarize_pair_result(reg_result: Optional[Dict[str, Any]]) -> Optional[Dic
     return {
         "status": status,
         "message": reg_result.get("message") if status != "success" else None,
+        "direction": reg_result.get("direction", "native"),
+        "measured_direction": reg_result.get("measured_direction"),
         "quality_tier": metrics.get("quality_tier", "FAILED" if status != "success" else "LOW_CONFIDENCE"),
         "match_count": metrics.get("match_count", reg_result.get("match_count", 0)),
         "inlier_count": metrics.get("inlier_count", reg_result.get("inlier_count", 0)),

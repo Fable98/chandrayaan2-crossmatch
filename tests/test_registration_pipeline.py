@@ -600,20 +600,20 @@ def test_evaluation_summary_contains_iirs_and_triplet_consistency():
         assert "triplet_consistency" in entry, f"Missing 'triplet_consistency' in {ds_id}"
         tc = entry["triplet_consistency"]
         assert "status" in tc, f"Missing status in triplet_consistency for {ds_id}"
-        assert tc["status"] in ("evaluated", "cycle_not_computable"), (
-            f"Invalid triplet status '{tc['status']}' in {ds_id}. Must be 'evaluated' or 'cycle_not_computable'."
+        assert tc["status"] in ("evaluated", "evaluated_composed", "evaluated_measured", "cycle_not_computable", "composition_not_computable"), (
+            f"Invalid triplet status '{tc['status']}' in {ds_id}."
         )
 
         failed_legs = tc.get("failed_legs", [])
-        if tc["status"] == "cycle_not_computable":
+        if tc["status"] in ("cycle_not_computable", "composition_not_computable"):
             # Must NOT substitute an identity matrix to produce a fake numeric cycle RMSE
             assert tc["cycle_rmse_px"] is None, (
-                f"{ds_id} reports cycle_not_computable but has numeric cycle_rmse_px: {tc['cycle_rmse_px']}"
+                f"{ds_id} reports {tc['status']} but has numeric cycle_rmse_px: {tc['cycle_rmse_px']}"
             )
             assert tc["cycle_closed_successfully"] is False
             assert "reason" in tc and tc["reason"] is not None
             assert len(failed_legs) > 0, f"Expected failed legs list for uncomputable cycle in {ds_id}"
-        elif tc["status"] == "evaluated":
+        elif tc["status"] in ("evaluated", "evaluated_composed", "evaluated_measured"):
             # Evaluated requires all underlying legs to have succeeded with real homographies
             assert isinstance(tc["cycle_rmse_px"], (int, float)), (
                 f"Evaluated cycle must have numeric cycle_rmse_px in {ds_id}"

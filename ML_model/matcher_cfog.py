@@ -16,6 +16,7 @@ from __future__ import annotations
 import os
 import json
 import math
+import shutil
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any, List
 
@@ -23,7 +24,7 @@ import numpy as np
 import cv2
 
 from metadata import extract_sensor_metadata, SensorMetadata
-from metrics import compute_canonical_metrics, verify_transformation_quality
+from metrics import compute_canonical_metrics, verify_transformation_quality, calculate_reprojection_errors
 
 
 # ---------------------------------------------------------------------------
@@ -389,24 +390,24 @@ def verify_spatial_quality_gate(
 
 
 def refine_inliers_lucas_kanade(
-    work_gray1: np.ndarray,
-    work_gray2: np.ndarray,
+    work_feat1: np.ndarray,
+    work_feat2: np.ndarray,
     inlier_src: np.ndarray,
     inlier_dst: np.ndarray,
     scale_factor1: float,
     scale_factor2: float,
-    win_size: int = 21,
+    win_size: int = 15,
     max_shift_px: float = 3.0,
     fb_threshold: float = 0.5,
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
     """
     Post-RANSAC Lucas-Kanade optical flow refinement for sub-pixel accuracy.
     Refines each inlier match position via iterative LK optical flow with
-    forward-backward consistency verification.
+    forward-backward consistency verification on structural feature maps.
 
     Args:
-        work_gray1: Working-scale source grayscale image [0, 1].
-        work_gray2: Working-scale reference grayscale image [0, 1].
+        work_feat1: Working-scale source structural feature map (e.g. Phase Congruency) [0, 1].
+        work_feat2: Working-scale reference structural feature map [0, 1].
         inlier_src: (N, 2) native-space source points.
         inlier_dst: (N, 2) native-space destination points.
         scale_factor1: Conversion from native px to working px for source.
@@ -422,67 +423,97 @@ def refine_inliers_lucas_kanade(
     if n == 0:
         return inlier_src.copy(), inlier_dst.copy(), {"refined_count": 0, "total": 0}
 
-    # Convert to uint8 for LK
-    img1_u8 = (np.clip(work_gray1, 0.0, 1.0) * 255.0).astype(np.uint8)
-    img2_u8 = (np.clip(work_gray2, 0.0, 1.0) * 255.0).astype(np.uint8)
+    # Convert normalized structural feature representations to uint8 for OpenCV LK
+    img1_u8 = (np.clip(work_feat1, 0.0, 1.0) * 255.0).astype(np.uint8)
+    img2_u8 = (np.clip(work_feat2, 0.0, 1.0) * 255.0).astype(np.uint8)
 
     # Map native-space dst points into working-scale space
     work_dst = inlier_dst.copy()
     work_dst[:, 0] /= scale_factor2
     work_dst[:, 1] /= scale_factor2
-
     pts_fwd = work_dst.reshape(-1, 1, 2).astype(np.float32)
 
-    lk_params = dict(
-        winSize=(win_size, win_size),
-        maxLevel=3,
-        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01),
-    )
-
-    # Forward flow: img2 predicted -> img2 refined
-    # Actually we refine dst positions by flowing from img1 to img2
     work_src_pts = inlier_src.copy()
     work_src_pts[:, 0] /= scale_factor1
     work_src_pts[:, 1] /= scale_factor1
     pts_src_lk = work_src_pts.reshape(-1, 1, 2).astype(np.float32)
 
-    # Forward: source -> target
-    refined_fwd, status_fwd, _ = cv2.calcOpticalFlowPyrLK(
-        img1_u8, img2_u8, pts_src_lk, pts_fwd, **lk_params
+    # CRITICAL: Preserve copies of initial target and source points before LK
+    # because cv2.calcOpticalFlowPyrLK mutates the nextPts array in place!
+    initial_target = pts_fwd.copy()
+    initial_source = pts_src_lk.copy()
+
+    lk_params = dict(
+        winSize=(win_size, win_size),
+        maxLevel=0,  # Pure native-resolution sub-pixel refinement around initial flow guess
+        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01),
+        flags=cv2.OPTFLOW_USE_INITIAL_FLOW,  # Track starting from coarse match position
     )
-    # Backward: refined target -> source (for consistency check)
+
+    # Forward: source -> target starting from initial coarse match position
+    fwd_guess = pts_fwd.copy()
+    refined_fwd, status_fwd, _ = cv2.calcOpticalFlowPyrLK(
+        img1_u8, img2_u8, pts_src_lk, fwd_guess, **lk_params
+    )
+
+    # Backward: refined target -> source starting from initial source position
+    bwd_guess = pts_src_lk.copy()
     refined_bwd, status_bwd, _ = cv2.calcOpticalFlowPyrLK(
-        img2_u8, img1_u8, refined_fwd, pts_src_lk.copy(), **lk_params
+        img2_u8, img1_u8, refined_fwd, bwd_guess, **lk_params
     )
 
     refined_dst = inlier_dst.copy()
     refined_count = 0
+    debug_points: List[Dict[str, Any]] = []
 
     for i in range(n):
-        if status_fwd[i, 0] != 1 or status_bwd[i, 0] != 1:
-            continue
+        s_fwd = int(status_fwd[i, 0]) if status_fwd is not None and i < len(status_fwd) else 0
+        s_bwd = int(status_bwd[i, 0]) if status_bwd is not None and i < len(status_bwd) else 0
 
-        # Forward-backward consistency check
-        fb_err = float(np.linalg.norm(refined_bwd[i, 0] - pts_src_lk[i, 0]))
-        if fb_err > fb_threshold:
-            continue
+        fb_err: Optional[float] = None
+        if refined_bwd is not None and i < len(refined_bwd):
+            fb_err = float(np.linalg.norm(refined_bwd[i, 0] - initial_source[i, 0]))
 
-        # Check shift magnitude
-        shift = refined_fwd[i, 0] - pts_fwd[i, 0]
-        shift_mag = float(np.linalg.norm(shift))
-        if shift_mag > max_shift_px:
-            continue
+        shift_mag: Optional[float] = None
+        if refined_fwd is not None and i < len(refined_fwd):
+            shift = refined_fwd[i, 0] - initial_target[i, 0]
+            shift_mag = float(np.linalg.norm(shift))
 
-        # Accept refinement — convert back to native space
-        refined_dst[i, 0] = float(refined_fwd[i, 0, 0]) * scale_factor2
-        refined_dst[i, 1] = float(refined_fwd[i, 0, 1]) * scale_factor2
-        refined_count += 1
+        pt_record: Dict[str, Any] = {
+            "point_index": i,
+            "src_pt": [float(inlier_src[i, 0]), float(inlier_src[i, 1])],
+            "dst_pt": [float(inlier_dst[i, 0]), float(inlier_dst[i, 1])],
+            "status_fwd": s_fwd,
+            "status_bwd": s_bwd,
+            "fb_err": fb_err,
+            "shift_mag": shift_mag,
+            "passed": False,
+            "failure_gate": None,
+        }
+
+        if s_fwd != 1:
+            pt_record["failure_gate"] = "fwd_non_convergence"
+        elif s_bwd != 1:
+            pt_record["failure_gate"] = "bwd_non_convergence"
+        elif fb_err is not None and fb_err > fb_threshold:
+            pt_record["failure_gate"] = f"fb_threshold_exceeded (fb_err={fb_err:.4f} > {fb_threshold})"
+        elif shift_mag is not None and shift_mag > max_shift_px:
+            pt_record["failure_gate"] = f"max_shift_exceeded (shift_mag={shift_mag:.4f} > {max_shift_px})"
+        else:
+            pt_record["passed"] = True
+            # Accept refinement — convert back to native space
+            refined_dst[i, 0] = float(refined_fwd[i, 0, 0]) * scale_factor2
+            refined_dst[i, 1] = float(refined_fwd[i, 0, 1]) * scale_factor2
+            refined_count += 1
+
+        debug_points.append(pt_record)
 
     stats = {
         "refined_count": refined_count,
         "total": n,
         "fb_threshold": fb_threshold,
         "max_shift_px": max_shift_px,
+        "debug_points": debug_points,
     }
     return inlier_src.copy(), refined_dst, stats
 
@@ -505,6 +536,7 @@ def match_images_cfog(
     grid_size: int = 10,
     max_matches_per_cell: int = 4,
     patch_size_m: float = 160.0,  # Physical patch width in meters
+    _is_inverted_call: bool = False,
 ) -> Dict[str, Any]:
     """
     Executes the primary cross-sensor registration pipeline:
@@ -566,6 +598,292 @@ def match_images_cfog(
     # Resample to working scale with area averaging
     work1_gray = cv2.resize(raw1_gray, (work_w1, work_h1), interpolation=cv2.INTER_AREA)
     work2_gray = cv2.resize(raw2_gray, (work_w2, work_h2), interpolation=cv2.INTER_AREA)
+
+    # Direction-Invariance Check for Multimodal (IIRS-involving) Pairs:
+    # Always match using the LARGER working-scale canvas as Image 1 (template source).
+    # If the caller requested the reverse direction, run in the better-conditioned
+    # direction and return the inverted homography.
+    sensors = {str(meta1.sensor).upper(), str(meta2.sensor).upper(), str(source_sensor).upper(), str(reference_sensor).upper()}
+    multimodal_pair = "IIRS" in sensors
+
+    area1 = work_w1 * work_h1
+    area2 = work_w2 * work_h2
+
+    if multimodal_pair and not _is_inverted_call and area2 > area1:
+        inv_temp_dir = Path(output_dir) / "_inv_temp" if output_dir else None
+        res_ba = match_images_cfog(
+            img_path1=img_path2,
+            img_path2=img_path1,
+            dem_path=dem_path,
+            output_dir=inv_temp_dir or output_dir,
+            source_sensor=meta2.sensor,
+            reference_sensor=meta1.sensor,
+            explicit_gsd1=meta2.gsd_m,
+            explicit_gsd2=meta1.gsd_m,
+            explicit_emission1=meta2.emission_angle_deg,
+            explicit_emission2=meta1.emission_angle_deg,
+            grid_size=grid_size,
+            max_matches_per_cell=max_matches_per_cell,
+            patch_size_m=patch_size_m,
+            _is_inverted_call=True,
+        )
+
+        if inv_temp_dir and inv_temp_dir.exists():
+            shutil.rmtree(str(inv_temp_dir), ignore_errors=True)
+
+        if res_ba.get("status") != "success" or res_ba.get("homography") is None:
+            fail_meta = {
+                "source": meta1.to_dict(),
+                "reference": meta2.to_dict(),
+                "working_scale": {"working_gsd_m": working_gsd},
+                "direction": "inverted_from_BA",
+                "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+            }
+            return {
+                "status": res_ba.get("status", "failed"),
+                "message": f"Optimal-direction match ({meta2.sensor} -> {meta1.sensor}) produced: {res_ba.get('message')}",
+                "direction": "inverted_from_BA",
+                "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+                "match_count": res_ba.get("match_count", 0),
+                "inlier_count": res_ba.get("inlier_count", 0),
+                "metrics": None,
+                "homography": None,
+                "metadata": fail_meta,
+                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
+                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
+                "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+                "matches": [],
+                "all_matches": [],
+                "outputs": {},
+            }
+
+        # Invert measured homography H_ba -> H_ab
+        H_ba = np.array(res_ba["homography"], dtype=np.float64)
+        try:
+            H_ab = np.linalg.inv(H_ba)
+            if abs(H_ab[2, 2]) > 1e-12:
+                H_ab = H_ab / H_ab[2, 2]
+        except np.linalg.LinAlgError:
+            return {
+                "status": "degenerate_matrix",
+                "message": "Inversion of measured BA homography failed (singular matrix).",
+                "direction": "inverted_from_BA",
+                "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+                "match_count": 0,
+                "inlier_count": 0,
+                "metrics": None,
+                "homography": None,
+                "metadata": {
+                    "source": meta1.to_dict(),
+                    "reference": meta2.to_dict(),
+                    "working_scale": {"working_gsd_m": working_gsd},
+                    "direction": "inverted_from_BA",
+                    "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+                },
+                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
+                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
+                "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+                "matches": [],
+                "all_matches": [],
+                "outputs": {},
+            }
+
+        tx_check = verify_transformation_quality(H_ab, (orig_h2, orig_w2))
+        if not tx_check["is_valid"]:
+            return {
+                "status": "geometric_verification_failed",
+                "message": f"Inverted transformation rejected by quality gate: {tx_check['reason']}",
+                "direction": "inverted_from_BA",
+                "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+                "match_count": res_ba.get("match_count", 0),
+                "inlier_count": res_ba.get("inlier_count", 0),
+                "metrics": None,
+                "homography": None,
+                "metadata": {
+                    "source": meta1.to_dict(),
+                    "reference": meta2.to_dict(),
+                    "working_scale": {"working_gsd_m": working_gsd},
+                    "direction": "inverted_from_BA",
+                    "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+                },
+                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
+                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
+                "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+                "matches": [],
+                "all_matches": [],
+                "outputs": {},
+            }
+
+        # Invert correspondences: target of BA becomes source of AB, source of BA becomes target of AB
+        inverted_all_matches = []
+        pts1_list = []
+        pts2_list = []
+        for m in res_ba.get("all_matches", []):
+            x1 = float(m["target_x"])
+            y1 = float(m["target_y"])
+            x2 = float(m["source_x"])
+            y2 = float(m["source_y"])
+            inv_m = {
+                "source_x": x1,
+                "source_y": y1,
+                "target_x": x2,
+                "target_y": y2,
+                "image1_x": x1,
+                "image1_y": y1,
+                "image2_x": x2,
+                "image2_y": y2,
+                "confidence": float(m.get("confidence", 0.0)),
+                "is_inlier": bool(m.get("is_inlier", False)),
+                "is_refined": bool(m.get("is_refined", False)),
+                "lk_refined": bool(m.get("lk_refined", False)),
+            }
+            inverted_all_matches.append(inv_m)
+            pts1_list.append([x1, y1])
+            pts2_list.append([x2, y2])
+
+        pts1_arr = np.array(pts1_list, dtype=np.float32) if pts1_list else np.empty((0, 2), dtype=np.float32)
+        pts2_arr = np.array(pts2_list, dtype=np.float32) if pts2_list else np.empty((0, 2), dtype=np.float32)
+        inlier_mask_arr = np.array([1 if m.get("is_inlier") else 0 for m in res_ba.get("all_matches", [])], dtype=np.uint8)
+
+        inlier_count = int(np.sum(inlier_mask_arr))
+        if inlier_count < 4:
+            return {
+                "status": "geometric_verification_failed",
+                "message": f"Optimal-direction match has fewer than 4 verified inliers ({inlier_count} found).",
+                "direction": "inverted_from_BA",
+                "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+                "match_count": len(pts1_arr),
+                "inlier_count": inlier_count,
+                "metrics": None,
+                "homography": None,
+                "metadata": {
+                    "source": meta1.to_dict(),
+                    "reference": meta2.to_dict(),
+                    "working_scale": {"working_gsd_m": working_gsd},
+                    "direction": "inverted_from_BA",
+                    "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+                },
+                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
+                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
+                "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+                "matches": [],
+                "all_matches": inverted_all_matches,
+                "outputs": {},
+            }
+
+        metrics = compute_canonical_metrics(
+            pts1_arr, pts2_arr, inlier_mask_arr, H_ab, (orig_h2, orig_w2), grid_size
+        )
+        metrics["direction"] = "inverted_from_BA"
+        metrics["measured_direction"] = f"{meta2.sensor} -> {meta1.sensor}"
+
+        warped_source = cv2.warpPerspective(
+            raw1_color, H_ab, (orig_w2, orig_h2), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0)
+        )
+
+        tif_path = out_path / "registered_source.tif"
+        written_tif = False
+        try:
+            import rasterio
+            from rasterio.transform import from_origin
+            profile = {
+                "driver": "GTiff",
+                "height": orig_h2,
+                "width": orig_w2,
+                "count": 3 if warped_source.ndim == 3 else 1,
+                "dtype": "uint8",
+                "nodata": 0,
+                "crs": raster_meta2.get("crs") or "+proj=eqc +lat_ts=0 +lon_0=0 +a=1737400 +b=1737400 +units=m +no_defs +type=crs",
+                "transform": raster_meta2.get("transform") or from_origin(0, orig_h2, meta2.gsd_m, meta2.gsd_m),
+            }
+            with rasterio.open(str(tif_path), "w", **profile) as dst:
+                if warped_source.ndim == 3:
+                    for b in range(3):
+                        dst.write(warped_source[:, :, 2 - b], b + 1)
+                else:
+                    dst.write(warped_source, 1)
+            written_tif = True
+        except Exception:
+            pass
+        if not written_tif:
+            cv2.imwrite(str(tif_path), warped_source)
+
+        preview_path = out_path / "registered_preview.png"
+        cv2.imwrite(str(preview_path), warped_source)
+
+        block_size = 50
+        blended = np.zeros_like(raw2_color)
+        for y in range(0, orig_h2, block_size):
+            for x in range(0, orig_w2, block_size):
+                if ((x // block_size) + (y // block_size)) % 2 == 0:
+                    blended[y : y + block_size, x : x + block_size] = warped_source[y : y + block_size, x : x + block_size]
+                else:
+                    blended[y : y + block_size, x : x + block_size] = raw2_color[y : y + block_size, x : x + block_size]
+        checker_path = out_path / "registered_checkerboard.png"
+        cv2.imwrite(str(checker_path), blended)
+
+        matches_path = out_path / "matches.json"
+        with open(matches_path, "w") as f:
+            json.dump([m for m in inverted_all_matches if m.get("is_inlier", False)], f, indent=4)
+
+        metrics_path = out_path / "metrics.json"
+        with open(metrics_path, "w") as f:
+            json.dump(metrics, f, indent=4)
+
+        transform_path = out_path / "transform.json"
+        transform_data = {
+            "model": "homography",
+            "matrix": H_ab.tolist(),
+            "quality": tx_check,
+            "direction": "inverted_from_BA",
+            "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+        }
+        with open(transform_path, "w") as f:
+            json.dump(transform_data, f, indent=4)
+
+        metadata_path = out_path / "metadata.json"
+        full_metadata = {
+            "source": meta1.to_dict(),
+            "reference": meta2.to_dict(),
+            "working_scale": {"working_gsd_m": working_gsd, "method": "common_physical_gsd_normalization"},
+            "terrain_correction": {"source": None, "reference": None},
+            "direction": "inverted_from_BA",
+            "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+            "provenance": {
+                "source_path": str(img_path1),
+                "reference_path": str(img_path2),
+                "dem_path": str(dem_path) if dem_path else None,
+                "matcher": "CFOG_PhaseCongruency_v2.0",
+                "direction": "inverted_from_BA",
+                "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+            },
+        }
+        with open(metadata_path, "w") as f:
+            json.dump(full_metadata, f, indent=4)
+
+        return {
+            "status": "success",
+            "direction": "inverted_from_BA",
+            "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
+            "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
+            "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
+            "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+            "metrics": metrics,
+            "homography": H_ab.tolist(),
+            "terrain_correction": full_metadata["terrain_correction"],
+            "spatial_attempts": res_ba.get("spatial_attempts", 0),
+            "matches": [m for m in inverted_all_matches if m.get("is_inlier", False)],
+            "all_matches": inverted_all_matches,
+            "outputs": {
+                "registered_raster": str(tif_path),
+                "preview": str(preview_path),
+                "checkerboard": str(checker_path),
+                "matches": str(matches_path),
+                "metrics": str(metrics_path),
+                "transform": str(transform_path),
+                "metadata": str(metadata_path),
+            },
+        }
 
     # 4. DEM Relief Compensation
     dem_arr = None
@@ -952,29 +1270,82 @@ def match_images_cfog(
         lk_dst = pts2_arr[inlier_idx_lk]
 
         refined_src, refined_dst, lk_stats = refine_inliers_lucas_kanade(
-            comp1_gray, comp2_gray, lk_src, lk_dst, scale_factor1, scale_factor2
+            pc1, pc2, lk_src, lk_dst, scale_factor1, scale_factor2
         )
 
         if lk_stats["refined_count"] > 0:
-            # Re-estimate homography from refined correspondences
-            H_refined, mask_refined = cv2.findHomography(
+            # (a) ORIGINAL baseline: pre-refinement point set and homography
+            err_a = calculate_reprojection_errors(lk_src, lk_dst, H_final)
+            rmse_a = float(np.sqrt(np.mean(err_a**2)))
+
+            # (b) MIXED refined+unrefined point set with a homography re-fit on all of them
+            H_b, mask_b = cv2.findHomography(
                 refined_src, refined_dst, cv2.RANSAC, ransacReprojThreshold=5.0
             )
-            if H_refined is not None and mask_refined is not None and np.sum(mask_refined) >= 4:
-                tx_check_r = verify_transformation_quality(H_refined, (orig_h2, orig_w2))
-                if tx_check_r["is_valid"]:
-                    H_final = H_refined
-                    # Update pts arrays with refined coordinates for metrics
-                    pts1_arr[inlier_idx_lk] = refined_src
-                    pts2_arr[inlier_idx_lk] = refined_dst
-                    # Update records
-                    for j, idx in enumerate(inlier_idx_lk):
-                        if idx < len(refinement_records):
-                            refinement_records[idx]["target_x"] = round(float(refined_dst[j, 0]), 2)
-                            refinement_records[idx]["target_y"] = round(float(refined_dst[j, 1]), 2)
-                            refinement_records[idx]["image2_x"] = round(float(refined_dst[j, 0]), 2)
-                            refinement_records[idx]["image2_y"] = round(float(refined_dst[j, 1]), 2)
-                            refinement_records[idx]["lk_refined"] = True
+            rmse_b = None
+            err_b = None
+            if H_b is not None:
+                err_b = calculate_reprojection_errors(refined_src, refined_dst, H_b)
+                rmse_b = float(np.sqrt(np.mean(err_b**2)))
+
+            # (c) ONLY successfully-refined points
+            debug_pts = lk_stats.get("debug_points", [])
+            passed_mask = np.array([pt.get("passed", False) for pt in debug_pts], dtype=bool)
+            n_passed = int(np.sum(passed_mask))
+            rmse_c = None
+            err_c = None
+            if n_passed >= 4:
+                src_c = refined_src[passed_mask]
+                dst_c = refined_dst[passed_mask]
+                H_c, _ = cv2.findHomography(src_c, dst_c, cv2.RANSAC, ransacReprojThreshold=5.0)
+                if H_c is None:
+                    H_c, _ = cv2.findHomography(src_c, dst_c, 0)
+                if H_c is not None:
+                    err_c = calculate_reprojection_errors(src_c, dst_c, H_c)
+                    rmse_c = float(np.sqrt(np.mean(err_c**2)))
+
+            # Record Step 1 comparison
+            lk_stats["step1_comparison"] = {
+                "fit_rmse_a_orig": round(rmse_a, 4),
+                "fit_rmse_b_mixed": round(rmse_b, 4) if rmse_b is not None else None,
+                "fit_rmse_c_refined_only": round(rmse_c, 4) if rmse_c is not None else None,
+                "refined_count": n_passed,
+                "total_inliers": len(lk_src),
+                "err_a_per_point": [round(float(e), 4) for e in err_a],
+                "err_b_per_point": [round(float(e), 4) for e in err_b] if err_b is not None else [],
+                "err_c_per_point": [round(float(e), 4) for e in err_c] if err_c is not None else [],
+            }
+
+            # Step 3 Fix (Option B):
+            # Only attempt re-fit if fraction of refined points is >= 50% and count >= 4.
+            # Re-fitting across mixed refined+coarse points or low-refined subsets destabilizes the model.
+            refined_fraction = n_passed / max(1, len(lk_src))
+            re_fit_accepted = False
+
+            if n_passed >= 4 and refined_fraction >= 0.50 and H_c is not None:
+                tx_check_c = verify_transformation_quality(H_c, (orig_h2, orig_w2))
+                if tx_check_c["is_valid"] and rmse_c is not None and rmse_c < rmse_a:
+                    # Verified improvement: adopt refined homography and update inliers to refined subset
+                    H_final = H_c
+                    re_fit_accepted = True
+
+                    refined_inlier_indices = inlier_idx_lk[passed_mask]
+                    new_inlier_mask = np.zeros_like(inlier_mask)
+                    new_inlier_mask[refined_inlier_indices] = 1
+                    inlier_mask = new_inlier_mask
+
+                    pts1_arr[refined_inlier_indices] = src_c
+                    pts2_arr[refined_inlier_indices] = dst_c
+
+            # Update match records with refined coordinates for downstream use
+            for j, idx in enumerate(inlier_idx_lk):
+                if idx < len(refinement_records):
+                    if debug_pts and j < len(debug_pts) and debug_pts[j]["passed"]:
+                        refinement_records[idx]["target_x"] = round(float(refined_dst[j, 0]), 2)
+                        refinement_records[idx]["target_y"] = round(float(refined_dst[j, 1]), 2)
+                        refinement_records[idx]["image2_x"] = round(float(refined_dst[j, 0]), 2)
+                        refinement_records[idx]["image2_y"] = round(float(refined_dst[j, 1]), 2)
+                        refinement_records[idx]["lk_refined"] = True
 
     # 9. Compute Canonical Master Metrics
     metrics = compute_canonical_metrics(
@@ -1056,6 +1427,7 @@ def match_images_cfog(
         "model": "homography",
         "matrix": H_final.tolist(),
         "quality": tx_check,
+        "direction": "native",
     }
     with open(transform_path, "w") as f:
         json.dump(transform_data, f, indent=4)
@@ -1073,6 +1445,7 @@ def match_images_cfog(
             "source": terrain_info1,
             "reference": terrain_info2,
         },
+        "direction": "native",
         "provenance": {
             "source_path": str(img_path1),
             "reference_path": str(img_path2),
@@ -1080,6 +1453,7 @@ def match_images_cfog(
             "matcher": "CFOG_PhaseCongruency_v2.0",
             "spatial_attempts": spatial_attempts,
             "coarse_matcher": "mutual_information" if multimodal_pair else "normalized_correlation",
+            "direction": "native",
         },
     }
     with open(metadata_path, "w") as f:
@@ -1087,6 +1461,7 @@ def match_images_cfog(
 
     return {
         "status": "success",
+        "direction": "native",
         "source": {
             "sensor": meta1.sensor,
             "width": orig_w1,

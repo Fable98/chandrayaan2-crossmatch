@@ -1,76 +1,17 @@
 {
-    "status": "evaluated_composed",
-    "reason": null,
-    "triplet_cycle_rmse_px": 0.0,
-    "triplet_mean_cycle_error_px": 0.0,
-    "cycle_closed_successfully": true,
-    "failed_legs": [],
+    "status": "cycle_not_computable",
+    "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+    "triplet_cycle_rmse_px": null,
+    "triplet_mean_cycle_error_px": null,
+    "cycle_closed_successfully": false,
+    "failed_legs": [
+        "BC (B -> C)",
+        "CA (C -> A)"
+    ],
     "leg_derivations": {
         "AB": "measured",
-        "BC": "measured",
-        "CA": "composed"
-    },
-    "legs": {
-        "AB": {
-            "derivation": "measured",
-            "homography": [
-                [
-                    1.3715474666114782,
-                    -0.09908656864464362,
-                    -66.64664147114561
-                ],
-                [
-                    -0.08244672765387907,
-                    0.939197960305678,
-                    65.53792391820926
-                ],
-                [
-                    0.0005488391595824375,
-                    -0.00014619641976661155,
-                    1.0
-                ]
-            ]
-        },
-        "BC": {
-            "derivation": "measured",
-            "homography": [
-                [
-                    0.055586749969889375,
-                    -0.0,
-                    348.0
-                ],
-                [
-                    0.0,
-                    0.055586749969889375,
-                    53.0
-                ],
-                [
-                    0.0,
-                    0.0,
-                    1.0
-                ]
-            ]
-        },
-        "CA": {
-            "derivation": "composed",
-            "homography": [
-                [
-                    3.976548729526351,
-                    0.45613141084640735,
-                    -1394.9438261514604
-                ],
-                [
-                    0.49631033751655557,
-                    5.901773216765294,
-                    -505.1717088522884
-                ],
-                [
-                    -0.002109926868313773,
-                    0.0006124753343774706,
-                    1.0
-                ]
-            ]
-        }
+        "BC": "failed",
+        "CA": "failed"
     },
     "pair_AB_metrics": {
         "match_count": 90,
@@ -90,6 +31,7 @@
         "fraction_below_0_25px": 0.0,
         "spatial_coverage": 0.06,
         "spatial_uniformity": 0.0183,
+        "coverage_relative_to_inlier_count": 0.5556,
         "spatial_distribution": {
             "grid_rows": 10,
             "grid_cols": 10,
@@ -99,7 +41,10 @@
             "count_std": 0.2375,
             "count_mean": 0.06,
             "spatial_entropy": 0.3891,
-            "uniformity_score": 0.0183
+            "uniformity_score": 0.0183,
+            "adaptive_grid_size": 3,
+            "coverage_relative_to_inlier_count": 0.5556,
+            "adaptive_uniformity_score": 0.4116
         },
         "transform_quality": {
             "is_valid": true,
@@ -109,80 +54,141 @@
             "scale_ratio": 1.5092
         },
         "lk_refinement": {
-            "refined_count": 0,
+            "refined_count": 2,
             "total": 6,
             "fb_threshold": 0.5,
-            "max_shift_px": 3.0
-        },
-        "derivation": "measured"
-    },
-    "pair_BC_metrics": {
-        "match_count": 79,
-        "inlier_count": 4,
-        "inlier_ratio": 0.0506,
-        "fit_rmse_px": 0.0,
-        "validation_rmse_px": null,
-        "held_out_inlier_validation_rmse_px": null,
-        "validation_median_error_px": null,
-        "validation_status": "insufficient_points_for_holdout",
-        "quality_tier": "LOW_CONFIDENCE",
-        "mean_reprojection_error_px": 0.0,
-        "median_reprojection_error_px": 0.0,
-        "max_reprojection_error_px": 0.0,
-        "fraction_below_1px": 1.0,
-        "fraction_below_0_5px": 1.0,
-        "fraction_below_0_25px": 1.0,
-        "spatial_coverage": 0.04,
-        "spatial_uniformity": 0.0092,
-        "spatial_distribution": {
-            "grid_rows": 10,
-            "grid_cols": 10,
-            "total_cells": 100,
-            "occupied_cells": 4,
-            "coverage": 0.04,
-            "count_std": 0.196,
-            "count_mean": 0.04,
-            "spatial_entropy": 0.301,
-            "uniformity_score": 0.0092
-        },
-        "transform_quality": {
-            "is_valid": true,
-            "reason": "OK",
-            "determinant": 0.00309,
-            "condition_number": 2229200.36,
-            "scale_ratio": 1.0
-        },
-        "derivation": "measured"
-    },
-    "pair_CA_metrics": {
-        "derivation": "composed",
-        "status": "composed_from_AB_BC",
-        "inlier_count": 0,
-        "fit_rmse_px": null
-    },
-    "composition": {
-        "source": "A -> B -> C",
-        "homography": [
-            [
-                0.26723589363305567,
-                -0.056384254395404905,
-                344.29532980421055
+            "max_shift_px": 3.0,
+            "debug_points": [
+                {
+                    "point_index": 0,
+                    "src_pt": [
+                        332.0,
+                        25.0
+                    ],
+                    "dst_pt": [
+                        328.0,
+                        54.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 2.868100643157959,
+                    "shift_mag": 6.750519752502441,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=2.8681 > 0.5)"
+                },
+                {
+                    "point_index": 1,
+                    "src_pt": [
+                        384.0,
+                        25.0
+                    ],
+                    "dst_pt": [
+                        381.0,
+                        46.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.11484568566083908,
+                    "shift_mag": 1.4870233535766602,
+                    "passed": true,
+                    "failure_gate": null
+                },
+                {
+                    "point_index": 2,
+                    "src_pt": [
+                        230.0,
+                        76.0
+                    ],
+                    "dst_pt": [
+                        213.8968048095703,
+                        107.36746215820312
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 3.792140245437622,
+                    "shift_mag": 0.693938136100769,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=3.7921 > 0.5)"
+                },
+                {
+                    "point_index": 3,
+                    "src_pt": [
+                        76.0,
+                        179.0
+                    ],
+                    "dst_pt": [
+                        20.0,
+                        222.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.325247198343277,
+                    "shift_mag": 2.421102523803711,
+                    "passed": true,
+                    "failure_gate": null
+                },
+                {
+                    "point_index": 4,
+                    "src_pt": [
+                        435.0,
+                        384.0
+                    ],
+                    "dst_pt": [
+                        415.0,
+                        329.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.8227871060371399,
+                    "shift_mag": 1.0577772855758667,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=0.8228 > 0.5)"
+                },
+                {
+                    "point_index": 5,
+                    "src_pt": [
+                        179.0,
+                        486.0
+                    ],
+                    "dst_pt": [
+                        128.0,
+                        495.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 2.18015193939209,
+                    "shift_mag": 1.0085523128509521,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=2.1802 > 0.5)"
+                }
             ],
-            [
-                0.024505529821937447,
-                0.0444585519441114,
-                56.64304019038713
-            ],
-            [
-                0.0005488391595824375,
-                -0.00014619641976661155,
-                1.0
-            ]
-        ],
-        "transform": "evaluation_output\\triplet_new_2022\\composed_ohrc_to_iirs_transform.json",
-        "registered_raster": "evaluation_output\\triplet_new_2022\\composed_registered_ohrc_to_iirs.png",
-        "registered_geotiff": "evaluation_output\\triplet_new_2022\\composed_registered_ohrc_to_iirs.tif",
-        "checkerboard_qa": "evaluation_output\\triplet_new_2022\\composed_checkerboard_qa.png",
-        "manifest": "evaluation_output\\triplet_new_2022\\registered_products_manifest.json"
-    }
+            "step1_comparison": {
+                "fit_rmse_a_orig": 2.0658,
+                "fit_rmse_b_mixed": 8.6036,
+                "fit_rmse_c_refined_only": null,
+                "refined_count": 2,
+                "total_inliers": 6,
+                "err_a_per_point": [
+                    1.7182,
+                    2.4713,
+                    2.9403,
+                    1.9605,
+                    1.4329,
+                    1.4153
+                ],
+                "err_b_per_point": [
+                    1.0103,
+                    0.4871,
+                    0.7426,
+                    0.1982,
+                    0.0171,
+                    21.0304
+                ],
+                "err_c_per_point": []
+            }
+        }
+    },
+    "pair_BC_metrics": null,
+    "pair_CA_metrics": null,
+    "composition": null
 }
