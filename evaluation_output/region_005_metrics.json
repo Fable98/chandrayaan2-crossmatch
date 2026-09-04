@@ -36,44 +36,35 @@
             "spatial_uniformity": 0.0183
         },
         "ohrc_iirs": {
-            "status": "geometric_verification_failed",
+            "status": "composition_not_computable",
             "inlier_count": 0,
             "fit_rmse_px": null,
             "forward_ohrc_to_iirs": {
-                "status": "geometric_verification_failed",
-                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "status": "composition_not_computable",
+                "message": "Missing verified homography for leg(s): BC (B -> C)",
                 "quality_tier": "FAILED",
-                "match_count": 16,
-                "inlier_count": 5,
+                "match_count": 0,
+                "inlier_count": 0,
                 "inlier_ratio": 0.0,
                 "fit_rmse_px": null,
                 "spatial_coverage": 0.0,
                 "spatial_uniformity": 0.0
             },
-            "reverse_iirs_to_ohrc": {
-                "status": "geometric_verification_failed",
-                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
-                "quality_tier": "FAILED",
-                "match_count": 8,
-                "inlier_count": 4,
-                "inlier_ratio": 0.0,
-                "fit_rmse_px": null,
-                "spatial_coverage": 0.0,
-                "spatial_uniformity": 0.0
-            },
-            "bidirectional_agreement": true,
-            "directional_note": null
+            "reverse_iirs_to_ohrc": null,
+            "bidirectional_agreement": false,
+            "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
+            "composition": null
         },
         "tmc_iirs": {
-            "status": "geometric_verification_failed",
+            "status": "failed",
             "inlier_count": 0,
             "fit_rmse_px": null,
             "forward_tmc_to_iirs": {
-                "status": "geometric_verification_failed",
-                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "status": "failed",
+                "message": null,
                 "quality_tier": "FAILED",
-                "match_count": 16,
-                "inlier_count": 7,
+                "match_count": 0,
+                "inlier_count": 0,
                 "inlier_ratio": 0.0,
                 "fit_rmse_px": null,
                 "spatial_coverage": 0.0,
@@ -83,26 +74,25 @@
                 "status": "geometric_verification_failed",
                 "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
                 "quality_tier": "FAILED",
-                "match_count": 17,
-                "inlier_count": 5,
+                "match_count": 114,
+                "inlier_count": 6,
                 "inlier_ratio": 0.0,
                 "fit_rmse_px": null,
                 "spatial_coverage": 0.0,
                 "spatial_uniformity": 0.0
             },
-            "bidirectional_agreement": true,
-            "directional_note": null
+            "bidirectional_agreement": false,
+            "directional_note": "Forward (TMC->IIRS) produced 'failed' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
         }
     },
     "triplet_consistency": {
-        "status": "cycle_not_computable",
-        "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+        "status": "composition_not_computable",
+        "reason": "Missing verified homography for leg(s): BC (B -> C)",
         "cycle_rmse_px": null,
         "cycle_mean_px": null,
         "cycle_closed_successfully": false,
         "failed_legs": [
-            "BC (B -> C)",
-            "CA (C -> A)"
+            "BC (B -> C)"
         ]
     }
 }

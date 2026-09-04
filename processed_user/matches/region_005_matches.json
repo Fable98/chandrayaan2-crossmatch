@@ -8,7 +8,7 @@
         "source_y": 25.0,
         "target_x": 402.43,
         "target_y": 22.19,
-        "confidence": 0.4196,
+        "confidence": 0.4195,
         "is_inlier": true
     },
     {
@@ -20,7 +20,7 @@
         "source_y": 179.0,
         "target_x": 149.0,
         "target_y": 229.0,
-        "confidence": 0.4252,
+        "confidence": 0.4251,
         "is_inlier": true
     },
     {

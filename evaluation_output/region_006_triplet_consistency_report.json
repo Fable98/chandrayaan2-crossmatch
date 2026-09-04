@@ -1,12 +1,77 @@
 {
-    "status": "cycle_not_computable",
-    "reason": "Missing verified homography for leg(s): BC (B -> C)",
-    "triplet_cycle_rmse_px": null,
-    "triplet_mean_cycle_error_px": null,
-    "cycle_closed_successfully": false,
-    "failed_legs": [
-        "BC (B -> C)"
-    ],
+    "status": "evaluated_composed",
+    "reason": null,
+    "triplet_cycle_rmse_px": 0.0,
+    "triplet_mean_cycle_error_px": 0.0,
+    "cycle_closed_successfully": true,
+    "failed_legs": [],
+    "leg_derivations": {
+        "AB": "measured",
+        "BC": "measured",
+        "CA": "composed"
+    },
+    "legs": {
+        "AB": {
+            "derivation": "measured",
+            "homography": [
+                [
+                    2.9844497908022833,
+                    0.7823591823234342,
+                    -387.0549828388665
+                ],
+                [
+                    0.806691486044386,
+                    2.433179402062708,
+                    -265.3989792047834
+                ],
+                [
+                    0.003466648912312203,
+                    0.0016131829019429863,
+                    0.9999999999999999
+                ]
+            ]
+        },
+        "BC": {
+            "derivation": "measured",
+            "homography": [
+                [
+                    3.118641842346355,
+                    0.1299492620207062,
+                    -12.445507967912546
+                ],
+                [
+                    1.5059294483798524,
+                    6.0693606437145,
+                    -792.8355078238488
+                ],
+                [
+                    0.0032096677384553453,
+                    0.007752723654047945,
+                    1.0
+                ]
+            ]
+        },
+        "CA": {
+            "derivation": "composed",
+            "homography": [
+                [
+                    0.2928581886241734,
+                    -0.1889812243685479,
+                    85.71972541645513
+                ],
+                [
+                    -0.3552643480046817,
+                    0.02226065025193895,
+                    164.80263386393577
+                ],
+                [
+                    -0.0010934190449356646,
+                    -0.0013633607910106976,
+                    1.0
+                ]
+            ]
+        }
+    },
     "pair_AB_metrics": {
         "match_count": 56,
         "inlier_count": 6,
@@ -39,47 +104,85 @@
         "transform_quality": {
             "is_valid": true,
             "reason": "OK",
-            "determinant": 9.949638,
-            "condition_number": 41370.93,
+            "determinant": 9.949637,
+            "condition_number": 41370.92,
             "scale_ratio": 1.9005
-        }
+        },
+        "lk_refinement": {
+            "refined_count": 0,
+            "total": 6,
+            "fb_threshold": 0.5,
+            "max_shift_px": 3.0
+        },
+        "derivation": "measured"
     },
-    "pair_BC_metrics": null,
-    "pair_CA_metrics": {
-        "match_count": 15,
-        "inlier_count": 5,
-        "inlier_ratio": 0.3333,
-        "fit_rmse_px": 1.4281,
-        "validation_rmse_px": null,
-        "held_out_inlier_validation_rmse_px": null,
-        "validation_median_error_px": null,
-        "validation_status": "insufficient_points_for_holdout",
+    "pair_BC_metrics": {
+        "match_count": 87,
+        "inlier_count": 8,
+        "inlier_ratio": 0.092,
+        "fit_rmse_px": 1.812,
+        "validation_rmse_px": 71.8765,
+        "held_out_inlier_validation_rmse_px": 71.8765,
+        "validation_median_error_px": 54.9953,
+        "validation_status": "evaluated",
         "quality_tier": "LOW_CONFIDENCE",
-        "mean_reprojection_error_px": 1.1861,
-        "median_reprojection_error_px": 0.9336,
-        "max_reprojection_error_px": 2.3182,
-        "fraction_below_1px": 0.6,
-        "fraction_below_0_5px": 0.2,
-        "fraction_below_0_25px": 0.2,
-        "spatial_coverage": 0.05,
-        "spatial_uniformity": 0.0135,
+        "mean_reprojection_error_px": 1.4217,
+        "median_reprojection_error_px": 1.3032,
+        "max_reprojection_error_px": 3.9986,
+        "fraction_below_1px": 0.375,
+        "fraction_below_0_5px": 0.125,
+        "fraction_below_0_25px": 0.125,
+        "spatial_coverage": 0.08,
+        "spatial_uniformity": 0.0289,
         "spatial_distribution": {
             "grid_rows": 10,
             "grid_cols": 10,
             "total_cells": 100,
-            "occupied_cells": 5,
-            "coverage": 0.05,
-            "count_std": 0.2179,
-            "count_mean": 0.05,
-            "spatial_entropy": 0.3495,
-            "uniformity_score": 0.0135
+            "occupied_cells": 8,
+            "coverage": 0.08,
+            "count_std": 0.2713,
+            "count_mean": 0.08,
+            "spatial_entropy": 0.4515,
+            "uniformity_score": 0.0289
         },
         "transform_quality": {
             "is_valid": true,
             "reason": "OK",
-            "determinant": 4.038613,
-            "condition_number": 70487.22,
-            "scale_ratio": 3.3131
-        }
+            "determinant": 37.668077,
+            "condition_number": 51660.91,
+            "scale_ratio": 2.1405
+        },
+        "derivation": "measured"
+    },
+    "pair_CA_metrics": {
+        "derivation": "composed",
+        "status": "composed_from_AB_BC",
+        "inlier_count": 0,
+        "fit_rmse_px": null
+    },
+    "composition": {
+        "source": "A -> B -> C",
+        "homography": [
+            [
+                -4.073735673373217,
+                -1.1896306310846638,
+                545.2537646687388
+            ],
+            [
+                -2.8879688701991326,
+                -6.377295453343133,
+                1298.5509862041904
+            ],
+            [
+                -0.00839164369258905,
+                -0.009995319362245625,
+                1.0
+            ]
+        ],
+        "transform": "evaluation_output\\region_006\\composed_ohrc_to_iirs_transform.json",
+        "registered_raster": "evaluation_output\\region_006\\composed_registered_ohrc_to_iirs.png",
+        "registered_geotiff": "evaluation_output\\region_006\\composed_registered_ohrc_to_iirs.tif",
+        "checkerboard_qa": "evaluation_output\\region_006\\composed_checkerboard_qa.png",
+        "manifest": "evaluation_output\\region_006\\registered_products_manifest.json"
     }
 }

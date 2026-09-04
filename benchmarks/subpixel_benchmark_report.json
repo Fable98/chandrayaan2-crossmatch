@@ -45,7 +45,7 @@
         "+Y": {
             "mean_error_px": 0.2179,
             "median_error_px": 0.2554,
-            "max_error_px": 0.3239
+            "max_error_px": 0.324
         },
         "-Y": {
             "mean_error_px": 0.2196,
@@ -90,7 +90,7 @@
         },
         "0.20_px": {
             "mean_error_px": 0.2931,
-            "median_error_px": 0.3181,
+            "median_error_px": 0.3182,
             "rmse_px": 0.2981,
             "p95_error_px": 0.3443,
             "max_error_px": 0.3445

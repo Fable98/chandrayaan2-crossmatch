@@ -36,73 +36,85 @@
             "spatial_uniformity": 0.0235
         },
         "ohrc_iirs": {
-            "status": "geometric_verification_failed",
+            "status": "composed",
             "inlier_count": 0,
-            "fit_rmse_px": null,
+            "fit_rmse_px": 3.3241,
             "forward_ohrc_to_iirs": {
-                "status": "geometric_verification_failed",
-                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
-                "quality_tier": "FAILED",
-                "match_count": 18,
-                "inlier_count": 5,
-                "inlier_ratio": 0.0,
-                "fit_rmse_px": null,
-                "spatial_coverage": 0.0,
-                "spatial_uniformity": 0.0
-            },
-            "reverse_iirs_to_ohrc": {
-                "status": "insufficient_correspondences",
-                "message": "Insufficient verified correspondences for geometric registration (found 0, minimum required is 4).",
-                "quality_tier": "FAILED",
+                "status": "composed",
+                "message": null,
+                "quality_tier": "COMPOSED_CHAIN",
                 "match_count": 0,
                 "inlier_count": 0,
-                "inlier_ratio": 0.0,
-                "fit_rmse_px": null,
-                "spatial_coverage": 0.0,
-                "spatial_uniformity": 0.0
+                "inlier_ratio": 1.0,
+                "fit_rmse_px": 3.3241,
+                "spatial_coverage": 1.0,
+                "spatial_uniformity": 1.0
             },
-            "bidirectional_agreement": false,
-            "directional_note": "Forward (OHRC->IIRS) produced 'geometric_verification_failed' while Reverse (IIRS->OHRC) produced 'insufficient_correspondences'. Caused by grid sizing and search window asymmetries under ~300x physical scale disparity."
+            "reverse_iirs_to_ohrc": null,
+            "bidirectional_agreement": true,
+            "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
+            "composition": {
+                "source": "A -> B -> C",
+                "homography": [
+                    [
+                        2.160819217516023,
+                        -0.5338351119901107,
+                        14.995346834609851
+                    ],
+                    [
+                        0.046814611658573015,
+                        1.4068876819316267,
+                        18.59869911042873
+                    ],
+                    [
+                        0.00166176255080062,
+                        4.8294561337289275e-05,
+                        1.0
+                    ]
+                ],
+                "transform": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
+                "registered_raster": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
+                "registered_geotiff": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
+                "checkerboard_qa": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\composed_checkerboard_qa.png",
+                "manifest": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\registered_products_manifest.json"
+            }
         },
         "tmc_iirs": {
-            "status": "geometric_verification_failed",
-            "inlier_count": 0,
-            "fit_rmse_px": null,
+            "status": "success",
+            "inlier_count": 14,
+            "fit_rmse_px": 2.8082,
             "forward_tmc_to_iirs": {
-                "status": "geometric_verification_failed",
-                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
-                "quality_tier": "FAILED",
-                "match_count": 31,
-                "inlier_count": 7,
-                "inlier_ratio": 0.0,
-                "fit_rmse_px": null,
-                "spatial_coverage": 0.0,
-                "spatial_uniformity": 0.0
+                "status": "success",
+                "message": null,
+                "quality_tier": "ACCEPTED",
+                "match_count": 96,
+                "inlier_count": 14,
+                "inlier_ratio": 0.1458,
+                "fit_rmse_px": 2.8082,
+                "spatial_coverage": 0.14,
+                "spatial_uniformity": 0.0666
             },
             "reverse_iirs_to_tmc": {
-                "status": "insufficient_correspondences",
-                "message": "Insufficient verified correspondences for geometric registration (found 2, minimum required is 4).",
-                "quality_tier": "FAILED",
-                "match_count": 2,
-                "inlier_count": 0,
-                "inlier_ratio": 0.0,
-                "fit_rmse_px": null,
-                "spatial_coverage": 0.0,
-                "spatial_uniformity": 0.0
+                "status": "success",
+                "message": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 131,
+                "inlier_count": 7,
+                "inlier_ratio": 0.0534,
+                "fit_rmse_px": 2.3419,
+                "spatial_coverage": 0.07,
+                "spatial_uniformity": 0.0235
             },
-            "bidirectional_agreement": false,
-            "directional_note": "Forward (TMC->IIRS) produced 'geometric_verification_failed' while Reverse (IIRS->TMC) produced 'insufficient_correspondences'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
+            "bidirectional_agreement": true,
+            "directional_note": null
         }
     },
     "triplet_consistency": {
-        "status": "cycle_not_computable",
-        "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
-        "cycle_rmse_px": null,
-        "cycle_mean_px": null,
-        "cycle_closed_successfully": false,
-        "failed_legs": [
-            "BC (B -> C)",
-            "CA (C -> A)"
-        ]
+        "status": "evaluated_composed",
+        "reason": null,
+        "cycle_rmse_px": 3.3241,
+        "cycle_mean_px": 2.7258,
+        "cycle_closed_successfully": true,
+        "failed_legs": []
     }
 }

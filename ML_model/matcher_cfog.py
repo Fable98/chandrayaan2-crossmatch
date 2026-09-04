@@ -292,6 +292,49 @@ def subpixel_phase_correlation(
     return shift_x, shift_y, peak_val, True
 
 
+def mutual_information_score(image_a: np.ndarray, image_b: np.ndarray, bins: int = 32) -> float:
+    """Estimate normalized mutual information for two equally shaped patches."""
+    a = np.asarray(image_a, dtype=np.float32).ravel()
+    b = np.asarray(image_b, dtype=np.float32).ravel()
+    if a.size == 0 or a.size != b.size or np.std(a) < 1e-6 or np.std(b) < 1e-6:
+        return 0.0
+    a_edges = np.linspace(float(a.min()), float(a.max()) + 1e-6, bins + 1)
+    b_edges = np.linspace(float(b.min()), float(b.max()) + 1e-6, bins + 1)
+    joint, _, _ = np.histogram2d(a, b, bins=(a_edges, b_edges))
+    joint = joint / max(float(joint.sum()), 1.0)
+    marginal_a = joint.sum(axis=1, keepdims=True)
+    marginal_b = joint.sum(axis=0, keepdims=True)
+    expected = marginal_a @ marginal_b
+    mask = joint > 0
+    mi = float(np.sum(joint[mask] * np.log((joint[mask] + 1e-12) / (expected[mask] + 1e-12))))
+    entropy = -float(np.sum(joint[mask] * np.log(joint[mask] + 1e-12)))
+    return mi / max(entropy, 1e-12)
+
+
+def detect_blob_centroids(image: np.ndarray, min_area: int = 3) -> np.ndarray:
+    """Detect coarse structural blobs and return intensity-weighted centroids."""
+    image_f = np.asarray(image, dtype=np.float32)
+    if image_f.ndim != 2 or np.std(image_f) < 1e-6:
+        return np.empty((0, 2), dtype=np.float32)
+    threshold = float(np.percentile(image_f, 75.0))
+    binary = (image_f >= threshold).astype(np.uint8)
+    count, _, stats, centroids = cv2.connectedComponentsWithStats(binary, 8)
+    found: List[List[float]] = []
+    for label in range(1, count):
+        area = int(stats[label, cv2.CC_STAT_AREA])
+        if area < min_area:
+            continue
+        mask = binary == label
+        weights = np.maximum(image_f[mask] - threshold, 0.0)
+        ys, xs = np.nonzero(mask)
+        weight_sum = float(weights.sum())
+        if weight_sum > 1e-6:
+            found.append([float(np.dot(xs, weights) / weight_sum), float(np.dot(ys, weights) / weight_sum)])
+        else:
+            found.append([float(centroids[label, 0]), float(centroids[label, 1])])
+    return np.asarray(found, dtype=np.float32).reshape(-1, 2)
+
+
 def verify_spatial_quality_gate(
     inlier_cells: List[Tuple[int, int]],
     min_distinct_cells: int = 3,
@@ -343,6 +386,105 @@ def verify_spatial_quality_gate(
         return False, reason, details
 
     return True, "Spatial distribution gate passed", details
+
+
+def refine_inliers_lucas_kanade(
+    work_gray1: np.ndarray,
+    work_gray2: np.ndarray,
+    inlier_src: np.ndarray,
+    inlier_dst: np.ndarray,
+    scale_factor1: float,
+    scale_factor2: float,
+    win_size: int = 21,
+    max_shift_px: float = 3.0,
+    fb_threshold: float = 0.5,
+) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
+    """
+    Post-RANSAC Lucas-Kanade optical flow refinement for sub-pixel accuracy.
+    Refines each inlier match position via iterative LK optical flow with
+    forward-backward consistency verification.
+
+    Args:
+        work_gray1: Working-scale source grayscale image [0, 1].
+        work_gray2: Working-scale reference grayscale image [0, 1].
+        inlier_src: (N, 2) native-space source points.
+        inlier_dst: (N, 2) native-space destination points.
+        scale_factor1: Conversion from native px to working px for source.
+        scale_factor2: Conversion from native px to working px for reference.
+        win_size: LK window size in working pixels.
+        max_shift_px: Maximum allowed refinement shift in working pixels.
+        fb_threshold: Forward-backward round-trip error threshold in working pixels.
+
+    Returns:
+        Refined (src, dst) arrays in native space and a stats dict.
+    """
+    n = len(inlier_src)
+    if n == 0:
+        return inlier_src.copy(), inlier_dst.copy(), {"refined_count": 0, "total": 0}
+
+    # Convert to uint8 for LK
+    img1_u8 = (np.clip(work_gray1, 0.0, 1.0) * 255.0).astype(np.uint8)
+    img2_u8 = (np.clip(work_gray2, 0.0, 1.0) * 255.0).astype(np.uint8)
+
+    # Map native-space dst points into working-scale space
+    work_dst = inlier_dst.copy()
+    work_dst[:, 0] /= scale_factor2
+    work_dst[:, 1] /= scale_factor2
+
+    pts_fwd = work_dst.reshape(-1, 1, 2).astype(np.float32)
+
+    lk_params = dict(
+        winSize=(win_size, win_size),
+        maxLevel=3,
+        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01),
+    )
+
+    # Forward flow: img2 predicted -> img2 refined
+    # Actually we refine dst positions by flowing from img1 to img2
+    work_src_pts = inlier_src.copy()
+    work_src_pts[:, 0] /= scale_factor1
+    work_src_pts[:, 1] /= scale_factor1
+    pts_src_lk = work_src_pts.reshape(-1, 1, 2).astype(np.float32)
+
+    # Forward: source -> target
+    refined_fwd, status_fwd, _ = cv2.calcOpticalFlowPyrLK(
+        img1_u8, img2_u8, pts_src_lk, pts_fwd, **lk_params
+    )
+    # Backward: refined target -> source (for consistency check)
+    refined_bwd, status_bwd, _ = cv2.calcOpticalFlowPyrLK(
+        img2_u8, img1_u8, refined_fwd, pts_src_lk.copy(), **lk_params
+    )
+
+    refined_dst = inlier_dst.copy()
+    refined_count = 0
+
+    for i in range(n):
+        if status_fwd[i, 0] != 1 or status_bwd[i, 0] != 1:
+            continue
+
+        # Forward-backward consistency check
+        fb_err = float(np.linalg.norm(refined_bwd[i, 0] - pts_src_lk[i, 0]))
+        if fb_err > fb_threshold:
+            continue
+
+        # Check shift magnitude
+        shift = refined_fwd[i, 0] - pts_fwd[i, 0]
+        shift_mag = float(np.linalg.norm(shift))
+        if shift_mag > max_shift_px:
+            continue
+
+        # Accept refinement — convert back to native space
+        refined_dst[i, 0] = float(refined_fwd[i, 0, 0]) * scale_factor2
+        refined_dst[i, 1] = float(refined_fwd[i, 0, 1]) * scale_factor2
+        refined_count += 1
+
+    stats = {
+        "refined_count": refined_count,
+        "total": n,
+        "fb_threshold": fb_threshold,
+        "max_shift_px": max_shift_px,
+    }
+    return inlier_src.copy(), refined_dst, stats
 
 
 # ---------------------------------------------------------------------------
@@ -452,15 +594,70 @@ def match_images_cfog(
     cell_h = work_h1 / float(grid_size)
 
     coarse_matches = []
+    attempted_cells = set()
+    sensors = {str(source_sensor).upper(), str(reference_sensor).upper()}
+    multimodal_pair = "IIRS" in sensors
     # Key half-patch size to preserve Phase Congruency Log-Gabor support
-    half_patch_c = max(8, int(round((patch_size_m / working_gsd) / 4.0)))
+    half_patch_c = max(4 if multimodal_pair else 8, int(round((patch_size_m / working_gsd) / 4.0)))
 
-    # Search window in image 2
-    search_half_w = max(16, work_w2 // 6)
-    search_half_h = max(16, work_h2 // 6)
+    # Search window in image 2 — wider for multimodal to compensate for IIRS's coarse resolution
+    if multimodal_pair:
+        search_half_w = max(16, work_w2 // 3)
+        search_half_h = max(16, work_h2 // 3)
+    else:
+        search_half_w = max(16, work_w2 // 6)
+        search_half_h = max(16, work_h2 // 6)
 
+    # --- 2b. For multimodal pairs, run centroid matching FIRST (primary strategy) ---
+    if multimodal_pair:
+        centroids1 = detect_blob_centroids(pc1, min_area=2)
+        centroids2 = detect_blob_centroids(pc2, min_area=2)
+        max_distance = max(search_half_w, search_half_h)
+        used_c2 = set()
+        for x1, y1 in centroids1:
+            expected = np.array([x1 * work_w2 / float(work_w1), y1 * work_h2 / float(work_h1)])
+            if len(centroids2) == 0:
+                break
+            distances = np.linalg.norm(centroids2 - expected, axis=1)
+            order = np.argsort(distances)
+            for nearest in order:
+                if int(nearest) in used_c2:
+                    continue
+                if float(distances[nearest]) > max_distance:
+                    break
+                x2, y2 = centroids2[nearest]
+                # Validate with MI on local patches around centroids
+                hpc = min(half_patch_c, min(int(x1), int(y1), int(x2), int(y2),
+                          work_w1 - int(x1) - 1, work_h1 - int(y1) - 1,
+                          work_w2 - int(x2) - 1, work_h2 - int(y2) - 1))
+                if hpc >= 3:
+                    p1 = pc1[int(y1) - hpc:int(y1) + hpc, int(x1) - hpc:int(x1) + hpc]
+                    p2 = pc2[int(y2) - hpc:int(y2) + hpc, int(x2) - hpc:int(x2) + hpc]
+                    if p1.size > 0 and p2.size > 0 and p1.shape == p2.shape:
+                        mi_score = mutual_information_score(p1, p2)
+                    else:
+                        mi_score = 0.0
+                else:
+                    mi_score = float(1.0 / (1.0 + distances[nearest]))
+                if mi_score > 0.03:
+                    cell = (
+                        min(grid_size - 1, int(x1 / max(cell_w, 1e-6))),
+                        min(grid_size - 1, int(y1 / max(cell_h, 1e-6))),
+                    )
+                    coarse_matches.append({
+                        "work_x1": float(x1), "work_y1": float(y1),
+                        "work_x2": float(x2), "work_y2": float(y2),
+                        "score": float(mi_score),
+                        "cell": cell,
+                        "method": "centroid",
+                    })
+                    used_c2.add(int(nearest))
+                    break
+
+    # --- Standard grid-based patch matching (primary for same-sensor, augments centroids for multimodal) ---
     for gy in range(grid_size):
         for gx in range(grid_size):
+            attempted_cells.add((gx, gy))
             cx = int((gx + 0.5) * cell_w)
             cy = int((gy + 0.5) * cell_h)
 
@@ -495,7 +692,16 @@ def match_images_cfog(
             res = cv2.matchTemplate(search_region, tmpl, cv2.TM_CCOEFF_NORMED)
             _, max_val, _, max_loc = cv2.minMaxLoc(res)
 
-            if max_val > 0.35:
+            # 2c. For multimodal pairs, use MI as the primary ranking criterion
+            if multimodal_pair:
+                candidate = search_region[
+                    max_loc[1] : max_loc[1] + tmpl.shape[0],
+                    max_loc[0] : max_loc[0] + tmpl.shape[1],
+                ]
+                if candidate.shape == tmpl.shape:
+                    max_val = mutual_information_score(tmpl, candidate)
+
+            if max_val > (0.05 if multimodal_pair else 0.35):
                 best_x2 = s_min_x + max_loc[0] + half_patch_c
                 best_y2 = s_min_y + max_loc[1] + half_patch_c
                 coarse_matches.append({
@@ -505,6 +711,7 @@ def match_images_cfog(
                     "work_y2": float(best_y2),
                     "score": float(max_val),
                     "cell": (gx, gy),
+                    "method": "patch",
                 })
 
     # Spatial filtering: limit matches per cell to ensure uniform spread
@@ -517,6 +724,71 @@ def match_images_cfog(
         cell_pts.sort(key=lambda x: x["score"], reverse=True)
         selected_matches.extend(cell_pts[:max_matches_per_cell])
 
+    # --- Item 4: 4x4 Mandatory Macro-Cell Coverage Enforcement ---
+    # Divide source image into 4x4 macro-cells and fill gaps with relaxed-threshold searches.
+    macro_grid = 4
+    macro_cell_w = work_w1 / float(macro_grid)
+    macro_cell_h = work_h1 / float(macro_grid)
+    occupied_macro: set = set()
+    for m in selected_matches:
+        mc_x = min(macro_grid - 1, int(m["work_x1"] / max(macro_cell_w, 1e-6)))
+        mc_y = min(macro_grid - 1, int(m["work_y1"] / max(macro_cell_h, 1e-6)))
+        occupied_macro.add((mc_x, mc_y))
+
+    mandatory_fill_count = 0
+    relaxed_ncc = 0.20 if not multimodal_pair else 0.03
+    for mc_y in range(macro_grid):
+        for mc_x in range(macro_grid):
+            if (mc_x, mc_y) in occupied_macro:
+                continue
+            # Attempt a match at the macro-cell center with relaxed threshold
+            cx = int((mc_x + 0.5) * macro_cell_w)
+            cy = int((mc_y + 0.5) * macro_cell_h)
+            if cy < half_patch_c or cy >= work_h1 - half_patch_c or cx < half_patch_c or cx >= work_w1 - half_patch_c:
+                continue
+            tmpl = pc1[cy - half_patch_c : cy + half_patch_c, cx - half_patch_c : cx + half_patch_c]
+            if float(np.std(tmpl)) < 1e-5:
+                continue
+            cx2 = int(cx * (work_w2 / float(work_w1)))
+            cy2 = int(cy * (work_h2 / float(work_h1)))
+            s_min_x = max(0, cx2 - search_half_w)
+            s_max_x = min(work_w2, cx2 + search_half_w)
+            s_min_y = max(0, cy2 - search_half_h)
+            s_max_y = min(work_h2, cy2 + search_half_h)
+            search_region = pc2[s_min_y:s_max_y, s_min_x:s_max_x]
+            if search_region.shape[0] <= tmpl.shape[0] or search_region.shape[1] <= tmpl.shape[1]:
+                continue
+            res = cv2.matchTemplate(search_region, tmpl, cv2.TM_CCOEFF_NORMED)
+            _, max_val, _, max_loc = cv2.minMaxLoc(res)
+            if multimodal_pair:
+                candidate = search_region[max_loc[1]:max_loc[1]+tmpl.shape[0], max_loc[0]:max_loc[0]+tmpl.shape[1]]
+                if candidate.shape == tmpl.shape:
+                    max_val = mutual_information_score(tmpl, candidate)
+            if max_val > relaxed_ncc:
+                best_x2 = s_min_x + max_loc[0] + half_patch_c
+                best_y2 = s_min_y + max_loc[1] + half_patch_c
+                fine_cell = (min(grid_size - 1, int(cx / max(cell_w, 1e-6))), min(grid_size - 1, int(cy / max(cell_h, 1e-6))))
+                selected_matches.append({
+                    "work_x1": float(cx), "work_y1": float(cy),
+                    "work_x2": float(best_x2), "work_y2": float(best_y2),
+                    "score": float(max_val),
+                    "cell": fine_cell,
+                    "method": "mandatory_fill",
+                })
+                occupied_macro.add((mc_x, mc_y))
+                mandatory_fill_count += 1
+
+    spatial_attempts = {
+        "grid_size": grid_size,
+        "attempted_cells": len(attempted_cells),
+        "total_cells": grid_size * grid_size,
+        "attempted_coverage": len(attempted_cells) / float(grid_size * grid_size),
+        "matched_cells": len(cell_bins),
+        "macro_grid": macro_grid,
+        "macro_cells_occupied": len(occupied_macro),
+        "mandatory_fill_count": mandatory_fill_count,
+    }
+
     # QUALITY GATE 1: Insufficient Genuine Matches
     # ZERO FAKE CORRESPONDENCES ALLOWED. Fail cleanly if real matches < 4.
     if len(selected_matches) < 4:
@@ -527,6 +799,7 @@ def match_images_cfog(
             "inlier_count": 0,
             "metrics": None,
             "homography": None,
+            "spatial_attempts": spatial_attempts,
             "metadata": {
                 "source": meta1.to_dict(),
                 "reference": meta2.to_dict(),
@@ -599,8 +872,16 @@ def match_images_cfog(
         pts1_arr, pts2_arr, cv2.RANSAC, ransacReprojThreshold=5.0
     )
 
+    if H_final is not None and inlier_mask is not None and np.sum(inlier_mask) >= 4:
+        try:
+            det = float(np.linalg.det(H_final))
+            if det <= 1e-4:
+                H_final = None
+        except Exception:
+            H_final = None
+
     if H_final is None or inlier_mask is None or np.sum(inlier_mask) < 4:
-        # Try affine transformation if perspective fails
+        # Try affine transformation if perspective fails or is reflective
         H_aff, inlier_mask = cv2.estimateAffinePartial2D(pts1_arr, pts2_arr)
         if H_aff is not None and inlier_mask is not None and np.sum(inlier_mask) >= 4:
             H_final = np.vstack([H_aff, [0.0, 0.0, 1.0]])
@@ -663,10 +944,44 @@ def match_images_cfog(
     for i, rec in enumerate(refinement_records):
         rec["is_inlier"] = bool(inlier_flat[i] == 1)
 
+    # --- Item 3: Post-RANSAC Lucas-Kanade Sub-Pixel Refinement (OHRC↔TMC-2 only) ---
+    lk_stats: Optional[Dict[str, Any]] = None
+    if not multimodal_pair and comp1_gray.shape == comp2_gray.shape and int(np.sum(inlier_mask)) >= 4:
+        inlier_idx_lk = np.where(inlier_mask.ravel() == 1)[0]
+        lk_src = pts1_arr[inlier_idx_lk]
+        lk_dst = pts2_arr[inlier_idx_lk]
+
+        refined_src, refined_dst, lk_stats = refine_inliers_lucas_kanade(
+            comp1_gray, comp2_gray, lk_src, lk_dst, scale_factor1, scale_factor2
+        )
+
+        if lk_stats["refined_count"] > 0:
+            # Re-estimate homography from refined correspondences
+            H_refined, mask_refined = cv2.findHomography(
+                refined_src, refined_dst, cv2.RANSAC, ransacReprojThreshold=5.0
+            )
+            if H_refined is not None and mask_refined is not None and np.sum(mask_refined) >= 4:
+                tx_check_r = verify_transformation_quality(H_refined, (orig_h2, orig_w2))
+                if tx_check_r["is_valid"]:
+                    H_final = H_refined
+                    # Update pts arrays with refined coordinates for metrics
+                    pts1_arr[inlier_idx_lk] = refined_src
+                    pts2_arr[inlier_idx_lk] = refined_dst
+                    # Update records
+                    for j, idx in enumerate(inlier_idx_lk):
+                        if idx < len(refinement_records):
+                            refinement_records[idx]["target_x"] = round(float(refined_dst[j, 0]), 2)
+                            refinement_records[idx]["target_y"] = round(float(refined_dst[j, 1]), 2)
+                            refinement_records[idx]["image2_x"] = round(float(refined_dst[j, 0]), 2)
+                            refinement_records[idx]["image2_y"] = round(float(refined_dst[j, 1]), 2)
+                            refinement_records[idx]["lk_refined"] = True
+
     # 9. Compute Canonical Master Metrics
     metrics = compute_canonical_metrics(
         pts1_arr, pts2_arr, inlier_mask, H_final, (orig_h2, orig_w2), grid_size
     )
+    if lk_stats:
+        metrics["lk_refinement"] = lk_stats
 
     # 10. Generate Output Products
     # A. Warped source image into reference space
@@ -763,6 +1078,8 @@ def match_images_cfog(
             "reference_path": str(img_path2),
             "dem_path": str(dem_path) if dem_path else None,
             "matcher": "CFOG_PhaseCongruency_v2.0",
+            "spatial_attempts": spatial_attempts,
+            "coarse_matcher": "mutual_information" if multimodal_pair else "normalized_correlation",
         },
     }
     with open(metadata_path, "w") as f:
@@ -789,6 +1106,7 @@ def match_images_cfog(
         "metrics": metrics,
         "homography": H_final.tolist(),
         "terrain_correction": full_metadata["terrain_correction"],
+        "spatial_attempts": spatial_attempts,
         "matches": [m for m in refinement_records if m.get("is_inlier", False)],
         "all_matches": refinement_records,
         "outputs": {

@@ -1,13 +1,10 @@
 {
-    "status": "cycle_not_computable",
-    "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
-    "triplet_cycle_rmse_px": null,
-    "triplet_mean_cycle_error_px": null,
-    "cycle_closed_successfully": false,
-    "failed_legs": [
-        "BC (B -> C)",
-        "CA (C -> A)"
-    ],
+    "status": "evaluated_composed",
+    "reason": null,
+    "triplet_cycle_rmse_px": 3.3241,
+    "triplet_mean_cycle_error_px": 2.7258,
+    "cycle_closed_successfully": true,
+    "failed_legs": [],
     "pair_AB_metrics": {
         "match_count": 70,
         "inlier_count": 7,
@@ -43,8 +40,75 @@
             "determinant": 3.21541,
             "condition_number": 41.13,
             "scale_ratio": 1.6691
+        },
+        "lk_refinement": {
+            "refined_count": 0,
+            "total": 7,
+            "fb_threshold": 0.5,
+            "max_shift_px": 3.0
         }
     },
-    "pair_BC_metrics": null,
-    "pair_CA_metrics": null
+    "pair_BC_metrics": {
+        "match_count": 96,
+        "inlier_count": 14,
+        "inlier_ratio": 0.1458,
+        "fit_rmse_px": 2.8082,
+        "validation_rmse_px": 7.0156,
+        "held_out_inlier_validation_rmse_px": 7.0156,
+        "validation_median_error_px": 6.3786,
+        "validation_status": "evaluated",
+        "quality_tier": "ACCEPTED",
+        "mean_reprojection_error_px": 2.4747,
+        "median_reprojection_error_px": 2.5692,
+        "max_reprojection_error_px": 4.8727,
+        "fraction_below_1px": 0.2143,
+        "fraction_below_0_5px": 0.0,
+        "fraction_below_0_25px": 0.0,
+        "spatial_coverage": 0.14,
+        "spatial_uniformity": 0.0666,
+        "spatial_distribution": {
+            "grid_rows": 10,
+            "grid_cols": 10,
+            "total_cells": 100,
+            "occupied_cells": 14,
+            "coverage": 0.14,
+            "count_std": 0.347,
+            "count_mean": 0.14,
+            "spatial_entropy": 0.5731,
+            "uniformity_score": 0.0666
+        },
+        "transform_quality": {
+            "is_valid": true,
+            "reason": "OK",
+            "determinant": 0.935404,
+            "condition_number": 340.01,
+            "scale_ratio": 1.0465
+        }
+    },
+    "pair_CA_metrics": null,
+    "composition": {
+        "source": "A -> B -> C",
+        "homography": [
+            [
+                2.160819217516023,
+                -0.5338351119901107,
+                14.995346834609851
+            ],
+            [
+                0.046814611658573015,
+                1.4068876819316267,
+                18.59869911042873
+            ],
+            [
+                0.00166176255080062,
+                4.8294561337289275e-05,
+                1.0
+            ]
+        ],
+        "transform": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
+        "registered_raster": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
+        "registered_geotiff": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
+        "checkerboard_qa": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\composed_checkerboard_qa.png",
+        "manifest": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\registered_products_manifest.json"
+    }
 }

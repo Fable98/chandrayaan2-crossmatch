@@ -1,0 +1,81 @@
+{
+    "source": {
+        "sensor": "TMC-2",
+        "gsd_m": 3.96,
+        "wavelength_range_um": [
+            0.4,
+            0.85
+        ],
+        "sun_azimuth_deg": 251.647896,
+        "sun_elevation_deg": null,
+        "incidence_angle_deg": null,
+        "emission_angle_deg": null,
+        "phase_angle_deg": null,
+        "acquisition_time": null,
+        "bounds": null,
+        "provenance": {
+            "sensor": "request",
+            "gsd_m": "header",
+            "emission_angle_deg": "unavailable",
+            "sun_azimuth_deg": "header",
+            "incidence_angle_deg": "unavailable",
+            "wavelength_range_um": "sensor_spec"
+        }
+    },
+    "reference": {
+        "sensor": "IIRS",
+        "gsd_m": 71.24,
+        "wavelength_range_um": [
+            0.8,
+            5.0
+        ],
+        "sun_azimuth_deg": null,
+        "sun_elevation_deg": null,
+        "incidence_angle_deg": null,
+        "emission_angle_deg": null,
+        "phase_angle_deg": null,
+        "acquisition_time": null,
+        "bounds": null,
+        "provenance": {
+            "sensor": "request",
+            "gsd_m": "header",
+            "emission_angle_deg": "unavailable",
+            "sun_azimuth_deg": "unavailable",
+            "incidence_angle_deg": "unavailable",
+            "wavelength_range_um": "sensor_spec"
+        }
+    },
+    "working_scale": {
+        "working_gsd_m": 71.24,
+        "method": "common_physical_gsd_normalization"
+    },
+    "terrain_correction": {
+        "source": {
+            "enabled": false,
+            "method": null,
+            "reason": "No DEM or nadir viewing"
+        },
+        "reference": {
+            "enabled": false,
+            "method": null,
+            "reason": "No DEM or nadir viewing"
+        }
+    },
+    "provenance": {
+        "source_path": "data_preprocessing_pipeline\\processed_triplets\\triplet_new_2022\\tmc_512.png",
+        "reference_path": "data_preprocessing_pipeline\\processed_triplets\\triplet_new_2022\\iirs_512.png",
+        "dem_path": null,
+        "matcher": "CFOG_PhaseCongruency_v2.0",
+        "spatial_attempts": {
+            "grid_size": 10,
+            "attempted_cells": 100,
+            "total_cells": 100,
+            "attempted_coverage": 1.0,
+            "matched_cells": 68,
+            "macro_grid": 4,
+            "macro_cells_occupied": 16,
+            "mandatory_fill_count": 0
+        },
+        "coarse_matcher": "mutual_information"
+    }
+}

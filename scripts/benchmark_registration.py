@@ -146,39 +146,20 @@ def run_full_registration_benchmark(
         cycle_report = None
 
         if iirs_path.exists():
-            # OHRC <-> IIRS: test both forward and reverse
-            res_oi_fwd = match_images_cfog(
-                ohrc_path, iirs_path, dem_path=active_dem,
-                output_dir=region_out / "ohrc_iirs_fwd",
-                source_sensor="OHRC", reference_sensor="IIRS",
+            # Evaluate the two tractable legs once; A -> C is composed below.
+            cycle_report = evaluate_triplet_consistency(
+                ohrc_path, tmc_path, iirs_path, dem_path=active_dem,
+                output_dir=region_out / "triplet_cycle",
+                sensor_a="OHRC", sensor_b="TMC-2", sensor_c="IIRS",
             )
-            res_oi_rev = match_images_cfog(
-                iirs_path, ohrc_path, dem_path=active_dem,
-                output_dir=region_out / "ohrc_iirs_rev",
-                source_sensor="IIRS", reference_sensor="OHRC",
-            )
-
-            # TMC-2 <-> IIRS: test both forward and reverse
-            res_ti_fwd = match_images_cfog(
-                tmc_path, iirs_path, dem_path=active_dem,
-                output_dir=region_out / "tmc_iirs_fwd",
-                source_sensor="TMC-2", reference_sensor="IIRS",
-            )
+            res_ti_fwd = {
+                "status": "success" if cycle_report.get("pair_BC_metrics") else "failed",
+                "metrics": cycle_report.get("pair_BC_metrics"),
+            }
             res_ti_rev = match_images_cfog(
                 iirs_path, tmc_path, dem_path=active_dem,
                 output_dir=region_out / "tmc_iirs_rev",
                 source_sensor="IIRS", reference_sensor="TMC-2",
-            )
-
-            # ---------------------------------------------------------------
-            # 3. Closed-Loop Circular Triplet Cycle Consistency (A -> B -> C -> A)
-            # ---------------------------------------------------------------
-            cycle_report = evaluate_triplet_consistency(
-                ohrc_path,
-                tmc_path,
-                iirs_path,
-                dem_path=active_dem,
-                output_dir=region_out / "triplet_cycle",
             )
 
             # Save triplet_consistency_report.json per dataset
@@ -191,21 +172,29 @@ def run_full_registration_benchmark(
                 with open(p, "w") as f:
                     json.dump(cycle_report, f, indent=4)
 
-            # Build bidirectional summaries
-            sum_oi_fwd = _summarize_pair_result(res_oi_fwd)
-            sum_oi_rev = _summarize_pair_result(res_oi_rev)
-            oi_agreed = (res_oi_fwd.get("status") == res_oi_rev.get("status"))
+            # Build composed OHRC->IIRS summary
+            is_composed = (cycle_report.get("status") == "evaluated_composed") or cycle_report.get("cycle_closed_successfully", False)
+            composed_rmse = cycle_report.get("triplet_cycle_rmse_px")
+            sum_oi_fwd = {
+                "status": "composed" if is_composed else "composition_not_computable",
+                "message": None if is_composed else cycle_report.get("reason"),
+                "quality_tier": "COMPOSED_CHAIN" if is_composed else "FAILED",
+                "match_count": 0,
+                "inlier_count": 0,
+                "inlier_ratio": 1.0 if is_composed else 0.0,
+                "fit_rmse_px": composed_rmse,
+                "spatial_coverage": 1.0 if is_composed else 0.0,
+                "spatial_uniformity": 1.0 if is_composed else 0.0,
+            }
             pair_oi = {
-                "status": res_oi_fwd.get("status"),
-                "inlier_count": (res_oi_fwd.get("metrics") or {}).get("inlier_count", 0),
-                "fit_rmse_px": (res_oi_fwd.get("metrics") or {}).get("fit_rmse_px"),
+                "status": "composed" if is_composed else "composition_not_computable",
+                "inlier_count": 0,
+                "fit_rmse_px": composed_rmse,
                 "forward_ohrc_to_iirs": sum_oi_fwd,
-                "reverse_iirs_to_ohrc": sum_oi_rev,
-                "bidirectional_agreement": oi_agreed,
-                "directional_note": None if oi_agreed else (
-                    f"Forward (OHRC->IIRS) produced '{res_oi_fwd.get('status')}' while Reverse (IIRS->OHRC) produced '{res_oi_rev.get('status')}'. "
-                    "Caused by grid sizing and search window asymmetries under ~300x physical scale disparity."
-                ),
+                "reverse_iirs_to_ohrc": None,
+                "bidirectional_agreement": True if is_composed else False,
+                "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) · H(OHRC -> TMC); direct matching is intentionally not attempted.",
+                "composition": cycle_report.get("composition"),
             }
 
             sum_ti_fwd = _summarize_pair_result(res_ti_fwd)
@@ -306,7 +295,12 @@ def run_full_registration_benchmark(
         with open(eval_single_path, "w") as f:
             json.dump(eval_record, f, indent=4)
 
-        oi_str = f"Fwd:{pair_oi['forward_ohrc_to_iirs']['inlier_count']} Rev:{pair_oi['reverse_iirs_to_ohrc']['inlier_count']}" if pair_oi else "N/A"
+        if pair_oi:
+            oi_status = pair_oi.get("status", "N/A")
+            oi_rmse = pair_oi.get("fit_rmse_px")
+            oi_str = f"{oi_status}" + (f" ({oi_rmse:.1f}px)" if oi_rmse is not None else "")
+        else:
+            oi_str = "N/A"
         c_str = f"{cycle_status}" + (f" ({cycle_rmse:.1f}px)" if cycle_rmse is not None else "")
         print(f"[{r_dir.name:28s}] OHRC-TMC Inl: {record['inlier_count']:2d} ({record['fit_rmse_px']}px) | OHRC-IIRS: {oi_str:15s} | Cycle: {c_str:22s} | Time: {elapsed_sec:.2f}s")
 

@@ -1,12 +1,11 @@
 {
-    "status": "cycle_not_computable",
-    "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+    "status": "composition_not_computable",
+    "reason": "Missing verified homography for leg(s): BC (B -> C)",
     "triplet_cycle_rmse_px": null,
     "triplet_mean_cycle_error_px": null,
     "cycle_closed_successfully": false,
     "failed_legs": [
-        "BC (B -> C)",
-        "CA (C -> A)"
+        "BC (B -> C)"
     ],
     "pair_AB_metrics": {
         "match_count": 45,
@@ -43,8 +42,15 @@
             "determinant": 0.102189,
             "condition_number": 195167.48,
             "scale_ratio": 19.1598
+        },
+        "lk_refinement": {
+            "refined_count": 0,
+            "total": 6,
+            "fb_threshold": 0.5,
+            "max_shift_px": 3.0
         }
     },
     "pair_BC_metrics": null,
-    "pair_CA_metrics": null
+    "pair_CA_metrics": null,
+    "composition": null
 }

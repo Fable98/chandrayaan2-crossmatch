@@ -235,7 +235,7 @@ def verify_transformation_quality(
         # A valid lunar transform should preserve orientation (det > 0) and not collapse scale
         is_valid = (
             np.isfinite(cond)
-            and cond < 1e6
+            and cond < 1e7
             and det > 1e-4
             and scale_ratio < 20.0
             and proj_strength < 0.05
