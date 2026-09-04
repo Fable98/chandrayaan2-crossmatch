@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Product_Observational xmlns="http://pds.nasa.gov/pds4/pds/v1">
+    <Identification_Area>
+        <logical_identifier>urn:isro:ch2:ch2_ohr_sample_001</logical_identifier>
+        <version_id>1.0</version_id>
+        <title>Chandrayaan-2 OHRC Calibrated Observation</title>
+        <information_model_version>1.14.0.0</information_model_version>
+        <product_class>Product_Observational</product_class>
+    </Identification_Area>
+    <Observation_Area>
+        <Observing_System>
+            <name>Chandrayaan-2</name>
+            <Observing_System_Component>
+                <name>OHRC</name>
+                <type>Instrument</type>
+            </Observing_System_Component>
+        </Observing_System>
+        <Target_Identification>
+            <name>Moon</name>
+            <type>Satellite</type>
+        </Target_Identification>
+    </Observation_Area>
+    <File_Area_Observational>
+        <File>
+            <file_name>ohrc_sample.png</file_name>
+            <creation_date_time>2020-04-15T06:22:11Z</creation_date_time>
+        </File>
+        <Array_2D_Image>
+            <name>OHRC Grayscale Image</name>
+            <offset unit="byte">0</offset>
+            <axes>2</axes>
+            <axis_index_order>Last_Index_Fastest</axis_index_order>
+            <Element_Array>
+                <data_type>UnsignedByte</data_type>
+            </Element_Array>
+            <Axis_Array>
+                <axis_name>Line</axis_name>
+                <elements>512</elements>
+                <sequence_number>1</sequence_number>
+            </Axis_Array>
+            <Axis_Array>
+                <axis_name>Sample</axis_name>
+                <elements>512</elements>
+                <sequence_number>2</sequence_number>
+            </Axis_Array>
+        </Array_2D_Image>
+    </File_Area_Observational>
+    <cart:Cartography xmlns:cart="http://pds.nasa.gov/pds4/cart/v1">
+        <cart:Spatial_Reference_Information>
+            <cart:pixel_resolution>0.25</cart:pixel_resolution>
+        </cart:Spatial_Reference_Information>
+    </cart:Cartography>
+    <geom:Geometry xmlns:geom="http://pds.nasa.gov/pds4/geom/v1">
+        <geom:sun_azimuth>135.5</geom:sun_azimuth>
+        <geom:sun_elevation>42.0</geom:sun_elevation>
+        <geom:incidence_angle>48.0</geom:incidence_angle>
+        <geom:emission_angle>0.0</geom:emission_angle>
+        <geom:phase_angle>48.0</geom:phase_angle>
+        <geom:spice_kernel_file>ch2_orb_v01.bsp</geom:spice_kernel_file>
+    </geom:Geometry>
+</Product_Observational>

@@ -16,9 +16,12 @@ from pathlib import Path
 from typing import Dict, Any, Tuple, Optional
 import urllib.request
 import urllib.error
+import logging
 
 import numpy as np
 import cv2
+
+logger = logging.getLogger("data.ingestion.lro_basemap")
 
 
 @dataclass
@@ -294,6 +297,7 @@ def download_or_fetch_lro_basemap(
 
     # Check if already cached
     if xml_target.exists() and img_target.exists():
+        logger.debug("Found cached LRO basemap product: %s", stem)
         meta = parse_lro_pds4_label(xml_target)
         raw = cv2.imread(str(img_target), cv2.IMREAD_UNCHANGED)
         if raw is not None:
@@ -312,6 +316,7 @@ def download_or_fetch_lro_basemap(
         f"&BBOX={min_lon},{min_lat},{max_lon},{max_lat}&WIDTH=512&HEIGHT=512&FORMAT=image/png"
     )
     try:
+        logger.debug("Attempting live WMS fetch for LRO basemap: bbox=%s", bbox)
         req = urllib.request.Request(wms_url, headers={"User-Agent": "Chandrayaan2Crossmatch/1.0"})
         with urllib.request.urlopen(req, timeout=timeout) as response:
             if response.status == 200:
@@ -320,11 +325,14 @@ def download_or_fetch_lro_basemap(
                     with open(img_target, "wb") as f:
                         f.write(content)
                     download_success = True
-    except (urllib.error.URLError, TimeoutError, OSError, Exception):
+                    logger.info("Successfully fetched live LRO WMS basemap (%d bytes)", len(content))
+    except (urllib.error.URLError, TimeoutError, OSError, Exception) as e:
+        logger.debug("Online basemap fetch bypassed or timed out (%s). Using local/synthetic PDS4.", e)
         download_success = False
 
     # If offline or download blocked, generate local mock PDS4 product
     if not download_success:
+        logger.info("Generating synthetic mock PDS4 LRO %s basemap for offline reference.", sensor)
         xml_file, img_file = create_mock_pds4_product(
             bbox=bbox,
             out_dir=cache_path,

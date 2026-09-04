@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 import re
+import logging
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -20,6 +21,8 @@ from typing import Dict, Any, Tuple, Optional, List
 
 import numpy as np
 import cv2
+
+logger = logging.getLogger("data.ingestion.pds4_reader")
 
 
 @dataclass
@@ -90,9 +93,17 @@ def parse_pds4_or_vicar_label(label_path: str | Path) -> PDS4ProductInfo:
     is_xml = content.strip().startswith("<?xml") or "<Product_" in content
 
     if is_xml:
-        return _parse_pds4_xml(content, path)
+        logger.info("Parsing PDS4 XML label: %s", path.name)
+        info = _parse_pds4_xml(content, path)
     else:
-        return _parse_vicar_text(content, path)
+        logger.info("Parsing legacy VICAR label: %s", path.name)
+        info = _parse_vicar_text(content, path)
+
+    logger.info(
+        "PDS4 metadata extracted: sensor=%s, size=(%dx%d), GSD=%.2fm, sun_az=%.1f deg, sun_el=%.1f deg",
+        info.sensor, info.samples, info.lines, info.gsd_m, info.sun_azimuth_deg, info.sun_elevation_deg
+    )
+    return info
 
 
 def _parse_pds4_xml(xml_text: str, path: Path) -> PDS4ProductInfo:

@@ -13,9 +13,12 @@ and off-nadir emission geometries by:
 from __future__ import annotations
 
 import math
+import logging
 from typing import Optional, Tuple, Dict, Any, List
 import numpy as np
 import cv2
+
+logger = logging.getLogger("ML_model.geometry")
 
 
 # ---------------------------------------------------------------------------
@@ -70,6 +73,10 @@ def dem_ray_intersection(
     # Center origin of coordinate frame at image center
     cx, cy = w / 2.0, h / 2.0
     mean_dem = float(np.nanmean(dem))
+    logger.debug(
+        "DEM ray intersection: %d points, emission=%.1f deg, azimuth=%.1f deg, mean DEM elevation=%.1f m",
+        len(pts), emission_deg, azimuth_deg, mean_dem
+    )
 
     # Sample DEM with bilinear interpolation
     def sample_elevation(x_arr: np.ndarray, y_arr: np.ndarray) -> np.ndarray:
@@ -168,6 +175,10 @@ def warp_piecewise_affine(
 
     src_arr = np.asarray(src_pts, dtype=np.float32)
     dst_arr = np.asarray(dst_pts, dtype=np.float32)
+    logger.debug(
+        "Piecewise affine warping: %d tie-points, source shape=%s, target shape=%s, tile_size=%d",
+        len(src_arr), image.shape, out_shape, tile_size
+    )
 
     # Compute global fallback affine or homography
     if global_H is None:
@@ -437,8 +448,15 @@ def ransac_dem_aware_fit(
         final_inlier_mask = np.zeros(n, dtype=np.uint8)
         best_H = None
 
+    final_count = int(np.sum(final_inlier_mask))
+    logger.info(
+        "DEM-aware RANSAC completed: %d/%d inliers (%.1f%%), relief compensated: %s",
+        final_count, n, (final_count / max(1, n)) * 100,
+        bool(dem is not None and abs(emission_deg) > 1e-2)
+    )
+
     return best_H, final_inlier_mask, {
-        "inlier_count": int(np.sum(final_inlier_mask)),
+        "inlier_count": final_count,
         "total_points": n,
         "dem_compensated": bool(dem is not None and abs(emission_deg) > 1e-2),
     }

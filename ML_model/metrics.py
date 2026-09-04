@@ -11,9 +11,12 @@ Unified, single source of truth for all quantitative evaluation metrics:
 from __future__ import annotations
 
 import math
-from typing import Optional, Dict, Any, List, Tuple
+import logging
+from typing import Optional, Dict, Any, List, Tuple, Union
 import numpy as np
 import cv2
+
+logger = logging.getLogger("ML_model.metrics")
 
 
 # ---------------------------------------------------------------------------
@@ -167,6 +170,7 @@ def calculate_absolute_rmse_meters(
         total_sq = planar_sq
 
     rmse_meters = float(np.sqrt(np.mean(total_sq)))
+    logger.debug("Calculated absolute RMSE: %.4f m (DEM topographic correction applied: %s)", rmse_meters, bool(dem_data is not None))
     return round(rmse_meters, 4)
 
 

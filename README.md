@@ -20,13 +20,29 @@ This repository provides an open, reproducible, and photogrammetrically defensib
 
 ---
 
-### Scope Clarification: Intra-Mission Cross-Registration vs. External Basemap Control
+## Quickstart / One-Command Demo
 
-This pipeline specifically performs cross-sensor correspondence directly among Chandrayaan-2's own onboard orbital instruments—**OHRC**, **TMC-2**, and **IIRS**—designating one payload as the moving/source image and another as the fixed/reference image in accordance with standard image co-registration definitions.
+Run the complete end-to-end registration pipeline, PDS4 metadata ingestion, DEM-aware RANSAC with piecewise affine warping, and 4-way comparative ablation benchmark with a single command:
 
-It does **not** currently register against an external lunar basemap or global reference mosaic (such as the LROC WAC global mosaic, Kaguya Terrain Camera mosaic, or LOLA DEM) as an absolute ground-control source. This is a **deliberate scope decision**, not an oversight:
-1. **Intra-Mission Scientific Focus**: The primary mandate under SIH Problem Statement 26166 is resolving severe cross-modal geometric alignment, illumination disparities, and massive physical scale differences (~16–20× linear physical resolution gap between OHRC and TMC-2, ~300× with IIRS) across Chandrayaan-2's own heterogeneous payloads operating concurrently.
-2. **Readiness for Basemap Extension**: The pipeline's architectural foundation—including automated PDS4 label parsing, spatial footprint intersection via Shapely/GeoPandas, tie-point extraction, and GDAL/rasterio projective warping—already provides the exact georeferencing infrastructure required to ingest external lunar basemaps as reference layers in future operational deployments.
+```bash
+python run_demo.py --input_dir ./sample_data --output_dir ./results
+```
+
+### What this command does:
+1. **PDS4 Metadata Ingestion**: Parses and validates `sample_data/*.xml` labels extracting GSD, Sun azimuth/elevation, and SPICE kernels via `data.ingestion.pds4_reader`.
+2. **Multi-Modal Registration**: Executes structural Phase Congruency & CFOG matching with **Grid NMS**, **DEM ray-intersection**, and **Piecewise Affine Warping** (`ML_model/matcher_cfog.py`).
+3. **Comparative Benchmark**: Runs the 4-way ablation study comparing Pure SIFT, Pure LoFTR, Pipeline without DEM, and Full Proposed Pipeline (`evaluation/run_ablation.py`).
+4. **Structured Deliverables**: Generates `results/summary_report.md`, `results/pipeline.log`, registered GeoTIFF raster, checkerboard QA preview, and archives the technical documentation.
+
+> [!TIP]
+> For complete mathematical formulations (Phase Congruency, CFOG, IIRS PCA/SAM, Grid NMS, DEM Ray-Intersection, and Selenodetic 3D RMSE), see [**`docs/methodology.md`**](docs/methodology.md).
+
+---
+
+### External Basemap & Multi-Sensor Scope
+- **Intra-Mission Cross-Registration**: High-precision co-registration across heterogeneous Chandrayaan-2 payloads (**OHRC**, **TMC-2**, **IIRS**).
+- **External Lunar Basemap Referencing**: Ingests **LRO WAC/NAC** basemaps (`data/ingestion/lro_basemap.py`) for absolute reference ground control.
+- **Topographic Metric Accuracy**: Evaluates Absolute RMSE in selenodetic **meters**, incorporating 3D terrain elevation deltas ($\Delta z$) alongside pixel residuals.
 
 ---
 

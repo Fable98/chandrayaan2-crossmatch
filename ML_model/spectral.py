@@ -11,9 +11,12 @@ Implements:
 
 from __future__ import annotations
 
+import logging
 from typing import Optional, Tuple, Dict, Any, List
 import numpy as np
 import cv2
+
+logger = logging.getLogger("ML_model.spectral")
 
 
 def enhance_iirs_structural_features(
@@ -59,6 +62,10 @@ def enhance_iirs_structural_features(
             arr[bad_mask, band_idx] = valid_val
 
     # 1. Principal Component Analysis (PCA)
+    logger.info(
+        "Enhancing hyperspectral features: %d bands, spatial dims=(%d, %d). Applying PCA PC1 + mineral ratio fusion.",
+        b, h, w
+    )
     flat = arr.reshape(-1, b)
     mean_vec = np.mean(flat, axis=0, keepdims=True)
     centered = flat - mean_vec
@@ -162,6 +169,11 @@ def quantify_iirs_residuals(
     else:
         mean_var = 0.0
         sam_deg = 0.0
+
+    logger.info(
+        "IIRS residual analysis: spatial misalignment=%.4f px, spectral variance=%.6f, SAM=%.2f deg",
+        spatial_misalignment, mean_var, sam_deg
+    )
 
     return {
         "spatial_misalignment_px": round(spatial_misalignment, 4),

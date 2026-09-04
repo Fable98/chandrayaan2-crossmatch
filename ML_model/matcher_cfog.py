@@ -18,7 +18,8 @@ import json
 import math
 import shutil
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any, List
+from typing import Optional, Tuple, Dict, Any, List, Union
+import logging
 
 import numpy as np
 import cv2
@@ -27,6 +28,8 @@ from metadata import extract_sensor_metadata, SensorMetadata
 from metrics import compute_canonical_metrics, verify_transformation_quality, calculate_reprojection_errors
 from geometry import warp_piecewise_affine, warp_thin_plate_splines, dem_ray_intersection, ransac_dem_aware_fit
 from spectral import enhance_iirs_structural_features, quantify_iirs_residuals
+
+logger = logging.getLogger("ML_model.matcher_cfog")
 
 
 # ---------------------------------------------------------------------------
@@ -617,6 +620,7 @@ def match_images_cfog(
     out_path.mkdir(parents=True, exist_ok=True)
 
     # 1. Ingest metadata
+    logger.info("Initializing registration pipeline: source='%s', reference='%s'", img_path1, img_path2)
     meta1 = extract_sensor_metadata(img_path1, source_sensor, explicit_gsd1, explicit_emission1)
     meta2 = extract_sensor_metadata(img_path2, reference_sensor, explicit_gsd2, explicit_emission2)
 
@@ -630,7 +634,9 @@ def match_images_cfog(
             raw_dem = cv2.imread(str(dem_path), cv2.IMREAD_UNCHANGED)
             if raw_dem is not None:
                 dem_arr = raw_dem.astype(np.float32)
-        except Exception:
+                logger.info("DEM loaded successfully from '%s' (shape: %s)", dem_path, dem_arr.shape)
+        except Exception as e:
+            logger.warning("Failed to load DEM from '%s': %s", dem_path, e)
             dem_arr = None
 
     orig_h1, orig_w1 = raw1_gray.shape[:2]
@@ -641,6 +647,10 @@ def match_images_cfog(
     working_gsd = max(meta1.gsd_m, meta2.gsd_m)
     scale_factor1 = float(working_gsd / meta1.gsd_m)  # e.g. 5.0 / 0.25 = 20.0
     scale_factor2 = float(working_gsd / meta2.gsd_m)  # e.g. 5.0 / 5.0 = 1.0
+    logger.info(
+        "Sensor metadata: %s (%.2fm GSD) -> %s (%.2fm GSD). Target working scale: %.2fm/px (scales: %.1fx, %.1fx)",
+        meta1.sensor, meta1.gsd_m, meta2.sensor, meta2.gsd_m, working_gsd, scale_factor1, scale_factor2
+    )
 
     work_w1 = int(round(orig_w1 / scale_factor1))
     work_h1 = int(round(orig_h1 / scale_factor1))
@@ -1227,6 +1237,10 @@ def match_images_cfog(
     # QUALITY GATE 1: Insufficient Genuine Matches
     # ZERO FAKE CORRESPONDENCES ALLOWED. Fail cleanly if real matches < 4.
     if len(selected_matches) < 4:
+        logger.warning(
+            "Quality Gate 1 Rejected: Insufficient verified correspondences (%d < 4). Aborting without synthetic fallback.",
+            len(selected_matches),
+        )
         return {
             "status": "insufficient_correspondences",
             "message": f"Insufficient verified correspondences for geometric registration (found {len(selected_matches)}, minimum required is 4).",
@@ -1241,6 +1255,8 @@ def match_images_cfog(
                 "working_scale": {"working_gsd_m": working_gsd},
             },
         }
+
+    logger.info("Quality Gate 1 Passed: %d candidate matches retained across grid.", len(selected_matches))
 
     # 7. Local Fourier Phase Correlation Sub-Pixel Refinement
     patch_size_work = max(16, int(round(patch_size_m / working_gsd)))
@@ -1331,6 +1347,7 @@ def match_images_cfog(
         else:
             # QUALITY GATE 2: Geometric Verification Failed
             # ZERO IDENTITY MATRIX FALLBACKS ALLOWED. Report failure cleanly.
+            logger.error("Quality Gate 2 Rejected: Robust geometric estimation failed to find consistent transformation.")
             return {
                 "status": "geometric_verification_failed",
                 "message": "Robust geometric verification failed to estimate a valid transformation from verified correspondences.",
@@ -1348,6 +1365,7 @@ def match_images_cfog(
     # QUALITY GATE 3: Sanity Check Transformation Conditioning
     tx_check = verify_transformation_quality(H_final, (orig_h2, orig_w2))
     if not tx_check["is_valid"]:
+        logger.warning("Quality Gate 3 Rejected: Transformation conditioning invalid: %s", tx_check["reason"])
         return {
             "status": "geometric_verification_failed",
             "message": f"Estimated transformation rejected by quality gate: {tx_check['reason']}",
@@ -1368,6 +1386,7 @@ def match_images_cfog(
     is_spatial_valid, spatial_reason, spatial_info = verify_spatial_quality_gate(inlier_cells)
 
     if not is_spatial_valid:
+        logger.warning("Quality Gate 4 Rejected: Spatial support check failed: %s", spatial_reason)
         return {
             "status": "geometric_verification_failed",
             "message": f"Transformation rejected by spatial quality gate: {spatial_reason}.",
@@ -1611,6 +1630,16 @@ def match_images_cfog(
     }
     with open(metadata_path, "w") as f:
         json.dump(full_metadata, f, indent=4)
+
+    abs_str = f"{metrics['absolute_rmse_m']:.2f} m" if metrics.get("absolute_rmse_m") is not None else "N/A"
+    logger.info(
+        "Registration succeeded: inliers=%d/%d (%.1f%%), fit_rmse=%.4f px, absolute_rmse=%s",
+        metrics.get("inlier_count", 0),
+        metrics.get("match_count", 0),
+        metrics.get("inlier_ratio", 0.0) * 100,
+        metrics.get("fit_rmse_px", 0.0),
+        abs_str,
+    )
 
     return {
         "status": "success",
