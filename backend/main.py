@@ -40,10 +40,16 @@ ALLOWED_ORIGINS: str = os.environ.get(
 )
 
 allowed_origins_list: list[str] = [
-    origin.strip() for origin in ALLOWED_ORIGINS.split(",") if origin.strip()
+    origin.strip()
+    for origin in ALLOWED_ORIGINS.split(",")
+    if origin.strip() and origin.strip() != "*"
 ]
 if not allowed_origins_list:
-    allowed_origins_list = [CORS_ORIGIN]
+    allowed_origins_list = [
+        CORS_ORIGIN,
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
 
 
 # ---------------------------------------------------------------------------
