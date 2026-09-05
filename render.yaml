@@ -8,4 +8,4 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.9
       - key: ALLOWED_ORIGINS
-        value: "*"
+        value: "https://chandrayaan2-crossmatch-56fjycajj-fable98s-projects.vercel.app,http://localhost:3000,http://127.0.0.1:3000"
