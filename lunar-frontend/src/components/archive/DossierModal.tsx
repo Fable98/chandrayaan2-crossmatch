@@ -158,7 +158,7 @@ export default function DossierModal({
                 <div className="flex justify-between border-b border-slate-200/60 pb-2">
                   <span className="font-sans text-slate-500">Root Mean Square Error</span>
                   <span className="font-bold text-[#4F46E5]">
-                    {metrics ? `${metrics.rmse_px.toFixed(3)} px` : "—"}
+                    {metrics?.rmse_px != null ? `${metrics.rmse_px.toFixed(3)} px` : "—"}
                   </span>
                 </div>
                 <div className="flex justify-between border-b border-slate-200/60 pb-2">
@@ -170,7 +170,7 @@ export default function DossierModal({
                 <div className="flex justify-between border-b border-slate-200/60 pb-2">
                   <span className="font-sans text-slate-500">Combined Coverage Score</span>
                   <span className="font-bold text-slate-900">
-                    {metrics ? `${(metrics.combined_coverage_score * 100).toFixed(1)}%` : "—"}
+                    {metrics?.combined_coverage_score != null ? `${(metrics.combined_coverage_score * 100).toFixed(1)}%` : "—"}
                   </span>
                 </div>
                 <div className="flex justify-between">

@@ -15,6 +15,7 @@ export interface SensorMeta {
   sun_elevation_deg?: number | null;
   sun_azimuth_deg?: number | null;
   incidence_angle_deg?: number | null;
+  tile_id?: string | null;
 }
 
 export interface TripletSummary {
@@ -29,6 +30,7 @@ export interface TripletSummary {
   incidence_angle?: Record<string, number>;
   dem_available?: boolean;
   dem_url?: string | null;
+  [key: string]: unknown;
 }
 
 export interface TripletListResponse {
@@ -44,33 +46,38 @@ export interface MatchPoint {
 }
 
 export interface MatchMetrics {
-  num_inliers: number;
-  num_raw_matches: number;
-  inlier_ratio: number;
-  rmse_px: number;
-  mean_reprojection_error_px: number;
-  median_reprojection_error_px: number;
-  max_reprojection_error_px: number;
-  sub_pixel_accurate: boolean;
-  fraction_below_1px: number;
-  source_coverage_ratio: number;
-  destination_coverage_ratio: number;
-  combined_coverage_score: number;
-  source_occupied_cells: number;
+  num_inliers?: number;
+  num_raw_matches?: number;
+  inlier_ratio?: number;
+  rmse_px?: number;
+  mean_reprojection_error_px?: number;
+  median_reprojection_error_px?: number;
+  max_reprojection_error_px?: number;
+  sub_pixel_accurate?: boolean;
+  fraction_below_1px?: number;
+  source_coverage_ratio?: number;
+  destination_coverage_ratio?: number;
+  combined_coverage_score?: number;
+  source_occupied_cells?: number;
   destination_occupied_cells?: number;
   total_cells?: number;
   uniformity_score?: number;
   triplet_consistency_px?: number | null;
   method?: string | null;
   orthorectified?: boolean;
+  fit_rmse_px?: number | null;
+  validation_rmse_px?: number | null;
+  validation_status?: string | null;
+  [key: string]: unknown;
 }
 
 export interface MatchesResponse {
   triplet_id: string;
-  num_matches: number;
+  num_matches?: number;
   homography: number[][] | null;
   matches: MatchPoint[];
   metrics?: MatchMetrics | null;
+  [key: string]: unknown;
 }
 
 export interface IIRSOverlay {

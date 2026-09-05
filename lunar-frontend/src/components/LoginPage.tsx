@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { login, register } from "@/lib/auth";
+import { login, register, loginAsDemo } from "@/lib/auth";
 
 interface Props {
   onLoginSuccess: () => void;
@@ -46,6 +46,14 @@ export default function LoginPage({ onLoginSuccess }: Props) {
     },
     [resetForm]
   );
+
+  const handleDemoAccess = () => {
+    loginAsDemo();
+    setShowSuccess(true);
+    setTimeout(() => {
+      onLoginSuccess();
+    }, 600);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,10 +102,10 @@ export default function LoginPage({ onLoginSuccess }: Props) {
   };
 
   return (
-    <section className="relative h-screen w-screen select-none overflow-hidden bg-[#000000] font-sans text-white">
+    <section className="relative min-h-screen w-full select-none overflow-x-hidden overflow-y-auto bg-[#000000] font-sans text-white flex flex-col justify-between">
       {/* Full-Bleed Lunar Background with Parallax */}
       <div
-        className="absolute inset-0 z-0 h-[106%] w-[106%] -left-[3%] -top-[3%] transition-transform duration-700 ease-out"
+        className="fixed inset-0 z-0 h-[106%] w-[106%] -left-[3%] -top-[3%] transition-transform duration-700 ease-out pointer-events-none"
         style={{
           transform: `translate3d(${mousePos.x * -8}px, ${mousePos.y * -8}px, 0)`,
         }}
@@ -116,7 +124,7 @@ export default function LoginPage({ onLoginSuccess }: Props) {
       </div>
 
       {/* Floating Particle / Glow Effects */}
-      <div className="pointer-events-none absolute inset-0 z-[1]">
+      <div className="pointer-events-none fixed inset-0 z-[1]">
         {/* Teal nebula glow behind card area */}
         <div
           className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-[0.06]"
@@ -129,7 +137,7 @@ export default function LoginPage({ onLoginSuccess }: Props) {
 
       {/* Top Bar */}
       <header
-        className={`relative z-30 flex h-16 items-center justify-between border-b border-white/5 px-6 transition-all duration-1000 md:px-12 ${
+        className={`relative z-30 flex h-14 shrink-0 items-center justify-between border-b border-white/5 px-6 transition-all duration-1000 md:px-12 ${
           isLoaded ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
         }`}
       >
@@ -139,7 +147,7 @@ export default function LoginPage({ onLoginSuccess }: Props) {
 
       {/* Main Content — Login Card */}
       <div
-        className={`relative z-20 flex h-[calc(100vh-64px)] items-center justify-center px-4 transition-all duration-1000 delay-200 ${
+        className={`relative z-20 flex-1 flex flex-col items-center justify-center px-4 py-8 transition-all duration-1000 delay-200 ${
           isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
         }`}
       >
@@ -357,6 +365,16 @@ export default function LoginPage({ onLoginSuccess }: Props) {
                     )}
                   </span>
                 </button>
+
+                {/* Quick Demo Bypass Button */}
+                <button
+                  type="button"
+                  onClick={handleDemoAccess}
+                  className="w-full rounded-xl border border-white/[0.1] bg-white/[0.04] py-2.5 text-xs font-semibold text-slate-300 hover:bg-white/[0.08] hover:text-white transition-all flex items-center justify-center gap-2"
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Quick Demo Access (One-Click Bypass)</span>
+                </button>
               </form>
 
               {/* Divider */}
@@ -386,7 +404,7 @@ export default function LoginPage({ onLoginSuccess }: Props) {
           </div>
 
           {/* Security Badge */}
-          <div className="mt-6 flex items-center justify-center gap-2 text-2xs text-ink-faint/60">
+          <div className="mt-5 flex items-center justify-center gap-2 text-2xs text-ink-faint/60">
             <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
               <path
                 fillRule="evenodd"
@@ -401,7 +419,7 @@ export default function LoginPage({ onLoginSuccess }: Props) {
 
       {/* Bottom Credits */}
       <footer
-        className={`absolute bottom-6 left-0 right-0 z-20 flex items-center justify-center px-6 text-xs text-ink-faint transition-all duration-1000 delay-700 md:bottom-8 md:px-12 ${
+        className={`relative z-20 shrink-0 flex items-center justify-center px-6 py-6 text-xs text-ink-faint transition-all duration-1000 delay-700 md:px-12 ${
           isLoaded ? "opacity-100" : "opacity-0"
         }`}
       >

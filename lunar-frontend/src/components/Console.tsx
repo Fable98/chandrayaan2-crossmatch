@@ -557,8 +557,8 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
               </div>
               <div className="my-3">
                 <div className="text-3xl font-extrabold tracking-tight text-slate-900">
-                  {metrics ? metrics.rmse_px.toFixed(3) : "—"}
-                  {metrics && <span className="text-sm font-semibold text-slate-500 ml-1">px</span>}
+                  {metrics?.rmse_px != null ? metrics.rmse_px.toFixed(3) : "—"}
+                  {metrics?.rmse_px != null && <span className="text-sm font-semibold text-slate-500 ml-1">px</span>}
                 </div>
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
@@ -576,12 +576,12 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
               </div>
               <div className="my-3">
                 <div className="text-3xl font-extrabold tracking-tight text-slate-900">
-                  {metrics ? metrics.num_inliers : 0}
+                  {metrics?.num_inliers ?? 0}
                   <span className="text-sm font-semibold text-slate-500 ml-1">matches</span>
                 </div>
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                <span>{metrics ? (metrics.inlier_ratio * 100).toFixed(1) : 0}% inlier ratio</span>
+                <span>{metrics?.inlier_ratio != null ? (metrics.inlier_ratio * 100).toFixed(1) : 0}% inlier ratio</span>
               </div>
             </div>
 
@@ -595,7 +595,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
               </div>
               <div className="my-3">
                 <div className="text-3xl font-extrabold tracking-tight text-slate-900">
-                  {metrics ? `${(metrics.combined_coverage_score * 100).toFixed(0)}%` : "—"}
+                  {metrics?.combined_coverage_score != null ? `${(metrics.combined_coverage_score * 100).toFixed(0)}%` : "—"}
                 </div>
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
