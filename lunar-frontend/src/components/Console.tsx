@@ -314,21 +314,6 @@ export default function Console({ onBackToHero }: Props = {}) {
           </div>
         </div>
 
-        {/* Lower Sidebar Mini Card (Replicates the "Download our mobile app" card in reference image) */}
-        <div className="p-4">
-          <div className="rounded-2xl bg-gradient-to-br from-[#1E1B4B] to-[#312E81] p-4 text-white shadow-md">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/20 text-xs">
-                ⚡
-              </span>
-              <h4 className="text-xs font-bold">Dynamic Matching</h4>
-            </div>
-            <p className="text-[10px] text-indigo-200 mb-3 leading-relaxed">
-              Upload custom optical and stereo imagery pairs for instant sub-pixel alignment.
-            </p>
-            <RegistrationLauncher />
-          </div>
-        </div>
       </aside>
 
       {/* ======================================================== */}
@@ -441,6 +426,8 @@ export default function Console({ onBackToHero }: Props = {}) {
               )}
             </div>
           </div>
+
+          <RegistrationLauncher />
 
           {/* ======================================================== */}
           {/* 3. ROW 1: TOP 4 KPI METRIC CARDS                         */}

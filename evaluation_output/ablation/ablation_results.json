@@ -1,0 +1,100 @@
+{
+    "results": [
+        {
+            "method": "Pure SIFT",
+            "status": "success",
+            "match_count": 7,
+            "inlier_count": 4,
+            "inlier_ratio": 0.5714,
+            "fit_rmse_px": 0.0,
+            "absolute_rmse_m": 0.0,
+            "runtime_s": 0.1526,
+            "homography": [
+                [
+                    -0.39333480226454826,
+                    0.07876466406724443,
+                    15.26892005289269
+                ],
+                [
+                    -1.4787048571965942,
+                    -0.6880610131119264,
+                    362.7103737511122
+                ],
+                [
+                    -0.0031201224839890965,
+                    -0.002853269281418098,
+                    1.0
+                ]
+            ]
+        },
+        {
+            "method": "Pure LoFTR (NCC Fallback)",
+            "status": "insufficient_matches",
+            "match_count": 2,
+            "inlier_count": 0,
+            "inlier_ratio": 0.0,
+            "fit_rmse_px": null,
+            "absolute_rmse_m": null,
+            "runtime_s": 0.0487,
+            "matches": [],
+            "failure_analysis": {
+                "status": "failure_diagnosed",
+                "failure_reason": "insufficient_matches",
+                "identified_root_causes": [
+                    "Geometric verification rejected: insufficient_matches"
+                ],
+                "primary_root_cause": "Geometric verification rejected: insufficient_matches",
+                "diagnostics": {
+                    "texture_variance": {
+                        "source_laplacian_var": 589.24,
+                        "reference_laplacian_var": 61.98
+                    },
+                    "illumination": {
+                        "source_sun_azimuth_deg": 45.0,
+                        "reference_sun_azimuth_deg": 45.0,
+                        "delta_azimuth_deg": 0.0
+                    },
+                    "scale": {
+                        "source_gsd_m": 5.0,
+                        "reference_gsd_m": 5.0,
+                        "scale_ratio": 1.0
+                    },
+                    "dynamic_range": {
+                        "source_dark_fraction": 0.002,
+                        "reference_dark_fraction": 0.0,
+                        "source_saturated_fraction": 0.0,
+                        "reference_saturated_fraction": 0.0
+                    }
+                },
+                "diagnostic_json": "evaluation_output\\ablation\\failure_pure_loftr_(ncc_fallback)\\failure_diagnostic_report.json",
+                "diagnostic_image": "evaluation_output\\ablation\\failure_pure_loftr_(ncc_fallback)\\failure_diagnostic_preview.png"
+            }
+        },
+        {
+            "method": "Our Pipeline (No DEM)",
+            "status": "success",
+            "match_count": 77,
+            "inlier_count": 6,
+            "inlier_ratio": 0.0779,
+            "fit_rmse_px": 1.3254,
+            "absolute_rmse_m": 7.1571,
+            "runtime_s": 1.9179
+        },
+        {
+            "method": "Our Full Pipeline (CFOG+DEM+Grid NMS)",
+            "status": "success",
+            "match_count": 77,
+            "inlier_count": 6,
+            "inlier_ratio": 0.0779,
+            "fit_rmse_px": 1.3254,
+            "absolute_rmse_m": 7.1572,
+            "runtime_s": 1.2141
+        }
+    ],
+    "failures": [
+        {
+            "method": "Pure LoFTR (NCC Fallback)",
+            "primary_cause": "Geometric verification rejected: insufficient_matches"
+        }
+    ]
+}

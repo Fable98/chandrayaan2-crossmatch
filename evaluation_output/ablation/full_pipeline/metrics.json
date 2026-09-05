@@ -1,0 +1,205 @@
+{
+    "match_count": 77,
+    "inlier_count": 6,
+    "inlier_ratio": 0.0779,
+    "fit_rmse_px": 1.3254,
+    "absolute_rmse_m": 7.1572,
+    "validation_rmse_px": null,
+    "held_out_inlier_validation_rmse_px": null,
+    "held_out_validation_rmse_px": null,
+    "validation_median_error_px": null,
+    "validation_status": "insufficient_points_for_holdout",
+    "quality_tier": "LOW_CONFIDENCE",
+    "confidence_tier": "LOW_CONFIDENCE",
+    "mean_reprojection_error_px": 1.0614,
+    "median_reprojection_error_px": 0.9814,
+    "max_reprojection_error_px": 2.3394,
+    "fraction_below_1px": 0.5,
+    "fraction_below_0_5px": 0.5,
+    "fraction_below_0_25px": 0.1667,
+    "spatial_coverage": 0.06,
+    "spatial_uniformity": 0.0183,
+    "coverage_relative_to_inlier_count": 0.5556,
+    "spatial_distribution": {
+        "grid_rows": 10,
+        "grid_cols": 10,
+        "total_cells": 100,
+        "occupied_cells": 6,
+        "coverage": 0.06,
+        "count_std": 0.2375,
+        "count_mean": 0.06,
+        "spatial_entropy": 0.3891,
+        "uniformity_score": 0.0183,
+        "adaptive_grid_size": 3,
+        "coverage_relative_to_inlier_count": 0.5556,
+        "adaptive_uniformity_score": 0.4116
+    },
+    "transform_quality": {
+        "is_valid": true,
+        "reason": "OK",
+        "determinant": 0.506697,
+        "condition_number": 13497.94,
+        "scale_ratio": 1.2832,
+        "fit_rmse_px": null
+    },
+    "lk_refinement": {
+        "refined_count": 6,
+        "total": 7,
+        "fb_threshold": 0.5,
+        "max_shift_px": 3.0,
+        "debug_points": [
+            {
+                "point_index": 0,
+                "src_pt": [
+                    332.0,
+                    25.0
+                ],
+                "dst_pt": [
+                    285.0,
+                    28.0
+                ],
+                "status_fwd": 1,
+                "status_bwd": 1,
+                "fb_err": 0.2737646996974945,
+                "shift_mag": 0.3626868724822998,
+                "passed": true,
+                "failure_gate": null
+            },
+            {
+                "point_index": 1,
+                "src_pt": [
+                    25.0,
+                    230.0
+                ],
+                "dst_pt": [
+                    71.0,
+                    262.0
+                ],
+                "status_fwd": 1,
+                "status_bwd": 1,
+                "fb_err": 0.19512228667736053,
+                "shift_mag": 0.8690013885498047,
+                "passed": true,
+                "failure_gate": null
+            },
+            {
+                "point_index": 2,
+                "src_pt": [
+                    486.0,
+                    281.0
+                ],
+                "dst_pt": [
+                    490.2834167480469,
+                    207.5232391357422
+                ],
+                "status_fwd": 1,
+                "status_bwd": 1,
+                "fb_err": 0.13177679479122162,
+                "shift_mag": 2.577390193939209,
+                "passed": true,
+                "failure_gate": null
+            },
+            {
+                "point_index": 3,
+                "src_pt": [
+                    179.0,
+                    384.0
+                ],
+                "dst_pt": [
+                    217.0,
+                    370.0
+                ],
+                "status_fwd": 1,
+                "status_bwd": 1,
+                "fb_err": 0.16733457148075104,
+                "shift_mag": 0.7935892343521118,
+                "passed": true,
+                "failure_gate": null
+            },
+            {
+                "point_index": 4,
+                "src_pt": [
+                    76.0,
+                    435.0
+                ],
+                "dst_pt": [
+                    140.8021240234375,
+                    434.6916198730469
+                ],
+                "status_fwd": 1,
+                "status_bwd": 1,
+                "fb_err": 1.9781420230865479,
+                "shift_mag": 1.7822463512420654,
+                "passed": false,
+                "failure_gate": "fb_threshold_exceeded (fb_err=1.9781 > 0.5)"
+            },
+            {
+                "point_index": 5,
+                "src_pt": [
+                    76.0,
+                    486.0
+                ],
+                "dst_pt": [
+                    145.4402618408203,
+                    490.0899353027344
+                ],
+                "status_fwd": 1,
+                "status_bwd": 1,
+                "fb_err": 0.24099744856357574,
+                "shift_mag": 0.7384462356567383,
+                "passed": true,
+                "failure_gate": null
+            },
+            {
+                "point_index": 6,
+                "src_pt": [
+                    128.0,
+                    486.0
+                ],
+                "dst_pt": [
+                    192.0,
+                    480.0
+                ],
+                "status_fwd": 1,
+                "status_bwd": 1,
+                "fb_err": 0.26930633187294006,
+                "shift_mag": 0.1685439497232437,
+                "passed": true,
+                "failure_gate": null
+            }
+        ],
+        "step1_comparison": {
+            "fit_rmse_a_orig": 1.8517,
+            "fit_rmse_b_mixed": 10.0245,
+            "fit_rmse_c_refined_only": 1.3254,
+            "refined_count": 6,
+            "total_inliers": 7,
+            "err_a_per_point": [
+                0.507,
+                0.8012,
+                0.2911,
+                2.3215,
+                3.2824,
+                2.5776,
+                0.4575
+            ],
+            "err_b_per_point": [
+                0.3437,
+                0.0577,
+                25.7399,
+                1.5544,
+                5.9849,
+                0.39,
+                1.5416
+            ],
+            "err_c_per_point": [
+                0.2824,
+                0.2262,
+                0.4409,
+                2.3394,
+                1.5574,
+                1.5219
+            ]
+        }
+    }
+}
