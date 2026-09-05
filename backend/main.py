@@ -36,14 +36,14 @@ import cv2
 CORS_ORIGIN: str = os.environ.get("CORS_ORIGIN", "http://localhost:3000")
 ALLOWED_ORIGINS: str = os.environ.get(
     "ALLOWED_ORIGINS",
-    f"{CORS_ORIGIN},http://localhost:3000,http://127.0.0.1:3000,*",
+    f"{CORS_ORIGIN},http://localhost:3000,http://127.0.0.1:3000",
 )
 
 allowed_origins_list: list[str] = [
     origin.strip() for origin in ALLOWED_ORIGINS.split(",") if origin.strip()
 ]
 if not allowed_origins_list:
-    allowed_origins_list = ["*"]
+    allowed_origins_list = [CORS_ORIGIN]
 
 
 # ---------------------------------------------------------------------------
@@ -72,7 +72,8 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow origins from ALLOWED_ORIGINS environment variable + all Vercel previews
+# CORS — use explicit origins with credentials and allow Vercel preview deployments.
+# A wildcard origin is invalid for credentialed browser requests.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins_list,
