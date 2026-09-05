@@ -40,7 +40,7 @@ export default function MapPanel({ triplet, iirsOverlay }: Props) {
   };
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative z-0 h-[460px] w-full overflow-hidden rounded-xl bg-[#090b0e]">
       <MapContainer
         center={center}
         zoom={13}
@@ -70,7 +70,7 @@ export default function MapPanel({ triplet, iirsOverlay }: Props) {
       </MapContainer>
 
       {activeLayers.size === 0 && (
-        <div className="pointer-events-none absolute left-1/2 top-1/2 z-[999] -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-panel/90 px-5 py-3 text-center shadow-2xl backdrop-blur-md">
+        <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-panel/90 px-5 py-3 text-center shadow-2xl backdrop-blur-md">
           <p className="text-xs font-medium text-white">
             The <span className="text-teal font-semibold">teal box</span> is the shared OHRC/TMC/IIRS footprint.
           </p>
@@ -80,7 +80,7 @@ export default function MapPanel({ triplet, iirsOverlay }: Props) {
         </div>
       )}
 
-      <div className="absolute right-4 top-4 z-[1000] flex flex-col gap-2 rounded-xl border border-border bg-panel/90 p-3 shadow-2xl backdrop-blur-md">
+      <div className="absolute right-4 top-4 z-10 flex flex-col gap-2 rounded-xl border border-border bg-panel/90 p-3 shadow-2xl backdrop-blur-md">
         <span className="font-mono text-[10px] uppercase tracking-widest text-ink-faint">
           Payload Layers
         </span>

@@ -555,7 +555,7 @@ export default function Console({ onBackToHero }: Props = {}) {
                 </div>
 
                 {/* Viewport Canvas Area */}
-                <div className="min-h-[460px] relative">
+                <div className="relative min-h-[460px]">
                   {loading && (
                     <div className="flex h-full min-h-[400px] items-center justify-center text-sm text-slate-400">
                       Loading sensor datasets…
