@@ -37,6 +37,30 @@ python run_demo.py --input_dir ./sample_data --output_dir ./results
 > [!TIP]
 > For complete mathematical formulations (Phase Congruency, CFOG, IIRS PCA/SAM, Grid NMS, DEM Ray-Intersection, and Selenodetic 3D RMSE), see [**`docs/methodology.md`**](docs/methodology.md).
 
+### Quantitative Evidence Suite
+
+Regenerate the auditable benchmark tables from checked-in results:
+
+```bash
+python scripts/build_quantitative_evidence.py
+```
+
+This writes `evaluation_output/quantitative_evidence/quantitative_evidence.json`
+and `.md`. Missing LRO basemap results, hyperspectral cubes, or ablation runs
+are reported as `not_available` or `not_run`; they are never represented as
+zero-error results. To run the controlled photometric stress test on a
+processed OHRC/TMC pair:
+
+```bash
+python scripts/build_quantitative_evidence.py \
+   --illumination-pair data_preprocessing_pipeline/processed_triplets/region_001
+```
+
+The stress test applies deterministic brightness, contrast, and inversion
+perturbations. It is a controlled proxy and does not replace independent
+CH2 acquisitions at different sun angles. Additional genuine triplets can be
+included with `--triplets-root` and are summarized from their manifests.
+
 ---
 
 ### External Basemap & Multi-Sensor Scope
