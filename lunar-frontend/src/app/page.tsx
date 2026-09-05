@@ -101,7 +101,7 @@ function MainContent() {
   }
 
   if (view === "console") {
-    return <Console onBackToHero={handleBackToHero} />;
+    return <Console onBackToHero={handleBackToHero} onLogout={handleLogout} />;
   }
 
   if (view === "about") {

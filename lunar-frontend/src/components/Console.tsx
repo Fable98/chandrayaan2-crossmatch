@@ -12,14 +12,16 @@ import VaultModal, { PayloadFilter } from "./archive/VaultModal";
 import TheoryModal from "./archive/TheoryModal";
 import InfoModal, { InfoModalContent } from "./archive/InfoModal";
 import RegistrationLauncher from "./RegistrationLauncher";
+import { getCurrentUser, logout, type AuthUser } from "@/lib/auth";
 
 type View = "registration" | "linked-cursor" | "map";
 
 interface Props {
   onBackToHero?: () => void;
+  onLogout?: () => void;
 }
 
-export default function Console({ onBackToHero }: Props = {}) {
+export default function Console({ onBackToHero, onLogout }: Props = {}) {
   const searchParams = useSearchParams();
   const subviewParam = searchParams.get("subview") as View | null;
   const modalParam = searchParams.get("modal");
@@ -46,7 +48,38 @@ export default function Console({ onBackToHero }: Props = {}) {
   const [infoModalContent, setInfoModalContent] = useState<InfoModalContent | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Authenticated User Profile & Dropdown
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
   const arenaRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    setCurrentUser(getCurrentUser());
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    }
+    if (profileMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [profileMenuOpen]);
+
+  const handleUserLogout = () => {
+    setProfileMenuOpen(false);
+    if (onLogout) {
+      onLogout();
+    } else {
+      logout();
+      window.location.href = "/";
+    }
+  };
 
   // Handle modal query param for demo linkability
   useEffect(() => {
@@ -338,41 +371,22 @@ export default function Console({ onBackToHero }: Props = {}) {
 
           {/* Right Header Controls */}
           <div className="flex items-center gap-3">
-            {onBackToHero && (
-              <button
-                onClick={onBackToHero}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition"
-              >
-                ← Back
-              </button>
-            )}
-
-            {/* Mail Icon Button */}
             <button
-              onClick={() => showToast("Archive communications online")}
-              className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition shadow-sm"
-              title="Messages"
+              onClick={() => {
+                if (onBackToHero) onBackToHero();
+                else window.location.href = "/";
+              }}
+              className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition shadow-sm flex items-center gap-1.5"
+              title="Return to Mission Overview"
             >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-              </svg>
-            </button>
-
-            {/* Bell Notification Button */}
-            <button
-              onClick={() => showToast(`${triplets.length} lunar datasets synced`)}
-              className="relative flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 transition shadow-sm"
-              title="Notifications"
-            >
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-[#4F46E5]" />
+              <span>←</span>
+              <span>Back</span>
             </button>
 
             <button
               onClick={() => openVaultWithFilter("all")}
               className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm flex items-center gap-2"
+              title="Browse all multi-sensor lunar datasets"
             >
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
               <span>{triplets.length} Datasets</span>
@@ -380,18 +394,97 @@ export default function Console({ onBackToHero }: Props = {}) {
 
             <div className="h-8 w-px bg-slate-200 mx-1" />
 
-            {/* Profile Pill with Avatar & Dropdown Chevron */}
-            <div className="flex items-center gap-2.5 pl-1">
-              <div className="h-9 w-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-[#4F46E5] text-white font-bold text-xs flex items-center justify-center shadow-sm">
-                IS
-              </div>
-              <div className="hidden sm:block text-left">
-                <span className="text-xs font-bold text-slate-800 block leading-tight">ISRO Pilot</span>
-                <span className="text-[10px] text-slate-400 block">Operator</span>
-              </div>
-              <svg className="h-3.5 w-3.5 text-slate-400 ml-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
+            {/* Profile Pill with Interactive Dropdown */}
+            <div className="relative" ref={profileMenuRef}>
+              <button
+                type="button"
+                onClick={() => setProfileMenuOpen((prev) => !prev)}
+                className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white p-1.5 pr-3 hover:bg-slate-50 transition shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20"
+                aria-haspopup="true"
+                aria-expanded={profileMenuOpen}
+              >
+                <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-[#4F46E5] text-white font-bold text-xs flex items-center justify-center shadow-sm">
+                  {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : "IS"}
+                </div>
+                <div className="hidden sm:block text-left">
+                  <span className="text-xs font-bold text-slate-800 block leading-tight truncate max-w-[120px]">
+                    {currentUser?.name || "ISRO Pilot"}
+                  </span>
+                  <span className="text-[10px] text-slate-400 block">Operator</span>
+                </div>
+                <svg
+                  className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${profileMenuOpen ? "rotate-180" : ""}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Dropdown Menu */}
+              {profileMenuOpen && (
+                <div className="absolute right-0 mt-2 w-64 rounded-2xl border border-slate-200/80 bg-white p-2 shadow-2xl z-50 animate-fade-in">
+                  <div className="p-3 border-b border-slate-100">
+                    <span className="text-xs font-bold text-slate-900 block truncate">
+                      {currentUser?.name || "ISRO Flight Operator"}
+                    </span>
+                    <span className="text-[11px] text-slate-500 block truncate">
+                      {currentUser?.email || "flight.ops@isro.gov.in"}
+                    </span>
+                    <span className="mt-2 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      Active Session
+                    </span>
+                  </div>
+
+                  <div className="py-1 space-y-0.5">
+                    <button
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        openVaultWithFilter("all");
+                      }}
+                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition text-left"
+                    >
+                      <span className="text-slate-400">▤</span>
+                      <span>Archive Vault ({triplets.length} Datasets)</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        setTheoryModalOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition text-left"
+                    >
+                      <span className="text-slate-400">📖</span>
+                      <span>Methodology Reference</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        if (onBackToHero) onBackToHero();
+                        else window.location.href = "/";
+                      }}
+                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition text-left"
+                    >
+                      <span className="text-slate-400">🌐</span>
+                      <span>Mission Overview</span>
+                    </button>
+                  </div>
+
+                  <div className="pt-1 mt-1 border-t border-slate-100">
+                    <button
+                      onClick={handleUserLogout}
+                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition text-left"
+                    >
+                      <span>🚪</span>
+                      <span>Log Out</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </header>
