@@ -24,6 +24,8 @@ type RegistrationResult = {
   metrics?: RegistrationMetrics | null;
   visual_url?: string | null;
   warped_url?: string | null;
+  source_url?: string | null;
+  reference_url?: string | null;
   matches_url?: string | null;
   raster_url?: string | null;
 };
@@ -97,8 +99,66 @@ function DownloadLink({ href, label }: { href?: string | null; label: string }) 
   return url ? <a href={url} download target="_blank" rel="noreferrer" className="rounded-lg border border-indigo-100 bg-white px-3 py-2 text-[10px] font-bold text-indigo-700 transition hover:bg-indigo-50">↓ {label}</a> : null;
 }
 
-function OverlayImage({ title, src, points, side }: { title: string; src: string | null; points: MatchPoint[]; side: "source" | "reference" }) {
-  return <div className="rounded-xl border border-slate-200 bg-white p-3"><div className="mb-2 flex items-center justify-between"><h4 className="text-xs font-bold text-slate-800">{title}</h4><span className="text-[10px] font-mono text-slate-400">{points.length} pts</span></div><div className="relative aspect-square overflow-hidden rounded-lg bg-slate-100">{src ? <img src={src} alt={title} className="h-full w-full object-contain" /> : <div className="flex h-full items-center justify-center text-xs text-slate-400">Preview unavailable</div>}{src && <PointOverlay points={points} side={side} />}</div></div>;
+function OverlayImage({
+  title,
+  src,
+  fallbackSrc,
+  secondaryFallback,
+  points,
+  side,
+}: {
+  title: string;
+  src: string | null;
+  fallbackSrc?: string | null;
+  secondaryFallback?: string | null;
+  points: MatchPoint[];
+  side: "source" | "reference";
+}) {
+  const [currentSrc, setCurrentSrc] = useState<string | null>(src);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setCurrentSrc(src);
+    setFailed(false);
+  }, [src]);
+
+  const handleError = () => {
+    if (fallbackSrc && currentSrc !== fallbackSrc) {
+      setCurrentSrc(fallbackSrc);
+    } else if (secondaryFallback && currentSrc !== secondaryFallback) {
+      setCurrentSrc(secondaryFallback);
+    } else {
+      setFailed(true);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-3">
+      <div className="mb-2 flex items-center justify-between">
+        <h4 className="text-xs font-bold text-slate-800">{title}</h4>
+        <span className="text-[10px] font-mono text-slate-400">{points.length} pts</span>
+      </div>
+      <div className="relative aspect-square overflow-hidden rounded-lg bg-slate-950 flex items-center justify-center">
+        {!failed && currentSrc ? (
+          <img
+            src={currentSrc}
+            alt={title}
+            className="h-full w-full object-contain"
+            onError={handleError}
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center p-6 text-center text-slate-400">
+            <span className="text-2xl mb-1.5 opacity-80">🛰️</span>
+            <span className="text-xs font-semibold text-slate-300">{title}</span>
+            <span className="text-[11px] text-slate-500 mt-1 max-w-[220px]">
+              Raw GeoTIFF/TIFF ingested · {points.length} correspondence points mapped
+            </span>
+          </div>
+        )}
+        <PointOverlay points={points} side={side} />
+      </div>
+    </div>
+  );
 }
 
 export default function RegistrationLauncher() {
@@ -157,6 +217,6 @@ export default function RegistrationLauncher() {
 
     {!result && <div className="mt-5 space-y-5"><div className="grid gap-3 md:grid-cols-2"><FilePicker label={`Source image · ${sourceSensor}`} file={sourceFile} onChange={setSourceFile} /><FilePicker label={`Reference image · ${referenceSensor}`} file={referenceFile} onChange={setReferenceFile} /></div><div className="grid gap-3 md:grid-cols-[1fr_1fr_1.3fr]"><label className="block"><span className="mb-2 block text-[10px] font-black uppercase tracking-wider text-slate-500">Source sensor</span><select value={sourceSensor} onChange={(event) => setSourceSensor(event.target.value as Sensor)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">{sensors.map((sensor) => <option key={sensor}>{sensor}</option>)}</select></label><label className="block"><span className="mb-2 block text-[10px] font-black uppercase tracking-wider text-slate-500">Reference sensor</span><select value={referenceSensor} onChange={(event) => setReferenceSensor(event.target.value as Sensor)} className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100">{sensors.map((sensor) => <option key={sensor}>{sensor}</option>)}</select></label><FilePicker label="Optional DEM elevation" file={demFile} optional onChange={setDemFile} /></div>{error && <StatusMessage tone="error" message={error} />}<button type="button" onClick={register} disabled={loading || !sourceFile || !referenceFile} className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#4F46E5] px-5 py-3.5 text-xs font-black uppercase tracking-[0.15em] text-white shadow-sm transition hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:opacity-40">{loading ? <><span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" /> Registering pair...</> : "Register pair"}</button></div>}
 
-    {result && <div className="mt-5 space-y-5">{error && <StatusMessage tone="error" message={error} />}{result.message && result.status === "success" && <StatusMessage tone="success" message={result.message} />}<div className="grid gap-4 xl:grid-cols-[1.45fr_1fr]"><div className="space-y-4"><div className="rounded-xl border border-slate-200 bg-slate-950 p-3"><div className="mb-3 flex items-center justify-between px-1"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-300">Primary visual proof</p><h4 className="mt-1 text-sm font-bold text-white">Checkerboard registration QA</h4></div><span className="rounded-md bg-emerald-400/10 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-emerald-300">50 px blocks</span></div>{absoluteUrl(result.visual_url) ? <img src={absoluteUrl(result.visual_url) as string} alt="Checkerboard registration quality assurance" className="max-h-[470px] w-full rounded-lg object-contain" /> : <div className="flex min-h-[260px] items-center justify-center rounded-lg bg-slate-900 text-xs text-slate-500">No checkerboard artifact returned.</div>}</div><div className="rounded-xl border border-slate-200 bg-white p-3"><div className="mb-2 flex items-center justify-between"><h4 className="text-xs font-bold text-slate-800">Registered warped source</h4><span className="text-[10px] font-mono text-slate-400">Output artifact</span></div>{absoluteUrl(result.warped_url) ? <img src={absoluteUrl(result.warped_url) as string} alt="Registered warped source image" className="max-h-[250px] w-full rounded-lg bg-slate-950 object-contain" /> : <div className="flex min-h-[120px] items-center justify-center rounded-lg bg-slate-100 text-xs text-slate-400">No warped image returned.</div>}</div></div><div className="grid grid-cols-2 content-start gap-3"><MetricCard label="Fit RMSE" value={format(metric(metrics, "fit_rmse_px", "rmse_px"))} suffix="px" emphasis /><MetricCard label="Validation RMSE" value={format(metric(metrics, "validation_rmse_px"))} suffix="px" /><MetricCard label="Verified inliers" value={inliers === null ? "-" : String(inliers)} /><MetricCard label="Inlier ratio" value={format(ratio === null ? null : ratio * 100, 1)} suffix="%" /><MetricCard label="Spatial coverage" value={format(coverage === null ? null : coverage * 100, 1)} suffix="%" /><MetricCard label="Uniformity score" value={format(uniformity === null ? null : uniformity * 100, 1)} suffix="%" /><div className={`col-span-2 rounded-xl border p-4 ${qualityTone}`}><p className="text-[10px] font-black uppercase tracking-[0.16em] opacity-70">Quality tier</p><p className="mt-1 text-2xl font-black tracking-tight">{qualityTier.replaceAll("_", " ")}</p><p className="mt-1 text-[11px] opacity-80">{metrics?.validation_status || "Backend geometric verification result"}</p></div></div></div><div className="grid gap-4 lg:grid-cols-2"><OverlayImage title={`Source · ${sourceSensor}`} src={sourcePreview} points={points} side="source" /><OverlayImage title={`Reference · ${referenceSensor}`} src={referencePreview} points={points} side="reference" /></div><div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4"><div><p className="text-xs font-bold text-slate-800">{points.length} correspondence points loaded</p><p className="mt-1 text-[10px] text-slate-500"><span className="text-emerald-500">●</span> high confidence <span className="ml-2 text-amber-500">●</span> review <span className="ml-2 text-rose-400">●</span> low confidence</p></div><div className="flex flex-wrap gap-2"><DownloadLink href={result.warped_url} label="Warped PNG" /><DownloadLink href={result.raster_url} label="Registered GeoTIFF" /><DownloadLink href={result.matches_url} label="matches.json" /><DownloadLink href={result.matches_url?.replace("matches.json", "metrics.json")} label="metrics.json" /><DownloadLink href={result.visual_url} label="Checkerboard" /></div></div><button type="button" onClick={reset} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50">Register another pair</button></div>}
+    {result && <div className="mt-5 space-y-5">{error && <StatusMessage tone="error" message={error} />}{result.message && result.status === "success" && <StatusMessage tone="success" message={result.message} />}<div className="grid gap-4 xl:grid-cols-[1.45fr_1fr]"><div className="space-y-4"><div className="rounded-xl border border-slate-200 bg-slate-950 p-3"><div className="mb-3 flex items-center justify-between px-1"><div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-300">Primary visual proof</p><h4 className="mt-1 text-sm font-bold text-white">Checkerboard registration QA</h4></div><span className="rounded-md bg-emerald-400/10 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-emerald-300">50 px blocks</span></div>{absoluteUrl(result.visual_url) ? <img src={absoluteUrl(result.visual_url) as string} alt="Checkerboard registration quality assurance" className="max-h-[470px] w-full rounded-lg object-contain" /> : <div className="flex min-h-[260px] items-center justify-center rounded-lg bg-slate-900 text-xs text-slate-500">No checkerboard artifact returned.</div>}</div><div className="rounded-xl border border-slate-200 bg-white p-3"><div className="mb-2 flex items-center justify-between"><h4 className="text-xs font-bold text-slate-800">Registered warped source</h4><span className="text-[10px] font-mono text-slate-400">Output artifact</span></div>{absoluteUrl(result.warped_url) ? <img src={absoluteUrl(result.warped_url) as string} alt="Registered warped source image" className="max-h-[250px] w-full rounded-lg bg-slate-950 object-contain" /> : <div className="flex min-h-[120px] items-center justify-center rounded-lg bg-slate-100 text-xs text-slate-400">No warped image returned.</div>}</div></div><div className="grid grid-cols-2 content-start gap-3"><MetricCard label="Fit RMSE" value={format(metric(metrics, "fit_rmse_px", "rmse_px"))} suffix="px" emphasis /><MetricCard label="Validation RMSE" value={format(metric(metrics, "validation_rmse_px"))} suffix="px" /><MetricCard label="Verified inliers" value={inliers === null ? "-" : String(inliers)} /><MetricCard label="Inlier ratio" value={format(ratio === null ? null : ratio * 100, 1)} suffix="%" /><MetricCard label="Spatial coverage" value={format(coverage === null ? null : coverage * 100, 1)} suffix="%" /><MetricCard label="Uniformity score" value={format(uniformity === null ? null : uniformity * 100, 1)} suffix="%" /><div className={`col-span-2 rounded-xl border p-4 ${qualityTone}`}><p className="text-[10px] font-black uppercase tracking-[0.16em] opacity-70">Quality tier</p><p className="mt-1 text-2xl font-black tracking-tight">{qualityTier.replaceAll("_", " ")}</p><p className="mt-1 text-[11px] opacity-80">{metrics?.validation_status || "Backend geometric verification result"}</p></div></div></div><div className="grid gap-4 lg:grid-cols-2"><OverlayImage title={`Source · ${sourceSensor}`} src={result.source_url ? absoluteUrl(result.source_url) : sourcePreview} fallbackSrc={result.source_url ? absoluteUrl(result.source_url) : (result.warped_url ? absoluteUrl(result.warped_url) : sourcePreview)} secondaryFallback={result.warped_url ? absoluteUrl(result.warped_url) : null} points={points} side="source" /><OverlayImage title={`Reference · ${referenceSensor}`} src={result.reference_url ? absoluteUrl(result.reference_url) : referencePreview} fallbackSrc={referencePreview} points={points} side="reference" /></div><div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4"><div><p className="text-xs font-bold text-slate-800">{points.length} correspondence points loaded</p><p className="mt-1 text-[10px] text-slate-500"><span className="text-emerald-500">●</span> high confidence <span className="ml-2 text-amber-500">●</span> review <span className="ml-2 text-rose-400">●</span> low confidence</p></div><div className="flex flex-wrap gap-2"><DownloadLink href={result.warped_url} label="Warped PNG" /><DownloadLink href={result.raster_url} label="Registered GeoTIFF" /><DownloadLink href={result.matches_url} label="matches.json" /><DownloadLink href={result.matches_url?.replace("matches.json", "metrics.json")} label="metrics.json" /><DownloadLink href={result.visual_url} label="Checkerboard" /></div></div><button type="button" onClick={reset} className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 transition hover:bg-slate-50">Register another pair</button></div>}
   </section>;
 }

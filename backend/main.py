@@ -224,6 +224,22 @@ async def register_images(
             metadata=result.get("metadata"),
         )
 
+    # Generate 8-bit web-compatible PNG previews for source and reference so browsers can display any uploaded GeoTIFF / TIFF
+    import cv2
+    source_url = None
+    reference_url = None
+    try:
+        _, src_color, _ = load_as_float_and_color(source_path)
+        _, ref_color, _ = load_as_float_and_color(ref_path)
+        src_png_path = output_dir / "source_preview.png"
+        ref_png_path = output_dir / "reference_preview.png"
+        cv2.imwrite(str(src_png_path), src_color)
+        cv2.imwrite(str(ref_png_path), ref_color)
+        source_url = f"/dynamic_runs/{run_id}/output/source_preview.png"
+        reference_url = f"/dynamic_runs/{run_id}/output/reference_preview.png"
+    except Exception as e:
+        logger.warning("Could not generate source/reference web previews: %s", e)
+
     return RegisterResponse(
         status="success",
         message="Registration verified successfully.",
@@ -231,6 +247,8 @@ async def register_images(
         homography=result.get("homography"),
         visual_url=f"/dynamic_runs/{run_id}/output/registered_checkerboard.png",
         warped_url=f"/dynamic_runs/{run_id}/output/registered_preview.png",
+        source_url=source_url,
+        reference_url=reference_url,
         matches_url=f"/dynamic_runs/{run_id}/output/matches.json",
         raster_url=f"/dynamic_runs/{run_id}/output/registered_source.tif",
         metadata=result.get("metadata"),

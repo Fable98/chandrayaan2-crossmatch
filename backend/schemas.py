@@ -177,7 +177,10 @@ class RegisterResponse(BaseModel):
     homography: list[list[float]] | None = None
     visual_url: str | None = None
     warped_url: str | None = None
+    source_url: str | None = None
+    reference_url: str | None = None
     matches_url: str | None = None
     raster_url: str | None = None
     metadata: dict | None = None
+
 
