@@ -4,6 +4,40 @@
 
 @import "leaflet/dist/leaflet.css";
 
+:root {
+  --bg-primary: #0a0e1a;
+  --bg-secondary: #111827;
+  --bg-surface: #1a2035;
+  --bg-elevated: #1f2a44;
+  --bg-glass: rgba(26, 32, 53, 0.72);
+  --bg-glass-hover: rgba(31, 42, 68, 0.85);
+  --accent-primary: #6366f1;
+  --accent-secondary: #818cf8;
+  --accent-glow: rgba(99, 102, 241, 0.25);
+  --accent-success: #34d399;
+  --accent-success-bg: rgba(52, 211, 153, 0.12);
+  --accent-warning: #fbbf24;
+  --accent-warning-bg: rgba(251, 191, 36, 0.12);
+  --accent-danger: #f87171;
+  --accent-danger-bg: rgba(248, 113, 113, 0.12);
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border-subtle: rgba(148, 163, 184, 0.1);
+  --border-default: rgba(148, 163, 184, 0.18);
+  --border-active: rgba(99, 102, 241, 0.5);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 40px var(--accent-glow);
+  --font-sans: var(--font-inter), sans-serif;
+  --font-mono: var(--font-plex-mono), monospace;
+}
+
 ::selection {
   background: #16343d;
   color: #3fb5c9;
@@ -45,4 +79,13 @@
 
 .animate-slow-pulse {
   animation: slow-pulse 16s ease-in-out infinite;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 400ms ease-out both;
 }

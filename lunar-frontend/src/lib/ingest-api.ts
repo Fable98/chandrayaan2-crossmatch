@@ -2,7 +2,10 @@
  * API service for the ingest pipeline.
  */
 
-const API_BASE = '/api/ingest';
+const BACKEND_BASE =
+  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ??
+  'http://localhost:8000';
+const API_BASE = `${BACKEND_BASE}/api/ingest`;
 
 export interface IngestConfig {
   containment: number;
