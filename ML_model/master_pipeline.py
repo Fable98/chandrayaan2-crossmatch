@@ -1,0 +1,539 @@
+"""ML_model/master_pipeline.py — Master Orchestrator for Chandrayaan-2 registration.
+
+Daisy-chains classical (CFOG), crater-anchor (YOLO), and deep (Kornia)
+matchers with sub-pixel refinement and uniform spatial filtering into a
+single fault-tolerant, memory-safe pipeline.
+
+Design guardrails:
+  * NEVER raises from :meth:`MasterRegistrationPipeline.register`.
+  * Lazy-loads heavy AI models only when actually needed.
+  * Every submodule call is wrapped in try/except; failures are logged
+    and the pipeline continues with whatever matches it has.
+"""
+
+from __future__ import annotations
+
+import logging
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import cv2
+import numpy as np
+
+logger = logging.getLogger("ML_model.master_pipeline")
+
+
+def _ensure_ml_model_on_path() -> None:
+    """Make bare ``from matcher_cfog import ...`` imports work.
+
+    ``matcher_cfog.py`` uses top-level imports (``from metadata import``),
+    so the ``ML_model/`` directory itself must be on ``sys.path``.
+    """
+    ml_dir = str(Path(__file__).resolve().parent)
+    if ml_dir not in sys.path:
+        sys.path.insert(0, ml_dir)
+
+
+class MasterRegistrationPipeline:
+    """Intelligent daisy-chain of CFOG -> Crater -> Kornia -> Subpixel -> Distribution."""
+
+    def __init__(self, min_inliers_required: int = 50) -> None:
+        self.min_inliers_required = int(min_inliers_required)
+        self.logger = logging.getLogger("ML_model.master_pipeline")
+        # CRITICAL GUARDRAIL: lazy-load heavy models only on demand.
+        self.kornia_matcher = None
+        self.crater_matcher = None
+        self.subpixel_refiner = None
+        self.distribution_filter = None
+
+    # ------------------------------------------------------------------
+    # Lazy loaders (instantiated only when the pipeline actually needs them)
+    # ------------------------------------------------------------------
+    def _get_crater_matcher(self):
+        if self.crater_matcher is not None:
+            return self.crater_matcher
+        _ensure_ml_model_on_path()
+        try:
+            try:
+                from ML_model.crater_matcher import CraterAnchorMatcher
+            except Exception:
+                from crater_matcher import CraterAnchorMatcher  # type: ignore[no-redef]
+            self.crater_matcher = CraterAnchorMatcher()
+        except Exception as e:
+            self.logger.warning("Lazy-load of CraterAnchorMatcher failed: %s", e)
+            raise
+        return self.crater_matcher
+
+    def _get_kornia_matcher(self):
+        if self.kornia_matcher is not None:
+            return self.kornia_matcher
+        _ensure_ml_model_on_path()
+        try:
+            try:
+                from ML_model.kornia_matcher import KorniaAI_Matcher
+            except Exception:
+                from kornia_matcher import KorniaAI_Matcher  # type: ignore[no-redef]
+            self.kornia_matcher = KorniaAI_Matcher()
+        except Exception as e:
+            self.logger.warning("Lazy-load of KorniaAI_Matcher failed: %s", e)
+            raise
+        return self.kornia_matcher
+
+    def _get_subpixel_refiner(self):
+        if self.subpixel_refiner is not None:
+            return self.subpixel_refiner
+        _ensure_ml_model_on_path()
+        try:
+            try:
+                from ML_model.subpixel_refiner import SubPixelRefiner
+            except Exception:
+                from subpixel_refiner import SubPixelRefiner  # type: ignore[no-redef]
+            self.subpixel_refiner = SubPixelRefiner()
+        except Exception as e:
+            self.logger.warning("Lazy-load of SubPixelRefiner failed: %s", e)
+            raise
+        return self.subpixel_refiner
+
+    # ------------------------------------------------------------------
+    # Phase 1 helper: run CFOG (class or function API)
+    # ------------------------------------------------------------------
+    def _run_cfog_phase(
+        self, src_img_path: str, ref_img_path: str
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+        """Run classical CFOG core.
+
+        Supports both the spec'd ``CFOGMatcher`` class API (if present) and
+        the actual ``match_images_cfog`` function API in this repo.
+
+        Returns:
+            (src_pts (N,2) float32, ref_pts (N,2) float32,
+             confidences (N,) float32, inlier_count int).
+        """
+        _ensure_ml_model_on_path()
+
+        # 1) Spec'd class API: CFOGMatcher (may not exist in this repo).
+        try:
+            try:
+                from ML_model.matcher_cfog import CFOGMatcher  # type: ignore
+            except Exception:
+                from matcher_cfog import CFOGMatcher  # type: ignore[no-redef]
+            matcher = CFOGMatcher()  # type: ignore[call-arg]
+            if hasattr(matcher, "match"):
+                res = matcher.match(src_img_path, ref_img_path)
+            elif hasattr(matcher, "match_images"):
+                res = matcher.match_images(src_img_path, ref_img_path)
+            else:
+                raise AttributeError("CFOGMatcher has no match()/match_images() method")
+            return self._parse_generic_match_result(res)
+        except ImportError:
+            # Class genuinely absent -> fall through to function API.
+            pass
+        except Exception as e:
+            self.logger.warning("CFOGMatcher class API failed (%s); trying function API.", e)
+
+        # 2) Actual repo function API: match_images_cfog(src, ref).
+        try:
+            try:
+                from ML_model.matcher_cfog import match_images_cfog  # type: ignore
+            except Exception:
+                from matcher_cfog import match_images_cfog  # type: ignore[no-redef]
+        except Exception as e:
+            raise ImportError(f"Could not import CFOG matcher: {e}") from e
+
+        tmp_dir = tempfile.mkdtemp(prefix="cfog_master_")
+        res = match_images_cfog(src_img_path, ref_img_path, output_dir=tmp_dir)
+        return self._parse_generic_match_result(res)
+
+    @staticmethod
+    def _parse_generic_match_result(
+        res: Any,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, int]:
+        """Normalise CFOG-style dict outputs to (src, ref, conf, inliers)."""
+        empty = (
+            np.zeros((0, 2), dtype=np.float32),
+            np.zeros((0, 2), dtype=np.float32),
+            np.zeros((0,), dtype=np.float32),
+            0,
+        )
+        if not isinstance(res, dict):
+            return empty
+        # Prefer inlier records when available.
+        records = None
+        if isinstance(res.get("matches"), list) and res.get("matches"):
+            records = res["matches"]
+        elif isinstance(res.get("all_matches"), list) and res.get("all_matches"):
+            records = [m for m in res["all_matches"] if m.get("is_inlier", True)]
+            if not records:
+                records = res["all_matches"]
+        if records:
+            src, ref, conf = [], [], []
+            for m in records:
+                try:
+                    sx = float(m.get("source_x", m.get("image1_x", m.get("work_x1"))))
+                    sy = float(m.get("source_y", m.get("image1_y", m.get("work_y1"))))
+                    tx = float(m.get("target_x", m.get("image2_x", m.get("work_x2"))))
+                    ty = float(m.get("target_y", m.get("image2_y", m.get("work_y2"))))
+                except Exception:
+                    continue
+                src.append([sx, sy])
+                ref.append([tx, ty])
+                try:
+                    conf.append(float(m.get("confidence", m.get("score", 0.8))))
+                except Exception:
+                    conf.append(0.8)
+            if not src:
+                return empty
+            src_pts = np.asarray(src, dtype=np.float32)
+            ref_pts = np.asarray(ref, dtype=np.float32)
+            conf_arr = np.asarray(conf, dtype=np.float32)
+            try:
+                inliers = int(res.get("inlier_count", len(src_pts)))
+            except Exception:
+                inliers = len(src_pts)
+            return src_pts, ref_pts, conf_arr, inliers
+        # Raw array style: {"src_pts": ..., "ref_pts": ...}.
+        try:
+            if res.get("src_pts") is not None and res.get("ref_pts") is not None:
+                src_pts = np.asarray(res["src_pts"], dtype=np.float32).reshape(-1, 2)
+                ref_pts = np.asarray(res["ref_pts"], dtype=np.float32).reshape(-1, 2)
+                n = min(len(src_pts), len(ref_pts))
+                src_pts, ref_pts = src_pts[:n], ref_pts[:n]
+                try:
+                    inliers = int(res.get("inlier_count", res.get("inliers", n)))
+                except Exception:
+                    inliers = n
+                conf_arr = np.full((n,), 0.8, dtype=np.float32)
+                return src_pts, ref_pts, conf_arr, inliers
+        except Exception:
+            pass
+        try:
+            inliers = int(res.get("inlier_count", res.get("inliers", 0)))
+        except Exception:
+            inliers = 0
+        return (
+            np.zeros((0, 2), dtype=np.float32),
+            np.zeros((0, 2), dtype=np.float32),
+            np.zeros((0,), dtype=np.float32),
+            inliers,
+        )
+
+    # ------------------------------------------------------------------
+    # Main entry point
+    # ------------------------------------------------------------------
+    def register(self, src_img_path: str, ref_img_path: str) -> dict:
+        """Register source -> reference image. NEVER raises.
+
+        Returns dict with keys: status, transformation_matrix,
+        final_inliers, final_rmse_pixels, coverage_ratio, balance_score,
+        phases_executed, phases_failed.
+        """
+        phases_executed: List[str] = []
+        phases_failed: List[str] = []
+
+        base_src = np.zeros((0, 2), dtype=np.float32)
+        base_ref = np.zeros((0, 2), dtype=np.float32)
+        base_conf = np.zeros((0,), dtype=np.float32)
+
+        def _append(src: Any, ref: Any, conf: Any) -> None:
+            nonlocal base_src, base_ref, base_conf
+            try:
+                s = np.asarray(src, dtype=np.float32).reshape(-1, 2)
+                r = np.asarray(ref, dtype=np.float32).reshape(-1, 2)
+                n = min(len(s), len(r))
+                if n == 0:
+                    return
+                s, r = s[:n], r[:n]
+                try:
+                    c = np.asarray(conf, dtype=np.float32).ravel()[:n]
+                    if c.size != n:
+                        raise ValueError("confidence length mismatch")
+                except Exception:
+                    c = np.full((n,), 0.8, dtype=np.float32)
+                base_src = np.vstack([base_src, s]) if len(base_src) else s
+                base_ref = np.vstack([base_ref, r]) if len(base_ref) else r
+                base_conf = np.concatenate([base_conf, c]) if base_conf.size else c
+            except Exception as e:
+                self.logger.warning("Match-merge failed: %s", e)
+
+        # ---------------- Phase 1: Classical Core (CFOG) ----------------
+        try:
+            s_pts, r_pts, c_pts, n_inl = self._run_cfog_phase(src_img_path, ref_img_path)
+            phases_executed.append("CFOG")
+            if len(s_pts) > 0:
+                _append(s_pts, r_pts, c_pts)
+                self.logger.info("CFOG phase: %d matches (inliers=%d).", len(s_pts), n_inl)
+            else:
+                self.logger.warning("CFOG phase returned 0 matches (inliers=%d).", n_inl)
+                phases_failed.append("CFOG")
+        except Exception as e:
+            self.logger.warning("CFOG phase crashed: %s", e)
+            if "CFOG" not in phases_executed:
+                phases_executed.append("CFOG")
+            phases_failed.append("CFOG")
+
+        # ---------------- Phase 2: AI Fallback (Crater Matcher) ----------------
+        try:
+            if len(base_src) < self.min_inliers_required:
+                _ensure_ml_model_on_path()
+                crater_success = False
+                # Preferred: run_crater_fallback drop-in.
+                try:
+                    try:
+                        from ML_model.crater_matcher import run_crater_fallback  # type: ignore
+                    except Exception:
+                        from crater_matcher import run_crater_fallback  # type: ignore[no-redef]
+                    crater_res = run_crater_fallback(src_img_path, ref_img_path)
+                    phases_executed.append("Crater")
+                    if (
+                        isinstance(crater_res, dict)
+                        and crater_res.get("status") == "success"
+                        and len(np.asarray(crater_res.get("src_pts", []))) > 0
+                    ):
+                        cs = np.asarray(crater_res["src_pts"], dtype=np.float32).reshape(-1, 2)
+                        cr = np.asarray(crater_res["ref_pts"], dtype=np.float32).reshape(-1, 2)
+                        cc = np.full((len(cs),), 0.9, dtype=np.float32)
+                        _append(cs, cr, cc)
+                        crater_success = True
+                        self.logger.info("Crater fallback: +%d anchors (conf=0.9).", len(cs))
+                    else:
+                        phases_failed.append("Crater")
+                except (ImportError, AttributeError) as e:
+                    # Fall back to class API.
+                    self.logger.debug("run_crater_fallback unavailable (%s); using class API.", e)
+                    matcher = self._get_crater_matcher()
+                    if "Crater" not in phases_executed:
+                        phases_executed.append("Crater")
+                    cs, cr = matcher.get_anchor_points(src_img_path, ref_img_path)
+                    if len(np.asarray(cs)) > 0:
+                        cc = np.full((len(np.asarray(cs).reshape(-1, 2)),), 0.9, dtype=np.float32)
+                        _append(cs, cr, cc)
+                        crater_success = True
+                        self.logger.info("Crater class API: +%d anchors (conf=0.9).", len(cc))
+                    else:
+                        phases_failed.append("Crater")
+                except Exception as e:
+                    if "Crater" not in phases_executed:
+                        phases_executed.append("Crater")
+                    phases_failed.append("Crater")
+                    self.logger.warning("Crater fallback crashed: %s", e)
+                if not crater_success:
+                    self.logger.info(
+                        "Crater phase yielded nothing; pool=%d (need %d).",
+                        len(base_src), self.min_inliers_required,
+                    )
+        except Exception as e:
+            self.logger.warning("Crater phase crashed (outer): %s", e)
+            if "Crater" not in phases_executed:
+                phases_executed.append("Crater")
+            if "Crater" not in phases_failed:
+                phases_failed.append("Crater")
+
+        # ---------------- Phase 3: Deep Learning Fallback (Kornia AI) ----------------
+        try:
+            if len(base_src) < self.min_inliers_required:
+                try:
+                    matcher = self._get_kornia_matcher()
+                    phases_executed.append("Kornia")
+                    # NOTE: Kornia API is match_images(ref_path, src_path)
+                    # returning {"ref_pts", "src_pts"} in ORIGINAL pixels.
+                    k_res = matcher.match_images(ref_img_path, src_img_path)
+                    if (
+                        isinstance(k_res, dict)
+                        and k_res.get("status") == "success"
+                        and len(np.asarray(k_res.get("src_pts", []))) > 0
+                    ):
+                        ks = np.asarray(k_res["src_pts"], dtype=np.float32).reshape(-1, 2)
+                        kr = np.asarray(k_res["ref_pts"], dtype=np.float32).reshape(-1, 2)
+                        # No descriptor distances exposed by the matcher;
+                        # use uniform mid-high confidence for RANSAC-verified
+                        # deep inliers so they survive distribution ranking
+                        # but stay below crater anchors (0.9).
+                        kc = np.full((len(ks),), 0.75, dtype=np.float32)
+                        _append(ks, kr, kc)
+                        self.logger.info("Kornia phase: +%d deep inliers (conf=0.75).", len(ks))
+                    else:
+                        reason = k_res.get("reason", "no_inliers") if isinstance(k_res, dict) else "no_inliers"
+                        self.logger.warning("Kornia phase returned no inliers (%s).", reason)
+                        phases_failed.append("Kornia")
+                except Exception as e:
+                    if "Kornia" not in phases_executed:
+                        phases_executed.append("Kornia")
+                    phases_failed.append("Kornia")
+                    self.logger.warning("Kornia phase crashed: %s", e)
+        except Exception as e:
+            self.logger.warning("Kornia phase crashed (outer): %s", e)
+            if "Kornia" not in phases_executed:
+                phases_executed.append("Kornia")
+            if "Kornia" not in phases_failed:
+                phases_failed.append("Kornia")
+
+        # ---------------- Phase 4: Sub-Pixel Refinement ----------------
+        refined_src: np.ndarray = base_src
+        refined_ref: np.ndarray = base_ref
+        try:
+            if len(base_src) > 0:
+                try:
+                    refiner = self._get_subpixel_refiner()
+                    phases_executed.append("Subpixel")
+                    src_img = cv2.imread(str(src_img_path), cv2.IMREAD_COLOR)
+                    ref_img = cv2.imread(str(ref_img_path), cv2.IMREAD_COLOR)
+                    if src_img is None or ref_img is None:
+                        raise FileNotFoundError("Could not read images for sub-pixel refinement.")
+                    # Refiner API: refine_batch(ref_img, src_img, ref_pts, src_pts).
+                    kept_ref, kept_src = refiner.refine_batch(
+                        ref_img, src_img, base_ref, base_src
+                    )
+                    kept_ref = np.asarray(kept_ref, dtype=np.float32).reshape(-1, 2)
+                    kept_src = np.asarray(kept_src, dtype=np.float32).reshape(-1, 2)
+                    if len(kept_src) > 0:
+                        refined_src, refined_ref = kept_src, kept_ref
+                        # Rebuild confidences for survivors: keep base
+                        # confidences is non-trivial post-filter; fall back
+                        # to uniform 0.8 (refiner already applied its
+                        # min_confidence gate internally).
+                        base_conf = np.full((len(kept_src),), 0.8, dtype=np.float32)
+                        self.logger.info(
+                            "Subpixel phase: %d/%d kept.", len(kept_src), len(base_src)
+                        )
+                        if len(kept_src) < len(base_src):
+                            self.logger.info(
+                                "Subpixel filtered %d low-confidence points.",
+                                len(base_src) - len(kept_src),
+                            )
+                    else:
+                        self.logger.warning("Subpixel dropped all points; keeping coarse pool.")
+                        phases_failed.append("Subpixel")
+                except Exception as e:
+                    if "Subpixel" not in phases_executed:
+                        phases_executed.append("Subpixel")
+                    phases_failed.append("Subpixel")
+                    self.logger.warning("Subpixel phase crashed: %s", e)
+        except Exception as e:
+            self.logger.warning("Subpixel phase crashed (outer): %s", e)
+            if "Subpixel" not in phases_executed:
+                phases_executed.append("Subpixel")
+            if "Subpixel" not in phases_failed:
+                phases_failed.append("Subpixel")
+
+        # ---------------- Phase 5: Uniform Spatial Distribution ----------------
+        filtered_src = refined_src
+        filtered_ref = refined_ref
+        coverage_ratio = 0.0
+        balance_score = 0.0
+        try:
+            _ensure_ml_model_on_path()
+            try:
+                try:
+                    from ML_model.spatial_distribution import UniformDistributionFilter  # type: ignore
+                except Exception:
+                    from spatial_distribution import UniformDistributionFilter  # type: ignore[no-redef]
+            except Exception as e:
+                raise ImportError(f"Could not import UniformDistributionFilter: {e}") from e
+            phases_executed.append("Distribution")
+            # Image dims from the source frame (filter bins on src coords).
+            h, w = None, None
+            try:
+                probe = cv2.imread(str(src_img_path), cv2.IMREAD_UNCHANGED)
+                if probe is not None:
+                    h, w = probe.shape[:2]
+            except Exception:
+                pass
+            if h is None or w is None:
+                raise ValueError("Could not determine image dimensions for distribution filter.")
+            dist_filter = UniformDistributionFilter(grid_rows=8, grid_cols=8, points_per_cell=10)
+            # Lazily cache a default instance without heavy state.
+            try:
+                self.distribution_filter = dist_filter
+            except Exception:
+                pass
+            conf_in = base_conf if base_conf.size == len(refined_src) else None
+            d_res = dist_filter.filter_points(refined_src, refined_ref, w, h, conf_in)
+            if isinstance(d_res, dict) and len(np.asarray(d_res.get("filtered_src_pts", []))) > 0:
+                filtered_src = np.asarray(d_res["filtered_src_pts"], dtype=np.float32).reshape(-1, 2)
+                filtered_ref = np.asarray(d_res["filtered_ref_pts"], dtype=np.float32).reshape(-1, 2)
+                try:
+                    coverage_ratio = float(d_res.get("coverage_ratio", 0.0))
+                except Exception:
+                    coverage_ratio = 0.0
+                try:
+                    balance_score = float(d_res.get("balance_score", 0.0))
+                except Exception:
+                    balance_score = 0.0
+                self.logger.info(
+                    "Distribution phase: %d -> %d (coverage=%.3f, balance=%.3f).",
+                    len(refined_src), len(filtered_src), coverage_ratio, balance_score,
+                )
+            else:
+                self.logger.warning("Distribution filter returned empty; keeping refined pool.")
+                phases_failed.append("Distribution")
+                filtered_src, filtered_ref = refined_src, refined_ref
+        except Exception as e:
+            if "Distribution" not in phases_executed:
+                phases_executed.append("Distribution")
+            phases_failed.append("Distribution")
+            self.logger.warning("Distribution phase crashed: %s", e)
+            filtered_src, filtered_ref = refined_src, refined_ref
+
+        # ---------------- Phase 6: Final Geometric Transformation ----------------
+        transformation_matrix: Optional[np.ndarray] = None
+        final_inliers = 0
+        final_rmse: float = float("inf")
+        try:
+            if filtered_src is not None and len(filtered_src) >= 4:
+                fs = np.asarray(filtered_src, dtype=np.float32).reshape(-1, 2)
+                fr = np.asarray(filtered_ref, dtype=np.float32).reshape(-1, 2)
+                n = min(len(fs), len(fr))
+                fs, fr = fs[:n], fr[:n]
+                H, mask = cv2.findHomography(fs, fr, cv2.RANSAC, 3.0)
+                if H is not None and mask is not None:
+                    inl = mask.ravel().astype(bool)
+                    final_inliers = int(np.count_nonzero(inl))
+                    if final_inliers >= 4:
+                        transformation_matrix = np.asarray(H, dtype=np.float64)
+                        # Final RMSE over RANSAC inliers in pixels.
+                        try:
+                            ones = np.ones((final_inliers, 1), dtype=np.float64)
+                            src_h = np.hstack([fs[inl].astype(np.float64), ones])
+                            proj = (H @ src_h.T).T
+                            proj = proj[:, :2] / np.maximum(proj[:, 2:3], 1e-12)
+                            err = np.linalg.norm(proj - fr[inl].astype(np.float64), axis=1)
+                            final_rmse = float(np.sqrt(np.mean(err**2)))
+                        except Exception as e:
+                            self.logger.warning("RMSE computation failed: %s", e)
+                            final_rmse = float("inf")
+                    else:
+                        self.logger.warning("Homography has <4 inliers (%d).", final_inliers)
+                        transformation_matrix = None
+                        final_inliers = 0
+                else:
+                    self.logger.warning("cv2.findHomography returned None.")
+                    transformation_matrix = None
+            else:
+                n_have = 0 if filtered_src is None else len(filtered_src)
+                self.logger.warning("Insufficient points for homography (%d < 4).", n_have)
+                transformation_matrix = None
+        except Exception as e:
+            self.logger.warning("Homography estimation crashed: %s", e)
+            transformation_matrix = None
+            final_inliers = 0
+            final_rmse = float("inf")
+
+        status = "success" if (transformation_matrix is not None and final_inliers >= 4) else "failed"
+        if status == "failed":
+            transformation_matrix = None
+
+        return {
+            "status": status,
+            "transformation_matrix": transformation_matrix,
+            "final_inliers": int(final_inliers),
+            "final_rmse_pixels": float(final_rmse),
+            "coverage_ratio": float(coverage_ratio),
+            "balance_score": float(balance_score),
+            "phases_executed": phases_executed,
+            "phases_failed": phases_failed,
+        }
+
+
+__all__ = ["MasterRegistrationPipeline"]
