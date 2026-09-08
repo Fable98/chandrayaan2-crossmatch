@@ -67,6 +67,7 @@ export interface MatchMetrics {
   orthorectified?: boolean;
   fit_rmse_px?: number | null;
   validation_rmse_px?: number | null;
+  absolute_rmse_m?: number | null;
   validation_status?: string | null;
   [key: string]: unknown;
 }

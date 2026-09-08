@@ -527,23 +527,23 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
           {/* (Exact layout & visual styling from reference image!)     */}
           {/* ======================================================== */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Card 1: Solid Vibrant Indigo Accent Card */}
+            {/* Card 1: Solid Vibrant Indigo Accent Card - Absolute Topographic RMSE */}
             <div className="rounded-2xl bg-[#4F46E5] p-5 text-white shadow-sm flex flex-col justify-between">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-indigo-100">Sub-Pixel Status</span>
+                <span className="text-xs font-medium text-indigo-100">Absolute Topographic RMSE</span>
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-white/20 text-xs">
-                  ↗
+                  🌑
                 </span>
               </div>
               <div className="my-3">
                 <div className="text-3xl font-extrabold tracking-tight">
-                  {metrics?.sub_pixel_accurate ? "< 0.50" : "Active"}
-                  {metrics?.sub_pixel_accurate && <span className="text-sm font-semibold ml-1">px</span>}
+                  {metrics?.absolute_rmse_m != null ? metrics.absolute_rmse_m.toFixed(2) : "—"}
+                  {metrics?.absolute_rmse_m != null && <span className="text-sm font-semibold ml-1">meters</span>}
                 </div>
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-indigo-100">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-                <span>Verified sub-pixel alignment</span>
+                <span>DEM-corrected physical accuracy</span>
               </div>
             </div>
 

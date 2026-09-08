@@ -1025,10 +1025,17 @@ def match_images_cfog(
         }
 
     # 4. DEM Relief Compensation
-    dem_arr = None
-    if dem_path and os.path.exists(str(dem_path)):
+    # NOTE: dem_arr was already raw-loaded above via cv2.imread (elevation meters
+    # preserved). Only (re)load here if still None, preferring raw meters so the
+    # downstream absolute_rmse_m stays physically meaningful. Null-safe: stays None
+    # when no DEM is supplied.
+    if dem_arr is None and dem_path and os.path.exists(str(dem_path)):
         try:
-            dem_arr, _, _ = load_as_float_and_color(dem_path)
+            raw_dem_reload = cv2.imread(str(dem_path), cv2.IMREAD_UNCHANGED)
+            if raw_dem_reload is not None:
+                dem_arr = raw_dem_reload.astype(np.float32)
+            else:
+                dem_arr, _, _ = load_as_float_and_color(dem_path)
         except Exception:
             dem_arr = None
 

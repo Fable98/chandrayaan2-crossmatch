@@ -450,6 +450,7 @@ def compute_canonical_metrics(
             "inlier_count": 0,
             "inlier_ratio": 0.0,
             "fit_rmse_px": None,
+            "absolute_rmse_m": None,
             "validation_rmse_px": None,
             "validation_median_error_px": None,
             "validation_status": "no_inliers",
@@ -516,10 +517,23 @@ def compute_canonical_metrics(
     else:
         quality_tier = "LOW_CONFIDENCE"
 
-    # Absolute RMSE in meters
+    # Absolute RMSE in meters (DEM-corrected physical accuracy; None when no DEM/GSD)
     abs_rmse_m = None
     if gsd_m is not None and inlier_count > 0:
-        abs_rmse_m = calculate_absolute_rmse_meters((inliers_src, inliers_dst, H), gsd_m, dem_data=dem_data)
+        try:
+            raw_abs = calculate_absolute_rmse_meters(
+                (inliers_src, inliers_dst, H), gsd_m, dem_data=dem_data
+            )
+            abs_rmse_m = float(raw_abs) if raw_abs is not None else None
+        except Exception as e:
+            logger.warning(f"Failed to calculate absolute_rmse_m: {e}")
+            abs_rmse_m = None
+            # Fallback: convert pixel RMSE to meters using GSD
+            try:
+                if len(fit_errors) > 0 and gsd_m is not None:
+                    abs_rmse_m = float(fit_rmse) * float(gsd_m)
+            except Exception:
+                abs_rmse_m = None
 
     return {
         "match_count": raw_count,
