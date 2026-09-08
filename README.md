@@ -34,6 +34,9 @@ python run_demo.py --input_dir ./sample_data --output_dir ./results
 3. **Comparative Benchmark**: Runs the 4-way ablation study comparing Pure SIFT, Pure LoFTR, Pipeline without DEM, and Full Proposed Pipeline (`evaluation/run_ablation.py`).
 4. **Structured Deliverables**: Generates `results/summary_report.md`, `results/pipeline.log`, registered GeoTIFF raster, checkerboard QA preview, and archives the technical documentation.
 
+> [!NOTE]
+> **Dependencies**: The core registration pipeline runs on standard scientific Python (`numpy`, `scipy`, `opencv-python`). Deep learning baselines (LoFTR) are optional; install `pip install -r requirements-eval.txt` if you wish to run the GPU/LoFTR comparator, otherwise the system gracefully degrades to normalized cross-correlation (NCC).
+
 > [!TIP]
 > For complete mathematical formulations (Phase Congruency, CFOG, IIRS PCA/SAM, Grid NMS, DEM Ray-Intersection, and Selenodetic 3D RMSE), see [**`docs/methodology.md`**](docs/methodology.md).
 

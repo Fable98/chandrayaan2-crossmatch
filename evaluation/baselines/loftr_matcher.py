@@ -11,14 +11,16 @@ from typing import Dict, Any, Tuple, Optional
 import numpy as np
 import cv2
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("evaluation.baselines.loftr_matcher")
 
 try:
     import torch
+    import kornia.feature as kf
     from kornia.feature import LoFTR
     LOFTR_AVAILABLE = True
-except (ImportError, ModuleNotFoundError):
+except (ImportError, Exception):
     torch = None
+    kf = None
     LoFTR = None
     LOFTR_AVAILABLE = False
 
@@ -37,16 +39,29 @@ def match_loftr(
 ) -> Dict[str, Any]:
     """
     Standard LoFTR baseline matching wrapper using kornia.feature.LoFTR.
-    Falls back gracefully to NCC if PyTorch or Kornia is not available.
+    Falls back gracefully to NCC if PyTorch/Kornia is not available.
     """
     start_time = time.time()
 
     if not LOFTR_AVAILABLE:
         logger.warning("PyTorch/Kornia not installed. LoFTR baseline unavailable. Falling back to NCC.")
-        from baselines.ncc_matcher import match_ncc
-        res = match_ncc(img1, img2, gsd_m=gsd_m, dem=dem, ransac_thresh=ransac_thresh)
-        res["method"] = "Pure LoFTR (NCC Fallback)"
-        return res
+        try:
+            from baselines.ncc_matcher import match_ncc
+            res = match_ncc(img1, img2, gsd_m=gsd_m, dem=dem, ransac_thresh=ransac_thresh)
+            res["method"] = "Pure LoFTR (Fallback: NCC)"
+            return res
+        except Exception as e:
+            logger.warning("NCC fallback also encountered error: %s", e)
+            return {
+                "method": "Pure LoFTR (Unavailable)",
+                "status": "dependencies_missing",
+                "match_count": 0,
+                "inlier_count": 0,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": None,
+                "absolute_rmse_m": None,
+                "runtime_s": round(time.time() - start_time, 4),
+            }
 
     def to_u8_gray(item):
         if isinstance(item, (str, Path)):
