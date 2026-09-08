@@ -14,7 +14,7 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+/lib/
 lib64/
 parts/
 sdist/
@@ -242,6 +242,10 @@ weights/
 tiles/
 outputs/
 *.geojson.cache
+registration_output_demo/
+benchmarks/registration_benchmark_output/
+dynamic_runs/
 
 # --- OS ---
 .DS_Store
+backend/data/users.json

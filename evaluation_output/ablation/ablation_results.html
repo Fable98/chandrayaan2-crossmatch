@@ -1,0 +1,13 @@
+<!DOCTYPE html><html><head><meta charset='utf-8'><title>Ablation Study Results</title>
+<style>table { border-collapse: collapse; width: 100%; font-family: sans-serif; }
+th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: center; }
+th { background-color: #2c3e50; color: white; }
+tr:nth-child(even) { background-color: #f2f2f2; }
+tr:hover { background-color: #e2f0d9; }</style></head><body>
+<h2>Chandrayaan-2 Cross-Sensor Registration: Ablation & Baseline Benchmark</h2>
+<table><thead><tr><th>Method</th><th>Inlier Count</th><th>Inlier Ratio</th><th>Pixel RMSE</th><th>Absolute RMSE (m)</th><th>Processing Time</th></tr></thead><tbody>
+<tr><td><strong>Pure SIFT</strong></td><td>4</td><td>57.1%</td><td>0.000 px</td><td>0.00 m</td><td>0.15 s</td></tr>
+<tr><td><strong>Pure LoFTR (NCC Fallback)</strong></td><td>0</td><td>0.0%</td><td>N/A</td><td>N/A</td><td>0.05 s</td></tr>
+<tr><td><strong>Our Pipeline (No DEM)</strong></td><td>6</td><td>7.8%</td><td>1.325 px</td><td>7.16 m</td><td>1.92 s</td></tr>
+<tr><td><strong>Our Full Pipeline (CFOG+DEM+Grid NMS)</strong></td><td>6</td><td>7.8%</td><td>1.325 px</td><td>7.16 m</td><td>1.21 s</td></tr>
+</tbody></table></body></html>

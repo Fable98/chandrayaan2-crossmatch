@@ -1,0 +1,37 @@
+{
+    "match_count": 79,
+    "inlier_count": 4,
+    "inlier_ratio": 0.0506,
+    "fit_rmse_px": 0.0,
+    "validation_rmse_px": null,
+    "held_out_inlier_validation_rmse_px": null,
+    "validation_median_error_px": null,
+    "validation_status": "insufficient_points_for_holdout",
+    "quality_tier": "LOW_CONFIDENCE",
+    "mean_reprojection_error_px": 0.0,
+    "median_reprojection_error_px": 0.0,
+    "max_reprojection_error_px": 0.0,
+    "fraction_below_1px": 1.0,
+    "fraction_below_0_5px": 1.0,
+    "fraction_below_0_25px": 1.0,
+    "spatial_coverage": 0.04,
+    "spatial_uniformity": 0.0092,
+    "spatial_distribution": {
+        "grid_rows": 10,
+        "grid_cols": 10,
+        "total_cells": 100,
+        "occupied_cells": 4,
+        "coverage": 0.04,
+        "count_std": 0.196,
+        "count_mean": 0.04,
+        "spatial_entropy": 0.301,
+        "uniformity_score": 0.0092
+    },
+    "transform_quality": {
+        "is_valid": true,
+        "reason": "OK",
+        "determinant": 0.00309,
+        "condition_number": 2229200.36,
+        "scale_ratio": 1.0
+    }
+}

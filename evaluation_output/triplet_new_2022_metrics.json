@@ -1,0 +1,105 @@
+{
+    "region_id": "triplet_new_2022",
+    "dataset_id": "triplet_new_2022",
+    "status": "evaluated",
+    "num_inliers": 6,
+    "num_raw_matches": 90,
+    "inlier_ratio": 0.0667,
+    "rmse_px": 2.0658,
+    "fit_rmse_px": 2.0658,
+    "validation_rmse_px": null,
+    "validation_status": "insufficient_points_for_holdout",
+    "mean_reprojection_error_px": 1.9897,
+    "median_reprojection_error_px": 1.8393,
+    "max_reprojection_error_px": 2.9403,
+    "sub_pixel_accurate": false,
+    "fraction_below_1px": 0.0,
+    "source_coverage_ratio": 0.06,
+    "destination_coverage_ratio": 0.06,
+    "combined_coverage_score": 0.06,
+    "source_occupied_cells": 6,
+    "destination_occupied_cells": 6,
+    "total_cells": 100,
+    "uniformity_score": 0.0183,
+    "quality_tier": "LOW_CONFIDENCE",
+    "method": "CFOG + Phase Congruency",
+    "pairs": {
+        "ohrc_tmc": {
+            "status": "success",
+            "message": null,
+            "direction": "native",
+            "measured_direction": null,
+            "quality_tier": "LOW_CONFIDENCE",
+            "match_count": 90,
+            "inlier_count": 6,
+            "inlier_ratio": 0.0667,
+            "fit_rmse_px": 2.0658,
+            "spatial_coverage": 0.06,
+            "spatial_uniformity": 0.0183
+        },
+        "ohrc_iirs": {
+            "status": "composition_not_computable",
+            "inlier_count": 0,
+            "fit_rmse_px": null,
+            "forward_ohrc_to_iirs": {
+                "status": "composition_not_computable",
+                "message": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+                "quality_tier": "FAILED",
+                "match_count": 0,
+                "inlier_count": 0,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "reverse_iirs_to_ohrc": null,
+            "bidirectional_agreement": false,
+            "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
+            "composition": null
+        },
+        "tmc_iirs": {
+            "status": "failed",
+            "inlier_count": 0,
+            "fit_rmse_px": null,
+            "forward_tmc_to_iirs": {
+                "status": "failed",
+                "message": null,
+                "direction": "native",
+                "measured_direction": null,
+                "quality_tier": "FAILED",
+                "match_count": 0,
+                "inlier_count": 0,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "reverse_iirs_to_tmc": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "direction": "native",
+                "measured_direction": null,
+                "quality_tier": "FAILED",
+                "match_count": 115,
+                "inlier_count": 8,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "bidirectional_agreement": false,
+            "directional_note": "Forward (TMC->IIRS) produced 'failed' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
+        }
+    },
+    "triplet_consistency": {
+        "status": "cycle_not_computable",
+        "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+        "cycle_rmse_px": null,
+        "cycle_mean_px": null,
+        "cycle_closed_successfully": false,
+        "failed_legs": [
+            "BC (B -> C)",
+            "CA (C -> A)"
+        ]
+    }
+}

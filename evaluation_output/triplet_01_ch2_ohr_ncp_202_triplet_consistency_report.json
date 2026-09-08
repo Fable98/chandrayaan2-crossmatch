@@ -1,0 +1,213 @@
+{
+    "status": "cycle_not_computable",
+    "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+    "triplet_cycle_rmse_px": null,
+    "triplet_mean_cycle_error_px": null,
+    "cycle_closed_successfully": false,
+    "failed_legs": [
+        "BC (B -> C)",
+        "CA (C -> A)"
+    ],
+    "leg_derivations": {
+        "AB": "measured",
+        "BC": "failed",
+        "CA": "failed"
+    },
+    "pair_AB_metrics": {
+        "match_count": 97,
+        "inlier_count": 7,
+        "inlier_ratio": 0.0722,
+        "fit_rmse_px": 2.1959,
+        "validation_rmse_px": null,
+        "held_out_inlier_validation_rmse_px": null,
+        "validation_median_error_px": null,
+        "validation_status": "insufficient_points_for_holdout",
+        "quality_tier": "LOW_CONFIDENCE",
+        "mean_reprojection_error_px": 1.7904,
+        "median_reprojection_error_px": 1.0978,
+        "max_reprojection_error_px": 3.6746,
+        "fraction_below_1px": 0.4286,
+        "fraction_below_0_5px": 0.1429,
+        "fraction_below_0_25px": 0.0,
+        "spatial_coverage": 0.07,
+        "spatial_uniformity": 0.0235,
+        "coverage_relative_to_inlier_count": 0.6667,
+        "spatial_distribution": {
+            "grid_rows": 10,
+            "grid_cols": 10,
+            "total_cells": 100,
+            "occupied_cells": 7,
+            "coverage": 0.07,
+            "count_std": 0.2551,
+            "count_mean": 0.07,
+            "spatial_entropy": 0.4225,
+            "uniformity_score": 0.0235,
+            "adaptive_grid_size": 3,
+            "coverage_relative_to_inlier_count": 0.6667,
+            "adaptive_uniformity_score": 0.5231
+        },
+        "transform_quality": {
+            "is_valid": true,
+            "reason": "OK",
+            "determinant": 0.286023,
+            "condition_number": 16276.7,
+            "scale_ratio": 1.3227
+        },
+        "lk_refinement": {
+            "refined_count": 1,
+            "total": 7,
+            "fb_threshold": 0.5,
+            "max_shift_px": 3.0,
+            "debug_points": [
+                {
+                    "point_index": 0,
+                    "src_pt": [
+                        128.0,
+                        25.0
+                    ],
+                    "dst_pt": [
+                        168.0,
+                        23.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 14.171638488769531,
+                    "shift_mag": 1.3793784379959106,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=14.1716 > 0.5)"
+                },
+                {
+                    "point_index": 1,
+                    "src_pt": [
+                        128.0,
+                        230.0
+                    ],
+                    "dst_pt": [
+                        174.0,
+                        156.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 19.09779930114746,
+                    "shift_mag": 0.7739371657371521,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=19.0978 > 0.5)"
+                },
+                {
+                    "point_index": 2,
+                    "src_pt": [
+                        281.0,
+                        281.0
+                    ],
+                    "dst_pt": [
+                        289.4371643066406,
+                        231.6515655517578
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.09283298999071121,
+                    "shift_mag": 3.644861936569214,
+                    "passed": false,
+                    "failure_gate": "max_shift_exceeded (shift_mag=3.6449 > 3.0)"
+                },
+                {
+                    "point_index": 3,
+                    "src_pt": [
+                        179.0,
+                        332.0
+                    ],
+                    "dst_pt": [
+                        220.0,
+                        275.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 4.041545867919922,
+                    "shift_mag": 0.12676694989204407,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=4.0415 > 0.5)"
+                },
+                {
+                    "point_index": 4,
+                    "src_pt": [
+                        435.0,
+                        332.0
+                    ],
+                    "dst_pt": [
+                        420.5992431640625,
+                        313.84320068359375
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.9273171424865723,
+                    "shift_mag": 1.1716411113739014,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=0.9273 > 0.5)"
+                },
+                {
+                    "point_index": 5,
+                    "src_pt": [
+                        25.0,
+                        435.0
+                    ],
+                    "dst_pt": [
+                        53.0,
+                        402.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.18954072892665863,
+                    "shift_mag": 2.4002504348754883,
+                    "passed": true,
+                    "failure_gate": null
+                },
+                {
+                    "point_index": 6,
+                    "src_pt": [
+                        384.0,
+                        435.0
+                    ],
+                    "dst_pt": [
+                        432.0,
+                        453.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 3.904231071472168,
+                    "shift_mag": 0.46011364459991455,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=3.9042 > 0.5)"
+                }
+            ],
+            "step1_comparison": {
+                "fit_rmse_a_orig": 2.1959,
+                "fit_rmse_b_mixed": 2.3312,
+                "fit_rmse_c_refined_only": null,
+                "refined_count": 1,
+                "total_inliers": 7,
+                "err_a_per_point": [
+                    0.629,
+                    2.6649,
+                    3.2598,
+                    3.6746,
+                    0.2914,
+                    1.0978,
+                    0.9153
+                ],
+                "err_b_per_point": [
+                    0.8195,
+                    2.8222,
+                    3.4202,
+                    3.9109,
+                    0.1117,
+                    1.2919,
+                    0.855
+                ],
+                "err_c_per_point": []
+            }
+        }
+    },
+    "pair_BC_metrics": null,
+    "pair_CA_metrics": null,
+    "composition": null
+}

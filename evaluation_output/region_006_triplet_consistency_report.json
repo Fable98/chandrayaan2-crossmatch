@@ -1,0 +1,331 @@
+{
+    "status": "evaluated_composed",
+    "reason": null,
+    "triplet_cycle_rmse_px": 0.0,
+    "triplet_mean_cycle_error_px": 0.0,
+    "cycle_closed_successfully": true,
+    "failed_legs": [],
+    "leg_derivations": {
+        "AB": "measured",
+        "BC": "measured",
+        "CA": "composed"
+    },
+    "legs": {
+        "AB": {
+            "derivation": "measured",
+            "homography": [
+                [
+                    2.9844497908022833,
+                    0.7823591823234342,
+                    -387.0549828388665
+                ],
+                [
+                    0.806691486044386,
+                    2.433179402062708,
+                    -265.3989792047834
+                ],
+                [
+                    0.003466648912312203,
+                    0.0016131829019429863,
+                    0.9999999999999999
+                ]
+            ]
+        },
+        "BC": {
+            "derivation": "measured",
+            "homography": [
+                [
+                    -1.4143535584367197,
+                    4.142621498380777,
+                    -226.93283696602586
+                ],
+                [
+                    -4.142621498380777,
+                    -1.41435355843672,
+                    2253.9873329766465
+                ],
+                [
+                    0.0,
+                    0.0,
+                    1.0
+                ]
+            ]
+        },
+        "CA": {
+            "derivation": "composed",
+            "homography": [
+                [
+                    -0.18267668083997118,
+                    -0.18247624112957805,
+                    630.0857573786557
+                ],
+                [
+                    0.3767320980630317,
+                    0.019136005866607284,
+                    212.45616719825958
+                ],
+                [
+                    2.5538137730298427e-05,
+                    0.0006017111853591795,
+                    1.0
+                ]
+            ]
+        }
+    },
+    "pair_AB_metrics": {
+        "match_count": 56,
+        "inlier_count": 6,
+        "inlier_ratio": 0.1071,
+        "fit_rmse_px": 1.6526,
+        "validation_rmse_px": null,
+        "held_out_inlier_validation_rmse_px": null,
+        "validation_median_error_px": null,
+        "validation_status": "insufficient_points_for_holdout",
+        "quality_tier": "LOW_CONFIDENCE",
+        "mean_reprojection_error_px": 1.3507,
+        "median_reprojection_error_px": 0.8588,
+        "max_reprojection_error_px": 3.3064,
+        "fraction_below_1px": 0.6667,
+        "fraction_below_0_5px": 0.0,
+        "fraction_below_0_25px": 0.0,
+        "spatial_coverage": 0.06,
+        "spatial_uniformity": 0.0183,
+        "coverage_relative_to_inlier_count": 0.5556,
+        "spatial_distribution": {
+            "grid_rows": 10,
+            "grid_cols": 10,
+            "total_cells": 100,
+            "occupied_cells": 6,
+            "coverage": 0.06,
+            "count_std": 0.2375,
+            "count_mean": 0.06,
+            "spatial_entropy": 0.3891,
+            "uniformity_score": 0.0183,
+            "adaptive_grid_size": 3,
+            "coverage_relative_to_inlier_count": 0.5556,
+            "adaptive_uniformity_score": 0.4116
+        },
+        "transform_quality": {
+            "is_valid": true,
+            "reason": "OK",
+            "determinant": 9.949637,
+            "condition_number": 41370.92,
+            "scale_ratio": 1.9005
+        },
+        "lk_refinement": {
+            "refined_count": 4,
+            "total": 6,
+            "fb_threshold": 0.5,
+            "max_shift_px": 3.0,
+            "debug_points": [
+                {
+                    "point_index": 0,
+                    "src_pt": [
+                        435.0,
+                        25.0
+                    ],
+                    "dst_pt": [
+                        365.0,
+                        58.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.4368806481361389,
+                    "shift_mag": 0.6360504031181335,
+                    "passed": true,
+                    "failure_gate": null
+                },
+                {
+                    "point_index": 1,
+                    "src_pt": [
+                        179.0,
+                        76.0
+                    ],
+                    "dst_pt": [
+                        119.0,
+                        36.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 2.2857444286346436,
+                    "shift_mag": 1.35186767578125,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=2.2857 > 0.5)"
+                },
+                {
+                    "point_index": 2,
+                    "src_pt": [
+                        179.0,
+                        281.0
+                    ],
+                    "dst_pt": [
+                        175.0,
+                        274.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.17024143040180206,
+                    "shift_mag": 0.7851095795631409,
+                    "passed": true,
+                    "failure_gate": null
+                },
+                {
+                    "point_index": 3,
+                    "src_pt": [
+                        281.0,
+                        281.0
+                    ],
+                    "dst_pt": [
+                        277.0,
+                        264.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.09798403829336166,
+                    "shift_mag": 0.3090652525424957,
+                    "passed": true,
+                    "failure_gate": null
+                },
+                {
+                    "point_index": 4,
+                    "src_pt": [
+                        76.0,
+                        332.0
+                    ],
+                    "dst_pt": [
+                        56.0,
+                        335.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.3975928723812103,
+                    "shift_mag": 0.14530590176582336,
+                    "passed": true,
+                    "failure_gate": null
+                },
+                {
+                    "point_index": 5,
+                    "src_pt": [
+                        384.0,
+                        332.0
+                    ],
+                    "dst_pt": [
+                        356.0,
+                        297.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 1.1559028625488281,
+                    "shift_mag": 1.6206108331680298,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=1.1559 > 0.5)"
+                }
+            ],
+            "step1_comparison": {
+                "fit_rmse_a_orig": 1.6526,
+                "fit_rmse_b_mixed": 5.3355,
+                "fit_rmse_c_refined_only": 0.0,
+                "refined_count": 4,
+                "total_inliers": 6,
+                "err_a_per_point": [
+                    0.6202,
+                    0.8159,
+                    3.3064,
+                    1.7617,
+                    0.9017,
+                    0.6981
+                ],
+                "err_b_per_point": [
+                    0.2107,
+                    0.1473,
+                    0.8782,
+                    1.9826,
+                    12.8484,
+                    0.9765
+                ],
+                "err_c_per_point": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    0.0
+                ]
+            }
+        },
+        "derivation": "measured"
+    },
+    "pair_BC_metrics": {
+        "match_count": 120,
+        "inlier_count": 4,
+        "inlier_ratio": 0.0333,
+        "fit_rmse_px": 3.9935,
+        "validation_rmse_px": null,
+        "held_out_inlier_validation_rmse_px": null,
+        "validation_median_error_px": null,
+        "validation_status": "insufficient_points_for_holdout",
+        "quality_tier": "LOW_CONFIDENCE",
+        "mean_reprojection_error_px": 3.7406,
+        "median_reprojection_error_px": 4.3671,
+        "max_reprojection_error_px": 4.83,
+        "fraction_below_1px": 0.0,
+        "fraction_below_0_5px": 0.0,
+        "fraction_below_0_25px": 0.0,
+        "spatial_coverage": 0.04,
+        "spatial_uniformity": 0.0092,
+        "coverage_relative_to_inlier_count": 0.5,
+        "spatial_distribution": {
+            "grid_rows": 10,
+            "grid_cols": 10,
+            "total_cells": 100,
+            "occupied_cells": 4,
+            "coverage": 0.04,
+            "count_std": 0.196,
+            "count_mean": 0.04,
+            "spatial_entropy": 0.301,
+            "uniformity_score": 0.0092,
+            "adaptive_grid_size": 2,
+            "coverage_relative_to_inlier_count": 0.5,
+            "adaptive_uniformity_score": 0.3704
+        },
+        "transform_quality": {
+            "is_valid": true,
+            "reason": "OK",
+            "determinant": 19.161709,
+            "condition_number": 1172377.92,
+            "scale_ratio": 1.0
+        },
+        "direction": "inverted_from_BA",
+        "measured_direction": "IIRS -> TMC-2",
+        "derivation": "measured"
+    },
+    "pair_CA_metrics": {
+        "derivation": "composed",
+        "status": "composed_from_AB_BC",
+        "inlier_count": 0,
+        "fit_rmse_px": null
+    },
+    "composition": {
+        "source": "A -> B -> C",
+        "homography": [
+            [
+                -1.66594616138492,
+                8.60712463442446,
+                -778.9477615792601
+            ],
+            [
+                -5.69061010183406,
+                -3.046300087016987,
+                4232.777616584097
+            ],
+            [
+                0.0034666489123122033,
+                0.0016131829019429866,
+                1.0
+            ]
+        ],
+        "transform": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
+        "registered_raster": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
+        "registered_geotiff": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
+        "checkerboard_qa": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\composed_checkerboard_qa.png",
+        "manifest": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\registered_products_manifest.json"
+    }
+}

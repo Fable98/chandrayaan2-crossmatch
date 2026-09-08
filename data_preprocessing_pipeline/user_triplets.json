@@ -24,6 +24,17 @@
     "ohrc_label": "user_xmls\\ch2_ohr_ncp_20210405T1606536730_d_img_d18.xml",
     "tmc2_label": "user_xmls\\ch2_tmc_ncf_20250807T1904346039_d_img_d18.xml",
     "iirs_label": "user_xmls\\ch2_iir_nri_20211221T0324126144_d_img_hw1.xml",
-    "intersection_wkt": "POLYGON ((336.589455 -2.579083, 336.587773 -3.416904, 336.4975330942577 -3.414245638623783, 336.49422182583595 -2.5762828654964793, 336.589455 -2.579083))"
+    "intersection_wkt": "POLYGON ((336.589455 -2.579083, 336.587773 -3.416904, 336.4975330942577 -3.414245638623783, 336.49422182583595 -2.5762828654964793, 336.589455 -2.579083))",
+    "aoi_optical_km": {
+      "width_km": 3.18,
+      "height_km": 3.82,
+      "notes": "OHRC-TMC high-res alignment"
+    },
+    "aoi_iirs_km": {
+      "width_km": 20.36,
+      "height_km": 20.0,
+      "detector_pixels_est": "295x290",
+      "notes": "Expanded physical IIRS-TMC footprint"
+    }
   }
 ]

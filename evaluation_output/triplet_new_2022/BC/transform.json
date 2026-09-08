@@ -1,0 +1,27 @@
+{
+    "model": "homography",
+    "matrix": [
+        [
+            0.055586749969889375,
+            -0.0,
+            348.0
+        ],
+        [
+            0.0,
+            0.055586749969889375,
+            53.0
+        ],
+        [
+            0.0,
+            0.0,
+            1.0
+        ]
+    ],
+    "quality": {
+        "is_valid": true,
+        "reason": "OK",
+        "determinant": 0.00309,
+        "condition_number": 2229200.36,
+        "scale_ratio": 1.0
+    }
+}

@@ -1,0 +1,86 @@
+[
+    {
+        "image1_x": 128.0,
+        "image1_y": 25.0,
+        "image2_x": 168.0,
+        "image2_y": 23.0,
+        "source_x": 128.0,
+        "source_y": 25.0,
+        "target_x": 168.0,
+        "target_y": 23.0,
+        "confidence": 0.3777,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 128.0,
+        "image1_y": 230.0,
+        "image2_x": 174.0,
+        "image2_y": 156.0,
+        "source_x": 128.0,
+        "source_y": 230.0,
+        "target_x": 174.0,
+        "target_y": 156.0,
+        "confidence": 0.38,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 281.0,
+        "image1_y": 281.0,
+        "image2_x": 289.44,
+        "image2_y": 231.65,
+        "source_x": 281.0,
+        "source_y": 281.0,
+        "target_x": 289.44,
+        "target_y": 231.65,
+        "confidence": 0.4687,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 179.0,
+        "image1_y": 332.0,
+        "image2_x": 220.0,
+        "image2_y": 275.0,
+        "source_x": 179.0,
+        "source_y": 332.0,
+        "target_x": 220.0,
+        "target_y": 275.0,
+        "confidence": 0.4217,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 435.0,
+        "image1_y": 332.0,
+        "image2_x": 420.6,
+        "image2_y": 313.84,
+        "source_x": 435.0,
+        "source_y": 332.0,
+        "target_x": 420.6,
+        "target_y": 313.84,
+        "confidence": 0.5484,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 25.0,
+        "image1_y": 435.0,
+        "image2_x": 50.61,
+        "image2_y": 401.78,
+        "source_x": 25.0,
+        "source_y": 435.0,
+        "target_x": 50.61,
+        "target_y": 401.78,
+        "confidence": 0.5113,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 384.0,
+        "image1_y": 435.0,
+        "image2_x": 432.0,
+        "image2_y": 453.0,
+        "source_x": 384.0,
+        "source_y": 435.0,
+        "target_x": 432.0,
+        "target_y": 453.0,
+        "confidence": 0.463,
+        "is_inlier": true
+    }
+]

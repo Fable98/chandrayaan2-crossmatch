@@ -1,0 +1,74 @@
+[
+    {
+        "image1_x": 486.0,
+        "image1_y": 128.0,
+        "image2_x": 472.24,
+        "image2_y": 71.65,
+        "source_x": 486.0,
+        "source_y": 128.0,
+        "target_x": 472.24,
+        "target_y": 71.65,
+        "confidence": 0.4336,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 486.0,
+        "image1_y": 179.0,
+        "image2_x": 472.0,
+        "image2_y": 107.0,
+        "source_x": 486.0,
+        "source_y": 179.0,
+        "target_x": 472.0,
+        "target_y": 107.0,
+        "confidence": 0.3725,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 230.0,
+        "image1_y": 230.0,
+        "image2_x": 157.0,
+        "image2_y": 284.0,
+        "source_x": 230.0,
+        "source_y": 230.0,
+        "target_x": 157.0,
+        "target_y": 284.0,
+        "confidence": 0.5087,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 25.0,
+        "image1_y": 281.0,
+        "image2_x": 68.0,
+        "image2_y": 341.0,
+        "source_x": 25.0,
+        "source_y": 281.0,
+        "target_x": 68.0,
+        "target_y": 341.0,
+        "confidence": 0.4314,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 486.0,
+        "image1_y": 384.0,
+        "image2_x": 502.24,
+        "image2_y": 347.83,
+        "source_x": 486.0,
+        "source_y": 384.0,
+        "target_x": 502.24,
+        "target_y": 347.83,
+        "confidence": 0.3876,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 76.0,
+        "image1_y": 435.0,
+        "image2_x": 48.0,
+        "image2_y": 408.0,
+        "source_x": 76.0,
+        "source_y": 435.0,
+        "target_x": 48.0,
+        "target_y": 408.0,
+        "confidence": 0.416,
+        "is_inlier": true
+    }
+]

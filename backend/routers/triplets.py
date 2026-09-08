@@ -1,9 +1,7 @@
 """
 triplets.py — GET /triplets and GET /triplets/{triplet_id}
 
-Returns triplet metadata from the in-memory cache populated by loader.py.
-No computation happens here — data is served exactly as it appears in the
-user_triplets.json manifest.
+Returns triplet metadata with shared TripletBounds from in-memory cache.
 """
 
 from fastapi import APIRouter, HTTPException

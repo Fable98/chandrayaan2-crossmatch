@@ -31,3 +31,10 @@ lunar-prep = "lunar_pipeline.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["lunar_pipeline*"]
+
+[tool.pyright]
+extraPaths = [
+    "../ML_model",
+    ".."
+]
+

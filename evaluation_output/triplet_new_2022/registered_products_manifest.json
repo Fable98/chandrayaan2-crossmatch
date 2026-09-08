@@ -1,0 +1,87 @@
+{
+    "composition_path": "A -> B -> C -> A",
+    "leg_derivations": {
+        "AB": "measured",
+        "BC": "measured",
+        "CA": "composed"
+    },
+    "homography_AB": [
+        [
+            1.3715474666114782,
+            -0.09908656864464362,
+            -66.64664147114561
+        ],
+        [
+            -0.08244672765387907,
+            0.939197960305678,
+            65.53792391820926
+        ],
+        [
+            0.0005488391595824375,
+            -0.00014619641976661155,
+            1.0
+        ]
+    ],
+    "homography_BC": [
+        [
+            0.055586749969889375,
+            -0.0,
+            348.0
+        ],
+        [
+            0.0,
+            0.055586749969889375,
+            53.0
+        ],
+        [
+            0.0,
+            0.0,
+            1.0
+        ]
+    ],
+    "homography_CA": [
+        [
+            3.976548729526351,
+            0.45613141084640735,
+            -1394.9438261514604
+        ],
+        [
+            0.49631033751655557,
+            5.901773216765294,
+            -505.1717088522884
+        ],
+        [
+            -0.002109926868313773,
+            0.0006124753343774706,
+            1.0
+        ]
+    ],
+    "homography_AC_composed": [
+        [
+            0.26723589363305567,
+            -0.056384254395404905,
+            344.29532980421055
+        ],
+        [
+            0.024505529821937447,
+            0.0444585519441114,
+            56.64304019038713
+        ],
+        [
+            0.0005488391595824375,
+            -0.00014619641976661155,
+            1.0
+        ]
+    ],
+    "products": {
+        "registered_png": "evaluation_output\\triplet_new_2022\\composed_registered_ohrc_to_iirs.png",
+        "registered_tif": "evaluation_output\\triplet_new_2022\\composed_registered_ohrc_to_iirs.tif",
+        "checkerboard_qa": "evaluation_output\\triplet_new_2022\\composed_checkerboard_qa.png",
+        "transform_json": "evaluation_output\\triplet_new_2022\\composed_ohrc_to_iirs_transform.json"
+    },
+    "cycle_metrics": {
+        "cycle_rmse_px": 0.0,
+        "cycle_mean_px": 0.0,
+        "cycle_closed": true
+    }
+}

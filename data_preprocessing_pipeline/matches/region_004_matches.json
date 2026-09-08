@@ -1,0 +1,86 @@
+[
+    {
+        "image1_x": 25.0,
+        "image1_y": 25.0,
+        "image2_x": 44.94,
+        "image2_y": 43.04,
+        "source_x": 25.0,
+        "source_y": 25.0,
+        "target_x": 44.94,
+        "target_y": 43.04,
+        "confidence": 0.3802,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 25.0,
+        "image1_y": 76.0,
+        "image2_x": 14.04,
+        "image2_y": 112.24,
+        "source_x": 25.0,
+        "source_y": 76.0,
+        "target_x": 14.04,
+        "target_y": 112.24,
+        "confidence": 0.4812,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 128.0,
+        "image1_y": 76.0,
+        "image2_x": 200.94,
+        "image2_y": 102.0,
+        "source_x": 128.0,
+        "source_y": 76.0,
+        "target_x": 200.94,
+        "target_y": 102.0,
+        "confidence": 0.419,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 76.0,
+        "image1_y": 179.0,
+        "image2_x": 64.0,
+        "image2_y": 233.0,
+        "source_x": 76.0,
+        "source_y": 179.0,
+        "target_x": 64.0,
+        "target_y": 233.0,
+        "confidence": 0.3923,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 128.0,
+        "image1_y": 384.0,
+        "image2_x": 65.0,
+        "image2_y": 447.0,
+        "source_x": 128.0,
+        "source_y": 384.0,
+        "target_x": 65.0,
+        "target_y": 447.0,
+        "confidence": 0.5837,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 435.0,
+        "image1_y": 384.0,
+        "image2_x": 425.0,
+        "image2_y": 330.0,
+        "source_x": 435.0,
+        "source_y": 384.0,
+        "target_x": 425.0,
+        "target_y": 330.0,
+        "confidence": 0.512,
+        "is_inlier": true
+    },
+    {
+        "image1_x": 486.0,
+        "image1_y": 435.0,
+        "image2_x": 454.0,
+        "image2_y": 352.0,
+        "source_x": 486.0,
+        "source_y": 435.0,
+        "target_x": 454.0,
+        "target_y": 352.0,
+        "confidence": 0.4101,
+        "is_inlier": true
+    }
+]

@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import "leaflet/dist/leaflet.css";
+
+::selection {
+  background: #16343d;
+  color: #3fb5c9;
+}
+
+/* Leaflet ships its own control chrome; retint it to match the console
+   instead of leaving the default white/blue Leaflet look. */
+.leaflet-container {
+  background: #090b0e;
+  font-family: var(--font-inter), var(--font-plex-sans), sans-serif;
+}
+.leaflet-control-zoom a {
+  background: #141820 !important;
+  color: #f0f2f5 !important;
+  border-color: #1b2029 !important;
+  border-radius: 6px !important;
+}
+.leaflet-control-zoom a:hover {
+  background: #1c232f !important;
+  color: #3fb5c9 !important;
+}
+.leaflet-control-attribution {
+  display: none !important;
+}
+
+/* Grayscale high-contrast photographic tone grading for lunar tiles */
+.lunar-tile-contrast {
+  filter: contrast(1.16) brightness(0.95);
+}
+
+@keyframes slow-pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.03);
+  }
+}
+
+.animate-slow-pulse {
+  animation: slow-pulse 16s ease-in-out infinite;
+}

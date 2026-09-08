@@ -1,0 +1,37 @@
+{
+    "match_count": 87,
+    "inlier_count": 8,
+    "inlier_ratio": 0.092,
+    "fit_rmse_px": 1.812,
+    "validation_rmse_px": 71.8765,
+    "held_out_inlier_validation_rmse_px": 71.8765,
+    "validation_median_error_px": 54.9953,
+    "validation_status": "evaluated",
+    "quality_tier": "LOW_CONFIDENCE",
+    "mean_reprojection_error_px": 1.4217,
+    "median_reprojection_error_px": 1.3032,
+    "max_reprojection_error_px": 3.9986,
+    "fraction_below_1px": 0.375,
+    "fraction_below_0_5px": 0.125,
+    "fraction_below_0_25px": 0.125,
+    "spatial_coverage": 0.08,
+    "spatial_uniformity": 0.0289,
+    "spatial_distribution": {
+        "grid_rows": 10,
+        "grid_cols": 10,
+        "total_cells": 100,
+        "occupied_cells": 8,
+        "coverage": 0.08,
+        "count_std": 0.2713,
+        "count_mean": 0.08,
+        "spatial_entropy": 0.4515,
+        "uniformity_score": 0.0289
+    },
+    "transform_quality": {
+        "is_valid": true,
+        "reason": "OK",
+        "determinant": 37.668077,
+        "condition_number": 51660.91,
+        "scale_ratio": 2.1405
+    }
+}

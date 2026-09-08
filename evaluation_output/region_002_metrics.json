@@ -1,0 +1,126 @@
+{
+    "region_id": "region_002",
+    "dataset_id": "region_002",
+    "status": "evaluated",
+    "num_inliers": 7,
+    "num_raw_matches": 66,
+    "inlier_ratio": 0.1061,
+    "rmse_px": 1.2421,
+    "fit_rmse_px": 1.2421,
+    "validation_rmse_px": null,
+    "validation_status": "insufficient_points_for_holdout",
+    "mean_reprojection_error_px": 1.1224,
+    "median_reprojection_error_px": 1.1438,
+    "max_reprojection_error_px": 1.8858,
+    "sub_pixel_accurate": false,
+    "fraction_below_1px": 0.4286,
+    "source_coverage_ratio": 0.07,
+    "destination_coverage_ratio": 0.07,
+    "combined_coverage_score": 0.07,
+    "source_occupied_cells": 7,
+    "destination_occupied_cells": 7,
+    "total_cells": 100,
+    "uniformity_score": 0.0235,
+    "quality_tier": "LOW_CONFIDENCE",
+    "method": "CFOG + Phase Congruency",
+    "pairs": {
+        "ohrc_tmc": {
+            "status": "success",
+            "message": null,
+            "direction": "native",
+            "measured_direction": null,
+            "quality_tier": "LOW_CONFIDENCE",
+            "match_count": 66,
+            "inlier_count": 7,
+            "inlier_ratio": 0.1061,
+            "fit_rmse_px": 1.2421,
+            "spatial_coverage": 0.07,
+            "spatial_uniformity": 0.0235
+        },
+        "ohrc_iirs": {
+            "status": "composed",
+            "inlier_count": 0,
+            "fit_rmse_px": 0.0,
+            "forward_ohrc_to_iirs": {
+                "status": "composed",
+                "message": null,
+                "quality_tier": "COMPOSED_CHAIN",
+                "match_count": 0,
+                "inlier_count": 0,
+                "inlier_ratio": 1.0,
+                "fit_rmse_px": 0.0,
+                "spatial_coverage": 1.0,
+                "spatial_uniformity": 1.0
+            },
+            "reverse_iirs_to_ohrc": null,
+            "bidirectional_agreement": true,
+            "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
+            "composition": {
+                "source": "A -> B -> C",
+                "homography": [
+                    [
+                        1.5085406352347532,
+                        0.17768312933303843,
+                        -198.8099629155653
+                    ],
+                    [
+                        -0.1776831293330384,
+                        1.508540635234753,
+                        26.818235439145607
+                    ],
+                    [
+                        0.0,
+                        -2.7383303595967524e-20,
+                        1.0
+                    ]
+                ],
+                "transform": "benchmarks\\registration_benchmark_output\\region_002\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
+                "registered_raster": "benchmarks\\registration_benchmark_output\\region_002\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
+                "registered_geotiff": "benchmarks\\registration_benchmark_output\\region_002\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
+                "checkerboard_qa": "benchmarks\\registration_benchmark_output\\region_002\\triplet_cycle\\composed_checkerboard_qa.png",
+                "manifest": "benchmarks\\registration_benchmark_output\\region_002\\triplet_cycle\\registered_products_manifest.json"
+            }
+        },
+        "tmc_iirs": {
+            "status": "success",
+            "inlier_count": 0,
+            "fit_rmse_px": null,
+            "forward_tmc_to_iirs": {
+                "status": "success",
+                "message": null,
+                "direction": "native",
+                "measured_direction": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 0,
+                "inlier_count": 0,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "reverse_iirs_to_tmc": {
+                "status": "geometric_verification_failed",
+                "message": "Robust geometric verification failed to estimate a valid transformation from verified correspondences.",
+                "direction": "native",
+                "measured_direction": null,
+                "quality_tier": "FAILED",
+                "match_count": 143,
+                "inlier_count": 3,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
+            },
+            "bidirectional_agreement": false,
+            "directional_note": "Forward (TMC->IIRS) produced 'success' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
+        }
+    },
+    "triplet_consistency": {
+        "status": "evaluated_composed",
+        "reason": null,
+        "cycle_rmse_px": 0.0,
+        "cycle_mean_px": 0.0,
+        "cycle_closed_successfully": true,
+        "failed_legs": []
+    }
+}
