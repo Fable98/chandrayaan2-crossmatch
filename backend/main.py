@@ -22,6 +22,12 @@ from fastapi.staticfiles import StaticFiles
 
 from data import loader
 from routers import triplets, footprint, matches, images, auth
+
+try:
+    from routers import registration as registration_router
+except Exception as _reg_exc:
+    registration_router = None
+    print(f"[main] WARNING: registration router unavailable: {_reg_exc}")
 from schemas import HealthResponse, RegisterResponse
 
 import shutil
@@ -99,6 +105,9 @@ app.include_router(footprint.router)
 app.include_router(matches.router)
 app.include_router(images.router)
 app.include_router(auth.router)
+
+if registration_router is not None:
+    app.include_router(registration_router.router)
 
 
 # ---------------------------------------------------------------------------
