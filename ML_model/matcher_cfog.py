@@ -682,6 +682,26 @@ def match_images_cfog(
     work1_gray = cv2.resize(raw1_gray, (work_w1, work_h1), interpolation=cv2.INTER_AREA)
     work2_gray = cv2.resize(raw2_gray, (work_w2, work_h2), interpolation=cv2.INTER_AREA)
 
+    # --- DYNAMIC SPATIAL GRID SCALING ---
+    # Calculate grid size based on the smallest working dimension to ensure uniform distribution
+    # Target: roughly 256px per cell. Min 4x4 grid, Max 20x20 grid to prevent memory/compute overload.
+    min_working_dim = min(work_w1, work_h1)
+    dynamic_grid_size = max(4, min(20, int(min_working_dim / 256)))
+
+    # Macro grid should be roughly half the density of the main grid (e.g., 2x2 for 4x4, 5x5 for 10x10)
+    dynamic_macro_grid = max(2, dynamic_grid_size // 2)
+
+    # Override the function arguments with dynamic values for internal processing
+    # (We keep the function signature intact for API compatibility, but adapt internally)
+    if grid_size == 10: # Only override if it's the default value
+        grid_size = dynamic_grid_size
+    macro_grid = dynamic_macro_grid
+
+    logger.info(
+        "Dynamic Spatial Scaling: Image dim=%dx%d. Set grid_size=%dx%d, macro_grid=%dx%d",
+        work_w1, work_h1, grid_size, grid_size, macro_grid, macro_grid
+    )
+
     # Direction-Invariance Check for Multimodal (IIRS-involving) Pairs:
     # Always match using the LARGER working-scale canvas as Image 1 (template source).
     # If the caller requested the reverse direction, run in the better-conditioned
@@ -1163,7 +1183,6 @@ def match_images_cfog(
 
     # --- Item 4: 4x4 Mandatory Macro-Cell Coverage Enforcement ---
     # Divide source image into 4x4 macro-cells and fill gaps with relaxed-threshold searches.
-    macro_grid = 4
     macro_cell_w = work_w1 / float(macro_grid)
     macro_cell_h = work_h1 / float(macro_grid)
     occupied_macro: set = set()
