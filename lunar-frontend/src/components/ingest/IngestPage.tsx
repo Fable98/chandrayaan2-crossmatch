@@ -1,7 +1,9 @@
+"use client";
+
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import DropZone from '../components/DropZone';
-import ProcessingProgress from '../components/ProcessingProgress';
-import ResultsTable from '../components/ResultsTable';
+import DropZone from './DropZone';
+import ProcessingProgress from './ProcessingProgress';
+import ResultsTable from './ResultsTable';
 import {
   uploadZips,
   pollStatus,
@@ -9,7 +11,7 @@ import {
   DEFAULT_CONFIG,
   type IngestConfig,
   type JobStatus,
-} from '../services/api';
+} from '@/lib/ingest-api';
 
 type Phase = 'idle' | 'queued' | 'processing' | 'done' | 'error';
 
@@ -317,7 +319,7 @@ export default function IngestPage() {
                   Clear All
                 </button>
               )}
-              {!isProcessing && phase !== 'done' && (
+              {!isProcessing && (
                 <button
                   className="btn btn-primary"
                   onClick={handleStart}

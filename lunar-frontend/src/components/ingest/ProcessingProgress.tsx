@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import type { JobStatus } from '../services/api';
+import type { JobStatus } from '@/lib/ingest-api';
 
 interface ProcessingProgressProps {
   status: JobStatus;

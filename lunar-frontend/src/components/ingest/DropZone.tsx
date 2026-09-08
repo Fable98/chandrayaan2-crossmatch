@@ -259,11 +259,10 @@ export default function DropZone({ onFilesSelected, disabled = false }: DropZone
         style={styles.hiddenInput}
         onChange={handleFileInput}
       />
-      {/* @ts-expect-error webkitdirectory is a non-standard attribute */}
       <input
         ref={folderInputRef}
         type="file"
-        webkitdirectory=""
+        {...({ webkitdirectory: '' } as { webkitdirectory: string })}
         multiple
         style={styles.hiddenInput}
         onChange={handleFileInput}
