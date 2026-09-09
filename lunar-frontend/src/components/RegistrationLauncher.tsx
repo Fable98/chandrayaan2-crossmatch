@@ -432,22 +432,26 @@ function OverlayImage({
 }
 
 export default function RegistrationLauncher() {
+  const defaultSample = SAMPLE_PAIRS[1] || SAMPLE_PAIRS[0];
+
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
-  const [sourcePreview, setSourcePreview] = useState<string | null>(null);
-  const [referencePreview, setReferencePreview] = useState<string | null>(null);
+  const [sourcePreview, setSourcePreview] = useState<string | null>(absoluteUrl(defaultSample.sourceUrl));
+  const [referencePreview, setReferencePreview] = useState<string | null>(absoluteUrl(defaultSample.referenceUrl));
   const [demFile, setDemFile] = useState<File | null>(null);
-  const [sourceSensor, setSourceSensor] = useState<Sensor>("OHRC");
-  const [referenceSensor, setReferenceSensor] = useState<Sensor>("TMC");
+  const [sourceSensor, setSourceSensor] = useState<Sensor>(defaultSample.sourceSensor);
+  const [referenceSensor, setReferenceSensor] = useState<Sensor>(defaultSample.referenceSensor);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<RegistrationResult | null>(null);
-  const [points, setPoints] = useState<MatchPoint[]>([]);
-  const [selectedSample, setSelectedSample] = useState<SamplePair | null>(null);
+  const [result, setResult] = useState<RegistrationResult | null>(defaultSample.demoResult);
+  const [points, setPoints] = useState<MatchPoint[]>(defaultSample.demoPoints);
+  const [selectedSample, setSelectedSample] = useState<SamplePair | null>(defaultSample);
+  const [customMode, setCustomMode] = useState(false);
 
   const handleSourceFile = (file: File | null) => {
     setSourceFile(file);
     setSelectedSample(null);
+    setCustomMode(true);
     if (!file) {
       setSourcePreview(null);
       return;
@@ -460,6 +464,7 @@ export default function RegistrationLauncher() {
   const handleReferenceFile = (file: File | null) => {
     setReferenceFile(file);
     setSelectedSample(null);
+    setCustomMode(true);
     if (!file) {
       setReferencePreview(null);
       return;
@@ -471,6 +476,7 @@ export default function RegistrationLauncher() {
 
   const loadSample = (sample: SamplePair) => {
     setSelectedSample(sample);
+    setCustomMode(false);
     setSourceSensor(sample.sourceSensor);
     setReferenceSensor(sample.referenceSensor);
     setSourcePreview(absoluteUrl(sample.sourceUrl));
@@ -479,8 +485,8 @@ export default function RegistrationLauncher() {
     setReferenceFile(null);
     setDemFile(null);
     setError(null);
-    setResult(null);
-    setPoints([]);
+    setResult(sample.demoResult);
+    setPoints(sample.demoPoints);
   };
 
   const reset = () => {
@@ -488,6 +494,7 @@ export default function RegistrationLauncher() {
     setPoints([]);
     setError(null);
     setSelectedSample(null);
+    setCustomMode(true);
     setSourceFile(null);
     setReferenceFile(null);
     setSourcePreview(null);
@@ -631,51 +638,83 @@ export default function RegistrationLauncher() {
         </div>
       </div>
 
-      {/* Form & Pre-load Samples (Shown when no result) */}
-      {!result && (
-        <div className="mt-5 space-y-5">
-          {/* Quick Pre-loaded Sample Pairs */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
-                ⚡ Quick Load Validated Benchmark Pairs (1-Click Demo)
-              </span>
-              <span className="text-[10px] font-medium text-slate-400">No local files required</span>
-            </div>
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {SAMPLE_PAIRS.map((sample) => {
-                const active = selectedSample?.id === sample.id;
-                return (
-                  <button
-                    key={sample.id}
-                    type="button"
-                    onClick={() => loadSample(sample)}
-                    className={`flex flex-col justify-between rounded-xl border p-3 text-left transition ${
-                      active
-                        ? "border-[#4F46E5] bg-indigo-50/40 shadow-sm"
-                        : "border-slate-200 bg-slate-50/60 hover:border-slate-300 hover:bg-slate-50"
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-1 mb-1.5">
-                        <span className="text-[11px] font-bold text-slate-900 leading-snug">{sample.title}</span>
-                      </div>
-                      <span className={`inline-block rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${sample.badgeStyle}`}>
-                        {sample.tag}
-                      </span>
-                      <p className="mt-2 text-[10px] leading-relaxed text-slate-500 line-clamp-2">{sample.description}</p>
-                    </div>
-                    <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-2 text-[10px] font-bold text-indigo-600">
-                      <span>{active ? "✓ Loaded in Form" : "Load Pair"}</span>
-                      <span>→</span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+      {/* 1. Benchmark Pair Selector (Always Accessible) */}
+      <div className="mt-5">
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+            ⚡ Quick Benchmark Pairs (1-Click Verification)
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setCustomMode(!customMode);
+                if (!customMode) {
+                  setSelectedSample(null);
+                  setResult(null);
+                }
+              }}
+              className={`rounded-lg px-2.5 py-1 text-xs font-bold transition flex items-center gap-1.5 ${
+                customMode
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              <span>+ Custom GeoTIFF Upload</span>
+            </button>
+            {(result || customMode) && (
+              <button
+                type="button"
+                onClick={reset}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+          {SAMPLE_PAIRS.map((sample) => {
+            const active = selectedSample?.id === sample.id && !customMode;
+            return (
+              <button
+                key={sample.id}
+                type="button"
+                onClick={() => loadSample(sample)}
+                className={`flex flex-col justify-between rounded-xl border p-3 text-left transition ${
+                  active
+                    ? "border-[#4F46E5] bg-indigo-50/50 shadow-sm ring-2 ring-indigo-200"
+                    : "border-slate-200 bg-slate-50/60 hover:border-slate-300 hover:bg-slate-50"
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-1 mb-1.5">
+                    <span className="text-[11px] font-bold text-slate-900 leading-snug">{sample.title}</span>
+                  </div>
+                  <span className={`inline-block rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${sample.badgeStyle}`}>
+                    {sample.tag}
+                  </span>
+                  <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500 line-clamp-2">{sample.description}</p>
+                </div>
+                <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-1.5 text-[10px] font-bold text-indigo-600">
+                  <span>{active ? "✓ Active Verification" : "Load Pair"}</span>
+                  <span>→</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 2. Custom Upload Inputs & Controls (Visible when customMode is active) */}
+      {customMode && (
+        <div className="mt-5 space-y-4 rounded-xl border border-indigo-100 bg-indigo-50/20 p-4">
+          <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+            <span className="text-xs font-bold text-slate-800">Upload Custom Multi-Sensor Pair</span>
+            <span className="text-[10px] text-slate-500 font-mono">GeoTIFF (.tif) or PNG (.png)</span>
           </div>
 
-          {/* Active Inputs / File Pickers */}
           <div className="grid gap-3 md:grid-cols-2">
             <FilePicker
               label={`Source Image · ${sourceSensor}`}
@@ -691,14 +730,13 @@ export default function RegistrationLauncher() {
             />
           </div>
 
-          {/* Sensor Selectors */}
           <div className="grid gap-3 md:grid-cols-[1fr_1fr_1.2fr]">
             <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-wider text-slate-500">Source Sensor</span>
+              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-500">Source Sensor</span>
               <select
                 value={sourceSensor}
                 onChange={(e) => setSourceSensor(e.target.value as Sensor)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
               >
                 {SENSOR_OPTIONS.filter((s) => s.value !== "LRO_NAC").map((sensor) => (
                   <option key={sensor.value} value={sensor.value}>
@@ -709,11 +747,11 @@ export default function RegistrationLauncher() {
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-wider text-slate-500">Reference Sensor</span>
+              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-500">Reference Sensor</span>
               <select
                 value={referenceSensor}
                 onChange={(e) => setReferenceSensor(e.target.value as Sensor)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
               >
                 {SENSOR_OPTIONS.map((sensor) => (
                   <option key={sensor.value} value={sensor.value}>
@@ -736,25 +774,23 @@ export default function RegistrationLauncher() {
           <button
             type="button"
             onClick={register}
-            disabled={loading || (!sourceFile && !selectedSample)}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#4F46E5] px-5 py-3.5 text-xs font-black uppercase tracking-[0.15em] text-white shadow-sm transition hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={loading || !sourceFile || !referenceFile}
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#4F46E5] px-5 py-3 text-xs font-black uppercase tracking-[0.15em] text-white shadow-sm transition hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:opacity-40"
           >
             {loading ? (
               <>
                 <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
                 Registering &amp; Validating Correspondences...
               </>
-            ) : selectedSample ? (
-              `Run Registration: ${selectedSample.title}`
             ) : (
-              "Register Uploaded Pair"
+              "Run Registration on Uploaded Pair"
             )}
           </button>
         </div>
       )}
 
-      {/* Scientific Failure State: Quality Gate Rejection Panel */}
-      {isFailedRegistration && (
+      {/* 3. Scientific Failure State: Quality Gate Rejection Panel */}
+      {isFailedRegistration && !customMode && (
         <div className="mt-5 space-y-4">
           <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-5 md:p-6">
             <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -801,6 +837,41 @@ export default function RegistrationLauncher() {
                   </div>
                 </div>
 
+                {/* Visual Comparison of Divergent Pair */}
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="rounded-xl border border-rose-200/80 bg-white p-2.5">
+                    <div className="flex items-center justify-between mb-1.5 px-1">
+                      <span className="text-[11px] font-bold text-slate-800">Source: OHRC (0.25m)</span>
+                      <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-800 font-mono">Sun: 269.6° (West)</span>
+                    </div>
+                    <div className="relative aspect-square bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center">
+                      <img
+                        src={sourcePrimarySrc || imageUrl("/images/ohrc/triplet_new_2022.png")}
+                        alt="Source Divergent"
+                        className="w-full h-full object-contain"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = imageUrl("/images/ohrc/region_001.png"); }}
+                      />
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-rose-200/80 bg-white p-2.5">
+                    <div className="flex items-center justify-between mb-1.5 px-1">
+                      <span className="text-[11px] font-bold text-slate-800">Reference: TMC-2 (4.0m)</span>
+                      <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-800 font-mono">Sun: 108.9° (East)</span>
+                    </div>
+                    <div className="relative aspect-square bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center">
+                      <img
+                        src={referencePrimarySrc || imageUrl("/images/tmc/triplet_new_2022.png")}
+                        alt="Reference Divergent"
+                        className="w-full h-full object-contain"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).src = imageUrl("/images/tmc/region_001.png"); }}
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2.5 rounded-lg bg-rose-100/70 py-1.5 px-3 text-center text-[10px] font-bold text-rose-800">
+                  ⚠️ 160.8° Solar Azimuth Inversion: Shadows fall toward opposite crater rims, causing cross-correlation to fail safely rather than producing hallucinated matches.
+                </div>
+
                 <div className="mt-5 flex flex-wrap items-center gap-3">
                   <button
                     type="button"
@@ -810,15 +881,18 @@ export default function RegistrationLauncher() {
                     }}
                     className="rounded-xl bg-[#4F46E5] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#4338CA]"
                   >
-                    ⚡ Try Verified Lunar Pair (Region 001 LRO NAC)
+                    ⚡ Switch to Verified Lunar Pair (Region 001 LRO NAC)
                   </button>
 
                   <button
                     type="button"
-                    onClick={reset}
+                    onClick={() => {
+                      const tmcSample = SAMPLE_PAIRS[0];
+                      loadSample(tmcSample);
+                    }}
                     className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
                   >
-                    Reset to Clean State
+                    View 21x Scale Pair (Region 001 TMC-2)
                   </button>
                 </div>
               </div>
@@ -857,6 +931,12 @@ export default function RegistrationLauncher() {
                     src={absoluteUrl(result.visual_url)!}
                     alt="Continuity checkerboard QA"
                     className="max-h-[470px] w-full rounded-lg object-contain"
+                    onError={(e) => {
+                      const img = e.currentTarget as HTMLImageElement;
+                      if (!img.src.includes("/images/registered/region_001/checkerboard_qa.png")) {
+                        img.src = imageUrl("/images/registered/region_001/checkerboard_qa.png");
+                      }
+                    }}
                   />
                 ) : (
                   <div className="flex min-h-[260px] items-center justify-center rounded-lg bg-slate-900 text-xs text-slate-500">
@@ -876,6 +956,12 @@ export default function RegistrationLauncher() {
                     src={absoluteUrl(result.warped_url)!}
                     alt="Registered warped source"
                     className="max-h-[250px] w-full rounded-lg bg-slate-950 object-contain"
+                    onError={(e) => {
+                      const img = e.currentTarget as HTMLImageElement;
+                      if (!img.src.includes("/images/registered/region_001/registered_ohrc.png")) {
+                        img.src = imageUrl("/images/registered/region_001/registered_ohrc.png");
+                      }
+                    }}
                   />
                 ) : (
                   <div className="flex min-h-[120px] items-center justify-center rounded-lg bg-slate-100 text-xs text-slate-400">

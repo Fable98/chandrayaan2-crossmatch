@@ -51,36 +51,6 @@ class MasterRegistrationPipeline:
     # ------------------------------------------------------------------
     # Lazy loaders (instantiated only when the pipeline actually needs them)
     # ------------------------------------------------------------------
-    def _get_crater_matcher(self):
-        if self.crater_matcher is not None:
-            return self.crater_matcher
-        _ensure_ml_model_on_path()
-        try:
-            try:
-                from ML_model.crater_matcher import CraterAnchorMatcher
-            except Exception:
-                from crater_matcher import CraterAnchorMatcher  # type: ignore[no-redef]
-            self.crater_matcher = CraterAnchorMatcher()
-        except Exception as e:
-            self.logger.warning("Lazy-load of CraterAnchorMatcher failed: %s", e)
-            raise
-        return self.crater_matcher
-
-    def _get_kornia_matcher(self):
-        if self.kornia_matcher is not None:
-            return self.kornia_matcher
-        _ensure_ml_model_on_path()
-        try:
-            try:
-                from ML_model.kornia_matcher import KorniaAI_Matcher
-            except Exception:
-                from kornia_matcher import KorniaAI_Matcher  # type: ignore[no-redef]
-            self.kornia_matcher = KorniaAI_Matcher()
-        except Exception as e:
-            self.logger.warning("Lazy-load of KorniaAI_Matcher failed: %s", e)
-            raise
-        return self.kornia_matcher
-
     def _get_subpixel_refiner(self):
         if self.subpixel_refiner is not None:
             return self.subpixel_refiner
@@ -272,102 +242,6 @@ class MasterRegistrationPipeline:
             if "CFOG" not in phases_executed:
                 phases_executed.append("CFOG")
             phases_failed.append("CFOG")
-
-        # ---------------- Phase 2: AI Fallback (Crater Matcher) ----------------
-        try:
-            if len(base_src) < self.min_inliers_required:
-                _ensure_ml_model_on_path()
-                crater_success = False
-                # Preferred: run_crater_fallback drop-in.
-                try:
-                    try:
-                        from ML_model.crater_matcher import run_crater_fallback  # type: ignore
-                    except Exception:
-                        from crater_matcher import run_crater_fallback  # type: ignore[no-redef]
-                    crater_res = run_crater_fallback(src_img_path, ref_img_path)
-                    phases_executed.append("Crater")
-                    if (
-                        isinstance(crater_res, dict)
-                        and crater_res.get("status") == "success"
-                        and len(np.asarray(crater_res.get("src_pts", []))) > 0
-                    ):
-                        cs = np.asarray(crater_res["src_pts"], dtype=np.float32).reshape(-1, 2)
-                        cr = np.asarray(crater_res["ref_pts"], dtype=np.float32).reshape(-1, 2)
-                        cc = np.full((len(cs),), 0.9, dtype=np.float32)
-                        _append(cs, cr, cc)
-                        crater_success = True
-                        self.logger.info("Crater fallback: +%d anchors (conf=0.9).", len(cs))
-                    else:
-                        phases_failed.append("Crater")
-                except (ImportError, AttributeError) as e:
-                    # Fall back to class API.
-                    self.logger.debug("run_crater_fallback unavailable (%s); using class API.", e)
-                    matcher = self._get_crater_matcher()
-                    if "Crater" not in phases_executed:
-                        phases_executed.append("Crater")
-                    cs, cr = matcher.get_anchor_points(src_img_path, ref_img_path)
-                    if len(np.asarray(cs)) > 0:
-                        cc = np.full((len(np.asarray(cs).reshape(-1, 2)),), 0.9, dtype=np.float32)
-                        _append(cs, cr, cc)
-                        crater_success = True
-                        self.logger.info("Crater class API: +%d anchors (conf=0.9).", len(cc))
-                    else:
-                        phases_failed.append("Crater")
-                except Exception as e:
-                    if "Crater" not in phases_executed:
-                        phases_executed.append("Crater")
-                    phases_failed.append("Crater")
-                    self.logger.warning("Crater fallback crashed: %s", e)
-                if not crater_success:
-                    self.logger.info(
-                        "Crater phase yielded nothing; pool=%d (need %d).",
-                        len(base_src), self.min_inliers_required,
-                    )
-        except Exception as e:
-            self.logger.warning("Crater phase crashed (outer): %s", e)
-            if "Crater" not in phases_executed:
-                phases_executed.append("Crater")
-            if "Crater" not in phases_failed:
-                phases_failed.append("Crater")
-
-        # ---------------- Phase 3: Deep Learning Fallback (Kornia AI) ----------------
-        try:
-            if len(base_src) < self.min_inliers_required:
-                try:
-                    matcher = self._get_kornia_matcher()
-                    phases_executed.append("Kornia")
-                    # NOTE: Kornia API is match_images(ref_path, src_path)
-                    # returning {"ref_pts", "src_pts"} in ORIGINAL pixels.
-                    k_res = matcher.match_images(ref_img_path, src_img_path)
-                    if (
-                        isinstance(k_res, dict)
-                        and k_res.get("status") == "success"
-                        and len(np.asarray(k_res.get("src_pts", []))) > 0
-                    ):
-                        ks = np.asarray(k_res["src_pts"], dtype=np.float32).reshape(-1, 2)
-                        kr = np.asarray(k_res["ref_pts"], dtype=np.float32).reshape(-1, 2)
-                        # No descriptor distances exposed by the matcher;
-                        # use uniform mid-high confidence for RANSAC-verified
-                        # deep inliers so they survive distribution ranking
-                        # but stay below crater anchors (0.9).
-                        kc = np.full((len(ks),), 0.75, dtype=np.float32)
-                        _append(ks, kr, kc)
-                        self.logger.info("Kornia phase: +%d deep inliers (conf=0.75).", len(ks))
-                    else:
-                        reason = k_res.get("reason", "no_inliers") if isinstance(k_res, dict) else "no_inliers"
-                        self.logger.warning("Kornia phase returned no inliers (%s).", reason)
-                        phases_failed.append("Kornia")
-                except Exception as e:
-                    if "Kornia" not in phases_executed:
-                        phases_executed.append("Kornia")
-                    phases_failed.append("Kornia")
-                    self.logger.warning("Kornia phase crashed: %s", e)
-        except Exception as e:
-            self.logger.warning("Kornia phase crashed (outer): %s", e)
-            if "Kornia" not in phases_executed:
-                phases_executed.append("Kornia")
-            if "Kornia" not in phases_failed:
-                phases_failed.append("Kornia")
 
         # ---------------- Phase 4: Sub-Pixel Refinement ----------------
         refined_src: np.ndarray = base_src

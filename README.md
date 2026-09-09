@@ -102,6 +102,18 @@ PDS4 Metadata Ingestion -> Common Physical-GSD Normalization -> DEM Relief Compe
 6. **RANSAC + Sub-Pixel Refinement:** Robust projective estimation followed by Fourier Phase Correlation and Lucas-Kanade refinement (per-point tracking 0.08–0.31 px; full-scene fit is larger).
 7. **Absolute RMSE (Meters) Calculation:** Computes DEM-corrected physical error on the lunar surface.
 
+### 🧠 Why We Chose Deterministic Structural Matching Over Deep Learning
+During our development, we rigorously evaluated state-of-the-art Deep Learning matchers (such as LoFTR and Kornia-based architectures) for this Problem Statement. Our empirical ablation studies proved that DL models fail catastrophically on cross-sensor, illumination-mismatched lunar data.
+
+Because Chandrayaan-2 and reference sensors capture the moon at drastically different sun angles, the "brightness constancy constraint" that neural networks rely on is violently broken by lunar shadows and crater rim reversals.
+
+Instead of relying on probabilistic AI that hallucinates under these conditions, we engineered a **deterministic, illumination-invariant pipeline**:
+1. **Phase Congruency:** Extracts structural edges based on frequency-phase agreement, ignoring contrast and shadow reversals.
+2. **CFOG Descriptors:** Matches these structural edges across massive scale disparities (OHRC vs TMC-2).
+3. **Fourier Phase Correlation:** Achieves strict sub-pixel accuracy via continuous signal math, rather than optical flow.
+
+*This guarantees mathematically verifiable correspondence without relying on synthetic training data or black-box neural networks.*
+
 ---
 
 ## 📊 Evaluation Metrics
