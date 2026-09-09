@@ -89,3 +89,189 @@
 .animate-fade-in {
   animation: fade-in 400ms ease-out both;
 }
+
+/* -- Glass panels ------------------------------------------- */
+.glass-panel {
+  background: var(--bg-glass);
+  backdrop-filter: blur(20px) saturate(1.4);
+  -webkit-backdrop-filter: blur(20px) saturate(1.4);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  transition: border-color 250ms cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 250ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glass-panel:hover {
+  border-color: var(--border-default);
+  box-shadow: var(--shadow-lg);
+}
+
+/* -- Buttons ------------------------------------------------ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+  white-space: nowrap;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  color: white;
+  box-shadow: 0 2px 12px var(--accent-glow);
+}
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 20px var(--accent-glow), var(--shadow-glow);
+}
+.btn-primary:active {
+  transform: translateY(0);
+}
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-secondary {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-default);
+}
+.btn-secondary:hover {
+  background: var(--bg-glass-hover);
+  color: var(--text-primary);
+  border-color: var(--border-active);
+}
+
+.btn-danger {
+  background: var(--accent-danger-bg);
+  color: var(--accent-danger);
+  border: 1px solid rgba(248, 113, 113, 0.25);
+}
+.btn-danger:hover {
+  background: rgba(248, 113, 113, 0.2);
+}
+
+.btn-sm { padding: 6px 12px; font-size: 0.75rem; }
+.btn-lg { padding: 14px 28px; font-size: 1rem; }
+
+/* -- Badges ------------------------------------------------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: var(--radius-full);
+}
+.badge-pass {
+  background: var(--accent-success-bg);
+  color: var(--accent-success);
+  border: 1px solid rgba(52, 211, 153, 0.3);
+}
+.badge-fail {
+  background: var(--accent-danger-bg);
+  color: var(--accent-danger);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+}
+.badge-pending {
+  background: var(--accent-warning-bg);
+  color: var(--accent-warning);
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+.badge-running {
+  background: var(--accent-glow);
+  color: var(--accent-secondary);
+  border: 1px solid var(--border-active);
+}
+
+/* -- Progress bar ------------------------------------------- */
+.progress-bar-track {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-elevated);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  border-radius: var(--radius-full);
+  transition: width 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  position: relative;
+}
+.progress-bar-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  animation: progress-shimmer 2s infinite;
+}
+
+@keyframes progress-shimmer {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* -- Log console -------------------------------------------- */
+.log-console {
+  background: #0d1117;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  max-height: 260px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+.log-console::-webkit-scrollbar {
+  width: 6px;
+}
+.log-console::-webkit-scrollbar-track {
+  background: transparent;
+}
+.log-console::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 3px;
+}
+.log-line { padding: 1px 0; }
+.log-line--info  { color: var(--text-secondary); }
+.log-line--stage { color: var(--accent-secondary); font-weight: 500; }
+.log-line--error { color: var(--accent-danger); }
+.log-line--ok    { color: var(--accent-success); }
+
+/* -- Pulse Ring animation for DropZone ---------------------- */
+@keyframes pulse-ring {
+  0%   { transform: scale(0.9); opacity: 0.8; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+/* -- Spinner ------------------------------------------------ */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.spinner {
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--border-default);
+  border-top-color: var(--accent-secondary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}

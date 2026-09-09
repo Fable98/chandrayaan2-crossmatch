@@ -111,16 +111,22 @@ export default function DropZone({ onFilesSelected, disabled = false }: DropZone
   const extractFilesFromEntry = async (entry: FileSystemEntry): Promise<File[]> => {
     if (entry.isFile) {
       return new Promise((resolve) => {
-        (entry as FileSystemFileEntry).file((f) => resolve([f]));
+        (entry as FileSystemFileEntry).file(
+          (f) => resolve([f]),
+          () => resolve([])
+        );
       });
     }
     if (entry.isDirectory) {
       const reader = (entry as FileSystemDirectoryEntry).createReader();
       return new Promise((resolve) => {
-        reader.readEntries(async (entries) => {
-          const nested = await Promise.all(entries.map(extractFilesFromEntry));
-          resolve(nested.flat());
-        });
+        reader.readEntries(
+          async (entries) => {
+            const nested = await Promise.all(entries.map(extractFilesFromEntry));
+            resolve(nested.flat());
+          },
+          () => resolve([])
+        );
       });
     }
     return [];
@@ -194,6 +200,12 @@ export default function DropZone({ onFilesSelected, disabled = false }: DropZone
       onClick={() => !disabled && fileInputRef.current?.click()}
       role="button"
       tabIndex={0}
+      onKeyDown={(e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && !disabled) {
+          e.preventDefault();
+          fileInputRef.current?.click();
+        }
+      }}
       aria-label="Drop zone for zip files"
     >
       {isDragOver && <div style={styles.pulseRing} />}

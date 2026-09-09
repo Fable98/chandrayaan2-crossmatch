@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import DropZone from './DropZone';
 import ProcessingProgress from './ProcessingProgress';
 import ResultsTable from './ResultsTable';
@@ -256,6 +257,32 @@ export default function IngestPage() {
 
   return (
     <div style={styles.page}>
+      {/* Top Navigation Header */}
+      <header className="flex items-center justify-between py-4 mb-8 border-b border-white/10">
+        <Link
+          href="/"
+          className="group flex items-center gap-2 font-mono text-xs text-[#9a958e] transition-colors hover:text-white"
+        >
+          <span className="transition-transform duration-200 group-hover:-translate-x-1">
+            ←
+          </span>
+          <span>Return to Lunar Globe</span>
+        </Link>
+
+        <div className="hidden items-center gap-2 font-mono text-xs font-semibold uppercase tracking-widest text-[#d4af37] md:flex">
+          <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37]" />
+          <span>SIH 26166 · Ingest &amp; Prepare Pipeline</span>
+        </div>
+
+        <Link
+          href="/?view=console"
+          className="flex items-center gap-2 rounded-full border border-teal/40 bg-teal/10 px-4 py-1.5 font-mono text-xs font-semibold text-teal backdrop-blur-sm transition-all duration-200 hover:bg-teal/20 hover:scale-105"
+        >
+          <span>Open Dashboard</span>
+          <span>↗</span>
+        </Link>
+      </header>
+
       {/* Hero */}
       <div style={styles.hero} className="animate-fade-in">
         <h1 style={styles.heroTitle}>Ingest &amp; Prepare</h1>

@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from data import loader
-from routers import triplets, footprint, matches, images, auth
+from routers import triplets, footprint, matches, images, auth, ingest
 
 try:
     from routers import registration as registration_router
@@ -105,6 +105,7 @@ app.include_router(footprint.router)
 app.include_router(matches.router)
 app.include_router(images.router)
 app.include_router(auth.router)
+app.include_router(ingest.router, prefix="/api/ingest", tags=["ingest"])
 
 if registration_router is not None:
     app.include_router(registration_router.router)

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Image from "next/image";
+import Link from "next/link";
 
 interface Props {
   onOpenConsole?: () => void;
@@ -72,6 +73,12 @@ export default function ExploreMoonHero({ onOpenConsole, onOpenAbout, onLogout, 
           >
             Explore
           </button>
+          <Link
+            href="/ingest"
+            className="text-xs font-normal tracking-wide text-ink-dim transition-colors hover:text-white"
+          >
+            Ingest
+          </Link>
           <button
             onClick={onOpenConsole}
             className="text-xs font-normal tracking-wide text-ink-dim transition-colors hover:text-white"

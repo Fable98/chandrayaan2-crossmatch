@@ -1,8 +1,8 @@
 """
-Ingest API routes.
+ingest.py — API routes for the Chandrayaan-2 ingest and preparation pipeline.
 
-Handles zip file uploads, kicks off the ingest_and_prepare pipeline as a
-subprocess, and exposes status / results endpoints.
+Handles zip file uploads, initiates the ingest_and_prepare pipeline as an
+asynchronous background subprocess, and exposes status / results endpoints.
 """
 from __future__ import annotations
 
@@ -22,17 +22,18 @@ from typing import Any
 from fastapi import APIRouter, File, Form, UploadFile, HTTPException
 from pydantic import BaseModel
 
-LOG = logging.getLogger("ingest_api")
+LOG = logging.getLogger("ingest_router")
 
 router = APIRouter()
 
 # ---------------------------------------------------------------------------
-# In-memory job store  (fine for single-server local tool)
+# In-memory job store (suitable for single-server local/preview tool)
 # ---------------------------------------------------------------------------
 _jobs: dict[str, dict[str, Any]] = {}
 
-# Resolve path to the ingest_and_prepare.py script
-_PIPELINE_ROOT = Path(__file__).resolve().parents[5] / "data_preprocessing_pipeline"
+# Resolve paths relative to repository root
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+_PIPELINE_ROOT = _REPO_ROOT / "data_preprocessing_pipeline"
 _INGEST_SCRIPT = _PIPELINE_ROOT / "scripts" / "ingest_and_prepare.py"
 _PROCESSED_TRIPLETS = _PIPELINE_ROOT / "processed_triplets"
 _UPLOAD_ROOT = _PIPELINE_ROOT / ".uploads"
@@ -144,7 +145,6 @@ async def _run_ingest_job(job_id: str, input_dir: Path, config: IngestConfig):
             job["status"] = "completed"
             job["progress_pct"] = 100.0
             job["stage"] = "Done!"
-            # Try to read the summary from the log
             summary_lines = []
             capture = False
             for ln in job["log_lines"]:
@@ -154,7 +154,6 @@ async def _run_ingest_job(job_id: str, input_dir: Path, config: IngestConfig):
                     summary_lines.append(ln)
             job["summary"] = "\n".join(summary_lines) if summary_lines else "Pipeline completed."
 
-            # Read manifest for results
             manifest_path = _PIPELINE_ROOT / "user_triplets.json"
             if manifest_path.exists():
                 with manifest_path.open("r", encoding="utf-8") as f:
@@ -212,7 +211,6 @@ async def upload_and_ingest(
         require_dates=require_dates,
     )
 
-    # Initialize job record
     _jobs[job_id] = {
         "job_id": job_id,
         "status": "pending",
@@ -228,7 +226,6 @@ async def upload_and_ingest(
         "config": config.model_dump(),
     }
 
-    # Fire-and-forget the pipeline
     asyncio.create_task(_run_ingest_job(job_id, upload_dir, config))
 
     return {"job_id": job_id, "files_uploaded": len(saved_files)}
@@ -248,7 +245,7 @@ async def get_job_status(job_id: str):
         progress_pct=job["progress_pct"],
         started_at=job.get("started_at"),
         completed_at=job.get("completed_at"),
-        log_lines=job.get("log_lines", [])[-50:],  # Last 50 lines
+        log_lines=job.get("log_lines", [])[-50:],
         error=job.get("error"),
     )
 

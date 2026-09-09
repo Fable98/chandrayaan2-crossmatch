@@ -504,3 +504,27 @@ def test_registered_image_serving():
     assert r.headers["content-type"].startswith("image/")
 
 
+# ---------------------------------------------------------------------------
+# Ingest pipeline endpoints
+# ---------------------------------------------------------------------------
+
+def test_ingest_jobs_endpoint():
+    """Verify /api/ingest/jobs returns a list of ingest jobs."""
+    r = client.get("/api/ingest/jobs")
+    assert r.status_code == 200
+    assert isinstance(r.json(), list)
+
+
+def test_ingest_status_not_found():
+    """Verify /api/ingest/status/{job_id} returns 404 for invalid job."""
+    r = client.get("/api/ingest/status/nonexistent_job")
+    assert r.status_code == 404
+
+
+def test_ingest_results_not_found():
+    """Verify /api/ingest/results/{job_id} returns 404 for invalid job."""
+    r = client.get("/api/ingest/results/nonexistent_job")
+    assert r.status_code == 404
+
+
+
