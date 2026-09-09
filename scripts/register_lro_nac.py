@@ -39,6 +39,7 @@ from scripts.register import (
     create_blend_overlay,
     create_checkerboard_qa,
     save_geotiff,
+    bounds_to_eqc_transform,
 )
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
@@ -67,11 +68,12 @@ def run_registration_for_region(
     if not ohrc_path.exists() or not nac_path.exists():
         raise FileNotFoundError(f"Missing images in {pair_dir}")
 
-    # Resolve native GSDs from the pair manifest so scale ratio is physical.
+    # Resolve native GSDs + shared-footprint bounds from the pair manifest.
     # Falls back to sensor specs only when manifest is absent.
     explicit_gsd1 = 0.25
     explicit_gsd2 = 0.914
     reference_provenance = "unknown"
+    pair_bounds = None
     try:
         if manifest_path.exists():
             with open(manifest_path) as _mf:
@@ -81,6 +83,7 @@ def run_registration_for_region(
             reference_provenance = _mdata.get(
                 "reference_provenance", _mdata.get("provenance", "unknown")
             )
+            pair_bounds = (_mdata.get("bounds_optical") or _mdata.get("bounds"))
     except Exception as exc:
         logger.warning("Could not parse pair manifest %s: %s; using defaults", manifest_path, exc)
 
@@ -176,7 +179,14 @@ def run_registration_for_region(
         cv2.imwrite(str(reg_png_path), warped_src)
         cv2.imwrite(str(blend_path), blend)
         cv2.imwrite(str(checker_path), checkerboard)
-        saved_tif = save_geotiff(warped_src, geotiff_path)
+        # Georeference from pair-manifest shared-footprint bounds (lunar EQC).
+        _lro_geo = bounds_to_eqc_transform(
+            pair_bounds, warped_src.shape[1], warped_src.shape[0]) if pair_bounds else None
+        if _lro_geo is not None:
+            saved_tif = save_geotiff(warped_src, geotiff_path,
+                                     transform=_lro_geo[0], crs=_lro_geo[1])
+        else:
+            saved_tif = save_geotiff(warped_src, geotiff_path)
         if saved_tif is None or not geotiff_path.exists():
             # Fallback: plain TIFF via OpenCV so the product always exists;
             # record that it is not georeferenced in the manifest.
@@ -270,7 +280,11 @@ def run_registration_for_region(
         "ohrc_native_gsd_m": explicit_gsd1,
         "lro_nac_native_gsd_m": explicit_gsd2,
         "geotiff_georeferenced": registered_products.get("registered_source_tif") is not None and locals().get("geotiff_georeferenced", True),
-        "georeferencing_note": "GeoTIFF uses reference CRS/transform when available; otherwise pixel-grid fallback from_origin(). Not a PDS/SPICE rigorous georeference.",
+        "georeferencing_method": "manifest_bounds_eqc" if pair_bounds else "pixel_grid_fallback",
+        "georeferencing_note": ("Lunar EQC from pair-manifest shared-footprint bounds "
+                                "(partial-overlap caveat in manifest); per-pixel SPICE rigor not claimed."
+                                if pair_bounds else
+                                "GeoTIFF uses reference CRS/transform when available; otherwise pixel-grid fallback from_origin(). Not a PDS/SPICE rigorous georeference."),
         "source_image": str(ohrc_path),
         "reference_image": str(nac_path),
         "status": status,
