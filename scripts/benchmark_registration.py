@@ -34,6 +34,7 @@ def _summarize_pair_result(reg_result: Optional[Dict[str, Any]]) -> Optional[Dic
         return None
     status = reg_result.get("status")
     metrics = reg_result.get("metrics") or {}
+    fit_rmse = metrics.get("fit_rmse_px")
     return {
         "status": status,
         "message": reg_result.get("message") if status != "success" else None,
@@ -43,9 +44,16 @@ def _summarize_pair_result(reg_result: Optional[Dict[str, Any]]) -> Optional[Dic
         "match_count": metrics.get("match_count", reg_result.get("match_count", 0)),
         "inlier_count": metrics.get("inlier_count", reg_result.get("inlier_count", 0)),
         "inlier_ratio": metrics.get("inlier_ratio", 0.0),
-        "fit_rmse_px": metrics.get("fit_rmse_px"),
+        "fit_rmse_px": fit_rmse,
+        "fit_rmse_is_in_sample": True,
+        "sub_pixel_accurate": bool(fit_rmse is not None and fit_rmse < 1.0),
+        "fraction_below_1px": metrics.get("fraction_below_1px", 0.0),
+        "validation_rmse_px": metrics.get("held_out_validation_rmse_px", metrics.get("validation_rmse_px")),
+        "validation_status": metrics.get("validation_status"),
         "spatial_coverage": metrics.get("spatial_coverage", 0.0),
         "spatial_uniformity": metrics.get("spatial_uniformity", 0.0),
+        "canonical_grid_size": metrics.get("canonical_grid_size", 10),
+        "matching_grid_size": metrics.get("matching_grid_size"),
     }
 
 
@@ -259,6 +267,12 @@ def run_full_registration_benchmark(
         benchmark_records.append(record)
 
         # Build comprehensive evaluation metrics record
+        # Canonical reporting grid is fixed 10x10 (100 cells). spatial_coverage
+        # from metrics is already canonical; do NOT mix dynamic-grid coverage
+        # with a hardcoded 100-cell denominator.
+        _dist = metrics_ot.get("spatial_distribution", {}) or {}
+        _total_cells = int(_dist.get("total_cells", 100))
+        _occupied = int(_dist.get("occupied_cells", metrics_ot.get("inlier_count", 0)))
         eval_record = {
             "region_id": r_dir.name,
             "dataset_id": r_dir.name,
@@ -278,9 +292,12 @@ def run_full_registration_benchmark(
             "source_coverage_ratio": metrics_ot.get("spatial_coverage", 0.0),
             "destination_coverage_ratio": metrics_ot.get("spatial_coverage", 0.0),
             "combined_coverage_score": metrics_ot.get("spatial_coverage", 0.0),
-            "source_occupied_cells": metrics_ot.get("inlier_count", 0),
-            "destination_occupied_cells": metrics_ot.get("inlier_count", 0),
-            "total_cells": 100,
+            "source_occupied_cells": _occupied,
+            "destination_occupied_cells": _occupied,
+            "total_cells": _total_cells,
+            "canonical_grid_size": metrics_ot.get("canonical_grid_size", 10),
+            "matching_grid_size": metrics_ot.get("matching_grid_size"),
+            "fit_rmse_is_in_sample": True,
             "uniformity_score": metrics_ot.get("spatial_uniformity", 0.0),
             "quality_tier": record["quality_tier"],
             "method": "CFOG + Phase Congruency",

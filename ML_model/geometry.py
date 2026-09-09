@@ -1,13 +1,15 @@
 """
-ML_model/geometry.py — Non-Planar Transformations, Piecewise Affine/TPS Warping,
-and Rigorous DEM Ray-Intersection for Lunar Topography.
+ML_model/geometry.py — Non-Planar Warping Helpers and Simplified DEM Relief Compensation.
 
-Resolves homography/planar approximation breakdown on steep crater walls, central peaks,
-and off-nadir emission geometries by:
+Provides:
 1. Piecewise Affine transformation on overlapping tiles with smooth 2D cosine blending.
-2. Thin Plate Splines (TPS) non-rigid deformation for non-planar surfaces.
-3. Rigorous 3D photogrammetric sensor ray-intersection against Lunar DEM height fields.
-4. DEM-aware robust RANSAC model estimation.
+2. Thin Plate Splines (TPS) non-rigid 2D resampling for non-planar surfaces.
+3. Simplified DEM relief-displacement compensation (local vertical-offset shift
+   along emission direction). This is NOT rigorous 3D photogrammetric
+   sensor-model ray-intersection; see README Limitations. On steep crater walls
+   (>30deg) or large off-nadir angles, residual parallax remains and the
+   pipeline correctly fails closed via Quality Gates instead of forcing a fit.
+4. DEM-aware robust RANSAC model estimation helpers.
 """
 
 from __future__ import annotations
@@ -36,24 +38,12 @@ def dem_ray_intersection(
     tolerance_m: float = 0.5,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Rigorously intersects line-of-sight camera rays with a lunar Digital Elevation Model (DEM).
-    
-    For steep crater walls and off-nadir geometries, standard planar assumptions fail because
-    terrain elevation creates strong relief parallax along the look-direction.
-    
-    Args:
-        pixel_coords: (N, 2) array of [x, y] pixel coordinates in the source sensor space.
-        dem: (H, W) 2D array of lunar surface elevation values in meters.
-        emission_deg: Sensor emission angle (off-nadir tilt) in degrees.
-        azimuth_deg: Sensor line-of-sight azimuth angle in degrees.
-        gsd_m: Ground Sample Distance in meters/pixel.
-        camera_altitude_m: Spacecraft altitude above lunar reference datum (m).
-        max_iters: Maximum iterations for iterative ray-surface intersection.
-        tolerance_m: Convergence threshold in meters.
-        
-    Returns:
-        coords_3d: (N, 3) real-world lunar surface coordinates [X_m, Y_m, Z_elev_m].
-        displacements_px: (N, 2) terrain-induced relief displacement vectors [dx_px, dy_px].
+    Simplified DEM relief-displacement estimator (closed-form local shift).
+
+    Approximates line-of-sight/DEM intersection as Δz*tan(emission)/GSD along
+    the sensor LOS azimuth. This is NOT a rigorous orbital sensor-model
+    ray-trace (no intrinsics/extrinsics, no iterative ray-march against a
+    geodetically registered DEM). Pass sensor LOS azimuth — never sun azimuth.
     """
     pts = np.asarray(pixel_coords, dtype=np.float64)
     if len(pts) == 0:

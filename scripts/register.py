@@ -6,6 +6,9 @@ image using the estimated homography matrix. Produces:
   1. registered_source.png — source warped directly into target pixel coordinates
   2. blend_overlay.png — alpha blended composite to visually inspect alignment
   3. checkerboard_qa.png — alternating tiles of source & reference for edge continuity QA
+  4. registered GeoTIFF (.tif) — pixel-grid fallback georeference unless real
+     CRS/transform supplied; see save_geotiff() and manifest georeferenced flag.
+  5. matches.json / metrics.json / transform.json sidecars (canonical names).
 """
 
 from __future__ import annotations
@@ -83,21 +86,29 @@ def create_checkerboard_qa(
     return checkerboard
 
 
-def save_geotiff(image: np.ndarray, path: Path) -> str | None:
-    """Save image as lunar GeoTIFF with lunar equatorial cylindrical CRS."""
+def save_geotiff(image: np.ndarray, path: Path, transform=None, crs=None, gsd_m: float | None = None) -> str | None:
+    """Save image as lunar GeoTIFF.
+
+    Uses provided raster CRS/transform when available; otherwise falls back to a
+    pixel-grid EQC placeholder (from_origin). The placeholder is NOT a rigorous
+    PDS/SPICE georeference — callers must record georeferenced=False in manifests.
+    Returns path string, or None on failure.
+    """
     try:
         import rasterio
         from rasterio.transform import from_origin
         h, w = image.shape[:2]
         count = 1 if image.ndim == 2 else min(image.shape[2], 3)
+        if transform is None and gsd_m is not None:
+            transform = from_origin(0, h * gsd_m, gsd_m, gsd_m)
         profile = {
             "driver": "GTiff",
             "height": h,
             "width": w,
             "count": count,
             "dtype": "uint8",
-            "crs": "+proj=eqc +lat_ts=0 +lon_0=0 +a=1737400 +b=1737400 +units=m +no_defs +type=crs",
-            "transform": from_origin(0, h, 1.0, 1.0),
+            "crs": crs or "+proj=eqc +lat_ts=0 +lon_0=0 +a=1737400 +b=1737400 +units=m +no_defs +type=crs",
+            "transform": transform if transform is not None else from_origin(0, h, 1.0, 1.0),
             "compress": "lzw",
         }
         with rasterio.open(str(path), "w", **profile) as dst:
@@ -147,16 +158,46 @@ def register_region(
     blend_path = region_out / "blend_overlay.png"
     checker_path = region_out / "checkerboard_qa.png"
     tif_path = region_out / "registered_ohrc.tif"
+    matches_path = region_out / "matches.json"
+    metrics_path = region_out / "metrics.json"
+    transform_path = region_out / "transform.json"
 
     cv2.imwrite(str(warped_path), warped)
     cv2.imwrite(str(blend_path), blend)
     cv2.imwrite(str(checker_path), checker)
     saved_tif = save_geotiff(warped, tif_path)
+    if saved_tif is None or not tif_path.exists():
+        cv2.imwrite(str(tif_path), warped)
+        saved_tif = str(tif_path)
+        georeferenced = False
+    else:
+        georeferenced = True
 
-    # Save homography
+    # Save homography (legacy name) + canonical transform.json
     h_path = region_out / "ohrc_to_tmc_homography.json"
     with open(h_path, "w") as f:
-        json.dump({"homography": H.tolist(), "inlier_count": len(matches)}, f, indent=4)
+        json.dump(
+            {
+                "homography": H.tolist(),
+                "inlier_count": len(matches),
+                "fit_rmse_is_in_sample": True,
+                "georeferenced": georeferenced,
+                "georeferencing_note": "Pixel-grid fallback unless real CRS supplied.",
+            },
+            f,
+            indent=4,
+        )
+    with open(transform_path, "w") as f:
+        json.dump({"model": "homography", "matrix": H.tolist()}, f, indent=4)
+    # Canonical match points + minimal metrics sidecars for PS compliance
+    with open(matches_path, "w") as f:
+        json.dump(matches, f, indent=4)
+    with open(metrics_path, "w") as f:
+        json.dump(
+            {"region_id": region_id, "inlier_count": len(matches), "georeferenced": georeferenced},
+            f,
+            indent=4,
+        )
 
     return {
         "registered_source": str(warped_path),
@@ -164,6 +205,9 @@ def register_region(
         "blend_overlay": str(blend_path),
         "checkerboard_qa": str(checker_path),
         "homography_json": str(h_path),
+        "transform_json": str(transform_path),
+        "matches_json": str(matches_path),
+        "metrics_json": str(metrics_path),
     }
 
 

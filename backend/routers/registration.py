@@ -370,16 +370,34 @@ async def run_bundle_adjustment(request: BundleAdjustmentRequest) -> Dict[str, A
 # ---------------------------------------------------------------------------
 
 
-def _pixel_to_latlon(px: float, py: float, width: float = 512.0, height: float = 512.0) -> tuple:
-    """Placeholder linear pixel -> lat/lon mapping (refine with SPICE later).
+def _pixel_to_latlon(
+    px: float,
+    py: float,
+    width: float = 512.0,
+    height: float = 512.0,
+    bounds: tuple | None = None,
+) -> tuple:
+    """Map pixel -> lat/lon.
 
-    Maps a 512x512 frame onto a demo lunar patch: lon in [336, 337],
-    lat in [-4, -3]. Keeps the globe wired up until SPICE kernels land.
+    When per-product geographic bounds (min_lon, max_lon, min_lat, max_lat) are
+    supplied (from manifest/PDS metadata), performs a bilinear interpolation
+    within those bounds. Otherwise falls back to the legacy demo patch
+    lon in [336, 337], lat in [-4, -3] and flags it as approximate.
     """
     w = max(float(width), 1.0)
     h = max(float(height), 1.0)
-    lon = 336.0 + (float(px) / w)
-    lat = -4.0 + (float(py) / h)
+    fx = min(max(float(px) / w, 0.0), 1.0)
+    fy = min(max(float(py) / h, 0.0), 1.0)
+    if bounds is not None:
+        try:
+            min_lon, max_lon, min_lat, max_lat = (float(v) for v in bounds)
+            lon = min_lon + fx * (max_lon - min_lon)
+            lat = max_lat - fy * (max_lat - min_lat)
+            return lat, lon
+        except Exception:
+            pass
+    lon = 336.0 + fx
+    lat = -4.0 + fy
     return lat, lon
 
 
@@ -398,6 +416,11 @@ async def get_moon_points(job_id: str) -> MoonPointsResponse:
     # Prefer stored match points; fall back to an empty globe layer.
     ref_pts: List[Any] = result.get("filtered_ref_pts") or result.get("ref_pts") or []
     src_pts: List[Any] = result.get("filtered_src_pts") or result.get("src_pts") or []
+    # Use product bounds when available; otherwise _pixel_to_latlon falls back
+    # to the demo patch (flagged approximate in API docs).
+    bounds = result.get("bounds") or result.get("metadata", {}).get("bounds") if isinstance(result.get("metadata"), dict) else result.get("bounds")
+    img_w = float(result.get("width", 512.0) or 512.0)
+    img_h = float(result.get("height", 512.0) or 512.0)
     points: List[MoonPoint] = []
     try:
         for i, pt in enumerate(ref_pts):
@@ -405,7 +428,7 @@ async def get_moon_points(job_id: str) -> MoonPointsResponse:
                 px, py = float(pt[0]), float(pt[1])
             except Exception:
                 continue
-            lat, lon = _pixel_to_latlon(px, py)
+            lat, lon = _pixel_to_latlon(px, py, width=img_w, height=img_h, bounds=bounds)
             conf = 0.0
             try:
                 conf = float((result.get("confidences") or [])[i])
