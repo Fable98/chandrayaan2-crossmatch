@@ -52,7 +52,18 @@ export function imageUrl(path: string): string {
   if (!path) return "";
   if (path.startsWith("http")) return path;
 
-  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  let cleanPath = path.startsWith("/") ? path : `/${path}`;
+
+  // Ensure .png extension is attached so browsers receive content-type: image/png
+  if (
+    cleanPath.startsWith("/images/") &&
+    !cleanPath.endsWith(".png") &&
+    !cleanPath.endsWith(".jpg") &&
+    !cleanPath.endsWith(".jpeg") &&
+    !cleanPath.endsWith(".json")
+  ) {
+    cleanPath = `${cleanPath}.png`;
+  }
 
   // If running in browser on a production domain (like Vercel) and API_BASE points to localhost,
   // serve relative /images/... so Next.js static public assets load directly without mixed-content errors.
