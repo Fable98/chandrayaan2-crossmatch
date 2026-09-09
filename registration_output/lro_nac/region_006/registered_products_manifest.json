@@ -9,6 +9,7 @@
     "num_raw_matches": 36,
     "inlier_ratio": 1.0,
     "fit_rmse_px": 0.2759,
+    "validation_rmse_px": 0.2504,
     "sub_pixel_accurate": true,
     "spatial_coverage_ratio": 1.0,
     "spatial_uniformity": 0.8953,

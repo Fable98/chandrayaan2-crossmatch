@@ -24,5 +24,6 @@
   "inlier_count": 0,
   "raw_match_count": 35,
   "fit_rmse_px": 0.2916,
+  "validation_rmse_px": 0.4181,
   "sub_pixel_accurate": false
 }

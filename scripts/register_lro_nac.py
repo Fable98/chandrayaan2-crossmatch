@@ -175,6 +175,7 @@ def run_registration_for_region(
         "inlier_count": len(inliers),
         "raw_match_count": len(raw_matches),
         "fit_rmse_px": metrics.get("fit_rmse_px"),
+        "validation_rmse_px": metrics.get("held_out_validation_rmse_px", metrics.get("validation_rmse_px")),
         "sub_pixel_accurate": metrics.get("sub_pixel_accurate", False),
     }
 
@@ -187,6 +188,7 @@ def run_registration_for_region(
     num_inliers = metrics.get("inlier_count", metrics.get("num_inliers", len(inliers)))
     num_raw = metrics.get("match_count", metrics.get("num_raw_matches", len(raw_matches)))
     fit_rmse = metrics.get("fit_rmse_px")
+    val_rmse = metrics.get("held_out_validation_rmse_px", metrics.get("validation_rmse_px"))
     sub_pixel = (fit_rmse is not None and fit_rmse < 1.0)
     cov_ratio = metrics.get("spatial_coverage", metrics.get("combined_coverage_score", 0.0)) or 0.0
 
@@ -201,6 +203,7 @@ def run_registration_for_region(
             "num_raw_matches": num_raw,
             "inlier_ratio": metrics.get("inlier_ratio", 0.0),
             "fit_rmse_px": fit_rmse,
+            "validation_rmse_px": val_rmse,
             "sub_pixel_accurate": sub_pixel,
             "spatial_coverage_ratio": cov_ratio,
             "spatial_uniformity": metrics.get("spatial_uniformity", metrics.get("uniformity_score", 0.0)),
@@ -214,9 +217,10 @@ def run_registration_for_region(
         json.dump(product_manifest, f, indent=2)
 
     logger.info(
-        "Registration finished for %s: Fit RMSE = %s px, Sub-pixel: %s, Inliers: %s, Coverage: %s",
+        "Registration finished for %s: Fit RMSE = %s px, Val RMSE = %s px, Sub-pixel: %s, Inliers: %s, Coverage: %s",
         region_id,
         str(fit_rmse),
+        str(val_rmse),
         str(sub_pixel),
         str(num_inliers),
         str(cov_ratio),
@@ -250,21 +254,23 @@ def main():
         )
         summary.append(res)
 
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 98)
     print("LRO NAC REFERENCE-IMAGE REGISTRATION SUMMARY (PS 26166)")
-    print("=" * 80)
+    print("=" * 98)
     for s in summary:
         m = s["metrics"]
-        rmse_str = f"{m['fit_rmse_px']:.4f}" if m.get("fit_rmse_px") is not None else "N/A"
+        fit_rmse_str = f"{m['fit_rmse_px']:.4f}" if m.get("fit_rmse_px") is not None else "N/A"
+        val_rmse = m.get("validation_rmse_px")
+        val_rmse_str = f"{val_rmse:.4f}" if val_rmse is not None else "N/A"
         cov_val = m.get("spatial_coverage_ratio") or 0.0
         print(
-            f"Region: {s['region_id']:<12} | Status: {s['status']:<8} | "
-            f"Raw: {str(m.get('num_raw_matches')):<3} | Inliers: {str(m.get('num_inliers')):<3} | "
-            f"Fit RMSE: {rmse_str:<8} px | "
+            f"Region: {s['region_id']:<10} | Status: {s['status']:<7} | "
+            f"Raw: {str(m.get('num_raw_matches')):<2} | Inliers: {str(m.get('num_inliers')):<2} | "
+            f"Fit RMSE: {fit_rmse_str:<7} px | Val RMSE: {val_rmse_str:<7} px | "
             f"Sub-pixel: {str(m.get('sub_pixel_accurate')):<5} | "
-            f"Coverage: {cov_val:.2%}"
+            f"Coverage: {cov_val:.1%}"
         )
-    print("=" * 80)
+    print("=" * 98)
 
 
 if __name__ == "__main__":

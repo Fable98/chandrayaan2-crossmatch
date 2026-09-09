@@ -52,6 +52,7 @@
     "lro_nac_incidence_deg": 5.82,
     "lro_nac_emission_deg": 1.71,
     "fit_rmse_px": 0.2702,
+    "validation_rmse_px": 0.3391,
     "sub_pixel_accurate": true,
     "inlier_count": 37,
     "spatial_coverage": 1.0,
@@ -74,10 +75,11 @@
     "lro_nac_incidence_deg": 5.82,
     "lro_nac_emission_deg": 1.71,
     "fit_rmse_px": 0.2916,
+    "validation_rmse_px": 0.4181,
     "sub_pixel_accurate": true,
     "inlier_count": 35,
     "spatial_coverage": 1.0,
-    "spatial_uniformity": 0.9153,
+    "spatial_uniformity": 0.8779,
     "quality_tier": "HIGH_CONFIDENCE",
     "registered_products_dir": "registration_output/lro_nac/region_003"
   },
@@ -96,10 +98,11 @@
     "lro_nac_incidence_deg": 51.74,
     "lro_nac_emission_deg": 2.15,
     "fit_rmse_px": 0.2759,
+    "validation_rmse_px": 0.2504,
     "sub_pixel_accurate": true,
     "inlier_count": 36,
     "spatial_coverage": 1.0,
-    "spatial_uniformity": 0.9153,
+    "spatial_uniformity": 0.8953,
     "quality_tier": "HIGH_CONFIDENCE",
     "registered_products_dir": "registration_output/lro_nac/region_006"
   }
