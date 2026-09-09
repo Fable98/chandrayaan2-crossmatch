@@ -600,6 +600,7 @@ def match_images_cfog(
     grid_size: int = 10,
     max_matches_per_cell: int = 4,
     patch_size_m: float = 160.0,  # Physical patch width in meters
+    multimodal_pair: Optional[bool] = None,
     _is_inverted_call: bool = False,
 ) -> Dict[str, Any]:
     """
@@ -704,7 +705,10 @@ def match_images_cfog(
     # If the caller requested the reverse direction, run in the better-conditioned
     # direction and return the inverted homography.
     sensors = {str(meta1.sensor).upper(), str(meta2.sensor).upper(), str(source_sensor).upper(), str(reference_sensor).upper()}
-    multimodal_pair = "IIRS" in sensors
+    if multimodal_pair is None:
+        multimodal_pair = "IIRS" in sensors
+    else:
+        multimodal_pair = bool(multimodal_pair)
 
     area1 = work_w1 * work_h1
     area2 = work_w2 * work_h2
@@ -725,6 +729,7 @@ def match_images_cfog(
             grid_size=grid_size,
             max_matches_per_cell=max_matches_per_cell,
             patch_size_m=patch_size_m,
+            multimodal_pair=multimodal_pair,
             _is_inverted_call=True,
         )
 
@@ -1057,7 +1062,8 @@ def match_images_cfog(
     coarse_matches = []
     attempted_cells = set()
     sensors = {str(source_sensor).upper(), str(reference_sensor).upper()}
-    multimodal_pair = "IIRS" in sensors
+    if multimodal_pair is None:
+        multimodal_pair = "IIRS" in sensors
     # Key half-patch size to preserve Phase Congruency Log-Gabor support
     half_patch_c = max(4 if multimodal_pair else 8, int(round((patch_size_m / working_gsd) / 4.0)))
 

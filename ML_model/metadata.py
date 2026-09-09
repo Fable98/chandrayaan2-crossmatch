@@ -79,6 +79,11 @@ SENSOR_SPECS = {
         "wavelength_range_um": None,
         "nominal_emission_deg": None,
     },
+    "LRO_NAC": {
+        "gsd_m": 0.5,  # ~0.5–2.0 m depending on orbital altitude
+        "wavelength_range_um": (0.40, 0.75),  # Panchromatic optical
+        "nominal_emission_deg": 0.0,
+    },
 }
 
 
@@ -93,6 +98,8 @@ def normalize_sensor_name(name: str) -> str:
         return "IIRS"
     elif "DEM" in name_clean:
         return "DEM"
+    elif "NAC" in name_clean or "LRO" in name_clean:
+        return "LRO_NAC"
     return name_clean
 
 
@@ -132,11 +139,49 @@ def extract_sensor_metadata(
         elif "dem" in filename_lower:
             sensor_type = "DEM"
             provenance["sensor"] = "filename_inference"
+        elif "nac" in filename_lower or "lro" in filename_lower:
+            sensor_type = "LRO_NAC"
+            provenance["sensor"] = "filename_inference"
         else:
             sensor_type = "UNKNOWN"
             provenance["sensor"] = "unknown"
 
-    # Step 2: Check for PDS4 XML label
+    # Step 2: Check for PDS3 .LBL label or attached .IMG header for LRO NAC
+    lbl_path = p.with_suffix(".lbl")
+    if not lbl_path.exists():
+        lbl_path = p.with_suffix(".LBL")
+    if lbl_path.exists() or (p.suffix.lower() == ".img" and sensor_type == "LRO_NAC"):
+        try:
+            from lro_pds3_parser import extract_lro_nac_metadata
+            target_lbl = lbl_path if lbl_path.exists() else p
+            nac_meta = extract_lro_nac_metadata(
+                target_lbl,
+                explicit_gsd=explicit_gsd,
+                explicit_emission=explicit_emission,
+                explicit_azimuth=explicit_azimuth,
+            )
+            # If this is a pre-gridded working tile (e.g. _512), normalize effective grid GSD if matching OHRC
+            if "_512" in p.name:
+                manifest_path = p.parent / "manifest.json"
+                if manifest_path.exists():
+                    try:
+                        import json
+                        with open(manifest_path) as mf:
+                            mdata = json.load(mf)
+                            working_gsd = mdata.get("working_gsd_m", 1.0)
+                            if explicit_gsd is None:
+                                nac_meta.gsd_m = working_gsd
+                                nac_meta.provenance["gsd_m"] = "manifest_grid"
+                    except Exception:
+                        pass
+                elif explicit_gsd is None:
+                    nac_meta.gsd_m = 1.0
+                    nac_meta.provenance["gsd_m"] = "grid_normalized"
+            return nac_meta
+        except Exception:
+            pass
+
+    # Check for PDS4 XML label
     header_data: Dict[str, Any] = {}
     xml_path = p.with_suffix(".xml")
     if not xml_path.exists():
@@ -178,7 +223,10 @@ def extract_sensor_metadata(
                 if sensor_type == "OHRC":
                     # If this is a pre-gridded tile (e.g. ohrc_512.png), its effective grid GSD is normalized to the reference grid
                     if "_512" in p.name:
-                        header_data["gsd_m"] = mdata.get("tmc2_gsd_m", 5.0)
+                        if mdata.get("reference_type") == "external_LRO_NAC":
+                            header_data["gsd_m"] = mdata.get("working_gsd_m", 1.0)
+                        else:
+                            header_data["gsd_m"] = mdata.get("tmc2_gsd_m", 5.0)
                     else:
                         header_data["gsd_m"] = mdata.get("ohrc_gsd_m", 0.25)
                     header_data["sun_azimuth_deg"] = mdata.get("ohrc_sun_azimuth_deg")
@@ -187,20 +235,26 @@ def extract_sensor_metadata(
                     header_data["sun_azimuth_deg"] = mdata.get("tmc2_sun_azimuth_deg")
                 elif sensor_type == "IIRS":
                     header_data["gsd_m"] = mdata.get("iirs_gsd_m", 75.0)
+                elif sensor_type == "LRO_NAC":
+                    if "_512" in p.name:
+                        header_data["gsd_m"] = mdata.get("working_gsd_m", 1.0)
+                    else:
+                        header_data["gsd_m"] = mdata.get("lro_nac_gsd_m", mdata.get("nac_gsd_m", 0.5))
+                    header_data["sun_azimuth_deg"] = mdata.get("lro_nac_sun_azimuth_deg")
                 if "bounds" in mdata:
                     b = mdata["bounds"]
                     header_data["bounds"] = (b["west_lon"], b["east_lon"], b["south_lat"], b["north_lat"])
         except Exception:
             pass
 
-    # Step 3: Resolve GSD
+    # Step 3: Resolve GSD (explicit request parameter has highest precedence)
     gsd_val = None
-    if "gsd_m" in header_data:
-        gsd_val = header_data["gsd_m"]
-        provenance["gsd_m"] = "header"
-    elif explicit_gsd is not None and explicit_gsd > 0:
+    if explicit_gsd is not None and explicit_gsd > 0:
         gsd_val = float(explicit_gsd)
         provenance["gsd_m"] = "request"
+    elif "gsd_m" in header_data:
+        gsd_val = header_data["gsd_m"]
+        provenance["gsd_m"] = "header"
     elif sensor_type in SENSOR_SPECS and SENSOR_SPECS[sensor_type].get("gsd_m") is not None:
         gsd_val = SENSOR_SPECS[sensor_type]["gsd_m"]
         provenance["gsd_m"] = "sensor_spec"

@@ -1,0 +1,32 @@
+{
+  "region_id": "region_006",
+  "reference_type": "external_LRO_NAC",
+  "source_sensor": "OHRC",
+  "reference_sensor": "LRO_NAC",
+  "ohrc_product_id": "ch2_ohr_ncp_20220914t0835371412_d_img_d32",
+  "lro_nac_product_id": "M1413636095LC",
+  "ohrc_native_gsd_m": 0.32,
+  "lro_nac_native_gsd_m": 1.12,
+  "scale_ratio": 3.5,
+  "working_tile_size": [
+    512,
+    512
+  ],
+  "bounds": {
+    "west_lon": 234.396774,
+    "east_lon": 234.528638,
+    "south_lat": 5.148811500000001,
+    "north_lat": 5.35283875
+  },
+  "bounds_optical": {
+    "west_lon": 234.396774,
+    "east_lon": 234.528638,
+    "south_lat": 5.148811500000001,
+    "north_lat": 5.35283875
+  },
+  "ohrc_sun_azimuth_deg": 89.392682,
+  "lro_nac_sun_azimuth_deg": 110.2,
+  "ohrc_source_image": "/Users/shresthkumar/chandrayaan2-crossmatch/data_preprocessing_pipeline/lro_nac_pairs/region_006/ohrc_source_512.png",
+  "lro_nac_reference_image": "/Users/shresthkumar/chandrayaan2-crossmatch/data_preprocessing_pipeline/lro_nac_pairs/region_006/lro_nac_reference_512.png",
+  "lro_nac_label": "/Users/shresthkumar/chandrayaan2-crossmatch/data_preprocessing_pipeline/lro_nac_pairs/region_006/lro_nac_reference_512.lbl"
+}
