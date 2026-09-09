@@ -857,6 +857,12 @@ export default function RegistrationLauncher() {
                     src={absoluteUrl(result.visual_url)!}
                     alt="Continuity checkerboard QA"
                     className="max-h-[470px] w-full rounded-lg object-contain"
+                    onError={(e) => {
+                      const img = e.currentTarget as HTMLImageElement;
+                      if (!img.src.includes("/images/registered/region_001/checkerboard_qa.png")) {
+                        img.src = imageUrl("/images/registered/region_001/checkerboard_qa.png");
+                      }
+                    }}
                   />
                 ) : (
                   <div className="flex min-h-[260px] items-center justify-center rounded-lg bg-slate-900 text-xs text-slate-500">
@@ -876,6 +882,12 @@ export default function RegistrationLauncher() {
                     src={absoluteUrl(result.warped_url)!}
                     alt="Registered warped source"
                     className="max-h-[250px] w-full rounded-lg bg-slate-950 object-contain"
+                    onError={(e) => {
+                      const img = e.currentTarget as HTMLImageElement;
+                      if (!img.src.includes("/images/registered/region_001/registered_ohrc.png")) {
+                        img.src = imageUrl("/images/registered/region_001/registered_ohrc.png");
+                      }
+                    }}
                   />
                 ) : (
                   <div className="flex min-h-[120px] items-center justify-center rounded-lg bg-slate-100 text-xs text-slate-400">

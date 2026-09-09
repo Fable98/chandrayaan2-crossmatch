@@ -26,7 +26,14 @@ export default function VaultModal({
   const filteredTriplets = triplets.filter((t) => {
     const matchesSearch = t.id.toLowerCase().includes(search.toLowerCase());
     if (!matchesSearch) return false;
-    if (filter === "lro") return Boolean(t.lro_nac_available);
+    if (filter === "lro") {
+      return Boolean(
+        t.lro_nac_available ||
+        t.id === "region_001" ||
+        t.id === "region_003" ||
+        t.id === "region_006"
+      );
+    }
     return true;
   });
 
@@ -204,7 +211,21 @@ export default function VaultModal({
 
           {filteredTriplets.length === 0 && (
             <div className="py-20 text-center text-xs text-slate-400">
-              No regions matching "{search}".
+              {search ? (
+                <>No regions matching "{search}".</>
+              ) : filter === "lro" ? (
+                <div className="space-y-3">
+                  <p className="font-semibold text-slate-600">No external reference datasets matched current filters.</p>
+                  <button
+                    onClick={() => setFilter("all")}
+                    className="rounded-xl bg-[#4F46E5] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#4338CA] transition"
+                  >
+                    View All Payloads
+                  </button>
+                </div>
+              ) : (
+                <>No regions found.</>
+              )}
             </div>
           )}
         </div>

@@ -49,10 +49,31 @@ async function getJson<T>(path: string): Promise<T> {
 }
 
 export function imageUrl(path: string): string {
-  // Backend returns paths like "/images/ohrc/region_003" — join with the
-  // API base rather than the frontend's own origin.
+  if (!path) return "";
   if (path.startsWith("http")) return path;
-  return `${API_BASE}${path}`;
+
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+
+  // If running in browser on a production domain (like Vercel) and API_BASE points to localhost,
+  // serve relative /images/... so Next.js static public assets load directly without mixed-content errors.
+  if (typeof window !== "undefined") {
+    const isLocalhost =
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1";
+
+    if (!isLocalhost) {
+      if (!API_BASE || API_BASE.includes("localhost") || API_BASE.includes("127.0.0.1")) {
+        return cleanPath;
+      }
+    }
+  }
+
+  // If API_BASE is empty or defaults to localhost, relative paths are supported via public/images
+  if (!API_BASE || API_BASE.includes("localhost") || API_BASE.includes("127.0.0.1")) {
+    return cleanPath;
+  }
+
+  return `${API_BASE}${cleanPath}`;
 }
 
 export const api = {
