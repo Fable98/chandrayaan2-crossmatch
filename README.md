@@ -201,6 +201,37 @@ Consequently, this pairing does not require the heavy multi-spectral dimensional
 
 ---
 
+## 🏆 8-Phase AI-Augmented Photogrammetry Pipeline
+
+Our solution is decomposed into 8 distinct phases, each addressing a specific challenge from the Problem Statement:
+
+| Phase | Name | Purpose | Method | Implementation status |
+| :--- | :--- | :--- | :--- | :--- |
+| **Phase 1** | Adaptive Illumination Normalization | Moderate gain/bias tolerance (not sun-angle invariant) | CLAHE + Shadow Masking (`matcher_cfog.adaptive_illumination_normalization`) | Implemented |
+| **Phase 2** | Multi-Scale Feature Extraction | Structural representation | 3-Level Gaussian Pyramid + Phase Congruency (`multi_scale_phase_congruency(scales=3)`) — pyramid computed, matching currently uses Level 0 finest scale | Implemented (pyramid built; coarse-to-fine propagation not yet wired) |
+| **Phase 3** | Coarse-to-Fine Correspondence | Scale handling | Correlation matching on common-GSD resampled pair; ECC coarse-to-fine pyramid only in IIRS registrar (`iirs_multimodal_registrar.align_ecc_pyramid`, `num_levels=3`) | Partial — optical path uses single finest scale; ~20× via area resampling, not a scale-invariant descriptor |
+| **Phase 4** | AI Match Verification | Supervised ML outlier gate | RandomForestClassifier scaffold (`ML_model/ai_verifier.py`) | Structural scaffold — `is_trained=False`, currently pass-through (returns all ones); no trained filtering yet |
+| **Phase 5** | Fourier Sub-Pixel Refinement | Sub-pixel tracking | 2D Phase Correlation + 2D Paraboloid Fit (`subpixel_phase_correlation`) + Lucas-Kanade | Implemented (per-point 0.08–0.31 px; full-scene fit 0.99–1.83 px — see §2) |
+| **Phase 6** | Uniform Spatial Distribution | Uniform distribution | Grid NMS + Macro-Cell Fill (`apply_grid_nms`, macro-cell enforcement) + pre-match SSC/ANMS (`spatial_suppression.py`) | Implemented (canonical 10×10 coverage 6–7% on primary pairs with 6–7 inliers) |
+| **Phase 7** | Robust Geometric Estimation | Final transformation | Weighted RANSAC path + Weighted DLT refinement (`matcher_cfog.py` Phase 7 block); native `weights=` kwarg attempted, OpenCV 4.x falls back to confidence-weighted sampling + sqrt(w) DLT | Mechanism present — weights currently near-uniform (Phase 4 untrained), effectively standard RANSAC; Quality Gates 1–4 enforced |
+| **Phase 8** | Held-Out Validation & Metrics | Evaluation metrics | 80/20 split + RMSE in meters (`ML_model/metrics.py`) | Implemented (`insufficient_points_for_holdout` when inliers <8 — all primary OHRC↔TMC pairs) |
+
+### 🧠 Why AI-Augmented Photogrammetry (and not end-to-end Deep Learning as primary)
+
+We evaluated pretrained Deep Learning matchers (LoFTR baseline retained in `ML_model/matcher.py` for comparison) and found the brightness-constancy assumption breaks under cross-sensor lunar shadow / crater-rim reversal, so the primary engine is deterministic structural matching:
+
+1. **Phase Congruency:** single-channel 2D Log-Gabor structural edges, moderately robust to gain/bias — NOT invariant to diametric shadow reversal (~162° flip in `triplet_new_2022` correctly fails closed).
+2. **Supervised ML gate (scaffold):** `RandomForestClassifier` interface in `ai_verifier.py` is wired into `match_images_cfog` Phase 4 but untrained — it does not yet reject outliers. Claiming production ML filtering would be unphysical; training/eval on labelled lunar matches is future work.
+3. **Unsupervised ML for hyperspectral:** PCA-PC1 dimensionality reduction for IIRS (256 bands → PC1) is implemented and used (`iirs_multimodal_registrar.py`, `spectral.py`) for real-time multimodal co-registration overlay (composed chain, 0 measured inliers, overlay-only).
+
+This gives us verifiable signal-processing correspondence today, with explicit hooks where trained AI can be plugged in without black-box failures.
+
+### 🛡️ Zero Fake Fallbacks (Scientific Integrity)
+
+Four deterministic Quality Gates + triplet closed-loop guard (§2) prevent fake correspondences or identity matrices. If the algorithm cannot find a mathematically valid transformation, it fails cleanly (`insufficient_correspondences`, `geometric_verification_failed`, distortion rejection, `cycle_not_computable`) and reports the failure. Missing data is reported as `not_available`/`not_run`, never zero-error. IIRS derived grid points are explicitly flagged `derived_composed_overlay`, never measured inliers.
+
+---
+
 ## 9. Installation & Usage Guide
 
 ### Prerequisites
