@@ -3,25 +3,25 @@
         "region_id": "region_001",
         "dataset_id": "region_001",
         "status": "evaluated",
-        "num_inliers": 6,
-        "num_raw_matches": 77,
-        "inlier_ratio": 0.0779,
-        "rmse_px": 1.3254,
-        "fit_rmse_px": 1.3254,
+        "num_inliers": 7,
+        "num_raw_matches": 41,
+        "inlier_ratio": 0.1707,
+        "rmse_px": 1.2715,
+        "fit_rmse_px": 1.2715,
         "validation_rmse_px": null,
         "validation_status": "insufficient_points_for_holdout",
-        "mean_reprojection_error_px": 1.0614,
-        "median_reprojection_error_px": 0.9814,
-        "max_reprojection_error_px": 2.3394,
+        "mean_reprojection_error_px": 1.1637,
+        "median_reprojection_error_px": 1.1472,
+        "max_reprojection_error_px": 2.1827,
         "sub_pixel_accurate": false,
-        "fraction_below_1px": 0.5,
-        "source_coverage_ratio": 0.06,
-        "destination_coverage_ratio": 0.06,
-        "combined_coverage_score": 0.06,
-        "source_occupied_cells": 6,
-        "destination_occupied_cells": 6,
+        "fraction_below_1px": 0.4286,
+        "source_coverage_ratio": 0.4375,
+        "destination_coverage_ratio": 0.4375,
+        "combined_coverage_score": 0.4375,
+        "source_occupied_cells": 7,
+        "destination_occupied_cells": 7,
         "total_cells": 100,
-        "uniformity_score": 0.0183,
+        "uniformity_score": 0.3113,
         "quality_tier": "LOW_CONFIDENCE",
         "method": "CFOG + Phase Congruency",
         "pairs": {
@@ -31,12 +31,12 @@
                 "direction": "native",
                 "measured_direction": null,
                 "quality_tier": "LOW_CONFIDENCE",
-                "match_count": 77,
-                "inlier_count": 6,
-                "inlier_ratio": 0.0779,
-                "fit_rmse_px": 1.3254,
-                "spatial_coverage": 0.06,
-                "spatial_uniformity": 0.0183
+                "match_count": 41,
+                "inlier_count": 7,
+                "inlier_ratio": 0.1707,
+                "fit_rmse_px": 1.2715,
+                "spatial_coverage": 0.4375,
+                "spatial_uniformity": 0.3113
             },
             "ohrc_iirs": {
                 "status": "composed",
@@ -60,26 +60,25 @@
                     "source": "A -> B -> C",
                     "homography": [
                         [
-                            0.2784995948000991,
-                            -0.36672312958073083,
-                            55.3201138325423
+                            -1.1688799168098072,
+                            -0.767617191288967,
+                            501.9382405556856
                         ],
                         [
-                            0.07308980411026318,
-                            0.1952707244068111,
-                            -39.006298370474774
+                            -0.5432478052979041,
+                            -0.622802709012029,
+                            282.62164373310543
                         ],
                         [
-                            -0.0005998351109673445,
-                            -0.003509828003522816,
+                            -0.0023117776209215014,
+                            -0.0017870675470659707,
                             1.0
                         ]
                     ],
-                    "transform": "benchmarks\\registration_benchmark_output\\region_001\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
-                    "registered_raster": "benchmarks\\registration_benchmark_output\\region_001\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
-                    "registered_geotiff": "benchmarks\\registration_benchmark_output\\region_001\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
-                    "checkerboard_qa": "benchmarks\\registration_benchmark_output\\region_001\\triplet_cycle\\composed_checkerboard_qa.png",
-                    "manifest": "benchmarks\\registration_benchmark_output\\region_001\\triplet_cycle\\registered_products_manifest.json"
+                    "transform": "benchmarks/registration_benchmark_output/region_001/triplet_cycle/composed_ohrc_to_iirs_transform.json",
+                    "registered_raster": "benchmarks/registration_benchmark_output/region_001/triplet_cycle/composed_registered_ohrc_to_iirs.png",
+                    "registered_geotiff": "benchmarks/registration_benchmark_output/region_001/triplet_cycle/composed_registered_ohrc_to_iirs.tif",
+                    "checkerboard_qa": "benchmarks/registration_benchmark_output/region_001/triplet_cycle/composed_checkerboard_qa.png"
                 }
             },
             "tmc_iirs": {
@@ -100,20 +99,20 @@
                     "spatial_uniformity": 0.0
                 },
                 "reverse_iirs_to_tmc": {
-                    "status": "geometric_verification_failed",
-                    "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                    "status": "success",
+                    "message": null,
                     "direction": "native",
                     "measured_direction": null,
-                    "quality_tier": "FAILED",
-                    "match_count": 128,
+                    "quality_tier": "LOW_CONFIDENCE",
+                    "match_count": 74,
                     "inlier_count": 6,
-                    "inlier_ratio": 0.0,
-                    "fit_rmse_px": null,
-                    "spatial_coverage": 0.0,
-                    "spatial_uniformity": 0.0
+                    "inlier_ratio": 0.0811,
+                    "fit_rmse_px": 1.3444,
+                    "spatial_coverage": 0.25,
+                    "spatial_uniformity": 0.1339
                 },
-                "bidirectional_agreement": false,
-                "directional_note": "Forward (TMC->IIRS) produced 'success' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
+                "bidirectional_agreement": true,
+                "directional_note": null
             }
         },
         "triplet_consistency": {
@@ -129,151 +128,25 @@
         "region_id": "region_002",
         "dataset_id": "region_002",
         "status": "evaluated",
-        "num_inliers": 7,
-        "num_raw_matches": 66,
-        "inlier_ratio": 0.1061,
-        "rmse_px": 1.2421,
-        "fit_rmse_px": 1.2421,
-        "validation_rmse_px": null,
-        "validation_status": "insufficient_points_for_holdout",
-        "mean_reprojection_error_px": 1.1224,
-        "median_reprojection_error_px": 1.1438,
-        "max_reprojection_error_px": 1.8858,
-        "sub_pixel_accurate": false,
-        "fraction_below_1px": 0.4286,
-        "source_coverage_ratio": 0.07,
-        "destination_coverage_ratio": 0.07,
-        "combined_coverage_score": 0.07,
-        "source_occupied_cells": 7,
-        "destination_occupied_cells": 7,
-        "total_cells": 100,
-        "uniformity_score": 0.0235,
-        "quality_tier": "LOW_CONFIDENCE",
-        "method": "CFOG + Phase Congruency",
-        "pairs": {
-            "ohrc_tmc": {
-                "status": "success",
-                "message": null,
-                "direction": "native",
-                "measured_direction": null,
-                "quality_tier": "LOW_CONFIDENCE",
-                "match_count": 66,
-                "inlier_count": 7,
-                "inlier_ratio": 0.1061,
-                "fit_rmse_px": 1.2421,
-                "spatial_coverage": 0.07,
-                "spatial_uniformity": 0.0235
-            },
-            "ohrc_iirs": {
-                "status": "composed",
-                "inlier_count": 0,
-                "fit_rmse_px": 0.0,
-                "forward_ohrc_to_iirs": {
-                    "status": "composed",
-                    "message": null,
-                    "quality_tier": "COMPOSED_CHAIN",
-                    "match_count": 0,
-                    "inlier_count": 0,
-                    "inlier_ratio": 1.0,
-                    "fit_rmse_px": 0.0,
-                    "spatial_coverage": 1.0,
-                    "spatial_uniformity": 1.0
-                },
-                "reverse_iirs_to_ohrc": null,
-                "bidirectional_agreement": true,
-                "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
-                "composition": {
-                    "source": "A -> B -> C",
-                    "homography": [
-                        [
-                            1.5085406352347532,
-                            0.17768312933303843,
-                            -198.8099629155653
-                        ],
-                        [
-                            -0.1776831293330384,
-                            1.508540635234753,
-                            26.818235439145607
-                        ],
-                        [
-                            0.0,
-                            -2.7383303595967524e-20,
-                            1.0
-                        ]
-                    ],
-                    "transform": "benchmarks\\registration_benchmark_output\\region_002\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
-                    "registered_raster": "benchmarks\\registration_benchmark_output\\region_002\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
-                    "registered_geotiff": "benchmarks\\registration_benchmark_output\\region_002\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
-                    "checkerboard_qa": "benchmarks\\registration_benchmark_output\\region_002\\triplet_cycle\\composed_checkerboard_qa.png",
-                    "manifest": "benchmarks\\registration_benchmark_output\\region_002\\triplet_cycle\\registered_products_manifest.json"
-                }
-            },
-            "tmc_iirs": {
-                "status": "success",
-                "inlier_count": 0,
-                "fit_rmse_px": null,
-                "forward_tmc_to_iirs": {
-                    "status": "success",
-                    "message": null,
-                    "direction": "native",
-                    "measured_direction": null,
-                    "quality_tier": "LOW_CONFIDENCE",
-                    "match_count": 0,
-                    "inlier_count": 0,
-                    "inlier_ratio": 0.0,
-                    "fit_rmse_px": null,
-                    "spatial_coverage": 0.0,
-                    "spatial_uniformity": 0.0
-                },
-                "reverse_iirs_to_tmc": {
-                    "status": "geometric_verification_failed",
-                    "message": "Robust geometric verification failed to estimate a valid transformation from verified correspondences.",
-                    "direction": "native",
-                    "measured_direction": null,
-                    "quality_tier": "FAILED",
-                    "match_count": 143,
-                    "inlier_count": 3,
-                    "inlier_ratio": 0.0,
-                    "fit_rmse_px": null,
-                    "spatial_coverage": 0.0,
-                    "spatial_uniformity": 0.0
-                },
-                "bidirectional_agreement": false,
-                "directional_note": "Forward (TMC->IIRS) produced 'success' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
-            }
-        },
-        "triplet_consistency": {
-            "status": "evaluated_composed",
-            "reason": null,
-            "cycle_rmse_px": 0.0,
-            "cycle_mean_px": 0.0,
-            "cycle_closed_successfully": true,
-            "failed_legs": []
-        }
-    },
-    {
-        "region_id": "region_003",
-        "dataset_id": "region_003",
-        "status": "evaluated",
         "num_inliers": 6,
-        "num_raw_matches": 77,
-        "inlier_ratio": 0.0779,
-        "rmse_px": 1.7724,
-        "fit_rmse_px": 1.7724,
+        "num_raw_matches": 43,
+        "inlier_ratio": 0.1395,
+        "rmse_px": 1.7868,
+        "fit_rmse_px": 1.7868,
         "validation_rmse_px": null,
         "validation_status": "insufficient_points_for_holdout",
-        "mean_reprojection_error_px": 1.556,
-        "median_reprojection_error_px": 1.8446,
-        "max_reprojection_error_px": 2.4277,
+        "mean_reprojection_error_px": 1.6185,
+        "median_reprojection_error_px": 1.5317,
+        "max_reprojection_error_px": 2.6395,
         "sub_pixel_accurate": false,
         "fraction_below_1px": 0.3333,
-        "source_coverage_ratio": 0.06,
-        "destination_coverage_ratio": 0.06,
-        "combined_coverage_score": 0.06,
+        "source_coverage_ratio": 0.3125,
+        "destination_coverage_ratio": 0.3125,
+        "combined_coverage_score": 0.3125,
         "source_occupied_cells": 6,
         "destination_occupied_cells": 6,
         "total_cells": 100,
-        "uniformity_score": 0.0183,
+        "uniformity_score": 0.1935,
         "quality_tier": "LOW_CONFIDENCE",
         "method": "CFOG + Phase Congruency",
         "pairs": {
@@ -283,264 +156,12 @@
                 "direction": "native",
                 "measured_direction": null,
                 "quality_tier": "LOW_CONFIDENCE",
-                "match_count": 77,
+                "match_count": 43,
                 "inlier_count": 6,
-                "inlier_ratio": 0.0779,
-                "fit_rmse_px": 1.7724,
-                "spatial_coverage": 0.06,
-                "spatial_uniformity": 0.0183
-            },
-            "ohrc_iirs": {
-                "status": "composed",
-                "inlier_count": 0,
-                "fit_rmse_px": 0.0,
-                "forward_ohrc_to_iirs": {
-                    "status": "composed",
-                    "message": null,
-                    "quality_tier": "COMPOSED_CHAIN",
-                    "match_count": 0,
-                    "inlier_count": 0,
-                    "inlier_ratio": 1.0,
-                    "fit_rmse_px": 0.0,
-                    "spatial_coverage": 1.0,
-                    "spatial_uniformity": 1.0
-                },
-                "reverse_iirs_to_ohrc": null,
-                "bidirectional_agreement": true,
-                "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
-                "composition": {
-                    "source": "A -> B -> C",
-                    "homography": [
-                        [
-                            -1.159114943987001,
-                            0.5657978037354202,
-                            48.22585009258398
-                        ],
-                        [
-                            -0.8345978142449727,
-                            -1.7619552070253557,
-                            1243.4725478307992
-                        ],
-                        [
-                            -0.0012860658774098129,
-                            -0.00047142577592714424,
-                            1.0
-                        ]
-                    ],
-                    "transform": "benchmarks\\registration_benchmark_output\\region_003\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
-                    "registered_raster": "benchmarks\\registration_benchmark_output\\region_003\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
-                    "registered_geotiff": "benchmarks\\registration_benchmark_output\\region_003\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
-                    "checkerboard_qa": "benchmarks\\registration_benchmark_output\\region_003\\triplet_cycle\\composed_checkerboard_qa.png",
-                    "manifest": "benchmarks\\registration_benchmark_output\\region_003\\triplet_cycle\\registered_products_manifest.json"
-                }
-            },
-            "tmc_iirs": {
-                "status": "success",
-                "inlier_count": 4,
-                "fit_rmse_px": 0.2782,
-                "forward_tmc_to_iirs": {
-                    "status": "success",
-                    "message": null,
-                    "direction": "native",
-                    "measured_direction": null,
-                    "quality_tier": "LOW_CONFIDENCE",
-                    "match_count": 133,
-                    "inlier_count": 4,
-                    "inlier_ratio": 0.0301,
-                    "fit_rmse_px": 0.2782,
-                    "spatial_coverage": 0.02,
-                    "spatial_uniformity": 0.0019
-                },
-                "reverse_iirs_to_tmc": {
-                    "status": "success",
-                    "message": null,
-                    "direction": "native",
-                    "measured_direction": null,
-                    "quality_tier": "LOW_CONFIDENCE",
-                    "match_count": 133,
-                    "inlier_count": 4,
-                    "inlier_ratio": 0.0301,
-                    "fit_rmse_px": 0.0664,
-                    "spatial_coverage": 0.04,
-                    "spatial_uniformity": 0.0092
-                },
-                "bidirectional_agreement": true,
-                "directional_note": null
-            }
-        },
-        "triplet_consistency": {
-            "status": "evaluated_composed",
-            "reason": null,
-            "cycle_rmse_px": 0.0,
-            "cycle_mean_px": 0.0,
-            "cycle_closed_successfully": true,
-            "failed_legs": []
-        }
-    },
-    {
-        "region_id": "region_004",
-        "dataset_id": "region_004",
-        "status": "evaluated",
-        "num_inliers": 7,
-        "num_raw_matches": 70,
-        "inlier_ratio": 0.1,
-        "rmse_px": 1.7787,
-        "fit_rmse_px": 1.7787,
-        "validation_rmse_px": null,
-        "validation_status": "insufficient_points_for_holdout",
-        "mean_reprojection_error_px": 1.6296,
-        "median_reprojection_error_px": 1.7089,
-        "max_reprojection_error_px": 2.7278,
-        "sub_pixel_accurate": false,
-        "fraction_below_1px": 0.2857,
-        "source_coverage_ratio": 0.07,
-        "destination_coverage_ratio": 0.07,
-        "combined_coverage_score": 0.07,
-        "source_occupied_cells": 7,
-        "destination_occupied_cells": 7,
-        "total_cells": 100,
-        "uniformity_score": 0.0235,
-        "quality_tier": "LOW_CONFIDENCE",
-        "method": "CFOG + Phase Congruency",
-        "pairs": {
-            "ohrc_tmc": {
-                "status": "success",
-                "message": null,
-                "direction": "native",
-                "measured_direction": null,
-                "quality_tier": "LOW_CONFIDENCE",
-                "match_count": 70,
-                "inlier_count": 7,
-                "inlier_ratio": 0.1,
-                "fit_rmse_px": 1.7787,
-                "spatial_coverage": 0.07,
-                "spatial_uniformity": 0.0235
-            },
-            "ohrc_iirs": {
-                "status": "composed",
-                "inlier_count": 0,
-                "fit_rmse_px": 0.0,
-                "forward_ohrc_to_iirs": {
-                    "status": "composed",
-                    "message": null,
-                    "quality_tier": "COMPOSED_CHAIN",
-                    "match_count": 0,
-                    "inlier_count": 0,
-                    "inlier_ratio": 1.0,
-                    "fit_rmse_px": 0.0,
-                    "spatial_coverage": 1.0,
-                    "spatial_uniformity": 1.0
-                },
-                "reverse_iirs_to_ohrc": null,
-                "bidirectional_agreement": true,
-                "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
-                "composition": {
-                    "source": "A -> B -> C",
-                    "homography": [
-                        [
-                            11.653894908060485,
-                            -5.4623641155093585,
-                            102.06706090905678
-                        ],
-                        [
-                            -5.377950681626991,
-                            11.181246245760475,
-                            -1034.23012394495
-                        ],
-                        [
-                            0.021513347076717655,
-                            -0.009850828493355222,
-                            1.0
-                        ]
-                    ],
-                    "transform": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
-                    "registered_raster": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
-                    "registered_geotiff": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
-                    "checkerboard_qa": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\composed_checkerboard_qa.png",
-                    "manifest": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\registered_products_manifest.json"
-                }
-            },
-            "tmc_iirs": {
-                "status": "success",
-                "inlier_count": 7,
-                "fit_rmse_px": 22.714,
-                "forward_tmc_to_iirs": {
-                    "status": "success",
-                    "message": null,
-                    "direction": "native",
-                    "measured_direction": null,
-                    "quality_tier": "LOW_CONFIDENCE",
-                    "match_count": 131,
-                    "inlier_count": 7,
-                    "inlier_ratio": 0.0534,
-                    "fit_rmse_px": 22.714,
-                    "spatial_coverage": 0.04,
-                    "spatial_uniformity": 0.0063
-                },
-                "reverse_iirs_to_tmc": {
-                    "status": "success",
-                    "message": null,
-                    "direction": "native",
-                    "measured_direction": null,
-                    "quality_tier": "LOW_CONFIDENCE",
-                    "match_count": 131,
-                    "inlier_count": 7,
-                    "inlier_ratio": 0.0534,
-                    "fit_rmse_px": 2.3419,
-                    "spatial_coverage": 0.07,
-                    "spatial_uniformity": 0.0235
-                },
-                "bidirectional_agreement": true,
-                "directional_note": null
-            }
-        },
-        "triplet_consistency": {
-            "status": "evaluated_composed",
-            "reason": null,
-            "cycle_rmse_px": 0.0,
-            "cycle_mean_px": 0.0,
-            "cycle_closed_successfully": true,
-            "failed_legs": []
-        }
-    },
-    {
-        "region_id": "region_005",
-        "dataset_id": "region_005",
-        "status": "evaluated",
-        "num_inliers": 6,
-        "num_raw_matches": 45,
-        "inlier_ratio": 0.1333,
-        "rmse_px": 1.4022,
-        "fit_rmse_px": 1.4022,
-        "validation_rmse_px": null,
-        "validation_status": "insufficient_points_for_holdout",
-        "mean_reprojection_error_px": 1.1478,
-        "median_reprojection_error_px": 0.9084,
-        "max_reprojection_error_px": 2.3575,
-        "sub_pixel_accurate": false,
-        "fraction_below_1px": 0.5,
-        "source_coverage_ratio": 0.06,
-        "destination_coverage_ratio": 0.06,
-        "combined_coverage_score": 0.06,
-        "source_occupied_cells": 6,
-        "destination_occupied_cells": 6,
-        "total_cells": 100,
-        "uniformity_score": 0.0183,
-        "quality_tier": "LOW_CONFIDENCE",
-        "method": "CFOG + Phase Congruency",
-        "pairs": {
-            "ohrc_tmc": {
-                "status": "success",
-                "message": null,
-                "direction": "native",
-                "measured_direction": null,
-                "quality_tier": "LOW_CONFIDENCE",
-                "match_count": 45,
-                "inlier_count": 6,
-                "inlier_ratio": 0.1333,
-                "fit_rmse_px": 1.4022,
-                "spatial_coverage": 0.06,
-                "spatial_uniformity": 0.0183
+                "inlier_ratio": 0.1395,
+                "fit_rmse_px": 1.7868,
+                "spatial_coverage": 0.3125,
+                "spatial_uniformity": 0.1935
             },
             "ohrc_iirs": {
                 "status": "composition_not_computable",
@@ -585,8 +206,343 @@
                     "direction": "native",
                     "measured_direction": null,
                     "quality_tier": "FAILED",
-                    "match_count": 114,
+                    "match_count": 81,
+                    "inlier_count": 4,
+                    "inlier_ratio": 0.0,
+                    "fit_rmse_px": null,
+                    "spatial_coverage": 0.0,
+                    "spatial_uniformity": 0.0
+                },
+                "bidirectional_agreement": false,
+                "directional_note": "Forward (TMC->IIRS) produced 'failed' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
+            }
+        },
+        "triplet_consistency": {
+            "status": "cycle_not_computable",
+            "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+            "cycle_rmse_px": null,
+            "cycle_mean_px": null,
+            "cycle_closed_successfully": false,
+            "failed_legs": [
+                "BC (B -> C)",
+                "CA (C -> A)"
+            ]
+        }
+    },
+    {
+        "region_id": "region_003",
+        "dataset_id": "region_003",
+        "status": "evaluated",
+        "num_inliers": 6,
+        "num_raw_matches": 44,
+        "inlier_ratio": 0.1364,
+        "rmse_px": 0.9941,
+        "fit_rmse_px": 0.9941,
+        "validation_rmse_px": null,
+        "validation_status": "insufficient_points_for_holdout",
+        "mean_reprojection_error_px": 0.8974,
+        "median_reprojection_error_px": 0.7802,
+        "max_reprojection_error_px": 1.6475,
+        "sub_pixel_accurate": false,
+        "fraction_below_1px": 0.6667,
+        "source_coverage_ratio": 0.375,
+        "destination_coverage_ratio": 0.375,
+        "combined_coverage_score": 0.375,
+        "source_occupied_cells": 6,
+        "destination_occupied_cells": 6,
+        "total_cells": 100,
+        "uniformity_score": 0.2546,
+        "quality_tier": "LOW_CONFIDENCE",
+        "method": "CFOG + Phase Congruency",
+        "pairs": {
+            "ohrc_tmc": {
+                "status": "success",
+                "message": null,
+                "direction": "native",
+                "measured_direction": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 44,
+                "inlier_count": 6,
+                "inlier_ratio": 0.1364,
+                "fit_rmse_px": 0.9941,
+                "spatial_coverage": 0.375,
+                "spatial_uniformity": 0.2546
+            },
+            "ohrc_iirs": {
+                "status": "composition_not_computable",
+                "inlier_count": 0,
+                "fit_rmse_px": null,
+                "forward_ohrc_to_iirs": {
+                    "status": "composition_not_computable",
+                    "message": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+                    "quality_tier": "FAILED",
+                    "match_count": 0,
+                    "inlier_count": 0,
+                    "inlier_ratio": 0.0,
+                    "fit_rmse_px": null,
+                    "spatial_coverage": 0.0,
+                    "spatial_uniformity": 0.0
+                },
+                "reverse_iirs_to_ohrc": null,
+                "bidirectional_agreement": false,
+                "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
+                "composition": null
+            },
+            "tmc_iirs": {
+                "status": "failed",
+                "inlier_count": 0,
+                "fit_rmse_px": null,
+                "forward_tmc_to_iirs": {
+                    "status": "failed",
+                    "message": null,
+                    "direction": "native",
+                    "measured_direction": null,
+                    "quality_tier": "FAILED",
+                    "match_count": 0,
+                    "inlier_count": 0,
+                    "inlier_ratio": 0.0,
+                    "fit_rmse_px": null,
+                    "spatial_coverage": 0.0,
+                    "spatial_uniformity": 0.0
+                },
+                "reverse_iirs_to_tmc": {
+                    "status": "geometric_verification_failed",
+                    "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                    "direction": "native",
+                    "measured_direction": null,
+                    "quality_tier": "FAILED",
+                    "match_count": 79,
+                    "inlier_count": 4,
+                    "inlier_ratio": 0.0,
+                    "fit_rmse_px": null,
+                    "spatial_coverage": 0.0,
+                    "spatial_uniformity": 0.0
+                },
+                "bidirectional_agreement": false,
+                "directional_note": "Forward (TMC->IIRS) produced 'failed' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
+            }
+        },
+        "triplet_consistency": {
+            "status": "cycle_not_computable",
+            "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+            "cycle_rmse_px": null,
+            "cycle_mean_px": null,
+            "cycle_closed_successfully": false,
+            "failed_legs": [
+                "BC (B -> C)",
+                "CA (C -> A)"
+            ]
+        }
+    },
+    {
+        "region_id": "region_004",
+        "dataset_id": "region_004",
+        "status": "evaluated",
+        "num_inliers": 6,
+        "num_raw_matches": 39,
+        "inlier_ratio": 0.1538,
+        "rmse_px": 1.8329,
+        "fit_rmse_px": 1.8329,
+        "validation_rmse_px": null,
+        "validation_status": "insufficient_points_for_holdout",
+        "mean_reprojection_error_px": 1.5804,
+        "median_reprojection_error_px": 2.0797,
+        "max_reprojection_error_px": 2.4585,
+        "sub_pixel_accurate": false,
+        "fraction_below_1px": 0.3333,
+        "source_coverage_ratio": 0.3125,
+        "destination_coverage_ratio": 0.3125,
+        "combined_coverage_score": 0.3125,
+        "source_occupied_cells": 6,
+        "destination_occupied_cells": 6,
+        "total_cells": 100,
+        "uniformity_score": 0.1935,
+        "quality_tier": "LOW_CONFIDENCE",
+        "method": "CFOG + Phase Congruency",
+        "pairs": {
+            "ohrc_tmc": {
+                "status": "success",
+                "message": null,
+                "direction": "native",
+                "measured_direction": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 39,
+                "inlier_count": 6,
+                "inlier_ratio": 0.1538,
+                "fit_rmse_px": 1.8329,
+                "spatial_coverage": 0.3125,
+                "spatial_uniformity": 0.1935
+            },
+            "ohrc_iirs": {
+                "status": "composed",
+                "inlier_count": 0,
+                "fit_rmse_px": 0.0,
+                "forward_ohrc_to_iirs": {
+                    "status": "composed",
+                    "message": null,
+                    "quality_tier": "COMPOSED_CHAIN",
+                    "match_count": 0,
+                    "inlier_count": 0,
+                    "inlier_ratio": 1.0,
+                    "fit_rmse_px": 0.0,
+                    "spatial_coverage": 1.0,
+                    "spatial_uniformity": 1.0
+                },
+                "reverse_iirs_to_ohrc": null,
+                "bidirectional_agreement": true,
+                "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
+                "composition": {
+                    "source": "A -> B -> C",
+                    "homography": [
+                        [
+                            0.9328724507764455,
+                            -0.10068805902310597,
+                            45.685747618752075
+                        ],
+                        [
+                            0.00012725508945843946,
+                            1.0513045669953356,
+                            -20.424490979005675
+                        ],
+                        [
+                            -0.00014499984756267186,
+                            -5.187728855649676e-05,
+                            1.0
+                        ]
+                    ],
+                    "transform": "benchmarks/registration_benchmark_output/region_004/triplet_cycle/composed_ohrc_to_iirs_transform.json",
+                    "registered_raster": "benchmarks/registration_benchmark_output/region_004/triplet_cycle/composed_registered_ohrc_to_iirs.png",
+                    "registered_geotiff": "benchmarks/registration_benchmark_output/region_004/triplet_cycle/composed_registered_ohrc_to_iirs.tif",
+                    "checkerboard_qa": "benchmarks/registration_benchmark_output/region_004/triplet_cycle/composed_checkerboard_qa.png"
+                }
+            },
+            "tmc_iirs": {
+                "status": "success",
+                "inlier_count": 0,
+                "fit_rmse_px": null,
+                "forward_tmc_to_iirs": {
+                    "status": "success",
+                    "message": null,
+                    "direction": "native",
+                    "measured_direction": null,
+                    "quality_tier": "LOW_CONFIDENCE",
+                    "match_count": 0,
+                    "inlier_count": 0,
+                    "inlier_ratio": 0.0,
+                    "fit_rmse_px": null,
+                    "spatial_coverage": 0.0,
+                    "spatial_uniformity": 0.0
+                },
+                "reverse_iirs_to_tmc": {
+                    "status": "geometric_verification_failed",
+                    "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                    "direction": "native",
+                    "measured_direction": null,
+                    "quality_tier": "FAILED",
+                    "match_count": 76,
                     "inlier_count": 6,
+                    "inlier_ratio": 0.0,
+                    "fit_rmse_px": null,
+                    "spatial_coverage": 0.0,
+                    "spatial_uniformity": 0.0
+                },
+                "bidirectional_agreement": false,
+                "directional_note": "Forward (TMC->IIRS) produced 'success' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
+            }
+        },
+        "triplet_consistency": {
+            "status": "evaluated_composed",
+            "reason": null,
+            "cycle_rmse_px": 0.0,
+            "cycle_mean_px": 0.0,
+            "cycle_closed_successfully": true,
+            "failed_legs": []
+        }
+    },
+    {
+        "region_id": "region_005",
+        "dataset_id": "region_005",
+        "status": "evaluated",
+        "num_inliers": 6,
+        "num_raw_matches": 26,
+        "inlier_ratio": 0.2308,
+        "rmse_px": 1.7699,
+        "fit_rmse_px": 1.7699,
+        "validation_rmse_px": null,
+        "validation_status": "insufficient_points_for_holdout",
+        "mean_reprojection_error_px": 1.6499,
+        "median_reprojection_error_px": 1.5571,
+        "max_reprojection_error_px": 2.5783,
+        "sub_pixel_accurate": false,
+        "fraction_below_1px": 0.1667,
+        "source_coverage_ratio": 0.3125,
+        "destination_coverage_ratio": 0.3125,
+        "combined_coverage_score": 0.3125,
+        "source_occupied_cells": 6,
+        "destination_occupied_cells": 6,
+        "total_cells": 100,
+        "uniformity_score": 0.1935,
+        "quality_tier": "LOW_CONFIDENCE",
+        "method": "CFOG + Phase Congruency",
+        "pairs": {
+            "ohrc_tmc": {
+                "status": "success",
+                "message": null,
+                "direction": "native",
+                "measured_direction": null,
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 26,
+                "inlier_count": 6,
+                "inlier_ratio": 0.2308,
+                "fit_rmse_px": 1.7699,
+                "spatial_coverage": 0.3125,
+                "spatial_uniformity": 0.1935
+            },
+            "ohrc_iirs": {
+                "status": "composition_not_computable",
+                "inlier_count": 0,
+                "fit_rmse_px": null,
+                "forward_ohrc_to_iirs": {
+                    "status": "composition_not_computable",
+                    "message": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+                    "quality_tier": "FAILED",
+                    "match_count": 0,
+                    "inlier_count": 0,
+                    "inlier_ratio": 0.0,
+                    "fit_rmse_px": null,
+                    "spatial_coverage": 0.0,
+                    "spatial_uniformity": 0.0
+                },
+                "reverse_iirs_to_ohrc": null,
+                "bidirectional_agreement": false,
+                "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
+                "composition": null
+            },
+            "tmc_iirs": {
+                "status": "failed",
+                "inlier_count": 0,
+                "fit_rmse_px": null,
+                "forward_tmc_to_iirs": {
+                    "status": "failed",
+                    "message": null,
+                    "direction": "native",
+                    "measured_direction": null,
+                    "quality_tier": "FAILED",
+                    "match_count": 0,
+                    "inlier_count": 0,
+                    "inlier_ratio": 0.0,
+                    "fit_rmse_px": null,
+                    "spatial_coverage": 0.0,
+                    "spatial_uniformity": 0.0
+                },
+                "reverse_iirs_to_tmc": {
+                    "status": "geometric_verification_failed",
+                    "message": "Robust geometric verification failed to estimate a valid transformation from verified correspondences.",
+                    "direction": "native",
+                    "measured_direction": null,
+                    "quality_tier": "FAILED",
+                    "match_count": 64,
+                    "inlier_count": 3,
                     "inlier_ratio": 0.0,
                     "fit_rmse_px": null,
                     "spatial_coverage": 0.0,
@@ -613,24 +569,24 @@
         "dataset_id": "region_006",
         "status": "evaluated",
         "num_inliers": 6,
-        "num_raw_matches": 56,
-        "inlier_ratio": 0.1071,
-        "rmse_px": 1.6526,
-        "fit_rmse_px": 1.6526,
+        "num_raw_matches": 37,
+        "inlier_ratio": 0.1622,
+        "rmse_px": 1.296,
+        "fit_rmse_px": 1.296,
         "validation_rmse_px": null,
         "validation_status": "insufficient_points_for_holdout",
-        "mean_reprojection_error_px": 1.3507,
-        "median_reprojection_error_px": 0.8588,
-        "max_reprojection_error_px": 3.3064,
+        "mean_reprojection_error_px": 1.2129,
+        "median_reprojection_error_px": 1.2084,
+        "max_reprojection_error_px": 1.7929,
         "sub_pixel_accurate": false,
-        "fraction_below_1px": 0.6667,
-        "source_coverage_ratio": 0.06,
-        "destination_coverage_ratio": 0.06,
-        "combined_coverage_score": 0.06,
+        "fraction_below_1px": 0.3333,
+        "source_coverage_ratio": 0.375,
+        "destination_coverage_ratio": 0.375,
+        "combined_coverage_score": 0.375,
         "source_occupied_cells": 6,
         "destination_occupied_cells": 6,
         "total_cells": 100,
-        "uniformity_score": 0.0183,
+        "uniformity_score": 0.2546,
         "quality_tier": "LOW_CONFIDENCE",
         "method": "CFOG + Phase Congruency",
         "pairs": {
@@ -640,138 +596,12 @@
                 "direction": "native",
                 "measured_direction": null,
                 "quality_tier": "LOW_CONFIDENCE",
-                "match_count": 56,
+                "match_count": 37,
                 "inlier_count": 6,
-                "inlier_ratio": 0.1071,
-                "fit_rmse_px": 1.6526,
-                "spatial_coverage": 0.06,
-                "spatial_uniformity": 0.0183
-            },
-            "ohrc_iirs": {
-                "status": "composed",
-                "inlier_count": 0,
-                "fit_rmse_px": 0.0,
-                "forward_ohrc_to_iirs": {
-                    "status": "composed",
-                    "message": null,
-                    "quality_tier": "COMPOSED_CHAIN",
-                    "match_count": 0,
-                    "inlier_count": 0,
-                    "inlier_ratio": 1.0,
-                    "fit_rmse_px": 0.0,
-                    "spatial_coverage": 1.0,
-                    "spatial_uniformity": 1.0
-                },
-                "reverse_iirs_to_ohrc": null,
-                "bidirectional_agreement": true,
-                "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
-                "composition": {
-                    "source": "A -> B -> C",
-                    "homography": [
-                        [
-                            -1.66594616138492,
-                            8.60712463442446,
-                            -778.9477615792601
-                        ],
-                        [
-                            -5.69061010183406,
-                            -3.046300087016987,
-                            4232.777616584097
-                        ],
-                        [
-                            0.0034666489123122033,
-                            0.0016131829019429866,
-                            1.0
-                        ]
-                    ],
-                    "transform": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
-                    "registered_raster": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
-                    "registered_geotiff": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
-                    "checkerboard_qa": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\composed_checkerboard_qa.png",
-                    "manifest": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\registered_products_manifest.json"
-                }
-            },
-            "tmc_iirs": {
-                "status": "success",
-                "inlier_count": 4,
-                "fit_rmse_px": 3.9935,
-                "forward_tmc_to_iirs": {
-                    "status": "success",
-                    "message": null,
-                    "direction": "native",
-                    "measured_direction": null,
-                    "quality_tier": "LOW_CONFIDENCE",
-                    "match_count": 120,
-                    "inlier_count": 4,
-                    "inlier_ratio": 0.0333,
-                    "fit_rmse_px": 3.9935,
-                    "spatial_coverage": 0.04,
-                    "spatial_uniformity": 0.0092
-                },
-                "reverse_iirs_to_tmc": {
-                    "status": "success",
-                    "message": null,
-                    "direction": "native",
-                    "measured_direction": null,
-                    "quality_tier": "LOW_CONFIDENCE",
-                    "match_count": 120,
-                    "inlier_count": 4,
-                    "inlier_ratio": 0.0333,
-                    "fit_rmse_px": 0.9126,
-                    "spatial_coverage": 0.04,
-                    "spatial_uniformity": 0.0092
-                },
-                "bidirectional_agreement": true,
-                "directional_note": null
-            }
-        },
-        "triplet_consistency": {
-            "status": "evaluated_composed",
-            "reason": null,
-            "cycle_rmse_px": 0.0,
-            "cycle_mean_px": 0.0,
-            "cycle_closed_successfully": true,
-            "failed_legs": []
-        }
-    },
-    {
-        "region_id": "triplet_01_ch2_ohr_ncp_202",
-        "dataset_id": "triplet_01_ch2_ohr_ncp_202",
-        "status": "evaluated",
-        "num_inliers": 7,
-        "num_raw_matches": 97,
-        "inlier_ratio": 0.0722,
-        "rmse_px": 2.1959,
-        "fit_rmse_px": 2.1959,
-        "validation_rmse_px": null,
-        "validation_status": "insufficient_points_for_holdout",
-        "mean_reprojection_error_px": 1.7904,
-        "median_reprojection_error_px": 1.0978,
-        "max_reprojection_error_px": 3.6746,
-        "sub_pixel_accurate": false,
-        "fraction_below_1px": 0.4286,
-        "source_coverage_ratio": 0.07,
-        "destination_coverage_ratio": 0.07,
-        "combined_coverage_score": 0.07,
-        "source_occupied_cells": 7,
-        "destination_occupied_cells": 7,
-        "total_cells": 100,
-        "uniformity_score": 0.0235,
-        "quality_tier": "LOW_CONFIDENCE",
-        "method": "CFOG + Phase Congruency",
-        "pairs": {
-            "ohrc_tmc": {
-                "status": "success",
-                "message": null,
-                "direction": "native",
-                "measured_direction": null,
-                "quality_tier": "LOW_CONFIDENCE",
-                "match_count": 97,
-                "inlier_count": 7,
-                "inlier_ratio": 0.0722,
-                "fit_rmse_px": 2.1959,
-                "spatial_coverage": 0.07,
-                "spatial_uniformity": 0.0235
+                "inlier_ratio": 0.1622,
+                "fit_rmse_px": 1.296,
+                "spatial_coverage": 0.375,
+                "spatial_uniformity": 0.2546
             },
             "ohrc_iirs": {
                 "status": "composition_not_computable",
@@ -816,8 +646,8 @@
                     "direction": "native",
                     "measured_direction": null,
                     "quality_tier": "FAILED",
-                    "match_count": 130,
-                    "inlier_count": 7,
+                    "match_count": 72,
+                    "inlier_count": 4,
                     "inlier_ratio": 0.0,
                     "fit_rmse_px": null,
                     "spatial_coverage": 0.0,
@@ -840,28 +670,28 @@
         }
     },
     {
-        "region_id": "triplet_new_2022",
-        "dataset_id": "triplet_new_2022",
+        "region_id": "triplet_01_ch2_ohr_ncp_202",
+        "dataset_id": "triplet_01_ch2_ohr_ncp_202",
         "status": "evaluated",
-        "num_inliers": 6,
-        "num_raw_matches": 90,
-        "inlier_ratio": 0.0667,
-        "rmse_px": 2.0658,
-        "fit_rmse_px": 2.0658,
+        "num_inliers": 7,
+        "num_raw_matches": 45,
+        "inlier_ratio": 0.1556,
+        "rmse_px": 1.5468,
+        "fit_rmse_px": 1.5468,
         "validation_rmse_px": null,
         "validation_status": "insufficient_points_for_holdout",
-        "mean_reprojection_error_px": 1.9897,
-        "median_reprojection_error_px": 1.8393,
-        "max_reprojection_error_px": 2.9403,
+        "mean_reprojection_error_px": 1.3957,
+        "median_reprojection_error_px": 1.4735,
+        "max_reprojection_error_px": 2.5807,
         "sub_pixel_accurate": false,
-        "fraction_below_1px": 0.0,
-        "source_coverage_ratio": 0.06,
-        "destination_coverage_ratio": 0.06,
-        "combined_coverage_score": 0.06,
-        "source_occupied_cells": 6,
-        "destination_occupied_cells": 6,
+        "fraction_below_1px": 0.4286,
+        "source_coverage_ratio": 0.4375,
+        "destination_coverage_ratio": 0.4375,
+        "combined_coverage_score": 0.4375,
+        "source_occupied_cells": 7,
+        "destination_occupied_cells": 7,
         "total_cells": 100,
-        "uniformity_score": 0.0183,
+        "uniformity_score": 0.3113,
         "quality_tier": "LOW_CONFIDENCE",
         "method": "CFOG + Phase Congruency",
         "pairs": {
@@ -871,12 +701,137 @@
                 "direction": "native",
                 "measured_direction": null,
                 "quality_tier": "LOW_CONFIDENCE",
-                "match_count": 90,
+                "match_count": 45,
+                "inlier_count": 7,
+                "inlier_ratio": 0.1556,
+                "fit_rmse_px": 1.5468,
+                "spatial_coverage": 0.4375,
+                "spatial_uniformity": 0.3113
+            },
+            "ohrc_iirs": {
+                "status": "composition_not_computable",
+                "inlier_count": 0,
+                "fit_rmse_px": 137.7112,
+                "forward_ohrc_to_iirs": {
+                    "status": "composition_not_computable",
+                    "message": null,
+                    "quality_tier": "FAILED",
+                    "match_count": 0,
+                    "inlier_count": 0,
+                    "inlier_ratio": 0.0,
+                    "fit_rmse_px": 137.7112,
+                    "spatial_coverage": 0.0,
+                    "spatial_uniformity": 0.0
+                },
+                "reverse_iirs_to_ohrc": null,
+                "bidirectional_agreement": false,
+                "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
+                "composition": {
+                    "source": "A -> B -> C",
+                    "homography": [
+                        [
+                            1.560005208370546,
+                            -0.4670415478199706,
+                            188.10179818254034
+                        ],
+                        [
+                            0.8280401162366585,
+                            0.9343487288469035,
+                            -217.61125394607896
+                        ],
+                        [
+                            0.0026604635472497443,
+                            -0.0014315853183681593,
+                            1.0
+                        ]
+                    ],
+                    "transform": "benchmarks/registration_benchmark_output/triplet_01_ch2_ohr_ncp_202/triplet_cycle/composed_ohrc_to_iirs_transform.json",
+                    "registered_raster": "benchmarks/registration_benchmark_output/triplet_01_ch2_ohr_ncp_202/triplet_cycle/composed_registered_ohrc_to_iirs.png",
+                    "registered_geotiff": "benchmarks/registration_benchmark_output/triplet_01_ch2_ohr_ncp_202/triplet_cycle/composed_registered_ohrc_to_iirs.tif",
+                    "checkerboard_qa": "benchmarks/registration_benchmark_output/triplet_01_ch2_ohr_ncp_202/triplet_cycle/composed_checkerboard_qa.png"
+                }
+            },
+            "tmc_iirs": {
+                "status": "success",
                 "inlier_count": 6,
-                "inlier_ratio": 0.0667,
-                "fit_rmse_px": 2.0658,
-                "spatial_coverage": 0.06,
-                "spatial_uniformity": 0.0183
+                "fit_rmse_px": 1.2354,
+                "forward_tmc_to_iirs": {
+                    "status": "success",
+                    "message": null,
+                    "direction": "native",
+                    "measured_direction": null,
+                    "quality_tier": "LOW_CONFIDENCE",
+                    "match_count": 82,
+                    "inlier_count": 6,
+                    "inlier_ratio": 0.0732,
+                    "fit_rmse_px": 1.2354,
+                    "spatial_coverage": 0.3125,
+                    "spatial_uniformity": 0.1935
+                },
+                "reverse_iirs_to_tmc": {
+                    "status": "success",
+                    "message": null,
+                    "direction": "native",
+                    "measured_direction": null,
+                    "quality_tier": "LOW_CONFIDENCE",
+                    "match_count": 82,
+                    "inlier_count": 6,
+                    "inlier_ratio": 0.0732,
+                    "fit_rmse_px": 1.1893,
+                    "spatial_coverage": 0.3125,
+                    "spatial_uniformity": 0.1935
+                },
+                "bidirectional_agreement": true,
+                "directional_note": null
+            }
+        },
+        "triplet_consistency": {
+            "status": "evaluated",
+            "reason": null,
+            "cycle_rmse_px": 137.7112,
+            "cycle_mean_px": 127.6425,
+            "cycle_closed_successfully": false,
+            "failed_legs": []
+        }
+    },
+    {
+        "region_id": "triplet_new_2022",
+        "dataset_id": "triplet_new_2022",
+        "status": "failed",
+        "num_inliers": 0,
+        "num_raw_matches": 0,
+        "inlier_ratio": 0.0,
+        "rmse_px": 0.0,
+        "fit_rmse_px": null,
+        "validation_rmse_px": null,
+        "validation_status": null,
+        "mean_reprojection_error_px": 0.0,
+        "median_reprojection_error_px": 0.0,
+        "max_reprojection_error_px": 0.0,
+        "sub_pixel_accurate": false,
+        "fraction_below_1px": 0.0,
+        "source_coverage_ratio": 0.0,
+        "destination_coverage_ratio": 0.0,
+        "combined_coverage_score": 0.0,
+        "source_occupied_cells": 0,
+        "destination_occupied_cells": 0,
+        "total_cells": 100,
+        "uniformity_score": 0.0,
+        "quality_tier": "FAILED",
+        "method": "CFOG + Phase Congruency",
+        "pairs": {
+            "ohrc_tmc": {
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "direction": "native",
+                "measured_direction": null,
+                "quality_tier": "FAILED",
+                "match_count": 49,
+                "inlier_count": 6,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
             },
             "ohrc_iirs": {
                 "status": "composition_not_computable",
@@ -884,7 +839,7 @@
                 "fit_rmse_px": null,
                 "forward_ohrc_to_iirs": {
                     "status": "composition_not_computable",
-                    "message": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+                    "message": "Missing verified homography for leg(s): AB (A -> B), BC (B -> C), CA (C -> A)",
                     "quality_tier": "FAILED",
                     "match_count": 0,
                     "inlier_count": 0,
@@ -921,8 +876,8 @@
                     "direction": "native",
                     "measured_direction": null,
                     "quality_tier": "FAILED",
-                    "match_count": 115,
-                    "inlier_count": 8,
+                    "match_count": 67,
+                    "inlier_count": 5,
                     "inlier_ratio": 0.0,
                     "fit_rmse_px": null,
                     "spatial_coverage": 0.0,
@@ -934,11 +889,12 @@
         },
         "triplet_consistency": {
             "status": "cycle_not_computable",
-            "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+            "reason": "Missing verified homography for leg(s): AB (A -> B), BC (B -> C), CA (C -> A)",
             "cycle_rmse_px": null,
             "cycle_mean_px": null,
             "cycle_closed_successfully": false,
             "failed_legs": [
+                "AB (A -> B)",
                 "BC (B -> C)",
                 "CA (C -> A)"
             ]

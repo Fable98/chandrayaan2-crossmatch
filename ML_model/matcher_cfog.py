@@ -28,6 +28,11 @@ from metadata import extract_sensor_metadata, SensorMetadata
 from metrics import compute_canonical_metrics, verify_transformation_quality, calculate_reprojection_errors
 from geometry import warp_piecewise_affine, warp_thin_plate_splines, dem_ray_intersection, ransac_dem_aware_fit
 from spectral import enhance_iirs_structural_features, quantify_iirs_residuals
+from spatial_suppression import (
+    detect_salient_keypoints,
+    suppression_via_square_covering,
+    apply_grid_density_budgeting,
+)
 
 logger = logging.getLogger("ML_model.matcher_cfog")
 
@@ -348,10 +353,11 @@ def apply_grid_nms(
     max_per_cell: int = 4,
 ) -> List[Dict[str, Any]] | np.ndarray:
     """
-    Applies Grid-based Non-Maximum Suppression (Grid NMS) to candidate correspondences.
+    Applies Grid-based Non-Maximum Suppression (Grid NMS) and density budgeting to candidate correspondences.
     
     Divides the image area into grid_dims[0] x grid_dims[1] cells (e.g. 10x10).
-    Enforces a strict cap of at most max_per_cell best matches per cell (sorted by confidence/score).
+    Enforces grid density budgeting: actively prioritizes matches from under-represented
+    cells before dense cells receive additional candidate allocations (up to max_per_cell).
     Guarantees uniform spatial distribution across the entire scene and prevents
     clustering exclusively on prominent crater rims.
     """
@@ -359,48 +365,39 @@ def apply_grid_nms(
         return matches
 
     is_dict_list = isinstance(matches, list) and len(matches) > 0 and isinstance(matches[0], dict)
+    if is_dict_list:
+        return apply_grid_density_budgeting(
+            matches,
+            image_shape=image_shape,
+            grid_dims=grid_dims,
+            max_per_cell=max_per_cell,
+        )
+
+    # Array of points or pairs: tiered round-robin density budgeting
     h, w = image_shape[:2]
     gw, gh = grid_dims
     cell_w = max(1.0, float(w) / float(gw))
     cell_h = max(1.0, float(h) / float(gh))
 
     grid_bins: Dict[Tuple[int, int], List[Any]] = {}
+    arr = np.asarray(matches)
+    for i in range(len(arr)):
+        pt = arr[i]
+        x = float(pt[0])
+        y = float(pt[1])
+        gx = min(gw - 1, max(0, int(x / cell_w)))
+        gy = min(gh - 1, max(0, int(y / cell_h)))
+        grid_bins.setdefault((gx, gy), []).append((i, pt))
 
-    if is_dict_list:
-        for m in matches:
-            x = float(m.get("work_x1", m.get("source_x", m.get("image1_x", 0.0))))
-            y = float(m.get("work_y1", m.get("source_y", m.get("image1_y", 0.0))))
-            gx = min(gw - 1, max(0, int(x / cell_w)))
-            gy = min(gh - 1, max(0, int(y / cell_h)))
-            grid_bins.setdefault((gx, gy), []).append(m)
-
-        selected = []
-        for cell_key, items in grid_bins.items():
-            sorted_items = sorted(
-                items,
-                key=lambda it: float(it.get("score", it.get("confidence", 1.0))),
-                reverse=True,
-            )
-            selected.extend(sorted_items[:max_per_cell])
-        return selected
-    else:
-        # Array of points or pairs
-        arr = np.asarray(matches)
-        for i in range(len(arr)):
-            pt = arr[i]
-            x = float(pt[0])
-            y = float(pt[1])
-            gx = min(gw - 1, max(0, int(x / cell_w)))
-            gy = min(gh - 1, max(0, int(y / cell_h)))
-            grid_bins.setdefault((gx, gy), []).append((i, pt))
-
-        selected_indices = []
-        for cell_key, items in grid_bins.items():
-            # Keep at most max_per_cell
-            for idx, _ in items[:max_per_cell]:
-                selected_indices.append(idx)
-        selected_indices.sort()
-        return arr[selected_indices]
+    selected_indices = []
+    occupied_cells = sorted(grid_bins.keys())
+    for round_idx in range(max_per_cell):
+        for cell_key in occupied_cells:
+            items = grid_bins[cell_key]
+            if round_idx < len(items):
+                selected_indices.append(items[round_idx][0])
+    selected_indices.sort()
+    return arr[selected_indices]
 
 
 def verify_spatial_quality_gate(
@@ -1072,10 +1069,97 @@ def match_images_cfog(
         search_half_w = max(16, work_w2 // 6)
         search_half_h = max(16, work_h2 // 6)
 
-    # --- 2b. For multimodal pairs, run centroid matching FIRST (primary strategy) ---
+    # --- 6a. Pre-match Spatial Suppression (ANMS / SSC, Bailo et al. 2018) ---
+    # Detect candidate salient keypoints in BOTH images and apply Suppression via Square Covering (SSC)
+    # so keypoints are selected for maximum spatial spread across the scene rather than clustering on single crater rims.
+    kps1_raw = detect_salient_keypoints(pc1, max_corners=500, quality_level=0.01)
+    kps2_raw = detect_salient_keypoints(pc2, max_corners=500, quality_level=0.01)
+
+    target_ssc = max(36, min(100, grid_size * grid_size * 2))
+    kps1_ssc = suppression_via_square_covering(
+        kps1_raw, num_ret_points=target_ssc, tolerance=0.15, cols=work_w1, rows=work_h1
+    )
+    kps2_ssc = suppression_via_square_covering(
+        kps2_raw, num_ret_points=target_ssc, tolerance=0.15, cols=work_w2, rows=work_h2
+    )
+
+    logger.info(
+        "Pre-match SSC keypoint selection: Image 1: %d -> %d; Image 2: %d -> %d",
+        len(kps1_raw), len(kps1_ssc), len(kps2_raw), len(kps2_ssc),
+    )
+
+    # Correlation matching on spatially uniform pre-match SSC keypoints
+    for kx, ky, _ in kps1_ssc:
+        cx = int(round(kx))
+        cy = int(round(ky))
+
+        if (
+            cy < half_patch_c
+            or cy >= work_h1 - half_patch_c
+            or cx < half_patch_c
+            or cx >= work_w1 - half_patch_c
+        ):
+            continue
+
+        tmpl = pc1[cy - half_patch_c : cy + half_patch_c, cx - half_patch_c : cx + half_patch_c]
+        if float(np.std(tmpl)) < 1e-4:
+            continue
+
+        cx2 = int(cx * (work_w2 / float(work_w1)))
+        cy2 = int(cy * (work_h2 / float(work_h1)))
+
+        s_min_x = max(0, cx2 - search_half_w)
+        s_max_x = min(work_w2, cx2 + search_half_w)
+        s_min_y = max(0, cy2 - search_half_h)
+        s_max_y = min(work_h2, cy2 + search_half_h)
+
+        search_region = pc2[s_min_y:s_max_y, s_min_x:s_max_x]
+        if (
+            search_region.shape[0] <= tmpl.shape[0]
+            or search_region.shape[1] <= tmpl.shape[1]
+            or float(np.std(search_region)) < 1e-4
+        ):
+            continue
+
+        res = cv2.matchTemplate(search_region, tmpl, cv2.TM_CCOEFF_NORMED)
+        _, max_val, _, max_loc = cv2.minMaxLoc(res)
+
+        if multimodal_pair:
+            candidate = search_region[
+                max_loc[1] : max_loc[1] + tmpl.shape[0],
+                max_loc[0] : max_loc[0] + tmpl.shape[1],
+            ]
+            if candidate.shape == tmpl.shape:
+                max_val = mutual_information_score(tmpl, candidate)
+
+        if max_val > (0.05 if multimodal_pair else 0.35):
+            best_x2 = s_min_x + max_loc[0] + half_patch_c
+            best_y2 = s_min_y + max_loc[1] + half_patch_c
+            gx = min(grid_size - 1, int(cx / max(cell_w, 1e-6)))
+            gy = min(grid_size - 1, int(cy / max(cell_h, 1e-6)))
+            coarse_matches.append({
+                "work_x1": float(cx),
+                "work_y1": float(cy),
+                "work_x2": float(best_x2),
+                "work_y2": float(best_y2),
+                "score": float(max_val),
+                "cell": (gx, gy),
+                "method": "ssc_patch",
+            })
+
+    # --- 2b. For multimodal pairs, run centroid matching (with SSC on centroids) ---
     if multimodal_pair:
         centroids1 = detect_blob_centroids(pc1, min_area=2)
         centroids2 = detect_blob_centroids(pc2, min_area=2)
+        if len(centroids1) > 24:
+            c1_tuples = [(float(c[0]), float(c[1]), float(pc1[min(work_h1 - 1, int(c[1])), min(work_w1 - 1, int(c[0]))])) for c in centroids1]
+            c1_ssc = suppression_via_square_covering(c1_tuples, num_ret_points=min(40, len(centroids1)), tolerance=0.1, cols=work_w1, rows=work_h1)
+            centroids1 = np.array([[c[0], c[1]] for c in c1_ssc], dtype=np.float32)
+        if len(centroids2) > 24:
+            c2_tuples = [(float(c[0]), float(c[1]), float(pc2[min(work_h2 - 1, int(c[1])), min(work_w2 - 1, int(c[0]))])) for c in centroids2]
+            c2_ssc = suppression_via_square_covering(c2_tuples, num_ret_points=min(40, len(centroids2)), tolerance=0.1, cols=work_w2, rows=work_h2)
+            centroids2 = np.array([[c[0], c[1]] for c in c2_ssc], dtype=np.float32)
+
         max_distance = max(search_half_w, search_half_h)
         used_c2 = set()
         for x1, y1 in centroids1:
@@ -1178,15 +1262,15 @@ def match_images_cfog(
                     "method": "patch",
                 })
 
-    # Spatial filtering: limit matches per cell to ensure uniform spread
-    cell_bins: Dict[Tuple[int, int], List[Dict[str, Any]]] = {}
-    for m in coarse_matches:
-        cell_bins.setdefault(m["cell"], []).append(m)
-
-    selected_matches: List[Dict[str, Any]] = []
-    for cell_pts in cell_bins.values():
-        cell_pts.sort(key=lambda x: x["score"], reverse=True)
-        selected_matches.extend(cell_pts[:max_matches_per_cell])
+    # --- Step 2: Post-match Grid Density Budgeting (NxN grid, 10x10) ---
+    # Prioritizes keeping candidates from under-represented cells before dense cells
+    # receive additional candidate allocations (tiered round-robin).
+    selected_matches = apply_grid_density_budgeting(
+        coarse_matches,
+        image_shape=(work_h1, work_w1),
+        grid_dims=(10, 10),
+        max_per_cell=max_matches_per_cell,
+    )
 
     # --- Item 4: 4x4 Mandatory Macro-Cell Coverage Enforcement ---
     # Divide source image into 4x4 macro-cells and fill gaps with relaxed-threshold searches.
@@ -1246,17 +1330,17 @@ def match_images_cfog(
         "attempted_cells": len(attempted_cells),
         "total_cells": grid_size * grid_size,
         "attempted_coverage": len(attempted_cells) / float(grid_size * grid_size),
-        "matched_cells": len(cell_bins),
+        "matched_cells": len({m["cell"] for m in selected_matches if "cell" in m}),
         "macro_grid": macro_grid,
         "macro_cells_occupied": len(occupied_macro),
         "mandatory_fill_count": mandatory_fill_count,
     }
 
-    # Enforce Spatial Uniformity via Grid-based Non-Maximum Suppression (Grid NMS)
+    # Enforce Spatial Uniformity via Grid-based Non-Maximum Suppression & Density Budgeting (10x10)
     selected_matches = apply_grid_nms(
         selected_matches,
         image_shape=(work_h1, work_w1),
-        grid_dims=(grid_size, grid_size),
+        grid_dims=(10, 10),
         max_per_cell=max_matches_per_cell,
     )
 

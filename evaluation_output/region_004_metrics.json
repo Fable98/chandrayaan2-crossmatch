@@ -2,25 +2,25 @@
     "region_id": "region_004",
     "dataset_id": "region_004",
     "status": "evaluated",
-    "num_inliers": 7,
-    "num_raw_matches": 70,
-    "inlier_ratio": 0.1,
-    "rmse_px": 1.7787,
-    "fit_rmse_px": 1.7787,
+    "num_inliers": 6,
+    "num_raw_matches": 39,
+    "inlier_ratio": 0.1538,
+    "rmse_px": 1.8329,
+    "fit_rmse_px": 1.8329,
     "validation_rmse_px": null,
     "validation_status": "insufficient_points_for_holdout",
-    "mean_reprojection_error_px": 1.6296,
-    "median_reprojection_error_px": 1.7089,
-    "max_reprojection_error_px": 2.7278,
+    "mean_reprojection_error_px": 1.5804,
+    "median_reprojection_error_px": 2.0797,
+    "max_reprojection_error_px": 2.4585,
     "sub_pixel_accurate": false,
-    "fraction_below_1px": 0.2857,
-    "source_coverage_ratio": 0.07,
-    "destination_coverage_ratio": 0.07,
-    "combined_coverage_score": 0.07,
-    "source_occupied_cells": 7,
-    "destination_occupied_cells": 7,
+    "fraction_below_1px": 0.3333,
+    "source_coverage_ratio": 0.3125,
+    "destination_coverage_ratio": 0.3125,
+    "combined_coverage_score": 0.3125,
+    "source_occupied_cells": 6,
+    "destination_occupied_cells": 6,
     "total_cells": 100,
-    "uniformity_score": 0.0235,
+    "uniformity_score": 0.1935,
     "quality_tier": "LOW_CONFIDENCE",
     "method": "CFOG + Phase Congruency",
     "pairs": {
@@ -30,12 +30,12 @@
             "direction": "native",
             "measured_direction": null,
             "quality_tier": "LOW_CONFIDENCE",
-            "match_count": 70,
-            "inlier_count": 7,
-            "inlier_ratio": 0.1,
-            "fit_rmse_px": 1.7787,
-            "spatial_coverage": 0.07,
-            "spatial_uniformity": 0.0235
+            "match_count": 39,
+            "inlier_count": 6,
+            "inlier_ratio": 0.1538,
+            "fit_rmse_px": 1.8329,
+            "spatial_coverage": 0.3125,
+            "spatial_uniformity": 0.1935
         },
         "ohrc_iirs": {
             "status": "composed",
@@ -59,60 +59,59 @@
                 "source": "A -> B -> C",
                 "homography": [
                     [
-                        11.653894908060485,
-                        -5.4623641155093585,
-                        102.06706090905678
+                        0.9328724507764455,
+                        -0.10068805902310597,
+                        45.685747618752075
                     ],
                     [
-                        -5.377950681626991,
-                        11.181246245760475,
-                        -1034.23012394495
+                        0.00012725508945843946,
+                        1.0513045669953356,
+                        -20.424490979005675
                     ],
                     [
-                        0.021513347076717655,
-                        -0.009850828493355222,
+                        -0.00014499984756267186,
+                        -5.187728855649676e-05,
                         1.0
                     ]
                 ],
-                "transform": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
-                "registered_raster": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
-                "registered_geotiff": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
-                "checkerboard_qa": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\composed_checkerboard_qa.png",
-                "manifest": "benchmarks\\registration_benchmark_output\\region_004\\triplet_cycle\\registered_products_manifest.json"
+                "transform": "benchmarks/registration_benchmark_output/region_004/triplet_cycle/composed_ohrc_to_iirs_transform.json",
+                "registered_raster": "benchmarks/registration_benchmark_output/region_004/triplet_cycle/composed_registered_ohrc_to_iirs.png",
+                "registered_geotiff": "benchmarks/registration_benchmark_output/region_004/triplet_cycle/composed_registered_ohrc_to_iirs.tif",
+                "checkerboard_qa": "benchmarks/registration_benchmark_output/region_004/triplet_cycle/composed_checkerboard_qa.png"
             }
         },
         "tmc_iirs": {
             "status": "success",
-            "inlier_count": 7,
-            "fit_rmse_px": 22.714,
+            "inlier_count": 0,
+            "fit_rmse_px": null,
             "forward_tmc_to_iirs": {
                 "status": "success",
                 "message": null,
                 "direction": "native",
                 "measured_direction": null,
                 "quality_tier": "LOW_CONFIDENCE",
-                "match_count": 131,
-                "inlier_count": 7,
-                "inlier_ratio": 0.0534,
-                "fit_rmse_px": 22.714,
-                "spatial_coverage": 0.04,
-                "spatial_uniformity": 0.0063
+                "match_count": 0,
+                "inlier_count": 0,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
             },
             "reverse_iirs_to_tmc": {
-                "status": "success",
-                "message": null,
+                "status": "geometric_verification_failed",
+                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
                 "direction": "native",
                 "measured_direction": null,
-                "quality_tier": "LOW_CONFIDENCE",
-                "match_count": 131,
-                "inlier_count": 7,
-                "inlier_ratio": 0.0534,
-                "fit_rmse_px": 2.3419,
-                "spatial_coverage": 0.07,
-                "spatial_uniformity": 0.0235
+                "quality_tier": "FAILED",
+                "match_count": 76,
+                "inlier_count": 6,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": null,
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0
             },
-            "bidirectional_agreement": true,
-            "directional_note": null
+            "bidirectional_agreement": false,
+            "directional_note": "Forward (TMC->IIRS) produced 'success' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
         }
     },
     "triplet_consistency": {

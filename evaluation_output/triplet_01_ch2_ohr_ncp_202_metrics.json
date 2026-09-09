@@ -3,24 +3,24 @@
     "dataset_id": "triplet_01_ch2_ohr_ncp_202",
     "status": "evaluated",
     "num_inliers": 7,
-    "num_raw_matches": 97,
-    "inlier_ratio": 0.0722,
-    "rmse_px": 2.1959,
-    "fit_rmse_px": 2.1959,
+    "num_raw_matches": 45,
+    "inlier_ratio": 0.1556,
+    "rmse_px": 1.5468,
+    "fit_rmse_px": 1.5468,
     "validation_rmse_px": null,
     "validation_status": "insufficient_points_for_holdout",
-    "mean_reprojection_error_px": 1.7904,
-    "median_reprojection_error_px": 1.0978,
-    "max_reprojection_error_px": 3.6746,
+    "mean_reprojection_error_px": 1.3957,
+    "median_reprojection_error_px": 1.4735,
+    "max_reprojection_error_px": 2.5807,
     "sub_pixel_accurate": false,
     "fraction_below_1px": 0.4286,
-    "source_coverage_ratio": 0.07,
-    "destination_coverage_ratio": 0.07,
-    "combined_coverage_score": 0.07,
+    "source_coverage_ratio": 0.4375,
+    "destination_coverage_ratio": 0.4375,
+    "combined_coverage_score": 0.4375,
     "source_occupied_cells": 7,
     "destination_occupied_cells": 7,
     "total_cells": 100,
-    "uniformity_score": 0.0235,
+    "uniformity_score": 0.3113,
     "quality_tier": "LOW_CONFIDENCE",
     "method": "CFOG + Phase Congruency",
     "pairs": {
@@ -30,76 +30,96 @@
             "direction": "native",
             "measured_direction": null,
             "quality_tier": "LOW_CONFIDENCE",
-            "match_count": 97,
+            "match_count": 45,
             "inlier_count": 7,
-            "inlier_ratio": 0.0722,
-            "fit_rmse_px": 2.1959,
-            "spatial_coverage": 0.07,
-            "spatial_uniformity": 0.0235
+            "inlier_ratio": 0.1556,
+            "fit_rmse_px": 1.5468,
+            "spatial_coverage": 0.4375,
+            "spatial_uniformity": 0.3113
         },
         "ohrc_iirs": {
             "status": "composition_not_computable",
             "inlier_count": 0,
-            "fit_rmse_px": null,
+            "fit_rmse_px": 137.7112,
             "forward_ohrc_to_iirs": {
                 "status": "composition_not_computable",
-                "message": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+                "message": null,
                 "quality_tier": "FAILED",
                 "match_count": 0,
                 "inlier_count": 0,
                 "inlier_ratio": 0.0,
-                "fit_rmse_px": null,
+                "fit_rmse_px": 137.7112,
                 "spatial_coverage": 0.0,
                 "spatial_uniformity": 0.0
             },
             "reverse_iirs_to_ohrc": null,
             "bidirectional_agreement": false,
             "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
-            "composition": null
+            "composition": {
+                "source": "A -> B -> C",
+                "homography": [
+                    [
+                        1.560005208370546,
+                        -0.4670415478199706,
+                        188.10179818254034
+                    ],
+                    [
+                        0.8280401162366585,
+                        0.9343487288469035,
+                        -217.61125394607896
+                    ],
+                    [
+                        0.0026604635472497443,
+                        -0.0014315853183681593,
+                        1.0
+                    ]
+                ],
+                "transform": "benchmarks/registration_benchmark_output/triplet_01_ch2_ohr_ncp_202/triplet_cycle/composed_ohrc_to_iirs_transform.json",
+                "registered_raster": "benchmarks/registration_benchmark_output/triplet_01_ch2_ohr_ncp_202/triplet_cycle/composed_registered_ohrc_to_iirs.png",
+                "registered_geotiff": "benchmarks/registration_benchmark_output/triplet_01_ch2_ohr_ncp_202/triplet_cycle/composed_registered_ohrc_to_iirs.tif",
+                "checkerboard_qa": "benchmarks/registration_benchmark_output/triplet_01_ch2_ohr_ncp_202/triplet_cycle/composed_checkerboard_qa.png"
+            }
         },
         "tmc_iirs": {
-            "status": "failed",
-            "inlier_count": 0,
-            "fit_rmse_px": null,
+            "status": "success",
+            "inlier_count": 6,
+            "fit_rmse_px": 1.2354,
             "forward_tmc_to_iirs": {
-                "status": "failed",
+                "status": "success",
                 "message": null,
                 "direction": "native",
                 "measured_direction": null,
-                "quality_tier": "FAILED",
-                "match_count": 0,
-                "inlier_count": 0,
-                "inlier_ratio": 0.0,
-                "fit_rmse_px": null,
-                "spatial_coverage": 0.0,
-                "spatial_uniformity": 0.0
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 82,
+                "inlier_count": 6,
+                "inlier_ratio": 0.0732,
+                "fit_rmse_px": 1.2354,
+                "spatial_coverage": 0.3125,
+                "spatial_uniformity": 0.1935
             },
             "reverse_iirs_to_tmc": {
-                "status": "geometric_verification_failed",
-                "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                "status": "success",
+                "message": null,
                 "direction": "native",
                 "measured_direction": null,
-                "quality_tier": "FAILED",
-                "match_count": 130,
-                "inlier_count": 7,
-                "inlier_ratio": 0.0,
-                "fit_rmse_px": null,
-                "spatial_coverage": 0.0,
-                "spatial_uniformity": 0.0
+                "quality_tier": "LOW_CONFIDENCE",
+                "match_count": 82,
+                "inlier_count": 6,
+                "inlier_ratio": 0.0732,
+                "fit_rmse_px": 1.1893,
+                "spatial_coverage": 0.3125,
+                "spatial_uniformity": 0.1935
             },
-            "bidirectional_agreement": false,
-            "directional_note": "Forward (TMC->IIRS) produced 'failed' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
+            "bidirectional_agreement": true,
+            "directional_note": null
         }
     },
     "triplet_consistency": {
-        "status": "cycle_not_computable",
-        "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
-        "cycle_rmse_px": null,
-        "cycle_mean_px": null,
+        "status": "evaluated",
+        "reason": null,
+        "cycle_rmse_px": 137.7112,
+        "cycle_mean_px": 127.6425,
         "cycle_closed_successfully": false,
-        "failed_legs": [
-            "BC (B -> C)",
-            "CA (C -> A)"
-        ]
+        "failed_legs": []
     }
 }
