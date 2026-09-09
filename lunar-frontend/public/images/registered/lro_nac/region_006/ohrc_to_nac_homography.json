@@ -1,0 +1,29 @@
+{
+  "region_id": "region_006",
+  "reference_type": "external_LRO_NAC",
+  "source_sensor": "OHRC",
+  "reference_sensor": "LRO_NAC",
+  "status": "success",
+  "homography": [
+    [
+      0.9954198135597359,
+      -0.006893005852397271,
+      2.5136652217469155
+    ],
+    [
+      0.00196919835799624,
+      0.9897396732192931,
+      2.03775082331369
+    ],
+    [
+      2.096838181183978e-06,
+      -8.95065694341531e-06,
+      0.9999999999999999
+    ]
+  ],
+  "inlier_count": 0,
+  "raw_match_count": 36,
+  "fit_rmse_px": 0.2759,
+  "validation_rmse_px": 0.2504,
+  "sub_pixel_accurate": false
+}

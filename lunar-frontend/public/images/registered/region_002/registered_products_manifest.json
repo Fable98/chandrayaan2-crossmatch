@@ -1,0 +1,32 @@
+{
+    "region_id": "region_002",
+    "mode": "composed_registration",
+    "chain": "OHRC -> TMC-2 -> IIRS",
+    "homography_composed": [
+        [
+            0.7313385655363218,
+            0.12779084631632404,
+            3.465268132977709
+        ],
+        [
+            -0.106432866574775,
+            0.8243003532468713,
+            51.335441248347024
+        ],
+        [
+            -0.0007090845439521222,
+            0.00017765588875981128,
+            1.0
+        ]
+    ],
+    "products": {
+        "registered_ohrc_png": "C:\\Users\\rohit\\chand2\\chandrayaan2-crossmatch\\registration_output\\region_002\\registered_ohrc.png",
+        "registered_ohrc_tif": "C:\\Users\\rohit\\chand2\\chandrayaan2-crossmatch\\registration_output\\region_002\\registered_ohrc.tif",
+        "blend_ohrc_tmc": "C:\\Users\\rohit\\chand2\\chandrayaan2-crossmatch\\registration_output\\region_002\\blend_overlay.png",
+        "checkerboard_ohrc_tmc": "C:\\Users\\rohit\\chand2\\chandrayaan2-crossmatch\\registration_output\\region_002\\checkerboard_qa.png",
+        "registered_ohrc_to_iirs_png": "C:\\Users\\rohit\\chand2\\chandrayaan2-crossmatch\\registration_output\\region_002\\registered_ohrc_to_iirs_composed.png",
+        "registered_ohrc_to_iirs_tif": "C:\\Users\\rohit\\chand2\\chandrayaan2-crossmatch\\registration_output\\region_002\\registered_ohrc_to_iirs_composed.tif",
+        "blend_ohrc_iirs": "C:\\Users\\rohit\\chand2\\chandrayaan2-crossmatch\\registration_output\\region_002\\blend_ohrc_iirs_composed.png",
+        "checkerboard_ohrc_iirs": "C:\\Users\\rohit\\chand2\\chandrayaan2-crossmatch\\registration_output\\region_002\\checkerboard_ohrc_iirs_composed.png"
+    }
+}

@@ -247,6 +247,11 @@ benchmarks/registration_benchmark_output/
 dynamic_runs/
 
 # --- Generated evaluation / registration artifacts (keep local only) ---
+# NOTE: lunar-frontend/public/images/ is intentionally TRACKED — it is the
+# offline/demo fallback served by Next.js (api.ts imageUrl() → /images/...
+# → app/images/[...slug]/route.ts reads public/images on disk). No build step
+# regenerates it (render.yaml builds backend only), so a clean Vercel checkout
+# without these files 404s every fallback image including LRO NAC outputs.
 evaluation_output/
 registration_output/
 processed_user/
@@ -254,8 +259,6 @@ data_preprocessing_pipeline/processed_triplets/
 */matches/
 data_preprocessing_pipeline/lro_nac_pairs/
 benchmarks/large_iirs_benchmark_output/
-lunar-frontend/public/images/
-lunar-frontend/public/images/registered/
 
 # --- OS ---
 .DS_Store
