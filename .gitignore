@@ -252,6 +252,11 @@ dynamic_runs/
 # → app/images/[...slug]/route.ts reads public/images on disk). No build step
 # regenerates it (render.yaml builds backend only), so a clean Vercel checkout
 # without these files 404s every fallback image including LRO NAC outputs.
+# NOTE: backend runtime seed files are force-tracked despite the ignores below:
+# processed_triplets/*/manifest.json + ohrc/tmc/iirs/dem_512.png (triplet list
+# + /images serving) and data_preprocessing_pipeline/matches/*.json (match
+# points). Fresh deploys return REGIONS (0) without them. Do NOT untrack.
+# Census/gradient/lbp/large variants, evaluation/registration outputs stay local.
 evaluation_output/
 registration_output/
 processed_user/

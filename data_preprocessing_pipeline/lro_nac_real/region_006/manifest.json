@@ -1,0 +1,47 @@
+{
+  "region_id": "region_006",
+  "reference_type": "external_LRO_NAC",
+  "reference_provenance": "real_downloaded_cdr",
+  "provenance_warning": null,
+  "source_sensor": "OHRC",
+  "reference_sensor": "LRO_NAC",
+  "ohrc_product_id": "ch2_ohr_ncp_20220914t0835371412_d_img_d32",
+  "lro_nac_product_id": "M1413636095LC",
+  "ohrc_native_gsd_m": 0.32,
+  "lro_nac_native_gsd_m": 1.081,
+  "scale_ratio": 3.38,
+  "working_tile_size": [
+    512,
+    512
+  ],
+  "bounds": {
+    "west_lon": 234.396774,
+    "east_lon": 234.528638,
+    "south_lat": 5.1488115,
+    "north_lat": 5.35283875
+  },
+  "bounds_optical": {
+    "west_lon": 234.396774,
+    "east_lon": 234.528638,
+    "south_lat": 5.1488115,
+    "north_lat": 5.35283875
+  },
+  "ohrc_sun_azimuth_deg": 89.392682,
+  "lro_nac_sun_azimuth_deg": 192.98,
+  "sun_azimuth_note": "OHRC PDS4 sun azimuth vs LROC sub-solar azimuth (~103.6deg gap); conventions may differ, treat as approximate real illumination gap; tougher than region_001",
+  "geometry_note": "EDR page values used (emi 32.12, phase 83.65): high off-nadir, strong relief; repo KNOWN table (emi 2.15/phase 52.4/sun 110.2) does not match page and is not used",
+  "nac_crop_note": "south-up window x2620..,y19100..25700 (2443x6600, partial east overlap), padded square to preserve aspect, resized 512; north-up hypothesis failed all gates; line direction consistent with node-crossing A (region_001 node D won north-up)",
+  "nac_crop_method": "edr_corner_affine_south_up_pad",
+  "matching_note": "multimodal_pair=True (MI) required; optical NCC=0 candidates; 24 raw/5 inliers, fit 0.1792px sub-pixel but 5pt/8DOF overfit risk, LOW_CONFIDENCE, 5% @10x10, no held-out",
+  "result": {
+    "fit_rmse_px": 0.1792,
+    "sub_pixel_accurate": true,
+    "inlier_count": 5,
+    "match_count": 24,
+    "quality_tier": "LOW_CONFIDENCE"
+  },
+  "ohrc_source_image": "data_preprocessing_pipeline\\lro_nac_real\\region_006\\ohrc_source_512.png",
+  "lro_nac_reference_image": "data_preprocessing_pipeline\\lro_nac_real\\region_006\\lro_nac_reference_512.png",
+  "lro_nac_label": "data_preprocessing_pipeline\\lro_nac_real\\region_006\\lro_nac_reference_512.lbl",
+  "nac_source_file": "C:\\Users\\rohit\\Downloads\\M1413636095LC.IMG"
+}

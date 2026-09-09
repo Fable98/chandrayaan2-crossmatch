@@ -9,14 +9,14 @@ This document details the implementation and empirical validation of **LRO NAC r
 ## 1. Key Technical Insights & Scale Ratio Analysis
 
 - **Scale Ratio Comparison**:
-  - Internal Chandrayaan-2 OHRC $\leftrightarrow$ TMC-2: $\sim 21\times$ physical scale gap ($0.25\,\text{m}$ vs. $5.4\,\text{m}$).
+  - Internal Chandrayaan-2 OHRC $\leftrightarrow$ TMC-2: $\sim 20\times$ physical scale gap ($0.25\,\text{m}$ vs. $5.4\,\text{m}$).
   - Internal Chandrayaan-2 OHRC $\rightarrow$ IIRS: $\sim 275\times$ physical scale gap ($0.25\,\text{m}$ vs. $69\,\text{m}$).
-  - External OHRC $\leftrightarrow$ LRO NAC: **$\sim 1$–$4\times$ physical scale ratio** ($0.25$–$0.32\,\text{m}$ vs. $0.91$–$1.12\,\text{m}$).
+  - External OHRC $\leftrightarrow$ LRO NAC: **$\sim 3.4$–$3.7\times$ physical scale ratio** ($0.25$–$0.32\,\text{m}$ vs. $0.914$–$1.081\,\text{m}$ manifest natives).
 - **Optical Compatibility**:
   - Both OHRC ($450$–$700\,\text{nm}$) and LRO NAC ($400$–$750\,\text{nm}$) are panchromatic visible-wavelength sensors.
-  - Multi-modal phase congruency centroiding is not required here. Setting `multimodal_pair=False` (normalized cross-correlation and direct structural correlation) outperforms the multi-modal path, reducing Fit RMSE from $0.326\,\text{px}$ to **$0.270\,\text{px}$**.
-- **Literal Sub-Pixel Accuracy**:
-  - Achieves **$< 0.30\,\text{px}$ In-Sample Fit RMSE** (0.270–0.292 px) and **$< 0.42\,\text{px}$ Out-of-Sample Held-Out Validation RMSE** (0.250–0.418 px) across all evaluated footprints, with 100% of verified inlier residuals below $1.0\,\text{px}$ and $> 91\%$ below $0.5\,\text{px}$.
+  - On synthetic proxies, `multimodal_pair=False` (NCC) won (0.326px → 0.270px). On **real CDRs it finds 0 candidates** under the true ~104–132° sun gap; the multimodal MI path (`multimodal_pair=True`) is required and yields 0.18–0.80px fit.
+- **Qualified Sub-Pixel Accuracy (real CDRs)**:
+  - **$0.18$–$0.80\,\text{px}$ In-Sample Fit RMSE** with 5 inliers each, `LOW_CONFIDENCE`, 5% canonical 10×10 coverage; **held-out validation not computable** (`insufficient_points_for_holdout`, <8 pts). Fragile by construction — density work is the priority follow-up.
 
 ---
 
@@ -28,8 +28,8 @@ This document details the implementation and empirical validation of **LRO NAC r
    - Integrated into [`ML_model/metadata.py`](../ML_model/metadata.py) with full provenance tracking.
 
 2. **Crop & Resample Preprocessor ([`data_preprocessing_pipeline/scripts/prepare_lro_nac_pair.py`](../data_preprocessing_pipeline/scripts/prepare_lro_nac_pair.py))**:
-   - Ingests overlapping LRO NAC scenes (`M1417670274LC` for `region_001` and `region_003`; `M1413636095LC` for `region_006`) matched to the exact geographic bounds (`bounds_optical`) of existing OHRC datasets.
-   - Supports user-provided raw CDR/EDR `.IMG` + `.LBL` pairs and creates matched 512×512 tile pairs, authentic PDS3 `.lbl` headers, and `manifest.json` sidecars in `data_preprocessing_pipeline/lro_nac_pairs/<region_id>/`.
+   - Legacy proxy path ingested overlapping scenes (`M1417670274LC` ×2, `M1413636095LC` ×1) — retired.
+   - Real-CDR evidence lives in `data_preprocessing_pipeline/lro_nac_real/<region_id>/` (rigorous corner-affine crop from the 52224×5064 CDR, pad-square → 512, detached `.lbl` + `manifest.json` with `reference_provenance=real_downloaded_cdr`). Line direction follows flight node (001/003 node D → north-up wins; 006 node A → south-up wins); OHRC east edge extends past the NAC swath (~66% overlap).
 
 3. **Registration Engine Generalization ([`ML_model/matcher_cfog.py`](../ML_model/matcher_cfog.py))**:
    - Added `multimodal_pair: Optional[bool] = None` override to `match_images_cfog()`.
@@ -52,39 +52,39 @@ This document details the implementation and empirical validation of **LRO NAC r
 
 | Region ID | OHRC Product ID | LRO NAC Scene ID | Inliers / Raw | In-Sample Fit RMSE | Held-Out Val RMSE | Sub-Pixel ($<1\,\text{px}$) | Spatial Coverage ($10 \times 10$) | Uniformity | Quality Tier |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `region_001` | `ch2_ohr_ncp_20210405t160653` | `M1417670274LC` | 37 / 37 | **0.2702 px** | **0.3391 px** | **TRUE** ($<1\,\text{px}$) | 100.0% | 0.9153 | HIGH_CONFIDENCE |
-| `region_003` | `ch2_ohr_ncp_20210405t160653` | `M1417670274LC` | 35 / 35 | **0.2916 px** | **0.4181 px** | **TRUE** ($<1\,\text{px}$) | 100.0% | 0.8779 | HIGH_CONFIDENCE |
-| `region_006` | `ch2_ohr_ncp_20220914t083537` | `M1413636095LC` | 36 / 36 | **0.2759 px** | **0.2504 px** | **TRUE** ($<1\,\text{px}$) | 100.0% | 0.8953 | HIGH_CONFIDENCE |
+| `region_001` | `ch2_ohr_ncp_20210405t160653` | `M1417670274LC` (real CDR) | 6 / 32 | **0.4979 px** | null (insufficient pts) | **TRUE** ($<1\,\text{px}$) | 6.0% | 0.0183 | LOW_CONFIDENCE |
+| `region_003` | `ch2_ohr_ncp_20210405t160653` | `M1417670274LC` (real CDR) | 5 / 27 | **0.5957 px** | null (insufficient pts) | **TRUE** ($<1\,\text{px}$) | 5.0% | 0.0135 | LOW_CONFIDENCE |
+| `region_006` | `ch2_ohr_ncp_20220914t083537` | `M1413636095LC` (real CDR) | 5 / 24 | **0.1792 px** | null (insufficient pts) | **TRUE** ($<1\,\text{px}$) | 5.0% | 0.0135 | LOW_CONFIDENCE |
+
+> [!NOTE]
+> Retired proxy scores (37/37 @0.2702px, 35/35 @0.2916px, 36/36 @0.2759px, HIGH) came from OHRC-derived synthetic tiles and are removed from tracking. The NCC path that won on proxies finds 0 candidates on real CDRs.
 
 ### CLI Runner Output
 
 ```text
 ==================================================================================================
-LRO NAC REFERENCE-IMAGE REGISTRATION SUMMARY (PS 26166)
+LRO NAC REFERENCE-IMAGE REGISTRATION SUMMARY — REAL CDR (PS 26166)
 ==================================================================================================
-Region: region_001 | Status: success | Raw: 37 | Inliers: 37 | Fit RMSE: 0.2702  px | Val RMSE: 0.3391  px | Sub-pixel: True  | Coverage: 100.0%
-Region: region_003 | Status: success | Raw: 35 | Inliers: 35 | Fit RMSE: 0.2916  px | Val RMSE: 0.4181  px | Sub-pixel: True  | Coverage: 100.0%
-Region: region_006 | Status: success | Raw: 36 | Inliers: 36 | Fit RMSE: 0.2759  px | Val RMSE: 0.2504  px | Sub-pixel: True  | Coverage: 100.0%
+Region: region_001 | Status: success | Raw: 23 | Inliers: 5 | Fit RMSE: 0.8045 px | Val RMSE: null (insufficient pts) | Sub-pixel: True | Coverage: 5.0% (10x10) | Tier: LOW_CONFIDENCE
+Region: region_003 | Status: success | Raw: 27 | Inliers: 5 | Fit RMSE: 0.5957 px | Val RMSE: null (insufficient pts) | Sub-pixel: True | Coverage: 5.0% (10x10) | Tier: LOW_CONFIDENCE
+Region: region_006 | Status: success | Raw: 24 | Inliers: 5 | Fit RMSE: 0.1792 px | Val RMSE: null (insufficient pts) | Sub-pixel: True | Coverage: 5.0% (10x10) | Tier: LOW_CONFIDENCE
 ==================================================================================================
 ```
 
 ### Methodological Rigor & Metric Interpretation
 1. **Fit RMSE vs. Held-Out Validation RMSE**:
-   - `fit_rmse_px` measures the reprojection error of the homography over all inliers used in the solve (in-sample optimization).
-   - `held_out_validation_rmse_px` (and `validation_median_error_px`) performs a genuine train/test evaluation by withholding a subset of correspondences and measuring reprojection error strictly on unseen points.
-   - As expected in rigorous photogrammetry, held-out validation error is moderately higher than in-sample fit error (`0.3391 px` vs `0.2702 px` in `region_001`; `0.4181 px` vs `0.2916 px` in `region_003`; `0.2504 px` vs `0.2759 px` in `region_006`).
-   - In particular, `region_003` held-out validation is `0.4181 px` (exceeding 0.30 px, but well within the true sub-pixel $< 0.50\,\text{px}$ regime). Reporting both transparently eliminates selective framing.
+   - `fit_rmse_px` is in-sample on RANSAC inliers (`fit_rmse_is_in_sample=True`).
+   - `held_out_validation_rmse_px` is `insufficient_points_for_holdout` in all 3 real regions (5 inliers < 8 minimum) — the top integrity gap, driving the density work item. Never read fit RMSE without inlier count and tier.
+   - 5-point / 8-DOF fits can overfit toward zero (006 @0.18px); the LOW tier and 5% coverage flag this explicitly.
 
 2. **Reference Dataset Scope & Provenance**:
-   - The initial validation comprises 3 test regions across **2 distinct LRO NAC orbital reference scenes**:
-     - `M1417670274LC` in Sinus Medii (covering `region_001` and `region_003`)
-     - `M1413636095LC` in the northern lunar plains (covering `region_006`)
-   - While covering 2 distinct reference scenes serves as an initial proof-of-concept, the ingestion and parsing pipeline is general to any PDS3 LRO NAC product.
+   - 3 real-CDR regions across **2 distinct scenes** (`M1417670274LC`, node D, emi 1.7°; `M1413636095LC`, node A, emi 32°). Sun gaps ~104–132° (convention-approximate) — a genuine illumination stress, which is why MI succeeds where NCC finds nothing.
+   - Residuals <1px: 60% (001), 100% (003, 006); <0.5px: 60% (001, 003), 100% (006). Absolute RMSE 0.19–0.74m.
 
 ### Detailed Metrics Breakdown
-- **`region_001`**: Fit RMSE: **0.2702 px** | Val RMSE: **0.3391 px** | Coverage: 100.0% | Residuals $< 0.5\,\text{px}$: 94.59%
-- **`region_003`**: Fit RMSE: **0.2916 px** | Val RMSE: **0.4181 px** | Coverage: 100.0% | Residuals $< 0.5\,\text{px}$: 91.43%
-- **`region_006`**: Fit RMSE: **0.2759 px** | Val RMSE: **0.2504 px** | Coverage: 100.0% | Residuals $< 0.5\,\text{px}$: 94.44%
+- **`region_001`**: Fit RMSE: **0.4979 px** | Val RMSE: **null** | Coverage: 6.0% | Residuals $< 0.5\,\text{px}$: 66.7% (overlap-matched native aspect; padded-square gave 0.8045px)
+- **`region_003`**: Fit RMSE: **0.5957 px** | Val RMSE: **null** | Coverage: 5.0% | Residuals $< 0.5\,\text{px}$: 60.0%
+- **`region_006`**: Fit RMSE: **0.1792 px** | Val RMSE: **null** | Coverage: 5.0% | Residuals $< 0.5\,\text{px}$: 100.0%
 
 ---
 

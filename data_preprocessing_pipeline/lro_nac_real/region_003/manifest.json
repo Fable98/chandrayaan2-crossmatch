@@ -1,0 +1,46 @@
+{
+  "region_id": "region_003",
+  "reference_type": "external_LRO_NAC",
+  "reference_provenance": "real_downloaded_cdr",
+  "provenance_warning": null,
+  "source_sensor": "OHRC",
+  "reference_sensor": "LRO_NAC",
+  "ohrc_product_id": "ch2_ohr_ncp_20210405t1606536730_d_img_d18",
+  "lro_nac_product_id": "M1417670274LC",
+  "ohrc_native_gsd_m": 0.25,
+  "lro_nac_native_gsd_m": 0.914,
+  "scale_ratio": 3.66,
+  "working_tile_size": [
+    512,
+    512
+  ],
+  "bounds": {
+    "west_lon": 336.484646,
+    "east_lon": 336.589455,
+    "south_lat": -3.0385188,
+    "north_lat": -2.9123904
+  },
+  "bounds_optical": {
+    "west_lon": 336.484646,
+    "east_lon": 336.589455,
+    "south_lat": -3.0385188,
+    "north_lat": -2.9123904
+  },
+  "ohrc_sun_azimuth_deg": 269.646098,
+  "lro_nac_sun_azimuth_deg": 137.89,
+  "sun_azimuth_note": "same scene as region_001 (M1417670274LC), second footprint north of it",
+  "nac_crop_note": "north-up window x2418..,y23450..27480 (2645x4030, partial east overlap), padded square, resized 512; south-up control also passes but worse (2.20px); consistent with node-crossing D north-up (region_001)",
+  "nac_crop_method": "corner_affine_north_up_pad",
+  "matching_note": "multimodal_pair=True (MI) required; optical NCC=0; 27 raw/5 inliers, fit 0.5957px sub-pixel, LOW_CONFIDENCE, 5% @10x10, no held-out",
+  "result": {
+    "fit_rmse_px": 0.5957,
+    "sub_pixel_accurate": true,
+    "inlier_count": 5,
+    "match_count": 27,
+    "quality_tier": "LOW_CONFIDENCE"
+  },
+  "ohrc_source_image": "data_preprocessing_pipeline\\lro_nac_real\\region_003\\ohrc_source_512.png",
+  "lro_nac_reference_image": "data_preprocessing_pipeline\\lro_nac_real\\region_003\\lro_nac_reference_512.png",
+  "lro_nac_label": "data_preprocessing_pipeline\\lro_nac_real\\region_003\\lro_nac_reference_512.lbl",
+  "nac_source_file": "C:\\Users\\rohit\\Downloads\\M1417670274LC.IMG"
+}
