@@ -21,7 +21,7 @@ class AIMatchVerifier:
         features = []
         for m in matches:
             features.append([
-                float(m.get("score", 0.0)),           # Coarse matching score
+                float(m.get("confidence", m.get("score", 0.0))),           # Coarse matching score
                 float(m.get("refinement_dx", 0.0)),   # Sub-pixel shift X
                 float(m.get("refinement_dy", 0.0)),   # Sub-pixel shift Y
                 1.0 if m.get("is_refined", False) else 0.0  # Was it refined?
@@ -30,16 +30,28 @@ class AIMatchVerifier:
 
     def predict_confidence(self, matches: List[Dict[str, Any]]) -> np.ndarray:
         """Returns probability each match is a true inlier."""
-        if not self.is_trained or len(matches) == 0:
-            # Fallback: trust all matches if model isn't trained
-            return np.ones(len(matches))
+        if len(matches) == 0:
+            return np.array([])
+        
+        # Extract coarse confidence scores
+        scores = np.array([
+            float(m.get("confidence", m.get("score", 0.5))) for m in matches
+        ], dtype=np.float32)
+
+        if not self.is_trained:
+            # HEURISTIC FALLBACK: 
+            # If no model is trained, act as a strict statistical gate.
+            # Reject matches that fall below the 25th percentile of the current batch.
+            threshold = np.percentile(scores, 25) if len(scores) > 4 else 0.3
+            # Return 1.0 for pass, 0.0 for fail (simulating probability)
+            return (scores >= threshold).astype(np.float32)
         
         features = self.extract_features(matches)
         try:
             return self.model.predict_proba(features)[:, 1]
         except Exception as e:
             logger.warning(f"AI Verifier prediction failed: {e}")
-            return np.ones(len(matches))
+            return (scores >= 0.3).astype(np.float32)
 
     def filter_matches(self, matches: List[Dict[str, Any]], threshold: float = 0.5) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """AI-powered outlier rejection."""
