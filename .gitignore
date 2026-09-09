@@ -246,6 +246,17 @@ registration_output_demo/
 benchmarks/registration_benchmark_output/
 dynamic_runs/
 
+# --- Generated evaluation / registration artifacts (keep local only) ---
+evaluation_output/
+registration_output/
+processed_user/
+data_preprocessing_pipeline/processed_triplets/
+*/matches/
+data_preprocessing_pipeline/lro_nac_pairs/
+benchmarks/large_iirs_benchmark_output/
+lunar-frontend/public/images/
+lunar-frontend/public/images/registered/
+
 # --- OS ---
 .DS_Store
 backend/data/users.json

@@ -1,4 +1,4 @@
-"""ML_model/iirs_multimodal_registrar.py — IIRS <-> OHRC multi-modal registration.
+"""ML_model/iirs_multimodal_registrar.py — IIRS <-> OHRC multi-modal co-registration.
 
 Strategy (why this exists):
   * Chandrayaan-2 IIRS is a 256-band hyperspectral cube (~80 m/px) with
@@ -8,7 +8,17 @@ Strategy (why this exists):
   * We therefore compress IIRS to a single spatial-structure channel via
     PCA (PC1), photometrically normalise both modalities (CLAHE + blur),
     align them with area-based ECC on an image pyramid, then emit a
-    uniform grid of synthetic tie-points warped into OHRC coordinates.
+    uniform grid of DERIVED (composed, not independently measured) tie-points
+    warped into OHRC coordinates for overlay/context only.
+
+Provenance honesty:
+  * Points from generate_uniform_tie_points() are DERIVED from the estimated
+    area-based warp, NOT independently verified correspondences. They must
+    never be counted as measured inliers, never drive Fit RMSE, and are valid
+    only as a spatial-spectral contextual overlay given the ~275x scale gap.
+  * Direct IIRS tie-point extraction at sub-meter precision is unphysical;
+    see README Limitations.
+"""
 
 Memory guardrails:
   * Hyperspectral cube is reshaped to (H*W, Bands) once; no 256xHxW
@@ -228,7 +238,7 @@ class IIRS_Multimodal_Registrar:
         return warp_matrix.astype(np.float32)
 
     # ------------------------------------------------------------------
-    # Method 4: uniform synthetic tie-points
+    # Method 4: uniform DERIVED tie-points (composed overlay only, NOT measured)
     # ------------------------------------------------------------------
     def generate_uniform_tie_points(
         self,
@@ -237,14 +247,19 @@ class IIRS_Multimodal_Registrar:
         grid_size: int = 10,
         ohrc_shape: tuple | None = None,
     ) -> dict:
-        """Warp a uniform IIRS grid into OHRC coordinates.
+        """Warp a uniform IIRS grid into OHRC coordinates (DERIVED overlay).
 
         Homogeneous math for each grid point (x_s, y_s):
             [x_r]   [w00 w01 w02] [x_s]
             [y_r] = [w10 w11 w12] [y_s]
-                                      [1]
+                                       [1]
         i.e. x_r = w00*x_s + w01*y_s + w02 (same for y_r).
         Vectorised: ref = (W @ src_h.T).T with src_h = [x_s, y_s, 1].
+
+        WARNING: returned points are derived from the area-based warp estimate.
+        They are NOT independently measured correspondences. Callers must tag
+        them provenance=derived_composed, inlier_count=0 for metrics, and must
+        not compute Fit RMSE from them.
         """
         height, width = int(iirs_shape[0]), int(iirs_shape[1])
         grid_size = max(2, int(grid_size))
@@ -274,6 +289,10 @@ class IIRS_Multimodal_Registrar:
 
         return {
             "status": "success",
+            "derivation": "derived_composed_overlay",
+            "is_measured_correspondence": False,
+            "provenance": "ECC area-based warp estimate; not RANSAC-verified inliers",
+            "use_restriction": "contextual overlay only; do not use for Fit RMSE or sub-pixel claims",
             "src_pts": src_pts,
             "ref_pts": ref_pts,
             "warp_matrix": np.asarray(warp_matrix, dtype=np.float32),
@@ -283,7 +302,7 @@ class IIRS_Multimodal_Registrar:
     # Main method: end-to-end IIRS -> OHRC registration
     # ------------------------------------------------------------------
     def register_iirs_to_ohrc(self, iirs_path: str, ohrc_img: np.ndarray) -> dict:
-        """Full chain: PC1 -> ECC preprocess -> pyramid ECC -> tie-points."""
+        """Full chain: PC1 -> ECC preprocess -> pyramid ECC -> derived overlay points."""
         try:
             pc1 = self.load_and_reduce_hyperspectral(iirs_path)
 

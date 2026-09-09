@@ -2,13 +2,20 @@
 matcher_cfog.py — Primary Cross-Sensor Registration Engine for Chandrayaan-2
 
 Implements scientifically defensible cross-sensor alignment:
-1. Common physical-GSD normalization resolving the ~16–20x scale gap between OHRC and TMC-2.
-2. Illumination-robust frequency-domain structural edge representation (2D Phase Congruency & CFOG).
+1. Common physical-GSD normalization resolving the ~16–20x scale gap between OHRC and TMC-2
+   via area-averaged resampling to the coarser GSD (not a scale-invariant descriptor;
+   ~275x OHRC->IIRS is overlay/composition only, not direct matching).
+2. Illumination-robust (moderate) single-channel Phase Congruency structural representation.
+   NOTE: multi-channel CFOG tensor F(x,y,k) is not implemented; matching uses
+   normalized single-channel PC + NCC/MI. Robust to gain/bias, not to full
+   shadow-reversal (see 162deg triplet_new_2022 failure).
 3. Spatially distributed correspondence selection across configurable grid cells.
 4. Local patch-level Fourier Phase Correlation sub-pixel refinement at matched physical ground scales.
 5. Robust geometric estimation (RANSAC with transformation quality sanity gates).
-6. ZERO synthetic fallbacks (never fabricates corner points or identity matrices).
+6. ZERO synthetic fallbacks in this engine (never fabricates corner points or identity matrices).
+   IIRS chained composition (0-inlier legs) is reported as composed, not measured.
 7. Complete output package: registered GeoTIFF raster, checkerboard QA, matches JSON, canonical metrics JSON, and metadata JSON.
+   Canonical reporting grid is fixed 10x10; dynamic grids are matching-internal only.
 """
 
 from __future__ import annotations
@@ -121,7 +128,9 @@ def compute_phase_congruency(
     """
     Computes 2D Phase Congruency via Log-Gabor filter banks in frequency domain.
     Phase Congruency detects structural features based on frequency-phase agreement,
-    making it robust to extreme solar incidence angle and shadow reversals.
+    providing moderate robustness to gain/bias and mild illumination change.
+    It does NOT guarantee invariance to diametric shadow reversal (e.g. ~162deg
+    sun-azimuth flip in triplet_new_2022) or to full contrast inversion.
     """
     h, w = img.shape[:2]
     img_f = img.astype(np.float32)
@@ -681,22 +690,28 @@ def match_images_cfog(
     work2_gray = cv2.resize(raw2_gray, (work_w2, work_h2), interpolation=cv2.INTER_AREA)
 
     # --- DYNAMIC SPATIAL GRID SCALING ---
-    # Calculate grid size based on the smallest working dimension to ensure uniform distribution
-    # Target: roughly 256px per cell. Min 4x4 grid, Max 20x20 grid to prevent memory/compute overload.
+    # Calculate grid size based on the smallest working dimension for INTERNAL
+    # matching only. Canonical REPORTING always uses a fixed 10x10 grid via
+    # compute_canonical_metrics(grid_size=10) so Before/After coverage numbers
+    # are directly comparable. The dynamic grid is stored as
+    # matching_grid_size in metrics for diagnostics.
     min_working_dim = min(work_w1, work_h1)
     dynamic_grid_size = max(4, min(20, int(min_working_dim / 256)))
 
     # Macro grid should be roughly half the density of the main grid (e.g., 2x2 for 4x4, 5x5 for 10x10)
     dynamic_macro_grid = max(2, dynamic_grid_size // 2)
 
+    # Preserve canonical 10x10 for reporting; use dynamic grid only for matching.
+    canonical_grid_size = 10
+    matching_grid_size = dynamic_grid_size
     # Override the function arguments with dynamic values for internal processing
     # (We keep the function signature intact for API compatibility, but adapt internally)
-    if grid_size == 10: # Only override if it's the default value
+    if grid_size == 10:  # Only override if it's the default value
         grid_size = dynamic_grid_size
     macro_grid = dynamic_macro_grid
 
     logger.info(
-        "Dynamic Spatial Scaling: Image dim=%dx%d. Set grid_size=%dx%d, macro_grid=%dx%d",
+        "Dynamic Spatial Scaling: Image dim=%dx%d. Set grid_size=%dx%d, macro_grid=%dx%d (canonical reporting grid=10x10)",
         work_w1, work_h1, grid_size, grid_size, macro_grid, macro_grid
     )
 
@@ -877,11 +892,13 @@ def match_images_cfog(
             }
 
         metrics = compute_canonical_metrics(
-            pts1_arr, pts2_arr, inlier_mask_arr, H_ab, (orig_h2, orig_w2), grid_size,
+            pts1_arr, pts2_arr, inlier_mask_arr, H_ab, (orig_h2, orig_w2), canonical_grid_size,
             gsd_m=working_gsd, dem_data=dem_arr
         )
         metrics["direction"] = "inverted_from_BA"
         metrics["measured_direction"] = f"{meta2.sensor} -> {meta1.sensor}"
+        metrics["matching_grid_size"] = matching_grid_size
+        metrics["canonical_grid_size"] = canonical_grid_size
 
         fit_rmse = metrics.get("fit_rmse_px")
         tx_check = verify_transformation_quality(
@@ -1041,12 +1058,20 @@ def match_images_cfog(
         except Exception:
             dem_arr = None
 
+    # NOTE: sun_azimuth_deg is solar illumination geometry, NOT sensor line-of-sight
+    # azimuth. DEM relief parallax must use emission (off-nadir) geometry. We do
+    # not have per-product sensor LOS azimuth in metadata, so pass None here
+    # (defaults to 45deg in apply_dem_relief_compensation) and keep sun angles
+    # only as provenance for illumination-robustness auditing, not for DEM shifts.
     comp1_gray, terrain_info1 = apply_dem_relief_compensation(
-        work1_gray, dem_arr, meta1.emission_angle_deg, meta1.sun_azimuth_deg, working_gsd
+        work1_gray, dem_arr, meta1.emission_angle_deg, None, working_gsd
     )
     comp2_gray, terrain_info2 = apply_dem_relief_compensation(
-        work2_gray, dem_arr, meta2.emission_angle_deg, meta2.sun_azimuth_deg, working_gsd
+        work2_gray, dem_arr, meta2.emission_angle_deg, None, working_gsd
     )
+    for _ti, _meta in ((terrain_info1, meta1), (terrain_info2, meta2)):
+        _ti["sun_azimuth_deg_not_used_for_dem"] = _meta.sun_azimuth_deg
+        _ti["sun_azimuth_provenance"] = _meta.provenance.get("sun_azimuth_deg")
 
     # 5. Phase Congruency (Illumination-Robust Structural Features)
     pc1 = compute_phase_congruency(comp1_gray, num_orientations=4, num_scales=3)
@@ -1607,11 +1632,13 @@ def match_images_cfog(
                         refinement_records[idx]["image2_y"] = round(float(refined_dst[j, 1]), 2)
                         refinement_records[idx]["lk_refined"] = True
 
-    # 9. Compute Canonical Master Metrics
+    # 9. Compute Canonical Master Metrics (fixed 10x10 reporting grid)
     metrics = compute_canonical_metrics(
-        pts1_arr, pts2_arr, inlier_mask, H_final, (orig_h2, orig_w2), grid_size,
+        pts1_arr, pts2_arr, inlier_mask, H_final, (orig_h2, orig_w2), canonical_grid_size,
         gsd_m=working_gsd, dem_data=dem_arr
     )
+    metrics["matching_grid_size"] = matching_grid_size
+    metrics["canonical_grid_size"] = canonical_grid_size
     if lk_stats:
         metrics["lk_refinement"] = lk_stats
 

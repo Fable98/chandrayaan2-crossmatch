@@ -211,9 +211,16 @@ def prepare_pair_for_region(
             if user_meta.gsd_m is not None:
                 product_info["native_gsd_m"] = user_meta.gsd_m
     else:
-        # Build calibrated, photometrically consistent lunar reference tile
-        # representing real orbital terrain from LRO NAC at ~1-2x scale ratio
-        logger.info("Generating calibrated LRO NAC reference tile for %s (%s)", region_id, product_info["product_id"])
+        # FALLBACK PROXY (NOT a real downloaded CDR): Build a calibrated,
+        # photometrically adjusted tile derived from the OHRC source for
+        # pipeline testing when no user-provided LRO NAC raster exists.
+        # This proxy must NEVER be presented as a real LRO download; the
+        # manifest records provenance=synthetic_ohrc_derived_proxy.
+        logger.warning(
+            "No user LRO NAC raster for %s — generating SYNTHETIC OHRC-derived proxy (not a real CDR). "
+            "Provide --raw_nac_img/--raw_nac_lbl with a real CDR for flight validation.",
+            region_id,
+        )
         # Invert/adjust photometric response to reflect LRO NAC observation geometry
         # with small projective rotation/shear and slight sensor MTF difference
         h, w = ohrc_img.shape
@@ -252,9 +259,16 @@ def prepare_pair_for_region(
         f.write(lbl_content)
 
     # 4. Write manifest.json sidecar
+    is_proxy = not (raw_nac_image and Path(raw_nac_image).exists())
     pair_manifest = {
         "region_id": region_id,
         "reference_type": "external_LRO_NAC",
+        "reference_provenance": "synthetic_ohrc_derived_proxy" if is_proxy else "real_downloaded_cdr",
+        "provenance_warning": (
+            "SYNTHETIC proxy derived from OHRC via warp+blur+noise for pipeline testing only; "
+            "not a real LRO CDR download. Replace with real CDR via --raw_nac_img for flight validation."
+            if is_proxy else None
+        ),
         "source_sensor": "OHRC",
         "reference_sensor": "LRO_NAC",
         "ohrc_product_id": region_manifest.get("ohrc_product_id"),

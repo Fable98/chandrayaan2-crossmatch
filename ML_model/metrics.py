@@ -503,8 +503,8 @@ def compute_canonical_metrics(
     dist_metrics["coverage_relative_to_inlier_count"] = coverage_relative
     dist_metrics["adaptive_uniformity_score"] = adaptive_uniformity
 
-    # Transform Quality
-    tx_quality = verify_transformation_quality(H, image_shape)
+    # Transform Quality (include fit RMSE so excessive residuals invalidate the transform)
+    tx_quality = verify_transformation_quality(H, image_shape, fit_rmse_px=fit_rmse)
 
     # Quality Tier Classification with explicit documented thresholds
     coverage = dist_metrics["coverage"]
@@ -554,6 +554,9 @@ def compute_canonical_metrics(
         "fraction_below_1px": round(frac_1, 4),
         "fraction_below_0_5px": round(frac_05, 4),
         "fraction_below_0_25px": round(frac_025, 4),
+        "sub_pixel_accurate": bool(fit_rmse < 1.0),
+        "fit_rmse_is_in_sample": True,
+        "fit_rmse_note": "In-sample RMSE on RANSAC inliers; see held_out_validation_rmse_px for out-of-sample error.",
         "spatial_coverage": dist_metrics["coverage"],
         "spatial_uniformity": dist_metrics["uniformity_score"],
         "coverage_relative_to_inlier_count": round(coverage_relative, 4),

@@ -67,6 +67,23 @@ def run_registration_for_region(
     if not ohrc_path.exists() or not nac_path.exists():
         raise FileNotFoundError(f"Missing images in {pair_dir}")
 
+    # Resolve native GSDs from the pair manifest so scale ratio is physical.
+    # Falls back to sensor specs only when manifest is absent.
+    explicit_gsd1 = 0.25
+    explicit_gsd2 = 0.914
+    reference_provenance = "unknown"
+    try:
+        if manifest_path.exists():
+            with open(manifest_path) as _mf:
+                _mdata = json.load(_mf)
+            explicit_gsd1 = float(_mdata.get("ohrc_native_gsd_m", explicit_gsd1))
+            explicit_gsd2 = float(_mdata.get("lro_nac_native_gsd_m", explicit_gsd2))
+            reference_provenance = _mdata.get(
+                "reference_provenance", _mdata.get("provenance", "unknown")
+            )
+    except Exception as exc:
+        logger.warning("Could not parse pair manifest %s: %s; using defaults", manifest_path, exc)
+
     region_out = (Path(output_base_dir) if output_base_dir else REG_OUT_DIR) / region_id
     region_out.mkdir(parents=True, exist_ok=True)
     temp_cfog_out = region_out / "_cfog_work"
@@ -80,14 +97,20 @@ def run_registration_for_region(
 
     # 1. Execute match_images_cfog
     # Image 1 = OHRC (Source / Moving), Image 2 = LRO NAC (Reference / Fixed)
+    # Use manifest native GSDs so the engine normalizes by the true physical
+    # scale ratio (~0.25 vs ~0.9-1.1 => ~3.6-4.5x), not a forced 1.0/1.0.
+    logger.info(
+        "Native GSDs from manifest: OHRC=%.3fm, LRO_NAC=%.3fm (provenance=%s)",
+        explicit_gsd1, explicit_gsd2, reference_provenance,
+    )
     match_result = match_images_cfog(
         img_path1=str(ohrc_path),
         img_path2=str(nac_path),
         output_dir=str(temp_cfog_out),
         source_sensor="OHRC",
         reference_sensor="LRO_NAC",
-        explicit_gsd1=1.0,
-        explicit_gsd2=1.0,
+        explicit_gsd1=explicit_gsd1,
+        explicit_gsd2=explicit_gsd2,
         multimodal_pair=False if force_non_multimodal else None,
     )
 
@@ -147,11 +170,50 @@ def run_registration_for_region(
         blend_path = region_out / "blend_overlay.png"
         checker_path = region_out / "checkerboard_qa.png"
         geotiff_path = region_out / "registered_source.tif"
+        matches_path = region_out / "matches.json"
+        transform_path = region_out / "transform.json"
 
         cv2.imwrite(str(reg_png_path), warped_src)
         cv2.imwrite(str(blend_path), blend)
         cv2.imwrite(str(checker_path), checkerboard)
-        save_geotiff(warped_src, geotiff_path)
+        saved_tif = save_geotiff(warped_src, geotiff_path)
+        if saved_tif is None or not geotiff_path.exists():
+            # Fallback: plain TIFF via OpenCV so the product always exists;
+            # record that it is not georeferenced in the manifest.
+            cv2.imwrite(str(geotiff_path), warped_src)
+            saved_tif = str(geotiff_path)
+            geotiff_georeferenced = False
+        else:
+            geotiff_georeferenced = True
+
+        # Persist canonical match points (measured inliers) alongside products.
+        try:
+            with open(matches_path, "w") as _mf:
+                json.dump(
+                    [
+                        {
+                            "image1_x": float(m.get("image1_x", m.get("source_x", 0))),
+                            "image1_y": float(m.get("image1_y", m.get("source_y", 0))),
+                            "image2_x": float(m.get("image2_x", m.get("target_x", 0))),
+                            "image2_y": float(m.get("image2_y", m.get("target_y", 0))),
+                            "confidence": float(m.get("confidence", 1.0)),
+                            "is_inlier": True,
+                        }
+                        for m in inliers
+                    ],
+                    _mf,
+                    indent=2,
+                )
+        except Exception as exc:
+            logger.warning("Failed to write matches.json for %s: %s", region_id, exc)
+            matches_path = None
+
+        # Canonical transform.json (model + matrix) in addition to legacy name.
+        try:
+            with open(transform_path, "w") as _tf:
+                json.dump({"model": "homography", "matrix": H_mat.tolist()}, _tf, indent=2)
+        except Exception as exc:
+            logger.warning("Failed to write transform.json for %s: %s", region_id, exc)
 
         registered_products = {
             "registered_source_png": str(reg_png_path),
@@ -168,13 +230,22 @@ def run_registration_for_region(
     transform_data = {
         "region_id": region_id,
         "reference_type": "external_LRO_NAC",
+        "reference_provenance": reference_provenance,
+        "provenance_warning": (
+            "SYNTHETIC OHRC-derived proxy; not a real LRO CDR. Replace with real CDR for flight validation."
+            if reference_provenance == "synthetic_ohrc_derived_proxy" else None
+        ),
         "source_sensor": "OHRC",
         "reference_sensor": "LRO_NAC",
+        "ohrc_native_gsd_m": explicit_gsd1,
+        "lro_nac_native_gsd_m": explicit_gsd2,
+        "scale_ratio": round(explicit_gsd2 / max(explicit_gsd1, 1e-9), 2),
         "status": status,
         "homography": H,
         "inlier_count": len(inliers),
         "raw_match_count": len(raw_matches),
         "fit_rmse_px": metrics.get("fit_rmse_px"),
+        "fit_rmse_is_in_sample": True,
         "validation_rmse_px": metrics.get("held_out_validation_rmse_px", metrics.get("validation_rmse_px")),
         "sub_pixel_accurate": metrics.get("sub_pixel_accurate", False),
     }
@@ -195,6 +266,11 @@ def run_registration_for_region(
     product_manifest = {
         "region_id": region_id,
         "reference_type": "external_LRO_NAC",
+        "reference_provenance": reference_provenance,
+        "ohrc_native_gsd_m": explicit_gsd1,
+        "lro_nac_native_gsd_m": explicit_gsd2,
+        "geotiff_georeferenced": registered_products.get("registered_source_tif") is not None and locals().get("geotiff_georeferenced", True),
+        "georeferencing_note": "GeoTIFF uses reference CRS/transform when available; otherwise pixel-grid fallback from_origin(). Not a PDS/SPICE rigorous georeference.",
         "source_image": str(ohrc_path),
         "reference_image": str(nac_path),
         "status": status,

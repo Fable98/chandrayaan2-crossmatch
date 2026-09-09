@@ -10,12 +10,13 @@
 
 This repository provides an open, reproducible, and photogrammetrically defensible pipeline for cross-sensor image correspondence between Chandrayaan-2 orbital instruments:
 - **Orbiter High-Resolution Camera (OHRC)**: High-resolution panchromatic imaging (~0.25–0.32 m GSD).
-- **Terrain Mapping Camera-2 (TMC-2)**: Stereo panchromatic triplets (~4–5 m GSD) supporting lunar surface topographic mapping.
-- **Imaging Infrared Spectrometer (IIRS)**: Hyperspectral sensor (~70–80 m GSD) across 256 contiguous bands (~0.8–5.0 µm) providing mineralogical and volatile signatures.
+- **Terrain Mapping Camera-2 (TMC-2)**: Panchromatic imaging (~4–5 m GSD). Current pipeline ingests a **single NCF view per region** (single-view OHRC↔TMC); joint Fore/Nadir/Aft stereo is future work, not implemented.
+- **Imaging Infrared Spectrometer (IIRS)**: Hyperspectral sensor (~70–80 m GSD) across 256 contiguous bands (~0.8–5.0 µm) providing mineralogical and volatile signatures. Stored test crops are single-band PCA proxies; direct sub-meter IIRS tie-points are unphysical.
 
 ### Primary Supported Scope
-* **Primary Registration Pipeline**: High-precision correspondence between **OHRC and TMC-2** (~16–20× linear physical resolution difference).
-* **IIRS Co-Registration Extension**: Co-registration of lower-resolution hyperspectral imagery as a spatial-spectral contextual overlay. **IIRS is treated honestly as an ~70–80 m spectrometer product, without unphysical claims of sub-meter spatial reconstruction.**
+* **Primary Registration Pipeline**: High-precision correspondence between **OHRC and TMC-2 single views** (~16–20× linear physical resolution difference) via common-GSD area resampling (not a scale-invariant descriptor).
+* **IIRS Co-Registration Extension**: Co-registration of lower-resolution hyperspectral imagery as a spatial-spectral contextual overlay. **IIRS is treated honestly as an ~70–80 m spectrometer product, without unphysical claims of sub-meter spatial reconstruction. OHRC→IIRS legs are composed chains (H_TI·H_OT, 0 measured inliers), not direct matches; derived grid points are overlay-only.**
+* **Lunar Reference (LRO NAC)**: OHRC↔LRO NAC optical pairs at ~3.6–4.5× native scale ratio. **Default test tiles are synthetic OHRC-derived proxies (warp+blur+noise) flagged `reference_provenance=synthetic_ohrc_derived_proxy` in manifests; replace with real downloaded CDRs via `--raw_nac_img` for flight validation.**
 * **Baseline Alternative**: A pretrained LoFTR baseline is provided for comparative evaluation alongside the primary structural engine.
 
 ### Quantitative Evidence & Audit Policy
@@ -93,21 +94,22 @@ PDS4 Metadata Ingestion -> Common Physical-GSD Normalization -> DEM Relief Compe
 ```
 
 **Stage Description:**
-1. **PDS4 Metadata Ingestion:** Parses sensor type, GSD, solar azimuth/elevation, emission angle, and provenance from ISRO PDS4 labels.
-2. **Common Physical-GSD Normalization:** Resamples OHRC (~0.25 m) and TMC-2 (~5 m) to a shared physical ground footprint for scale-invariant matching.
-3. **DEM Relief Compensation:** Corrects topographic parallax displacement using lunar DEM elevation and viewing geometry.
-4. **Phase Congruency & CFOG Extraction:** Extracts illumination-invariant structural features via 2D Log-Gabor filters and oriented gradient channels.
-5. **Dynamic Grid NMS:** Enforces spatially uniform feature distribution with resolution-adaptive grid scaling.
-6. **RANSAC + Sub-Pixel Refinement:** Robust projective estimation followed by Fourier Phase Correlation and Lucas-Kanade refinement.
+1. **PDS4 Metadata Ingestion:** Parses sensor type, GSD, solar azimuth/elevation, emission angle, and provenance from ISRO PDS4 labels. Sun azimuth is tracked as illumination provenance only; DEM shifts use emission geometry (sun≠sensor azimuth).
+2. **Common Physical-GSD Normalization:** Resamples OHRC (~0.25 m) and TMC-2 (~5 m) to the coarser working GSD via area averaging. This handles ~20× by downsampling, not by a scale-invariant descriptor; ~275× OHRC→IIRS is composition/overlay only.
+3. **DEM Relief Compensation:** Simplified local vertical-offset relief shift (not rigorous orbital ray-trace). Disabled at nadir or when emission/DEM unavailable; steep relief may still fail closed via Quality Gates.
+4. **Phase Congruency Extraction:** Single-channel 2D Log-Gabor Phase Congruency + normalized NCC/MI. Moderately robust to gain/bias; NOT invariant to diametric shadow reversal (~162° flip fails). Multi-channel CFOG tensor is not implemented.
+5. **Dynamic Grid NMS:** Internal matching uses a resolution-adaptive grid (e.g. 4×4 at 512px); **canonical reporting is always fixed 10×10** (`canonical_grid_size=10`, `matching_grid_size` stored separately).
+6. **RANSAC + Sub-Pixel Refinement:** Robust projective estimation followed by Fourier Phase Correlation and Lucas-Kanade refinement (per-point tracking 0.08–0.31 px; full-scene fit is larger).
 7. **Absolute RMSE (Meters) Calculation:** Computes DEM-corrected physical error on the lunar surface.
 
 ---
 
 ## 📊 Evaluation Metrics
 
-- **Fit RMSE (px):** In-sample pixel reprojection error.
+- **Fit RMSE (px):** In-sample pixel reprojection error on RANSAC inliers (`fit_rmse_is_in_sample=True`, `sub_pixel_accurate = fit_rmse<1.0`). Always read alongside held-out error.
+- **Held-Out Validation RMSE (px):** Out-of-sample error from 80/20 split; `insufficient_points_for_holdout` when inliers <8 (all primary OHRC↔TMC pairs with 6–7 inliers).
 - **Absolute RMSE (m):** DEM-corrected physical distance error on the lunar surface (the most critical metric for ISRO).
-- **Spatial Coverage Score:** Percentage of active $10 \times 10$ image grid cells occupied by verified geometric inliers.
+- **Spatial Coverage Score:** Percentage of **canonical fixed $10 \times 10$** grid cells occupied by verified inliers (`matching_grid_size` reported separately; dynamic-grid coverage is not comparable).
 - **Spatial Uniformity Score:** Information entropy-based dispersion metric measuring spatial spread across the scene.
 - **Inlier Ratio:** Percentage of raw candidate matches that pass rigorous geometric verification.
 
@@ -144,9 +146,12 @@ Empirical evaluation across all 8 multi-sensor Chandrayaan-2 test regions, bench
 SIH Problem Statement 26166 explicitly mandates image correspondence between Chandrayaan-2 optical sensors and **Lunar reference images**. This requirement is addressed via direct registration between Chandrayaan-2 **OHRC (Source/Moving)** and NASA **LRO Narrow Angle Camera (Reference/Fixed)** products.
 
 ### Strategic Physical Framework: Why LRO NAC Yields Defensible Sub-Pixel Accuracy
-While internal Chandrayaan-2 pairs span extreme resolution disparities (OHRC $\leftrightarrow$ TMC-2 at $\sim 21\times$, OHRC $\rightarrow$ IIRS at $\sim 275\times$), the OHRC native resolution ($\sim 0.25$–$0.32\,\text{m/px}$) and LRO NAC native resolution ($\sim 0.5$–$1.2\,\text{m/px}$) form a tightly coupled **$\sim 1$–$4\times$ physical scale ratio**. Both instruments are panchromatic optical imagers capturing visible lunar reflectance (OHRC: 450–700 nm; NAC: 400–750 nm).
+While internal Chandrayaan-2 pairs span extreme resolution disparities (OHRC $\leftrightarrow$ TMC-2 at $\sim 20\times$, OHRC $\rightarrow$ IIRS at $\sim 275$–$300\times$ overlay only), the OHRC native resolution ($\sim 0.25$–$0.32\,\text{m/px}$) and LRO NAC native resolution ($\sim 0.9$–$1.1\,\text{m/px}$) form a tightly coupled **$\sim 3.6$–$4.5\times$ physical scale ratio**. Both instruments are panchromatic optical imagers capturing visible lunar reflectance (OHRC: 450–700 nm; NAC: 400–750 nm).
 
-Consequently, this pairing does not require the heavy multi-spectral dimensionality reduction required for hyperspectral IIRS. In fact, running the matching engine with `multimodal_pair=False` (normalized cross-correlation and direct structural correlation) outperforms the multi-modal path, reducing Fit RMSE from $0.326\,\text{px}$ down to **$0.270\,\text{px}$**.
+Consequently, this pairing does not require the heavy multi-spectral dimensionality reduction required for hyperspectral IIRS. In fact, running the matching engine with `multimodal_pair=False` (normalized cross-correlation and direct structural correlation) outperforms the multi-modal path, reducing Fit RMSE from $0.326\,\text{px}$ down to **$0.270\,\text{px}$** (in-sample; held-out up to $0.418\,\text{px}$).
+
+> [!WARNING]
+> **Reference provenance:** default `lro_nac_reference_512.png` tiles in this repo are **synthetic OHRC-derived proxies** (`warp+blur+noise`, `reference_provenance=synthetic_ohrc_derived_proxy` in `manifest.json`) for pipeline testing when no downloaded CDR is supplied. Product IDs (`M1417670274LC`, `M1413636095LC`) record the intended overlapping scene, not a downloaded raster. For flight validation, supply a real CDR via `prepare_lro_nac_pair.py --raw_nac_img/--raw_nac_lbl`. Native GSDs from the manifest (≈0.25 vs ≈0.9–1.1 m) are now used by `register_lro_nac.py`; earlier 1.0/1.0 forcing is fixed.
 
 ### Empirical Benchmark Across Real Orbital Footprints
 
@@ -167,17 +172,17 @@ Consequently, this pairing does not require the heavy multi-spectral dimensional
 
 | Requirement from Problem Statement | Status | Technical Evidence in Repository |
 | :--- | :--- | :--- |
-| **Lunar Reference Images (LRO NAC)** | **Delivered** (External Reference Framework) | PDS3 parser in [`ML_model/lro_pds3_parser.py`](ML_model/lro_pds3_parser.py), pair preparation in [`data_preprocessing_pipeline/scripts/prepare_lro_nac_pair.py`](data_preprocessing_pipeline/scripts/prepare_lro_nac_pair.py), and runner in [`scripts/register_lro_nac.py`](scripts/register_lro_nac.py) |
-| **OHRC ↔ TMC-2 Cross-Registration** | **Delivered** (Primary) | Primary CFOG / Phase Congruency matching engine in [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py) |
-| **Multi-Modal Hyperspectral (IIRS)** | **Delivered** (Co-Registration) | Multi-band IIRS reader, Phase Congruency centroid extraction, and chained triplet composition in [`data_preprocessing_pipeline/triplet_evaluator.py`](data_preprocessing_pipeline/triplet_evaluator.py) |
-| **Scale Disparity Handling (~20x)** | **Delivered** | Dynamic common physical-GSD normalization in [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py#L650-L700) |
-| **Sun-Angle / Illumination Robustness** | **Delivered** | 2D Log-Gabor Phase Congruency & CFOG oriented gradient channel features invariant to contrast inversion |
-| **Spatially Distributed Matches** | **Delivered** | **Pre-match Spatial Suppression (ANMS / SSC)** via Bailo et al. (PRL 2018) and **Post-match Grid Density Budgeting (10x10 tiered round-robin)** in [`ML_model/spatial_suppression.py`](ML_model/spatial_suppression.py) |
-| **Sub-Pixel Refinement** | **Delivered** | Two-stage refinement: 2D Fourier Phase Correlation sub-pixel quadratic peak fitting and post-RANSAC Lucas-Kanade optical flow |
-| **Independent Evaluation Metrics** | **Delivered** | In-sample Fit RMSE separated from Held-Out Validation RMSE, with 10x10 Spatial Coverage and Uniformity in [`ML_model/metrics.py`](ML_model/metrics.py) |
-| **Terrain Parallax Compensation** | **Delivered** | DEM-aware ray-intersection and relief displacement compensation in [`ML_model/geometry.py`](ML_model/geometry.py) and [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py) |
-| **Full Output Product Package** | **Delivered** | Registered GeoTIFF (`.tif`), preview (`.png`), checkerboard QA (`.png`), and structured JSON sidecars (`transform.json`, `metrics.json`) |
-| **Zero Fake Fallbacks** | **Verified** | Four strict Quality Gates; zero manufactured corner points or identity homographies when true correspondences fail |
+| **Lunar Reference Images (LRO NAC)** | **Partial — framework delivered, default imagery is proxy** | PDS3 parser in [`ML_model/lro_pds3_parser.py`](ML_model/lro_pds3_parser.py), pair preparation in [`data_preprocessing_pipeline/scripts/prepare_lro_nac_pair.py`](data_preprocessing_pipeline/scripts/prepare_lro_nac_pair.py) (`reference_provenance` flag), and runner in [`scripts/register_lro_nac.py`](scripts/register_lro_nac.py) (manifest native GSDs). Real CDR download still required for flight claim. |
+| **OHRC ↔ TMC-2 Cross-Registration** | **Delivered (single-view primary)** | Single-channel Phase Congruency matching engine in [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py). Single NCF view per region; joint Fore/Nadir/Aft stereo not implemented. |
+| **Multi-Modal Hyperspectral (IIRS)** | **Partial — co-registration overlay only** | Multi-band IIRS reader + PCA-PC1 + chained triplet composition in [`data_preprocessing_pipeline/triplet_evaluator.py`](data_preprocessing_pipeline/triplet_evaluator.py). Direct IIRS legs fail in 6/8 evals; OHRC→IIRS is composed (0 inliers); derived grid points flagged `derived_composed_overlay` in [`ML_model/iirs_multimodal_registrar.py`](ML_model/iirs_multimodal_registrar.py). |
+| **Scale Disparity Handling (~20x)** | **Partial — 20× via resampling; 275× overlay only** | Common physical-GSD area resampling in [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py#L650-L700). Not a scale-invariant descriptor; 275–300× never directly matched. |
+| **Sun-Angle / Illumination Robustness** | **Partial — moderate robustness, not invariant** | Single-channel 2D Log-Gabor Phase Congruency tolerant to gain/bias; fails diametric reversal (`triplet_new_2022` 162°). Sun azimuth logged as provenance, not used for DEM (fixed conflation bug). CFOG tensor not implemented. |
+| **Spatially Distributed Matches** | **Partial — mechanism delivered, density low** | **Pre-match Spatial Suppression (ANMS / SSC)** and **Post-match Grid Density Budgeting** in [`ML_model/spatial_suppression.py`](ML_model/spatial_suppression.py). Canonical 10×10 coverage is 6–7% with 6–7 inliers (LOW_CONFIDENCE); earlier 31–44% figures were dynamic 4×4 grid (fixed). |
+| **Sub-Pixel Refinement** | **Partial — tracker sub-pixel, scene fit mostly >1px** | Two-stage refinement (Fourier Phase Correlation + Lucas-Kanade, 0.08–0.31 px per-point). Full-scene fit 0.99–1.83 px (1/7 <1px); LRO-only 0.27–0.29 px fit / 0.25–0.42 px held-out. `sub_pixel_accurate` flag now computed (`fit<1.0`). |
+| **Independent Evaluation Metrics** | **Delivered** | In-sample Fit RMSE separated from Held-Out Validation RMSE (null when <8 inliers), fixed 10×10 coverage + `matching_grid_size` audit in [`ML_model/metrics.py`](ML_model/metrics.py) |
+| **Terrain Parallax Compensation** | **Partial — simplified shift, not rigorous 3D** | Simplified DEM relief-displacement in [`ML_model/geometry.py`](ML_model/geometry.py) and [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py). Planar homography remains; steep relief fails closed. |
+| **Full Output Product Package** | **Partial — suite exists, georef is fallback** | Registered GeoTIFF (`.tif`, pixel-grid fallback unless real CRS supplied), preview (`.png`), checkerboard QA (`.png`), `transform.json` + `ohrc_to_*_homography.json`, `metrics.json`, `matches.json` (added to LRO + `register.py`), `registered_products_manifest.json` with `georeferenced` + provenance flags |
+| **Zero Fake Fallbacks** | **Verified for primary engine** | Four strict Quality Gates; zero manufactured corner points or identity homographies. IIRS derived overlay explicitly tagged non-measured. |
 
 ---
 
@@ -216,8 +221,13 @@ Run the frontend from within the `lunar-frontend/` directory. The backend expose
 ## 10. Limitations & Physical Constraints
 
 1. **Planar Projective Approximation**: The homography model operates as a local projective approximation. On steep lunar crater walls (>30° slope), non-planar relief displacement can induce localized residual errors.
-2. **DEM Relief Compensation**: Relief displacement compensation currently uses local vertical height offsets rather than full iterative photogrammetric ray-intersection with a rigorous spacecraft orbital sensor model.
-3. **IIRS Resolution Boundary**: IIRS GSD (~70–80 m) physically limits direct optical tie-point extraction. Hyperspectral information is integrated through co-registration rather than unphysical sub-meter feature correspondence.
+2. **DEM Relief Compensation**: Simplified local vertical-offset shift, not rigorous orbital ray-trace. Sensor LOS azimuth unavailable; DEM often disabled at nadir. `geometry.dem_ray_intersection` is closed-form, not iterative.
+3. **IIRS Resolution Boundary**: IIRS GSD (~70–80 m) physically limits direct optical tie-point extraction. Hyperspectral information is integrated through composed co-registration (0 measured inliers) and derived overlay grids, not sub-meter correspondence.
+4. **Illumination / Sun-Angle**: Moderate gain/bias robustness only. Diametric ~162° azimuth reversal (`triplet_new_2022`) correctly fails closed; contrast-reversal invariance not proven. Synthetic brightness tests are diagnostic proxies, not orbital proof.
+5. **Scale**: ~20× handled by downsampling OHRC to TMC grid (detail loss); ~275× IIRS never directly matched. No scale-invariant descriptor.
+6. **Density / Uniformity**: Primary pairs yield 6–7 inliers at 6–7% canonical 10×10 coverage (LOW_CONFIDENCE); held-out validation not computable (<8 pts). Sub-pixel scene fit achieved only for LRO proxies (1–4× optical) and one borderline TMC case.
+7. **Georeferencing**: GeoTIFFs use reference CRS/transform when present, else pixel-grid EQC fallback (`georeferenced=False`). Moon-globe lat/lon uses manifest bounds when available, else demo-patch approximation.
+8. **TMC Stereo**: Single NCF view only; Fore/Nadir/Aft joint stereo not implemented.
 
 ---
 

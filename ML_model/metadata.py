@@ -53,7 +53,16 @@ class SensorMetadata:
 
     @property
     def azimuth_deg(self) -> Optional[float]:
+        # Deprecated alias: historically returned sun azimuth, which is NOT
+        # sensor line-of-sight azimuth. Kept for backward compatibility only.
+        # Do NOT use for DEM relief compensation; pass None instead.
         return self.sun_azimuth_deg
+
+    @property
+    def sensor_los_azimuth_deg(self) -> Optional[float]:
+        # Sensor line-of-sight azimuth is currently unavailable in PDS4/PDS3
+        # ingestion; DEM code must treat this as None (default geometry).
+        return None
 
 
 # Standard physical sensor specifications per Chandrayaan-2 mission documentation
@@ -65,7 +74,9 @@ SENSOR_SPECS = {
         "nominal_emission_deg": 0.0,
     },
     "TMC-2": {
-        "gsd_m": 5.0,  # ~4–5 m at 100 km nominal orbit (stereo Fore, Nadir, Aft)
+        "gsd_m": 5.0,  # ~4–5 m at 100 km nominal orbit. NOTE: current pipeline
+        # ingests a single TMC-2 NCF view per region (single-view, not joint
+        # Fore/Nadir/Aft stereo). Fore +26°/Nadir 0°/Aft -26° handling is future work.
         "wavelength_range_um": (0.40, 0.85),  # Panchromatic optical
         "nominal_emission_deg": None,  # Scene/product dependent (Fore +26°, Nadir 0°, Aft -26°); no universal default
     },
