@@ -11,7 +11,7 @@
   "lro_nac_native_gsd_m": 0.914,
   "scale_ratio": 3.66,
   "working_tile_size": [
-    512,
+    317,
     512
   ],
   "bounds": {
@@ -32,16 +32,16 @@
   "ohrc_source_image": "data_preprocessing_pipeline\\lro_nac_real\\region_001\\ohrc_source_512.png",
   "lro_nac_reference_image": "data_preprocessing_pipeline\\lro_nac_real\\region_001\\lro_nac_reference_512.png",
   "lro_nac_label": "data_preprocessing_pipeline\\lro_nac_real\\region_001\\lro_nac_reference_512.lbl",
-  "nac_crop_note": "RIGOROUS north-up affine from CDR corners (y0=north -2.18): x2418..5063,y34300..38577 (2645x4277, partial east overlap ~66%), padded square to preserve aspect, resized 512; first south-up hypothesis failed all gates, flipped passes",
+  "nac_crop_note": "RIGOROUS north-up affine x2418..5063,y34300..38577 NATIVE aspect (317x512, no pad distortion); OHRC cropped to overlapping western ~66% and resized to same 317x512; overlap-matched aspect",
   "nac_source_file": "C:\\Users\\rohit\\Downloads\\M1417670274LC.IMG",
-  "matching_note": "multimodal_pair=True (MI) required; optical NCC=0 candidates; 23 raw/5 inliers, fit 0.8045px sub-pixel, LOW_CONFIDENCE, coverage 5% @10x10, no held-out (<8)",
-  "nac_crop_method": "affine_least_squares_corners_north_up_pad",
+  "matching_note": "multimodal_pair=True (MI); optical NCC=0; 32 raw/6 inliers, fit 0.4979px sub-pixel, LOW_CONFIDENCE, 6% @10x10, no held-out; beats padded-square 23/5 @0.8045",
+  "nac_crop_method": "affine_north_up_native_aspect_overlap_matched",
   "overlap_note": "partial: OHRC east edge 336.589 vs NAC east edge ~336.58; scale_ratio absorbs aspect",
   "result": {
-    "fit_rmse_px": 0.8045,
+    "fit_rmse_px": 0.4979,
     "sub_pixel_accurate": true,
-    "inlier_count": 5,
-    "match_count": 23,
+    "inlier_count": 6,
+    "match_count": 32,
     "quality_tier": "LOW_CONFIDENCE"
   }
 }
