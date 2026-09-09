@@ -501,6 +501,39 @@ export default function RegistrationLauncher() {
     setReferencePreview(null);
   };
 
+  const loadTestPairIntoForm = async (
+    sourceRel: string,
+    refRel: string,
+    sSensor: Sensor,
+    rSensor: Sensor,
+    sName: string,
+    rName: string
+  ) => {
+    try {
+      setLoading(true);
+      setError(null);
+      setResult(null);
+      const [sRes, rRes] = await Promise.all([
+        fetch(imageUrl(sourceRel)),
+        fetch(imageUrl(refRel)),
+      ]);
+      const sBlob = await sRes.blob();
+      const rBlob = await rRes.blob();
+      const sFile = new File([sBlob], sName, { type: "image/png" });
+      const rFile = new File([rBlob], rName, { type: "image/png" });
+      setSourceFile(sFile);
+      setReferenceFile(rFile);
+      setSourcePreview(imageUrl(sourceRel));
+      setReferencePreview(imageUrl(refRel));
+      setSourceSensor(sSensor);
+      setReferenceSensor(rSensor);
+    } catch {
+      setError("Could not load sample files into upload form.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const register = async () => {
     if (!sourceFile && !selectedSample) {
       setError("Please select or upload both a source image and reference image before registering.");
@@ -616,7 +649,8 @@ export default function RegistrationLauncher() {
 
   const referencePrimarySrc = result?.reference_url ? absoluteUrl(result.reference_url) : referencePreview;
 
-  const isFailedRegistration = result && result.status !== "success";
+  const isFailedRegistration =
+    (result && result.status !== "success") || (customMode && !!error);
 
   return (
     <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm md:p-6">
@@ -764,9 +798,46 @@ export default function RegistrationLauncher() {
             <FilePicker label="Optional DEM Elevation DTM" file={demFile} optional onChange={setDemFile} />
           </div>
 
+          {/* Quick Pre-aligned test buttons */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-indigo-100/60 text-[10px]">
+            <span className="font-bold text-slate-500">Quick Test Pairs:</span>
+            <button
+              type="button"
+              onClick={() =>
+                loadTestPairIntoForm(
+                  "/images/ohrc/region_001.png",
+                  "/images/lro_nac/region_001.png",
+                  "OHRC",
+                  "LRO_NAC",
+                  "region_001_ohrc.png",
+                  "region_001_lro_nac.png"
+                )
+              }
+              className="rounded-lg border border-indigo-200 bg-white px-2.5 py-1 font-bold text-indigo-600 hover:bg-indigo-50 transition shadow-xs"
+            >
+              🌙 Load Region 001 (OHRC + LRO NAC)
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                loadTestPairIntoForm(
+                  "/images/ohrc/region_001.png",
+                  "/images/tmc/region_001.png",
+                  "OHRC",
+                  "TMC",
+                  "region_001_ohrc.png",
+                  "region_001_tmc.png"
+                )
+              }
+              className="rounded-lg border border-indigo-200 bg-white px-2.5 py-1 font-bold text-indigo-600 hover:bg-indigo-50 transition shadow-xs"
+            >
+              🪐 Load Region 001 (OHRC + TMC-2)
+            </button>
+          </div>
+
           {error && (
             <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
-              <span className="font-black uppercase tracking-wider">Note:</span>
+              <span className="font-black uppercase tracking-wider">Verification Notice:</span>
               <span className="ml-2">{error}</span>
             </div>
           )}
@@ -790,7 +861,7 @@ export default function RegistrationLauncher() {
       )}
 
       {/* 3. Scientific Failure State: Quality Gate Rejection Panel */}
-      {isFailedRegistration && !customMode && (
+      {isFailedRegistration && (
         <div className="mt-5 space-y-4">
           <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-5 md:p-6">
             <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -824,11 +895,11 @@ export default function RegistrationLauncher() {
                   <div className="space-y-1 font-mono text-[11px]">
                     <div className="flex justify-between border-b border-slate-100 pb-1">
                       <span className="font-sans text-slate-500">Rejection Cause:</span>
-                      <span className="font-bold text-rose-700">{result.message}</span>
+                      <span className="font-bold text-rose-700">{result?.message || error || "Robust geometric verification failed to estimate a valid transformation from verified correspondences."}</span>
                     </div>
                     <div className="flex justify-between border-b border-slate-100 pb-1">
                       <span className="font-sans text-slate-500">Verified Inliers:</span>
-                      <span className="font-bold text-slate-900">0 consensus points</span>
+                      <span className="font-bold text-slate-900">{result?.metrics?.num_inliers ?? 0} consensus points (minimum 4 required)</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="font-sans text-slate-500">Synthetic Fallback Action:</span>
@@ -841,12 +912,16 @@ export default function RegistrationLauncher() {
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div className="rounded-xl border border-rose-200/80 bg-white p-2.5">
                     <div className="flex items-center justify-between mb-1.5 px-1">
-                      <span className="text-[11px] font-bold text-slate-800">Source: OHRC (0.25m)</span>
-                      <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-800 font-mono">Sun: 269.6° (West)</span>
+                      <span className="text-[11px] font-bold text-slate-800">
+                        {customMode && sourceFile ? `Uploaded Source: ${sourceFile.name}` : `Source: OHRC (0.25m)`}
+                      </span>
+                      <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-800 font-mono">
+                        {customMode ? sourceSensor : "Sun: 269.6° (West)"}
+                      </span>
                     </div>
                     <div className="relative aspect-square bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center">
                       <img
-                        src={sourcePrimarySrc || imageUrl("/images/ohrc/triplet_new_2022.png")}
+                        src={sourcePreview || sourcePrimarySrc || imageUrl("/images/ohrc/triplet_new_2022.png")}
                         alt="Source Divergent"
                         className="w-full h-full object-contain"
                         onError={(e) => { (e.currentTarget as HTMLImageElement).src = imageUrl("/images/ohrc/region_001.png"); }}
@@ -855,12 +930,16 @@ export default function RegistrationLauncher() {
                   </div>
                   <div className="rounded-xl border border-rose-200/80 bg-white p-2.5">
                     <div className="flex items-center justify-between mb-1.5 px-1">
-                      <span className="text-[11px] font-bold text-slate-800">Reference: TMC-2 (4.0m)</span>
-                      <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-800 font-mono">Sun: 108.9° (East)</span>
+                      <span className="text-[11px] font-bold text-slate-800">
+                        {customMode && referenceFile ? `Uploaded Reference: ${referenceFile.name}` : `Reference: TMC-2 (4.0m)`}
+                      </span>
+                      <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-800 font-mono">
+                        {customMode ? referenceSensor : "Sun: 108.9° (East)"}
+                      </span>
                     </div>
                     <div className="relative aspect-square bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center">
                       <img
-                        src={referencePrimarySrc || imageUrl("/images/tmc/triplet_new_2022.png")}
+                        src={referencePreview || referencePrimarySrc || imageUrl("/images/tmc/triplet_new_2022.png")}
                         alt="Reference Divergent"
                         className="w-full h-full object-contain"
                         onError={(e) => { (e.currentTarget as HTMLImageElement).src = imageUrl("/images/tmc/region_001.png"); }}
@@ -869,7 +948,9 @@ export default function RegistrationLauncher() {
                   </div>
                 </div>
                 <div className="mt-2.5 rounded-lg bg-rose-100/70 py-1.5 px-3 text-center text-[10px] font-bold text-rose-800">
-                  ⚠️ 160.8° Solar Azimuth Inversion: Shadows fall toward opposite crater rims, causing cross-correlation to fail safely rather than producing hallucinated matches.
+                  {customMode
+                    ? "⚠️ Insufficient Consensus Overlap: When uploaded images lack sufficient shared crater topography or feature points, the pipeline cleanly rejects registration rather than producing hallucinated matches."
+                    : "⚠️ 160.8° Solar Azimuth Inversion: Shadows fall toward opposite crater rims, causing cross-correlation to fail safely rather than producing hallucinated matches."}
                 </div>
 
                 <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -894,6 +975,25 @@ export default function RegistrationLauncher() {
                   >
                     View 21x Scale Pair (Region 001 TMC-2)
                   </button>
+
+                  {customMode && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        loadTestPairIntoForm(
+                          "/images/ohrc/region_001.png",
+                          "/images/lro_nac/region_001.png",
+                          "OHRC",
+                          "LRO_NAC",
+                          "region_001_ohrc.png",
+                          "region_001_lro_nac.png"
+                        );
+                      }}
+                      className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100"
+                    >
+                      Load Verified Sample Files into Form
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
