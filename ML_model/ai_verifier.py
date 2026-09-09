@@ -42,7 +42,7 @@ class AIMatchVerifier:
             # HEURISTIC FALLBACK: 
             # If no model is trained, act as a strict statistical gate.
             # Reject matches that fall below the 25th percentile of the current batch.
-            threshold = np.percentile(scores, 25) if len(scores) > 4 else 0.3
+            threshold = float(np.percentile(scores, 25)) if len(scores) > 4 else 0.3
             # Return 1.0 for pass, 0.0 for fail (simulating probability)
             return (scores >= threshold).astype(np.float32)
         

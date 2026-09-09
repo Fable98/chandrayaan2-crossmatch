@@ -1,12 +1,10 @@
 """ML_model/master_pipeline.py — Master Orchestrator for Chandrayaan-2 registration.
 
-Daisy-chains classical (CFOG), crater-anchor (YOLO), and deep (Kornia)
-matchers with sub-pixel refinement and uniform spatial filtering into a
-single fault-tolerant, memory-safe pipeline.
+Orchestrates classical CFOG + Phase Congruency matching with uniform
+spatial filtering into a single fault-tolerant, memory-safe pipeline.
 
 Design guardrails:
   * NEVER raises from :meth:`MasterRegistrationPipeline.register`.
-  * Lazy-loads heavy AI models only when actually needed.
   * Every submodule call is wrapped in try/except; failures are logged
     and the pipeline continues with whatever matches it has.
 """
@@ -37,14 +35,12 @@ def _ensure_ml_model_on_path() -> None:
 
 
 class MasterRegistrationPipeline:
-    """Intelligent daisy-chain of CFOG -> Crater -> Kornia -> Subpixel -> Distribution."""
+    """8-Phase AI-Augmented Photogrammetry Pipeline: CFOG + Phase Congruency + AI Verifier + Distribution."""
 
     def __init__(self, min_inliers_required: int = 50) -> None:
         self.min_inliers_required = int(min_inliers_required)
         self.logger = logging.getLogger("ML_model.master_pipeline")
         # CRITICAL GUARDRAIL: lazy-load heavy models only on demand.
-        self.kornia_matcher = None
-        self.crater_matcher = None
         self.subpixel_refiner = None
         self.distribution_filter = None
 
@@ -249,10 +245,13 @@ class MasterRegistrationPipeline:
                 phases_executed.append("CFOG")
             phases_failed.append("CFOG")
 
-        # ---------------- Phase 4: Sub-Pixel Refinement ----------------
-        # --- Phase 4: Sub-Pixel Refinement (DISABLED - CFOG already does this) ---
+        # ---------------- Phase 4: Sub-Pixel Refinement (HANDLED BY CFOG) ----
+        # CFOG engine already performs Fourier Phase Correlation + Lucas-Kanade
+        # sub-pixel refinement internally. Running an external refiner here
+        # would apply double-refinement and introduce jitter.
         refined_src: np.ndarray = base_src
         refined_ref: np.ndarray = base_ref
+        phases_executed.append("Subpixel_internal")
 
         # ---------------- Phase 5: Uniform Spatial Distribution ----------------
         filtered_src = refined_src
@@ -318,31 +317,32 @@ class MasterRegistrationPipeline:
         final_inliers = 0
         final_rmse: float = float("inf")
 
-        # PRIORITY: Use the perfect homography matrix calculated by CFOG
+        # PRIORITY: Use the homography already calculated by CFOG
         if cfog_H is not None:
-            transformation_matrix = np.asarray(cfog_H, dtype=np.float64)
             try:
+                if isinstance(cfog_H, list):
+                    cfog_H = np.asarray(cfog_H, dtype=np.float64)
+                transformation_matrix = np.asarray(cfog_H, dtype=np.float64).reshape(3, 3)
                 final_inliers = int(n_inl)
-            except Exception:
-                final_inliers = 0
-            # Estimate RMSE using the provided points and matrix
-            try:
-                fs = filtered_src
-                fr = filtered_ref
-                n = min(len(fs), len(fr))
-                if n == 0:
-                    raise ValueError("No points for RMSE estimation.")
-                fs, fr = fs[:n], fr[:n]
-                ones = np.ones((n, 1), dtype=np.float64)
-                src_h = np.hstack([fs.astype(np.float64), ones])
-                proj = (transformation_matrix @ src_h.T).T
-                proj = proj[:, :2] / np.maximum(proj[:, 2:3], 1e-12)
-                err = np.linalg.norm(proj - fr.astype(np.float64), axis=1)
-                final_rmse = float(np.sqrt(np.mean(err**2)))
+                # Compute RMSE using available points
+                if filtered_src is not None and len(filtered_src) >= 4:
+                    fs = np.asarray(filtered_src, dtype=np.float64).reshape(-1, 2)
+                    fr = np.asarray(filtered_ref, dtype=np.float64).reshape(-1, 2)
+                    n = min(len(fs), len(fr))
+                    fs, fr = fs[:n], fr[:n]
+                    ones = np.ones((n, 1), dtype=np.float64)
+                    src_h = np.hstack([fs, ones])
+                    proj = (transformation_matrix @ src_h.T).T
+                    proj = proj[:, :2] / np.maximum(proj[:, 2:3], 1e-12)
+                    err = np.linalg.norm(proj - fr, axis=1)
+                    final_rmse = float(np.sqrt(np.mean(err**2)))
+                self.logger.info("Using CFOG pre-calculated homography (inliers=%d, RMSE=%.4f).", final_inliers, final_rmse)
             except Exception as e:
-                self.logger.warning("RMSE computation failed: %s", e)
-        else:
-            # FALLBACK: Use vanilla RANSAC ONLY if CFOG didn't return a matrix
+                self.logger.warning("CFOG homography passthrough failed: %s. Falling back.", e)
+                cfog_H = None
+
+        # FALLBACK: Vanilla RANSAC only if CFOG didn't provide a matrix
+        if cfog_H is None or transformation_matrix is None:
             try:
                 if filtered_src is not None and len(filtered_src) >= 4:
                     fs = np.asarray(filtered_src, dtype=np.float32).reshape(-1, 2)
@@ -355,33 +355,14 @@ class MasterRegistrationPipeline:
                         final_inliers = int(np.count_nonzero(inl))
                         if final_inliers >= 4:
                             transformation_matrix = np.asarray(H, dtype=np.float64)
-                            # Final RMSE over RANSAC inliers in pixels.
-                            try:
-                                ones = np.ones((final_inliers, 1), dtype=np.float64)
-                                src_h = np.hstack([fs[inl].astype(np.float64), ones])
-                                proj = (H @ src_h.T).T
-                                proj = proj[:, :2] / np.maximum(proj[:, 2:3], 1e-12)
-                                err = np.linalg.norm(proj - fr[inl].astype(np.float64), axis=1)
-                                final_rmse = float(np.sqrt(np.mean(err**2)))
-                            except Exception as e:
-                                self.logger.warning("RMSE computation failed: %s", e)
-                                final_rmse = float("inf")
-                        else:
-                            self.logger.warning("Homography has <4 inliers (%d).", final_inliers)
-                            transformation_matrix = None
-                            final_inliers = 0
-                    else:
-                        self.logger.warning("cv2.findHomography returned None.")
-                        transformation_matrix = None
-                else:
-                    n_have = 0 if filtered_src is None else len(filtered_src)
-                    self.logger.warning("Insufficient points for homography (%d < 4).", n_have)
-                    transformation_matrix = None
+                            ones = np.ones((final_inliers, 1), dtype=np.float64)
+                            src_h = np.hstack([fs[inl].astype(np.float64), ones])
+                            proj = (H @ src_h.T).T
+                            proj = proj[:, :2] / np.maximum(proj[:, 2:3], 1e-12)
+                            err = np.linalg.norm(proj - fr[inl].astype(np.float64), axis=1)
+                            final_rmse = float(np.sqrt(np.mean(err**2)))
             except Exception as e:
-                self.logger.warning("Homography estimation crashed: %s", e)
-                transformation_matrix = None
-                final_inliers = 0
-                final_rmse = float("inf")
+                self.logger.warning("Fallback homography estimation failed: %s", e)
 
         status = "success" if (transformation_matrix is not None and final_inliers >= 4) else "failed"
         if status == "failed":
@@ -396,6 +377,8 @@ class MasterRegistrationPipeline:
             "balance_score": float(balance_score),
             "phases_executed": phases_executed,
             "phases_failed": phases_failed,
+            "filtered_src_pts": filtered_src.tolist() if filtered_src is not None and hasattr(filtered_src, 'tolist') else None,
+            "filtered_ref_pts": filtered_ref.tolist() if filtered_ref is not None and hasattr(filtered_ref, 'tolist') else None,
         }
 
 
