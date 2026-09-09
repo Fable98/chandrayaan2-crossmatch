@@ -5,7 +5,7 @@ import { imageUrl } from "@/lib/api";
 import { footprintSizeKm } from "@/lib/geo";
 import type { TripletSummary } from "@/lib/types";
 
-export type PayloadFilter = "all" | "ohrc" | "tmc" | "iirs" | "qa";
+export type PayloadFilter = "all" | "ohrc" | "tmc" | "iirs" | "lro" | "qa";
 
 interface Props {
   triplets: TripletSummary[];
@@ -23,9 +23,12 @@ export default function VaultModal({
   const [filter, setFilter] = useState<PayloadFilter>(initialFilter);
   const [search, setSearch] = useState("");
 
-  const filteredTriplets = triplets.filter((t) =>
-    t.id.toLowerCase().includes(search.toLowerCase())
-  );
+  const filteredTriplets = triplets.filter((t) => {
+    const matchesSearch = t.id.toLowerCase().includes(search.toLowerCase());
+    if (!matchesSearch) return false;
+    if (filter === "lro") return Boolean(t.lro_nac_available);
+    return true;
+  });
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm animate-fade-in">
@@ -82,6 +85,11 @@ export default function VaultModal({
               label="IIRS (70m)"
             />
             <FilterButton
+              active={filter === "lro"}
+              onClick={() => setFilter("lro")}
+              label="LRO NAC (0.9m)"
+            />
+            <FilterButton
               active={filter === "qa"}
               onClick={() => setFilter("qa")}
               label="Registration QA"
@@ -121,6 +129,10 @@ export default function VaultModal({
                 thumbUrl = imageUrl(`/images/iirs/${t.id}`);
                 badge = "IIRS 70m";
                 targetView = "map";
+              } else if (filter === "lro") {
+                thumbUrl = imageUrl(`/images/lro_nac/${t.id}`);
+                badge = "LRO NAC 0.9m";
+                targetView = "linked-cursor";
               } else if (filter === "qa") {
                 thumbUrl = imageUrl(`/images/registered/${t.id}/blend_overlay.png`);
                 badge = "Co-Reg QA";

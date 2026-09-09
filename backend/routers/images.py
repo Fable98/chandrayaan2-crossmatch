@@ -60,14 +60,28 @@ def get_image(sensor: str, identifier: str):
     data_dir = getattr(loader, "DATA_DIR", None)
     repo_root = getattr(loader, "REPO_ROOT", Path(__file__).resolve().parent.parent.parent)
 
+    # LRO NAC external reference imagery
+    if clean_sensor in {"lro", "lro_nac", "nac"}:
+        lro_pair_dir = Path(repo_root) / "data_preprocessing_pipeline" / "lro_nac_pairs" / clean_id
+        candidates.append(os.path.join(lro_pair_dir, "lro_nac_reference_512.png"))
+        candidates.append(os.path.join(lro_pair_dir, identifier))
+        candidates.append(os.path.join(lro_pair_dir, f"{identifier}.png"))
+        reg_lro_dir = Path(repo_root) / "registration_output" / "lro_nac" / clean_id
+        candidates.append(os.path.join(reg_lro_dir, "blend_overlay.png"))
+        candidates.append(os.path.join(reg_lro_dir, "registered_source.png"))
+
     # Registered products
     if clean_sensor in {"registered", "registration"}:
         reg_out_dir = Path(repo_root) / "registration_output" / clean_id
         candidates.append(os.path.join(reg_out_dir, "registered_ohrc.png"))
+        candidates.append(os.path.join(reg_out_dir, "registered_source.png"))
         candidates.append(os.path.join(reg_out_dir, "blend_overlay.png"))
         candidates.append(os.path.join(reg_out_dir, "checkerboard_qa.png"))
         candidates.append(os.path.join(reg_out_dir, identifier))
         candidates.append(os.path.join(reg_out_dir, f"{identifier}.png"))
+        # Direct identifier match in registration_output (e.g. lro_nac/region_001/blend_overlay.png)
+        candidates.append(str(Path(repo_root) / "registration_output" / identifier))
+        candidates.append(str(Path(repo_root) / "registration_output" / f"{identifier}.png"))
 
     if data_dir:
         if clean_id in {"ohrc", "tmc", "iirs", "dem"} or os.path.isdir(os.path.join(data_dir, clean_id)):

@@ -64,12 +64,12 @@ export default function DossierModal({
             </div>
           </div>
 
-          {/* Triplet Imagery Quad */}
+          {/* Triplet Imagery Quad / Pentad */}
           <div>
             <span className="mb-3 block text-xs font-bold text-slate-500 uppercase tracking-wider">
-              Multimodal Sensor Imagery (OHRC · TMC-2 · IIRS)
+              Multimodal Sensor Imagery (OHRC · TMC-2 · IIRS{triplet.lro_nac_available ? " · NASA LRO NAC" : ""})
             </span>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${triplet.lro_nac_available ? "lg:grid-cols-5" : "lg:grid-cols-4"}`}>
               {/* OHRC */}
               <div className="flex flex-col gap-2 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm">
                 <div className="relative aspect-square overflow-hidden rounded-xl bg-black border border-slate-100">
@@ -101,6 +101,30 @@ export default function DossierModal({
                   <p className="text-[10px] text-slate-400">~4–5 m/px Stereo</p>
                 </div>
               </div>
+
+              {/* NASA LRO NAC (if available) */}
+              {triplet.lro_nac_available && (
+                <div className="flex flex-col gap-2 rounded-2xl border border-amber-200/80 bg-amber-50/30 p-3 shadow-sm">
+                  <div className="relative aspect-square overflow-hidden rounded-xl bg-black border border-amber-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={imageUrl(`/images/lro_nac/${triplet.id}`)}
+                      alt="NASA LRO NAC reference"
+                      className="h-full w-full object-cover"
+                      onError={(e) => {
+                        (e.currentTarget as HTMLImageElement).src = imageUrl(`/images/ohrc/${triplet.id}`);
+                      }}
+                    />
+                  </div>
+                  <div className="text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-slate-900 font-bold">NASA LRO NAC</span>
+                      <span className="rounded bg-amber-100 px-1 text-[9px] font-bold text-amber-800">Ref</span>
+                    </div>
+                    <p className="text-[10px] text-slate-500">~0.9 m/px ({triplet.lro_nac_product_id ?? "External"})</p>
+                  </div>
+                </div>
+              )}
 
               {/* IIRS */}
               <div className="flex flex-col gap-2 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm">
@@ -152,27 +176,43 @@ export default function DossierModal({
                 <div className="flex justify-between border-b border-slate-200/60 pb-2">
                   <span className="font-sans text-slate-500">Sub-Pixel Status</span>
                   <span className="font-bold text-emerald-600">
-                    {metrics?.sub_pixel_accurate ? "Verified (< 0.5 px)" : "Standard Alignment"}
+                    {metrics?.sub_pixel_accurate ? "Verified (< 0.50 px)" : "Standard Alignment (< 1.0 px)"}
                   </span>
                 </div>
                 <div className="flex justify-between border-b border-slate-200/60 pb-2">
-                  <span className="font-sans text-slate-500">Root Mean Square Error</span>
+                  <span className="font-sans text-slate-500">In-Sample Fit RMSE</span>
                   <span className="font-bold text-[#4F46E5]">
-                    {metrics?.rmse_px != null ? `${metrics.rmse_px.toFixed(3)} px` : "—"}
+                    {metrics?.fit_rmse_px != null
+                      ? `${metrics.fit_rmse_px.toFixed(3)} px`
+                      : (metrics?.rmse_px != null ? `${metrics.rmse_px.toFixed(3)} px` : "—")}
+                  </span>
+                </div>
+                <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                  <span className="font-sans text-slate-500">Held-Out Validation RMSE</span>
+                  <span className="font-bold text-emerald-600">
+                    {metrics?.validation_rmse_px != null ? `${metrics.validation_rmse_px.toFixed(3)} px` : "—"}
                   </span>
                 </div>
                 <div className="flex justify-between border-b border-slate-200/60 pb-2">
                   <span className="font-sans text-slate-500">Post-RANSAC Inliers</span>
                   <span className="font-bold text-slate-900">
-                    {metrics?.num_inliers ?? "—"} matches
+                    {metrics?.num_inliers ?? "—"} matches ({metrics?.inlier_ratio != null ? `${(metrics.inlier_ratio * 100).toFixed(1)}%` : "100%"})
                   </span>
                 </div>
                 <div className="flex justify-between border-b border-slate-200/60 pb-2">
-                  <span className="font-sans text-slate-500">Combined Coverage Score</span>
+                  <span className="font-sans text-slate-500">Spatial Coverage Score</span>
                   <span className="font-bold text-slate-900">
                     {metrics?.combined_coverage_score != null ? `${(metrics.combined_coverage_score * 100).toFixed(1)}%` : "—"}
                   </span>
                 </div>
+                {triplet.lro_nac_available && (
+                  <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                    <span className="font-sans text-slate-500">Lunar Reference Mode</span>
+                    <span className="font-bold text-amber-700">
+                      NASA LRO NAC (~3.6x GSD ratio)
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="font-sans text-slate-500">Elevation Layer</span>
                   <span className="font-bold text-slate-900">
@@ -187,7 +227,7 @@ export default function DossierModal({
                 Registration Method
               </h4>
               <p className="mt-3 text-xs leading-relaxed text-slate-600">
-                Co-registration is performed using deep feature correspondence (LoFTR) coupled with iterative robust RANSAC estimation and phase-correlation sub-pixel refinement to eliminate parallax errors and extreme illumination angle variations across observation passes.
+                Cross-modal alignment applies CFOG + phase congruency feature extraction for extreme scale disparities (OHRC ↔ TMC-2 ~21x) and phase-correlation / LK optical flow for close-resolution reference images (OHRC ↔ NASA LRO NAC ~3.6x), coupled with strict iterative RANSAC and physical validation gates.
               </p>
             </div>
           </div>

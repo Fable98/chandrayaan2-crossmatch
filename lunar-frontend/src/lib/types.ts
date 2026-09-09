@@ -25,11 +25,20 @@ export interface TripletSummary {
   ohrc_product_id?: string | null;
   tmc2_product_id?: string | null;
   iirs_product_id?: string | null;
+  lro_nac_product_id?: string | null;
+  lro_nac_available?: boolean;
+  lro_nac_gsd_m?: number;
+  reference_type?: "internal_TMC2" | "external_LRO_NAC";
   gsd?: Record<string, number>;
   sun_angle?: Record<string, number>;
   incidence_angle?: Record<string, number>;
   dem_available?: boolean;
   dem_url?: string | null;
+  fit_rmse_px?: number | null;
+  validation_rmse_px?: number | null;
+  spatial_coverage?: number | null;
+  spatial_uniformity?: number | null;
+  quality_tier?: string | null;
   [key: string]: unknown;
 }
 
@@ -50,6 +59,8 @@ export interface MatchMetrics {
   num_raw_matches?: number;
   inlier_ratio?: number;
   rmse_px?: number;
+  fit_rmse_px?: number | null;
+  validation_rmse_px?: number | null;
   mean_reprojection_error_px?: number;
   median_reprojection_error_px?: number;
   max_reprojection_error_px?: number;
@@ -58,17 +69,18 @@ export interface MatchMetrics {
   source_coverage_ratio?: number;
   destination_coverage_ratio?: number;
   combined_coverage_score?: number;
+  spatial_coverage?: number;
   source_occupied_cells?: number;
   destination_occupied_cells?: number;
   total_cells?: number;
   uniformity_score?: number;
+  spatial_uniformity?: number;
   triplet_consistency_px?: number | null;
   method?: string | null;
   orthorectified?: boolean;
-  fit_rmse_px?: number | null;
-  validation_rmse_px?: number | null;
   absolute_rmse_m?: number | null;
   validation_status?: string | null;
+  quality_tier?: string | null;
   [key: string]: unknown;
 }
 
@@ -88,4 +100,4 @@ export interface IIRSOverlay {
   opacity_hint: number;
 }
 
-export type SensorKind = "ohrc" | "tmc" | "iirs" | "dem";
+export type SensorKind = "ohrc" | "tmc" | "iirs" | "dem" | "lro_nac";

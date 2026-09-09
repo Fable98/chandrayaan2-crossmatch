@@ -32,8 +32,9 @@ def get_matches(triplet_id: str):
     processed it yet), returns 200 with an empty matches list — not 404.
     This keeps the frontend robust for partially-processed regions.
     """
-    # First verify the triplet exists
-    triplet = loader.get_triplet(triplet_id)
+    # First verify the triplet exists (support _lro_nac suffix)
+    base_id = triplet_id.replace("_lro_nac", "")
+    triplet = loader.get_triplet(triplet_id) or loader.get_triplet(base_id)
     if triplet is None:
         raise HTTPException(status_code=404, detail=f"Triplet '{triplet_id}' not found")
 

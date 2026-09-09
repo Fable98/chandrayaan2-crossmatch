@@ -10,6 +10,7 @@ const NEARBY_PX = 45;
 interface Props {
   tripletId: string;
   points: MatchPoint[];
+  referenceMode?: "tmc" | "lro_nac";
 }
 
 interface Selection {
@@ -45,7 +46,7 @@ function findNearestMatch(
   return { match: best, index: bestIdx, distance: bestDist };
 }
 
-export default function LinkedCursorPanel({ tripletId, points }: Props) {
+export default function LinkedCursorPanel({ tripletId, points, referenceMode = "tmc" }: Props) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [clickNotice, setClickNotice] = useState<string | null>(null);
@@ -58,22 +59,29 @@ export default function LinkedCursorPanel({ tripletId, points }: Props) {
     setSelection(null);
     setHoveredIndex(null);
     setClickNotice(null);
-  }, [tripletId]);
+  }, [tripletId, referenceMode]);
+
+  const activeIdx = selection ? selection.selectedIndex : hoveredIndex;
+  const activeMatch = activeIdx !== null && activeIdx !== undefined ? points[activeIdx] ?? null : null;
+
+  const handleSelectIndex = (index: number) => {
+    const p = points[index];
+    if (!p) return;
+    setSelection({ selectedIndex: index, match: p, source: "chip" });
+    setClickNotice(null);
+  };
 
   const handleCanvasClick = (
     e: React.MouseEvent<HTMLDivElement>,
     sensor: "ohrc" | "tmc"
   ) => {
-    const ref = sensor === "ohrc" ? ohrcRef : tmcRef;
-    const el = ref.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const xFrac = (e.clientX - rect.left) / rect.width;
-    const yFrac = (e.clientY - rect.top) / rect.height;
-    const px: [number, number] = [xFrac * TILE_PX, yFrac * TILE_PX];
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = ((e.clientX - rect.left) / rect.width) * TILE_PX;
+    const clickY = ((e.clientY - rect.top) / rect.height) * TILE_PX;
 
-    const nearest = findNearestMatch(px, points, sensor);
-    if (nearest && nearest.distance < NEARBY_PX) {
+    const nearest = findNearestMatch([clickX, clickY], points, sensor);
+
+    if (nearest && nearest.distance <= NEARBY_PX) {
       setSelection({
         selectedIndex: nearest.index,
         match: nearest.match,
@@ -82,59 +90,39 @@ export default function LinkedCursorPanel({ tripletId, points }: Props) {
       setClickNotice(null);
     } else {
       setClickNotice(
-        `No match within ${NEARBY_PX}px of clicked location. Click on or near an active correspondence dot.`
+        `Clicked at (${clickX.toFixed(0)}, ${clickY.toFixed(0)} px) · No correspondence within ${NEARBY_PX}px`
       );
       setTimeout(() => setClickNotice(null), 3000);
     }
   };
 
-  const handleSelectIndex = (idx: number) => {
-    if (idx >= 0 && idx < points.length) {
-      setSelection({
-        selectedIndex: idx,
-        match: points[idx],
-        source: "chip",
-      });
-      setClickNotice(null);
-    }
-  };
-
-  const activeIdx = selection?.selectedIndex ?? null;
-  const activeMatch = selection?.match ?? null;
+  const isLro = referenceMode === "lro_nac";
+  const refLabel = isLro ? "NASA LRO NAC · ~0.9 m/px (Reference)" : "TMC-2 · ~4–5 m/px (Reference)";
+  const refSrc = isLro ? imageUrl(`/images/lro_nac/${tripletId}`) : imageUrl(`/images/tmc/${tripletId}`);
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Top Status Header */}
-      <div className="flex items-center justify-between border-b border-border bg-panel/80 px-5 py-3">
-        <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-white">
-            Linked Cursor ·{" "}
-            <span className="font-normal text-ink-dim lowercase">
-              Click any match point on OHRC or TMC-2
-            </span>
-          </h2>
-          <p className="text-[10px] font-mono text-ink-faint">
-            LoFTR + CFOG sub-pixel verified geometric correspondence across sensor scales
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {activeIdx !== null && (
-            <span className="rounded-full border border-gold/40 bg-gold/15 px-2.5 py-0.5 font-mono text-2xs font-semibold text-gold animate-pulse">
-              Match #{activeIdx + 1} Selected
-            </span>
-          )}
-          <span className="rounded-full border border-teal/30 bg-teal/10 px-2.5 py-0.5 font-mono text-2xs font-semibold text-teal">
-            {points.length} verified pairs
+    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-panel text-ink shadow-panel">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-border bg-panel-raised px-5 py-3">
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-2xs uppercase tracking-widest text-teal">
+            Sub-Pixel Match Verification
+          </span>
+          <span className="text-xs text-ink-dim font-mono">
+            {points.length} verified tie points
           </span>
         </div>
+        <span className="rounded bg-teal/10 border border-teal/30 px-2 py-0.5 font-mono text-3xs uppercase tracking-wider text-teal">
+          Stage 4: LK Refinement
+        </span>
       </div>
 
-      {/* Dual Image Workspace */}
-      <div className="flex flex-1 items-center justify-center gap-6 p-4 md:gap-8 md:p-6">
+      {/* Dual Canvas Arena */}
+      <div className="grid flex-1 grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-4 p-5">
         {/* Left: OHRC Image Pane */}
         <ImagePane
           sensor="ohrc"
-          label="OHRC · 0.25–0.32 m/px (Source)"
+          label="OHRC · 0.25 m/px (Source)"
           innerRef={ohrcRef}
           src={imageUrl(`/images/ohrc/${tripletId}`)}
           onCanvasClick={(e) => handleCanvasClick(e, "ohrc")}
@@ -146,7 +134,7 @@ export default function LinkedCursorPanel({ tripletId, points }: Props) {
           onHoverIndex={setHoveredIndex}
         />
 
-        {/* Center: Interactive Linkage Indicator */}
+        {/* Center: Interactive Correlation Bridge */}
         <div className="flex flex-col items-center gap-2 text-ink-faint">
           <div className="flex flex-col items-center">
             <span
@@ -183,12 +171,12 @@ export default function LinkedCursorPanel({ tripletId, points }: Props) {
           </span>
         </div>
 
-        {/* Right: TMC-2 Image Pane */}
+        {/* Right: Reference Image Pane (TMC-2 or LRO NAC) */}
         <ImagePane
           sensor="tmc"
-          label="TMC-2 · ~4–5 m/px (Reference)"
+          label={refLabel}
           innerRef={tmcRef}
-          src={imageUrl(`/images/tmc/${tripletId}`)}
+          src={refSrc}
           onCanvasClick={(e) => handleCanvasClick(e, "tmc")}
           points={points}
           coordKey="tmc_px"

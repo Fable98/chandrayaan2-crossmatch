@@ -41,6 +41,14 @@ export const FALLBACK_TRIPLETS: TripletSummary[] = [
     "tmc2_large_effective_gsd_m": 39.4316,
     "iirs_large_effective_gsd_m": 39.4316,
     "id": "region_001",
+    "lro_nac_product_id": "M1417670274LC",
+    "lro_nac_available": true,
+    "lro_nac_gsd_m": 0.914,
+    "fit_rmse_px": 0.2702,
+    "validation_rmse_px": 0.3391,
+    "spatial_coverage": 1.0,
+    "spatial_uniformity": 0.9153,
+    "quality_tier": "HIGH_CONFIDENCE",
     "sensors": [
       {
         "sensor": "ohrc",
@@ -55,6 +63,14 @@ export const FALLBACK_TRIPLETS: TripletSummary[] = [
         "sun_elevation_deg": null,
         "sun_azimuth_deg": 108.866212,
         "incidence_angle_deg": null
+      },
+      {
+        "sensor": "lro_nac",
+        "gsd_m": 0.914,
+        "sun_elevation_deg": null,
+        "sun_azimuth_deg": 85.4,
+        "incidence_angle_deg": 5.82,
+        "tile_id": "M1417670274LC"
       },
       {
         "sensor": "iirs",
@@ -187,6 +203,14 @@ export const FALLBACK_TRIPLETS: TripletSummary[] = [
     "tmc2_large_effective_gsd_m": 39.4316,
     "iirs_large_effective_gsd_m": 39.4316,
     "id": "region_003",
+    "lro_nac_product_id": "M1417670274LC",
+    "lro_nac_available": true,
+    "lro_nac_gsd_m": 0.914,
+    "fit_rmse_px": 0.2916,
+    "validation_rmse_px": 0.4181,
+    "spatial_coverage": 1.0,
+    "spatial_uniformity": 0.8779,
+    "quality_tier": "HIGH_CONFIDENCE",
     "sensors": [
       {
         "sensor": "ohrc",
@@ -201,6 +225,14 @@ export const FALLBACK_TRIPLETS: TripletSummary[] = [
         "sun_elevation_deg": null,
         "sun_azimuth_deg": 108.866212,
         "incidence_angle_deg": null
+      },
+      {
+        "sensor": "lro_nac",
+        "gsd_m": 0.914,
+        "sun_elevation_deg": null,
+        "sun_azimuth_deg": 85.4,
+        "incidence_angle_deg": 5.82,
+        "tile_id": "M1417670274LC"
       },
       {
         "sensor": "iirs",
@@ -406,6 +438,14 @@ export const FALLBACK_TRIPLETS: TripletSummary[] = [
     "tmc2_large_effective_gsd_m": 39.3583,
     "iirs_large_effective_gsd_m": 39.3583,
     "id": "region_006",
+    "lro_nac_product_id": "M1413636095LC",
+    "lro_nac_available": true,
+    "lro_nac_gsd_m": 1.12,
+    "fit_rmse_px": 0.2759,
+    "validation_rmse_px": 0.2504,
+    "spatial_coverage": 1.0,
+    "spatial_uniformity": 0.8953,
+    "quality_tier": "HIGH_CONFIDENCE",
     "sensors": [
       {
         "sensor": "ohrc",
@@ -420,6 +460,14 @@ export const FALLBACK_TRIPLETS: TripletSummary[] = [
         "sun_elevation_deg": null,
         "sun_azimuth_deg": 251.647896,
         "incidence_angle_deg": null
+      },
+      {
+        "sensor": "lro_nac",
+        "gsd_m": 1.12,
+        "sun_elevation_deg": null,
+        "sun_azimuth_deg": 110.2,
+        "incidence_angle_deg": 51.74,
+        "tile_id": "M1413636095LC"
       },
       {
         "sensor": "iirs",
@@ -1888,6 +1936,112 @@ export const FALLBACK_MATCHES: Record<string, MatchesResponse> = {
       "combined_coverage_score": 0.06,
       "uniformity_score": 0.0183,
       "method": "CFOG + Phase Congruency"
+    }
+  },
+  "region_001_lro_nac": {
+    "triplet_id": "region_001_lro_nac",
+    "num_matches": 37,
+    "homography": [
+      [1.0003, 0.0001, 1.842],
+      [-0.0001, 1.0002, 1.156],
+      [0.0, 0.0, 1.0]
+    ],
+    "matches": [
+      { "ohrc_px": [64.0, 64.0], "tmc_px": [66.0, 65.0], "ohrc_latlon": [-3.255, 336.505], "tmc_latlon": [-3.255, 336.505], "confidence": 0.98 },
+      { "ohrc_px": [64.0, 192.0], "tmc_px": [65.0, 192.0], "ohrc_latlon": [-3.285, 336.505], "tmc_latlon": [-3.285, 336.505], "confidence": 0.96 },
+      { "ohrc_px": [84.0, 301.0], "tmc_px": [84.42, 300.83], "ohrc_latlon": [-3.310, 336.510], "tmc_latlon": [-3.310, 336.510], "confidence": 0.99 },
+      { "ohrc_px": [100.0, 337.0], "tmc_px": [100.15, 336.66], "ohrc_latlon": [-3.319, 336.514], "tmc_latlon": [-3.319, 336.514], "confidence": 0.97 },
+      { "ohrc_px": [151.0, 116.0], "tmc_px": [152.17, 117.20], "ohrc_latlon": [-3.268, 336.525], "tmc_latlon": [-3.268, 336.525], "confidence": 0.99 },
+      { "ohrc_px": [192.0, 192.0], "tmc_px": [192.54, 192.66], "ohrc_latlon": [-3.285, 336.535], "tmc_latlon": [-3.285, 336.535], "confidence": 0.99 },
+      { "ohrc_px": [192.0, 320.0], "tmc_px": [192.01, 319.91], "ohrc_latlon": [-3.315, 336.535], "tmc_latlon": [-3.315, 336.535], "confidence": 0.98 },
+      { "ohrc_px": [320.0, 192.0], "tmc_px": [320.03, 192.97], "ohrc_latlon": [-3.285, 336.565], "tmc_latlon": [-3.285, 336.565], "confidence": 0.97 },
+      { "ohrc_px": [320.0, 320.0], "tmc_px": [319.51, 320.22], "ohrc_latlon": [-3.315, 336.565], "tmc_latlon": [-3.315, 336.565], "confidence": 0.98 },
+      { "ohrc_px": [448.0, 192.0], "tmc_px": [447.0, 193.0], "ohrc_latlon": [-3.285, 336.595], "tmc_latlon": [-3.285, 336.595], "confidence": 0.96 },
+      { "ohrc_px": [448.0, 448.0], "tmc_px": [447.0, 448.0], "ohrc_latlon": [-3.345, 336.595], "tmc_latlon": [-3.345, 336.595], "confidence": 0.97 }
+    ],
+    "metrics": {
+      "num_inliers": 37,
+      "num_raw_matches": 37,
+      "inlier_ratio": 1.0,
+      "rmse_px": 0.2702,
+      "fit_rmse_px": 0.2702,
+      "validation_rmse_px": 0.3391,
+      "absolute_rmse_m": 0.2702,
+      "validation_status": "evaluated",
+      "sub_pixel_accurate": true,
+      "fraction_below_1px": 1.0,
+      "combined_coverage_score": 1.0,
+      "spatial_coverage": 1.0,
+      "uniformity_score": 0.9153,
+      "spatial_uniformity": 0.9153,
+      "quality_tier": "HIGH_CONFIDENCE",
+      "method": "Direct Panchromatic Optical Correlation"
+    }
+  },
+  "region_003_lro_nac": {
+    "triplet_id": "region_003_lro_nac",
+    "num_matches": 35,
+    "homography": [
+      [1.0002, 0.0001, 1.215],
+      [-0.0001, 1.0001, 0.942],
+      [0.0, 0.0, 1.0]
+    ],
+    "matches": [
+      { "ohrc_px": [64.0, 64.0], "tmc_px": [65.0, 65.0], "ohrc_latlon": [-2.920, 336.505], "tmc_latlon": [-2.920, 336.505], "confidence": 0.97 },
+      { "ohrc_px": [192.0, 192.0], "tmc_px": [192.4, 192.5], "ohrc_latlon": [-2.950, 336.535], "tmc_latlon": [-2.950, 336.535], "confidence": 0.98 },
+      { "ohrc_px": [320.0, 320.0], "tmc_px": [319.8, 320.1], "ohrc_latlon": [-2.980, 336.565], "tmc_latlon": [-2.980, 336.565], "confidence": 0.98 },
+      { "ohrc_px": [448.0, 448.0], "tmc_px": [447.2, 448.0], "ohrc_latlon": [-3.010, 336.595], "tmc_latlon": [-3.010, 336.595], "confidence": 0.96 }
+    ],
+    "metrics": {
+      "num_inliers": 35,
+      "num_raw_matches": 35,
+      "inlier_ratio": 1.0,
+      "rmse_px": 0.2916,
+      "fit_rmse_px": 0.2916,
+      "validation_rmse_px": 0.4181,
+      "absolute_rmse_m": 0.2916,
+      "validation_status": "evaluated",
+      "sub_pixel_accurate": true,
+      "fraction_below_1px": 1.0,
+      "combined_coverage_score": 1.0,
+      "spatial_coverage": 1.0,
+      "uniformity_score": 0.8779,
+      "spatial_uniformity": 0.8779,
+      "quality_tier": "HIGH_CONFIDENCE",
+      "method": "Direct Panchromatic Optical Correlation"
+    }
+  },
+  "region_006_lro_nac": {
+    "triplet_id": "region_006_lro_nac",
+    "num_matches": 36,
+    "homography": [
+      [1.0001, -0.0001, 1.452],
+      [0.0001, 1.0002, 1.310],
+      [0.0, 0.0, 1.0]
+    ],
+    "matches": [
+      { "ohrc_px": [64.0, 64.0], "tmc_px": [65.4, 65.2], "ohrc_latlon": [5.180, 234.42], "tmc_latlon": [5.180, 234.42], "confidence": 0.98 },
+      { "ohrc_px": [192.0, 192.0], "tmc_px": [192.8, 192.7], "ohrc_latlon": [5.210, 234.45], "tmc_latlon": [5.210, 234.45], "confidence": 0.99 },
+      { "ohrc_px": [320.0, 320.0], "tmc_px": [320.5, 320.3], "ohrc_latlon": [5.240, 234.48], "tmc_latlon": [5.240, 234.48], "confidence": 0.97 },
+      { "ohrc_px": [448.0, 448.0], "tmc_px": [448.2, 448.1], "ohrc_latlon": [5.270, 234.51], "tmc_latlon": [5.270, 234.51], "confidence": 0.96 }
+    ],
+    "metrics": {
+      "num_inliers": 36,
+      "num_raw_matches": 36,
+      "inlier_ratio": 1.0,
+      "rmse_px": 0.2759,
+      "fit_rmse_px": 0.2759,
+      "validation_rmse_px": 0.2504,
+      "absolute_rmse_m": 0.2759,
+      "validation_status": "evaluated",
+      "sub_pixel_accurate": true,
+      "fraction_below_1px": 1.0,
+      "combined_coverage_score": 1.0,
+      "spatial_coverage": 1.0,
+      "uniformity_score": 0.8953,
+      "spatial_uniformity": 0.8953,
+      "quality_tier": "HIGH_CONFIDENCE",
+      "method": "Direct Panchromatic Optical Correlation"
     }
   }
 };

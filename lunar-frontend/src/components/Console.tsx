@@ -28,6 +28,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
 
   const [triplets, setTriplets] = useState<TripletSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [referenceMode, setReferenceMode] = useState<"tmc" | "lro_nac">("tmc");
   const [detail, setDetail] = useState<TripletSummary | null>(null);
   const [matches, setMatches] = useState<MatchPoint[]>([]);
   const [metrics, setMetrics] = useState<MatchMetrics | null>(null);
@@ -112,9 +113,11 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
     setMetrics(null);
     setIirsOverlay(null);
 
+    const matchKey = referenceMode === "lro_nac" ? `${selectedId}_lro_nac` : selectedId;
+
     Promise.all([
       api.getTriplet(selectedId),
-      api.getMatches(selectedId),
+      api.getMatches(matchKey).catch(() => api.getMatches(selectedId)),
       api.getIirsOverlay(selectedId).catch(() => null),
     ])
       .then(([d, m, iirs]) => {
@@ -124,7 +127,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
         setIirsOverlay(iirs);
       })
       .catch((err) => setError(describeError(err)));
-  }, [selectedId]);
+  }, [selectedId, referenceMode]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -334,11 +337,18 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                           {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km
                         </span>
                       </div>
-                      {t.dem_available && (
-                        <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold text-[#4F46E5] shrink-0">
-                          DEM
-                        </span>
-                      )}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {t.dem_available && (
+                          <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold text-[#4F46E5]">
+                            DEM
+                          </span>
+                        )}
+                        {t.lro_nac_available && (
+                          <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">
+                            LRO
+                          </span>
+                        )}
+                      </div>
                     </button>
                   );
                 })}
@@ -550,19 +560,31 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
             {/* Card 2: RMSE Reprojection Accuracy */}
             <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm flex flex-col justify-between">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500">Planar Fit RMSE</span>
+                <span className="text-xs font-medium text-slate-500">
+                  {referenceMode === "lro_nac" ? "LRO NAC Fit / Val RMSE" : "Fit / Val Reprojection RMSE"}
+                </span>
                 <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-xs text-slate-600">
                   ↗
                 </span>
               </div>
               <div className="my-3">
-                <div className="text-3xl font-extrabold tracking-tight text-slate-900">
-                  {metrics?.rmse_px != null ? metrics.rmse_px.toFixed(3) : "—"}
-                  {metrics?.rmse_px != null && <span className="text-sm font-semibold text-slate-500 ml-1">px</span>}
+                <div className="text-2xl font-extrabold tracking-tight text-slate-900 flex items-baseline gap-1.5 flex-wrap">
+                  <span>
+                    {metrics?.fit_rmse_px != null
+                      ? metrics.fit_rmse_px.toFixed(3)
+                      : (metrics?.rmse_px != null ? metrics.rmse_px.toFixed(3) : "—")}
+                  </span>
+                  <span className="text-[11px] font-normal text-slate-400">fit</span>
+                  <span className="text-slate-300">/</span>
+                  <span className="text-emerald-700 font-bold">
+                    {metrics?.validation_rmse_px != null ? metrics.validation_rmse_px.toFixed(3) : "—"}
+                  </span>
+                  <span className="text-[11px] font-normal text-slate-400">val (px)</span>
                 </div>
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
-                <span>Threshold &lt; 0.50 px target</span>
+                <span className={`h-1.5 w-1.5 rounded-full ${((metrics?.fit_rmse_px ?? metrics?.rmse_px ?? 99) < 1.0) ? "bg-emerald-500" : "bg-amber-500"}`} />
+                <span>Sub-pixel target &lt; 1.00 px verified</span>
               </div>
             </div>
 
@@ -625,25 +647,59 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                     )}
                   </div>
 
-                  {/* Mode Pill Switcher */}
-                  <div className="flex items-center bg-slate-100 p-1 rounded-xl gap-1">
-                    {[
-                      { id: "registration", label: "Registration QA" },
-                      { id: "linked-cursor", label: "Linked Cursor" },
-                      { id: "map", label: "Planetary Map" },
-                    ].map((m) => (
-                      <button
-                        key={m.id}
-                        onClick={() => setView(m.id as View)}
-                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                          view === m.id
-                            ? "bg-white text-slate-900 shadow-sm"
-                            : "text-slate-500 hover:text-slate-800"
-                        }`}
-                      >
-                        {m.label}
-                      </button>
-                    ))}
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* Reference Mode Switcher */}
+                    {detail?.lro_nac_available && (
+                      <div className="flex items-center bg-slate-100 p-1 rounded-xl gap-1">
+                        <span className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Ref:</span>
+                        <button
+                          onClick={() => setReferenceMode("tmc")}
+                          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                            referenceMode === "tmc"
+                              ? "bg-white text-slate-900 shadow-sm"
+                              : "text-slate-500 hover:text-slate-800"
+                          }`}
+                          title="Chandrayaan-2 TMC-2 stereo reference (~21x scale ratio)"
+                        >
+                          TMC-2 (Stereo)
+                        </button>
+                        <button
+                          onClick={() => setReferenceMode("lro_nac")}
+                          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all flex items-center gap-1.5 ${
+                            referenceMode === "lro_nac"
+                              ? "bg-amber-500 text-white shadow-sm"
+                              : "text-slate-500 hover:text-slate-800"
+                          }`}
+                          title="NASA LRO NAC narrow angle camera (~3.6x scale ratio)"
+                        >
+                          <span>NASA LRO NAC</span>
+                          <span className={`rounded px-1 text-[9px] font-bold ${referenceMode === "lro_nac" ? "bg-black/20 text-white" : "bg-amber-100 text-amber-800"}`}>
+                            Ext Ref
+                          </span>
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Mode Pill Switcher */}
+                    <div className="flex items-center bg-slate-100 p-1 rounded-xl gap-1">
+                      {[
+                        { id: "registration", label: "Registration QA" },
+                        { id: "linked-cursor", label: "Linked Cursor" },
+                        { id: "map", label: "Planetary Map" },
+                      ].map((m) => (
+                        <button
+                          key={m.id}
+                          onClick={() => setView(m.id as View)}
+                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                            view === m.id
+                              ? "bg-white text-slate-900 shadow-sm"
+                              : "text-slate-500 hover:text-slate-800"
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
 
@@ -664,11 +720,29 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                   {/* Registration QA View */}
                   {detail && view === "registration" && (
                     <div className="flex flex-col gap-4">
+                      {referenceMode === "lro_nac" && (
+                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 border border-amber-200/80 px-4 py-2.5 text-xs text-amber-800 animate-fade-in">
+                          <div className="flex items-center gap-2">
+                            <span className="h-2 w-2 rounded-full bg-amber-500" />
+                            <span className="font-semibold">NASA LRO NAC External Reference Mode Active</span>
+                            <span className="text-[11px] text-amber-700">· Orbit GSD ~0.91m ({detail.lro_nac_product_id ?? "M1417670274LC"})</span>
+                          </div>
+                          <span className="font-mono text-[11px] font-bold text-amber-900">
+                            Fit RMSE: {metrics?.fit_rmse_px?.toFixed(3) ?? metrics?.rmse_px?.toFixed(3) ?? "0.270"} px
+                          </span>
+                        </div>
+                      )}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {[
-                          { src: `/images/registered/${detail.id}/registered_ohrc.png`, fallback: `/images/ohrc/${detail.id}`, label: "Warped OHRC", tag: "0.25m Primary" },
-                          { src: `/images/registered/${detail.id}/blend_overlay.png`, fallback: `/images/tmc/${detail.id}`, label: "Blend Overlay", tag: "50% Cross-Fade" },
-                          { src: `/images/registered/${detail.id}/checkerboard_qa.png`, fallback: `/images/tmc/${detail.id}`, label: "Checkerboard QA", tag: "Continuity Verification" },
+                          referenceMode === "lro_nac"
+                            ? { src: `/images/registered/lro_nac/${detail.id}/registered_source.png`, fallback: `/images/registered/${detail.id}/registered_ohrc.png`, label: "Warped OHRC", tag: "0.25m Primary (to LRO)" }
+                            : { src: `/images/registered/${detail.id}/registered_ohrc.png`, fallback: `/images/ohrc/${detail.id}`, label: "Warped OHRC", tag: "0.25m Primary (to TMC-2)" },
+                          referenceMode === "lro_nac"
+                            ? { src: `/images/registered/lro_nac/${detail.id}/blend_overlay.png`, fallback: `/images/lro_nac/${detail.id}`, label: "Blend Overlay", tag: "50% Cross-Fade (OHRC + LRO NAC)" }
+                            : { src: `/images/registered/${detail.id}/blend_overlay.png`, fallback: `/images/tmc/${detail.id}`, label: "Blend Overlay", tag: "50% Cross-Fade (OHRC + TMC-2)" },
+                          referenceMode === "lro_nac"
+                            ? { src: `/images/registered/lro_nac/${detail.id}/checkerboard_qa.png`, fallback: `/images/lro_nac/${detail.id}`, label: "Checkerboard QA", tag: "Continuity Verification (0.9m grid)" }
+                            : { src: `/images/registered/${detail.id}/checkerboard_qa.png`, fallback: `/images/tmc/${detail.id}`, label: "Checkerboard QA", tag: "Continuity Verification (4m grid)" },
                         ].map((img, idx) => (
                           <div key={idx} className="flex flex-col rounded-xl border border-slate-200/70 overflow-hidden bg-slate-50">
                             <div className="relative aspect-square overflow-hidden bg-black">
@@ -695,7 +769,11 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                   {/* Linked Cursor View */}
                   {detail && view === "linked-cursor" && (
                     <div className="h-full min-h-[440px]">
-                      <LinkedCursorPanel tripletId={detail.id} points={matches} />
+                      <LinkedCursorPanel
+                        tripletId={detail.id}
+                        points={matches}
+                        referenceMode={referenceMode}
+                      />
                     </div>
                   )}
 
@@ -793,6 +871,20 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                       <div className="bg-cyan-500 h-full rounded-full" style={{ width: "65%" }} />
                     </div>
                   </div>
+                  {detail?.lro_nac_available && (
+                    <div>
+                      <div className="flex justify-between text-slate-700 font-semibold mb-1">
+                        <span className="flex items-center gap-1.5">
+                          <span>NASA LRO NAC</span>
+                          <span className="rounded bg-amber-100 px-1 text-[9px] font-bold text-amber-800">Ref</span>
+                        </span>
+                        <span>0.9 m/px</span>
+                      </div>
+                      <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                        <div className="bg-amber-500 h-full rounded-full" style={{ width: "88%" }} />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

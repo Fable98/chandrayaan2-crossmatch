@@ -234,6 +234,32 @@ def _normalize_triplet(data: dict, default_id: str | None = None, region_dir: st
             "incidence_angle_deg": None,
         })
 
+    # Check LRO NAC (NASA Lunar Reconnaissance Orbiter Narrow Angle Camera) reference availability
+    has_lro = False
+    lro_dir = os.path.join(REPO_ROOT, "data_preprocessing_pipeline", "lro_nac_pairs", triplet["id"])
+    if os.path.isdir(lro_dir) or triplet.get("lro_nac_available"):
+        has_lro = True
+        lro_manifest_file = os.path.join(lro_dir, "manifest.json")
+        if os.path.isfile(lro_manifest_file):
+            try:
+                with open(lro_manifest_file, "r") as mf:
+                    lro_mf = json.load(mf)
+                triplet.setdefault("lro_nac_product_id", lro_mf.get("lro_nac_product_id"))
+                triplet.setdefault("lro_nac_gsd_m", lro_mf.get("lro_nac_native_gsd_m", 0.914))
+                triplet.setdefault("lro_nac_sun_azimuth_deg", lro_mf.get("lro_nac_sun_azimuth_deg"))
+            except Exception:
+                pass
+
+    triplet["lro_nac_available"] = has_lro
+    if has_lro and not any(s.get("sensor") == "lro_nac" for s in triplet.get("sensors", [])):
+        triplet["sensors"].append({
+            "sensor": "lro_nac",
+            "gsd_m": triplet.get("lro_nac_gsd_m", 0.914),
+            "sun_elevation_deg": None,
+            "sun_azimuth_deg": triplet.get("lro_nac_sun_azimuth_deg"),
+            "incidence_angle_deg": None,
+        })
+
     return triplet
 
 
@@ -387,6 +413,69 @@ def load_all() -> None:
             "homography": homography,
             "metrics": metrics_data,
         }
+
+    # Load LRO NAC matches for regions with registration output
+    lro_reg_dir = os.path.join(REPO_ROOT, "registration_output", "lro_nac")
+    if os.path.isdir(lro_reg_dir):
+        for reg_id in sorted(os.listdir(lro_reg_dir)):
+            reg_path = os.path.join(lro_reg_dir, reg_id)
+            if not os.path.isdir(reg_path):
+                continue
+            metrics_path = os.path.join(reg_path, "metrics.json")
+            homog_path = os.path.join(reg_path, "ohrc_to_nac_homography.json")
+            if os.path.isfile(metrics_path):
+                try:
+                    with open(metrics_path, "r") as f:
+                        m_json = json.load(f)
+                    homog_mat = None
+                    if os.path.isfile(homog_path):
+                        with open(homog_path, "r") as f:
+                            h_json = json.load(f)
+                            homog_mat = h_json.get("homography_matrix") or h_json.get("matrix")
+
+                    debug_pts = m_json.get("lk_refinement", {}).get("debug_points", [])
+                    raw_lro_matches = []
+                    for pt in debug_pts:
+                        if pt.get("passed", True):
+                            raw_lro_matches.append({
+                                "image1_x": pt["src_pt"][0],
+                                "image1_y": pt["src_pt"][1],
+                                "image2_x": pt["dst_pt"][0],
+                                "image2_y": pt["dst_pt"][1],
+                                "confidence": max(0.1, 1.0 - float(pt.get("fb_err", 0.0))),
+                            })
+
+                    bounds = (_triplets.get(reg_id) or {}).get("bounds")
+                    if bounds and raw_lro_matches:
+                        pts, derived_h = _parse_ml_matches(raw_lro_matches, bounds)
+                        metrics_data = {
+                            "num_inliers": m_json.get("inlier_count", len(raw_lro_matches)),
+                            "num_raw_matches": m_json.get("match_count", len(raw_lro_matches)),
+                            "inlier_ratio": m_json.get("inlier_ratio", 1.0),
+                            "rmse_px": m_json.get("fit_rmse_px") or 0.0,
+                            "fit_rmse_px": m_json.get("fit_rmse_px"),
+                            "absolute_rmse_m": m_json.get("absolute_rmse_m"),
+                            "validation_rmse_px": m_json.get("validation_rmse_px"),
+                            "validation_status": m_json.get("validation_status", "evaluated"),
+                            "mean_reprojection_error_px": m_json.get("mean_reprojection_error_px", 0.0),
+                            "median_reprojection_error_px": m_json.get("median_reprojection_error_px", 0.0),
+                            "max_reprojection_error_px": m_json.get("max_reprojection_error_px", 0.0),
+                            "sub_pixel_accurate": (m_json.get("fit_rmse_px") or 1.0) < 0.5,
+                            "fraction_below_1px": m_json.get("fraction_below_1px", 1.0),
+                            "source_coverage_ratio": m_json.get("spatial_coverage", 1.0),
+                            "destination_coverage_ratio": m_json.get("spatial_coverage", 1.0),
+                            "combined_coverage_score": m_json.get("spatial_coverage", 1.0),
+                            "uniformity_score": m_json.get("spatial_uniformity", 0.9),
+                            "method": "OHRC-to-LRO-NAC Phase Correlation / LK",
+                        }
+                        enriched[f"{reg_id}_lro_nac"] = {
+                            "triplet_id": f"{reg_id}_lro_nac",
+                            "matches": pts,
+                            "homography": homog_mat or derived_h,
+                            "metrics": metrics_data,
+                        }
+                except Exception:
+                    pass
 
     _matches = enriched
 
