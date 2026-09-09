@@ -591,6 +591,101 @@ def refine_inliers_lucas_kanade(
     return inlier_src.copy(), refined_dst, stats
 
 
+def _guided_refill_matches(
+    kps1_ssc,
+    selected_matches,
+    pc1,
+    pc2,
+    H_native,
+    scale_factor1: float,
+    scale_factor2: float,
+    work_w1: int,
+    work_h1: int,
+    work_w2: int,
+    work_h2: int,
+    half_patch_c: int,
+    multimodal_pair: bool,
+    grid_size: int,
+    cell_w: float,
+    cell_h: float,
+    max_add: int = 80,
+    radius: int = 14,
+):
+    """H-guided second-pass matching (honest densification, no synthesis).
+
+    Projects unused pre-match SSC keypoints through the RANSAC homography
+    (native scale) and correlates a tight local window around the prediction
+    with the SAME NCC/MI thresholds as coarse matching. Every returned point
+    is a measured correlation, re-verified by a second RANSAC + quality gates
+    by the caller. Returns [] when H is None/degenerate.
+    """
+    try:
+        Hm = np.asarray(H_native, dtype=np.float64)
+        if Hm.shape != (3, 3) or not np.all(np.isfinite(Hm)):
+            return []
+        used = set()
+        for m in selected_matches:
+            try:
+                ux = int(round(float(m["work_x1"])))
+                uy = int(round(float(m["work_y1"])))
+                used.add((ux, uy))
+            except Exception:
+                continue
+        added = []
+        thresh = 0.05 if multimodal_pair else 0.35
+        for kx, ky, _ in kps1_ssc:
+            if len(added) >= max_add:
+                break
+            cx, cy = int(round(kx)), int(round(ky))
+            if (cx, cy) in used:
+                continue
+            if cy < half_patch_c or cy >= work_h1 - half_patch_c:
+                continue
+            if cx < half_patch_c or cx >= work_w1 - half_patch_c:
+                continue
+            tmpl = pc1[cy - half_patch_c:cy + half_patch_c, cx - half_patch_c:cx + half_patch_c]
+            if float(np.std(tmpl)) < 1e-4:
+                continue
+            # native -> H -> work2 prediction
+            p1 = np.array([[[float(cx * scale_factor1), float(cy * scale_factor1)]]], dtype=np.float64)
+            try:
+                p2 = cv2.perspectiveTransform(p1, Hm).reshape(-1)
+            except Exception:
+                continue
+            px, py = float(p2[0] / max(scale_factor2, 1e-9)), float(p2[1] / max(scale_factor2, 1e-9))
+            s_min_x = max(0, int(px) - radius)
+            s_max_x = min(work_w2, int(px) + radius)
+            s_min_y = max(0, int(py) - radius)
+            s_max_y = min(work_h2, int(py) + radius)
+            if s_max_x - s_min_x <= tmpl.shape[1] or s_max_y - s_min_y <= tmpl.shape[0]:
+                continue
+            search_region = pc2[s_min_y:s_max_y, s_min_x:s_max_x]
+            if float(np.std(search_region)) < 1e-4:
+                continue
+            res = cv2.matchTemplate(search_region, tmpl, cv2.TM_CCOEFF_NORMED)
+            _, max_val, _, max_loc = cv2.minMaxLoc(res)
+            if multimodal_pair:
+                cand = search_region[max_loc[1]:max_loc[1] + tmpl.shape[0],
+                                     max_loc[0]:max_loc[0] + tmpl.shape[1]]
+                if cand.shape == tmpl.shape:
+                    max_val = mutual_information_score(tmpl, cand)
+            if max_val > thresh:
+                bx = s_min_x + max_loc[0] + half_patch_c
+                by = s_min_y + max_loc[1] + half_patch_c
+                added.append({
+                    "work_x1": float(cx), "work_y1": float(cy),
+                    "work_x2": float(bx), "work_y2": float(by),
+                    "score": float(max_val),
+                    "cell": (min(grid_size - 1, int(cx / max(cell_w, 1e-6))),
+                             min(grid_size - 1, int(cy / max(cell_h, 1e-6)))),
+                    "method": "guided_refill",
+                })
+                used.add((cx, cy))
+        return added
+    except Exception:
+        return []
+
+
 # ---------------------------------------------------------------------------
 # 5. Primary Registration Pipeline
 # ---------------------------------------------------------------------------
@@ -1460,12 +1555,14 @@ def match_images_cfog(
     pts2_arr = np.array(native_pts2, dtype=np.float32)
 
     # 8. Robust Geometric Estimation (RANSAC)
+    # NOTE: azimuth for DEM-aware fitting must be sensor line-of-sight azimuth,
+    # never sun azimuth (see relief-compensation fix above). LOS azimuth is
+    # currently unavailable, so pass None and let the helper use its default.
     em1 = meta1.emission_deg if meta1.emission_deg is not None else 0.0
-    az1 = meta1.azimuth_deg if meta1.azimuth_deg is not None else 0.0
     if dem_arr is not None and abs(em1) > 1e-2:
         H_final, inlier_mask, _ = ransac_dem_aware_fit(
             pts1_arr, pts2_arr, dem=dem_arr, emission_deg=em1,
-            azimuth_deg=az1, gsd_m=working_gsd
+            azimuth_deg=None, gsd_m=working_gsd
         )
     else:
         H_final, inlier_mask = cv2.findHomography(
@@ -1504,7 +1601,15 @@ def match_images_cfog(
             }
 
     # QUALITY GATE 3: Sanity Check Transformation Conditioning
-    tx_check = verify_transformation_quality(H_final, (orig_h2, orig_w2))
+    # Include inlier fit RMSE so excessive residuals fail here, not silently.
+    try:
+        _gate3_idx = np.where(inlier_mask.ravel() == 1)[0]
+        _gate3_err = calculate_reprojection_errors(
+            pts1_arr[_gate3_idx], pts2_arr[_gate3_idx], H_final) if len(_gate3_idx) else np.array([])
+        _gate3_rmse = float(np.sqrt(np.mean(_gate3_err ** 2))) if len(_gate3_err) else None
+    except Exception:
+        _gate3_rmse = None
+    tx_check = verify_transformation_quality(H_final, (orig_h2, orig_w2), fit_rmse_px=_gate3_rmse)
     if not tx_check["is_valid"]:
         logger.warning("Quality Gate 3 Rejected: Transformation conditioning invalid: %s", tx_check["reason"])
         return {
@@ -1546,6 +1651,61 @@ def match_images_cfog(
     inlier_flat = inlier_mask.ravel()
     for i, rec in enumerate(refinement_records):
         rec["is_inlier"] = bool(inlier_flat[i] == 1)
+    n_inliers_pre_refill = int(np.sum(inlier_mask))
+
+    # --- Guided refill: H-constrained second pass over unused SSC keypoints ---
+    # Honest densification: same NCC/MI thresholds, re-RANSAC + gates. Adopt the
+    # refilled solution only on strict improvement (more inliers) with valid
+    # conditioning and spatial support; otherwise keep the original solution.
+    try:
+        guided = _guided_refill_matches(
+            kps1_ssc, selected_matches, pc1, pc2, H_final,
+            scale_factor1, scale_factor2, work_w1, work_h1, work_w2, work_h2,
+            half_patch_c, bool(multimodal_pair), grid_size, cell_w, cell_h,
+        )
+    except Exception:
+        guided = []
+    if guided:
+        _g1 = [float(g["work_x1"]) * scale_factor1 for g in guided]
+        _g1y = [float(g["work_y1"]) * scale_factor1 for g in guided]
+        _g2 = [float(g["work_x2"]) * scale_factor2 for g in guided]
+        _g2y = [float(g["work_y2"]) * scale_factor2 for g in guided]
+        aug1 = np.vstack([pts1_arr, np.column_stack([_g1, _g1y]).astype(np.float32)])
+        aug2 = np.vstack([pts2_arr, np.column_stack([_g2, _g2y]).astype(np.float32)])
+        H_g, mask_g = cv2.findHomography(aug1, aug2, cv2.RANSAC, ransacReprojThreshold=5.0)
+        if H_g is not None and mask_g is not None and int(np.sum(mask_g)) > n_inliers_pre_refill:
+            _g_err = calculate_reprojection_errors(
+                aug1[np.where(mask_g.ravel() == 1)[0]], aug2[np.where(mask_g.ravel() == 1)[0]], H_g)
+            _g_rmse = float(np.sqrt(np.mean(_g_err ** 2))) if len(_g_err) else None
+            _g_tx = verify_transformation_quality(H_g, (orig_h2, orig_w2), fit_rmse_px=_g_rmse)
+            if _g_tx.get("is_valid"):
+                for g in guided:
+                    selected_matches.append(g)
+                    refinement_records.append({
+                        "source_x": round(float(g["work_x1"]) * scale_factor1, 2),
+                        "source_y": round(float(g["work_y1"]) * scale_factor1, 2),
+                        "target_x": round(float(g["work_x2"]) * scale_factor2, 2),
+                        "target_y": round(float(g["work_y2"]) * scale_factor2, 2),
+                        "image1_x": round(float(g["work_x1"]) * scale_factor1, 2),
+                        "image1_y": round(float(g["work_y1"]) * scale_factor1, 2),
+                        "image2_x": round(float(g["work_x2"]) * scale_factor2, 2),
+                        "image2_y": round(float(g["work_y2"]) * scale_factor2, 2),
+                        "confidence": round(float(g["score"]), 4),
+                        "refinement_dx": 0.0, "refinement_dy": 0.0,
+                        "is_refined": False, "method": "guided_refill",
+                    })
+                pts1_arr, pts2_arr, H_final, inlier_mask = aug1, aug2, H_g, mask_g
+                inlier_flat = inlier_mask.ravel()
+                for i, rec in enumerate(refinement_records):
+                    rec["is_inlier"] = bool(inlier_flat[i] == 1)
+                logger.info("Guided refill: inliers %d -> %d (+%d measured)",
+                            n_inliers_pre_refill, int(np.sum(mask_g)), len(guided))
+            else:
+                logger.info("Guided refill rejected by quality gate (%s); keeping original solution.",
+                            _g_tx.get("reason"))
+        else:
+            logger.info("Guided refill: no strict inlier gain (%d candidates); keeping original solution.",
+                        len(guided))
 
     # --- Item 3: Post-RANSAC Lucas-Kanade Sub-Pixel Refinement (OHRC↔TMC-2 only) ---
     lk_stats: Optional[Dict[str, Any]] = None
