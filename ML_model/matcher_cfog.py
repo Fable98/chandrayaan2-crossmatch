@@ -221,6 +221,28 @@ def compute_phase_congruency(
     return np.clip(pc, 0.0, 1.0).astype(np.float32)
 
 
+def multi_scale_phase_congruency(img: np.ndarray, scales: int = 3) -> List[np.ndarray]:
+    """
+    Phase 2: Multi-Scale Feature Extraction
+    Purpose: Handle the massive scale gap between OHRC and TMC-2.
+    Method: Compute Phase Congruency at 3 Gaussian pyramid levels.
+    Returns: List of Phase Congruency maps [Level 0 (Original), Level 1 (1/2), Level 2 (1/4)]
+    """
+    pyramid = [img]
+    current_img = img
+    for _ in range(scales - 1):
+        # Downsample by 2 for the next scale
+        current_img = cv2.pyrDown(current_img)
+        pyramid.append(current_img)
+
+    pc_pyramid = []
+    for level_img in pyramid:
+        pc = compute_phase_congruency(level_img, num_orientations=4, num_scales=3)
+        pc_pyramid.append(pc)
+
+    return pc_pyramid
+
+
 # ---------------------------------------------------------------------------
 # 3. DEM Relief Displacement Compensation
 # ---------------------------------------------------------------------------
@@ -1209,8 +1231,15 @@ def match_images_cfog(
         _ti["sun_azimuth_provenance"] = _meta.provenance.get("sun_azimuth_deg")
 
     # 5. Phase Congruency (Illumination-Robust Structural Features)
-    pc1 = compute_phase_congruency(comp1_gray, num_orientations=4, num_scales=3)
-    pc2 = compute_phase_congruency(comp2_gray, num_orientations=4, num_scales=3)
+    # --- PHASE 2: MULTI-SCALE FEATURE EXTRACTION ---
+    # Compute Phase Congruency at 3 scales to handle the 16-20x OHRC/TMC gap
+    pc1_pyramid = multi_scale_phase_congruency(comp1_gray, scales=3)
+    pc2_pyramid = multi_scale_phase_congruency(comp2_gray, scales=3)
+
+    # For the rest of the pipeline, we will use the finest scale (Level 0) for now
+    # to maintain compatibility with existing coarse matching logic.
+    pc1 = pc1_pyramid[0]
+    pc2 = pc2_pyramid[0]
 
     # 6. Spatially Distributed Coarse Matching (Symmetric Scale-Aware Sizing)
     min_work_w = min(work_w1, work_w2)
