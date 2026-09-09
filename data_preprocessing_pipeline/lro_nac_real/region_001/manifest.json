@@ -43,5 +43,16 @@
     "inlier_count": 6,
     "match_count": 32,
     "quality_tier": "LOW_CONFIDENCE"
+  },
+  "georeferencing": {
+    "method": "manifest_bounds_eqc",
+    "crs": "+proj=eqc +lat_ts=0 +lon_0=0 +a=1737400 +b=1737400 +units=m +no_defs +type=crs",
+    "working_pixel_m": 8.75,
+    "native_gsds_m": [
+      0.25,
+      0.914
+    ],
+    "verified": "rasterio readback: CRS set, west/north edges match manifest bounds <1m",
+    "caveat": "Tile is the western overlap subset (OHRC east edge extends past NAC swath); transform spans the shared-footprint bounds, so eastern edge pixels carry up to ~0.3km placement uncertainty. Per-pixel SPICE rigor not claimed."
   }
 }

@@ -86,6 +86,39 @@ def create_checkerboard_qa(
     return checkerboard
 
 
+def bounds_to_eqc_transform(
+    bounds: dict,
+    width: int,
+    height: int,
+    radius_m: float = 1737400.0,
+) -> tuple | None:
+    """Derive a lunar EQC Affine transform from geographic bounds.
+
+    EQC (lat_ts=0, lon_0=0): x = R*lon_rad, y = R*lat_rad. Pixel (0,0) is the
+    north-west corner. Returns (transform, crs_proj4, pixel_size_m) or None
+    when bounds are missing/malformed. Accuracy is limited by the bounds
+    themselves (manifest shared-footprint bounds, not per-pixel SPICE).
+    """
+    try:
+        from rasterio.transform import from_origin
+        import math
+        w = float(bounds["west_lon"])
+        e = float(bounds["east_lon"])
+        s = float(bounds["south_lat"])
+        n = float(bounds["north_lat"])
+        if not (e > w and n > s and width > 0 and height > 0):
+            return None
+        xw, xe = math.radians(w) * radius_m, math.radians(e) * radius_m
+        ys, yn = math.radians(s) * radius_m, math.radians(n) * radius_m
+        dx, dy = (xe - xw) / width, (yn - ys) / height
+        if not (dx > 0 and dy > 0):
+            return None
+        crs = "+proj=eqc +lat_ts=0 +lon_0=0 +a=1737400 +b=1737400 +units=m +no_defs +type=crs"
+        return from_origin(xw, yn, dx, dy), crs, (dx + dy) / 2.0
+    except Exception:
+        return None
+
+
 def save_geotiff(image: np.ndarray, path: Path, transform=None, crs=None, gsd_m: float | None = None) -> str | None:
     """Save image as lunar GeoTIFF.
 
@@ -165,7 +198,23 @@ def register_region(
     cv2.imwrite(str(warped_path), warped)
     cv2.imwrite(str(blend_path), blend)
     cv2.imwrite(str(checker_path), checker)
-    saved_tif = save_geotiff(warped, tif_path)
+    # Georeference from the region manifest shared-footprint bounds when
+    # available (lunar EQC meters); otherwise pixel-grid fallback.
+    _geo, _georef_method = None, "pixel_grid_fallback"
+    try:
+        _mf = reg_dir / "manifest.json"
+        if _mf.is_file():
+            _mdata = json.load(open(_mf))
+            _mb = _mdata.get("bounds_optical") or _mdata.get("bounds")
+            _geo = bounds_to_eqc_transform(_mb, warped.shape[1], warped.shape[0]) if _mb else None
+            if _geo is not None:
+                _georef_method = "manifest_bounds_eqc"
+    except Exception:
+        _geo = None
+    if _geo is not None:
+        saved_tif = save_geotiff(warped, tif_path, transform=_geo[0], crs=_geo[1])
+    else:
+        saved_tif = save_geotiff(warped, tif_path)
     if saved_tif is None or not tif_path.exists():
         cv2.imwrite(str(tif_path), warped)
         saved_tif = str(tif_path)
@@ -182,7 +231,13 @@ def register_region(
                 "inlier_count": len(matches),
                 "fit_rmse_is_in_sample": True,
                 "georeferenced": georeferenced,
-                "georeferencing_note": "Pixel-grid fallback unless real CRS supplied.",
+                "georeferencing_method": _georef_method,
+                "georeferencing_note": (
+                    "Lunar EQC from manifest shared-footprint bounds; per-pixel SPICE "
+                    "rigor not claimed."
+                    if georeferenced else
+                    "Pixel-grid fallback unless real CRS supplied."
+                ),
             },
             f,
             indent=4,
@@ -267,7 +322,19 @@ def register_composed_ohrc_to_iirs(
     cv2.imwrite(str(warped_path), warped)
     cv2.imwrite(str(blend_path), blend)
     cv2.imwrite(str(checker_path), checker)
-    saved_tif = save_geotiff(warped, tif_path)
+    _geo2 = None
+    try:
+        _mf2 = reg_dir / "manifest.json"
+        if _mf2.is_file():
+            _md2 = json.load(open(_mf2))
+            _mb2 = _md2.get("bounds_iirs") or _md2.get("bounds_optical") or _md2.get("bounds")
+            _geo2 = bounds_to_eqc_transform(_mb2, warped.shape[1], warped.shape[0]) if _mb2 else None
+    except Exception:
+        _geo2 = None
+    if _geo2 is not None:
+        saved_tif = save_geotiff(warped, tif_path, transform=_geo2[0], crs=_geo2[1])
+    else:
+        saved_tif = save_geotiff(warped, tif_path)
 
     # Write registered products manifest
     manifest_path = region_out / "registered_products_manifest.json"
