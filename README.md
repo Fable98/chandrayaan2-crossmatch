@@ -1,17 +1,73 @@
 # Chandrayaan-2 Multi-Modal Cross-Sensor Image Correspondence
-### Official Solution for SIH Problem Statement 26166 (ISRO)
 
-This is a production-ready, photogrammetrically defensible pipeline for sub-pixel registration of OHRC, TMC-2, and IIRS optical payloads. Designed for full-resolution orbital imagery, the system delivers geometrically verified correspondences with DEM-corrected absolute accuracy in physical lunar meters.
+### SIH Problem Statement 26166
+**Title**: Multi-modal, Sun angle and scale invariant image correspondence using Chandrayaan-2 optical images (OHRC, TMC and IIRS)  
+**Organization**: Indian Space Research Organisation (ISRO)
 
 ---
 
-## Key Engineering Achievements
+## 1. Executive Summary
 
-- **Dynamic Spatial Uniformity:** Auto-scaling grid NMS (Non-Maximum Suppression) that adapts to full-resolution orbital images, guaranteeing uniform match distribution.
-- **Absolute Topographic Accuracy:** Calculates `absolute_rmse_m` (in physical lunar meters) by integrating DEM elevation data, moving beyond simple pixel RMSE.
-- **Illumination & Scale Invariance:** Utilizes 2D Log-Gabor Phase Congruency and CFOG (Channel Features of Oriented Gradients) to match features across extreme sun-angle shadows and 20x+ scale disparities.
-- **True Sub-Pixel Refinement:** Two-stage refinement using Fourier Phase Correlation and post-RANSAC Lucas-Kanade optical flow.
-- **Zero-Fake Fallbacks:** Strict geometric quality gates. If a transformation is ill-conditioned or lacks spatial support, the pipeline fails cleanly rather than hallucinating an identity matrix.
+This repository provides an open, reproducible, and photogrammetrically defensible pipeline for cross-sensor image correspondence between Chandrayaan-2 orbital instruments:
+- **Orbiter High-Resolution Camera (OHRC)**: High-resolution panchromatic imaging (~0.25–0.32 m GSD).
+- **Terrain Mapping Camera-2 (TMC-2)**: Stereo panchromatic triplets (~4–5 m GSD) supporting lunar surface topographic mapping.
+- **Imaging Infrared Spectrometer (IIRS)**: Hyperspectral sensor (~70–80 m GSD) across 256 contiguous bands (~0.8–5.0 µm) providing mineralogical and volatile signatures.
+
+### Primary Supported Scope
+* **Primary Registration Pipeline**: High-precision correspondence between **OHRC and TMC-2** (~16–20× linear physical resolution difference).
+* **IIRS Co-Registration Extension**: Co-registration of lower-resolution hyperspectral imagery as a spatial-spectral contextual overlay. **IIRS is treated honestly as an ~70–80 m spectrometer product, without unphysical claims of sub-meter spatial reconstruction.**
+* **Baseline Alternative**: A pretrained LoFTR baseline is provided for comparative evaluation alongside the primary structural engine.
+
+### Quantitative Evidence & Audit Policy
+* **Missing Data Caveat**: Missing LRO basemap results, hyperspectral cubes, or ablation runs are reported as `not_available` or `not_run`; **they are never represented as zero-error results.**
+* **Controlled Stress Testing**: Photometric perturbations in `scripts/build_quantitative_evidence.py` serve as a controlled diagnostic proxy and do not replace independent orbital acquisitions at different sun angles.
+
+---
+
+## 2. Error Boundaries & Quality Gates (Addressing Q24: What Happens on Failure / Incorrect Prediction?)
+
+A critical requirement for planetary photogrammetry is knowing **when not to register**. When an algorithm forces a transformation across non-overlapping, featureless, or extreme shadow-inverted scenes, unconstrained projective models produce catastrophic distortions. This pipeline implements **four deterministic Quality Gates** that intercept incorrect predictions and fail cleanly without silent data corruption:
+
+```text
+Raw Candidate Matches
+        │
+        ▼
+[ QUALITY GATE 1: Correspondence Count Gate ]
+  └─ Fail if genuine correspondences < 4 (status: "insufficient_correspondences").
+     Zero synthetic corner points or fabricated correspondences.
+        │
+        ▼
+[ QUALITY GATE 2: RANSAC Geometric Verification ]
+  └─ Fail if robust estimation yields < 4 consensus inliers within 5.0 px residual
+     (status: "geometric_verification_failed"). Zero identity matrix fallbacks.
+        │
+        ▼
+[ QUALITY GATE 3: Transformation Conditioning & Distortion Check ]
+  └─ Reject if singular, reflective, or pathologically distorted:
+     • Condition number cond(H) >= 1e7
+     • Determinant det(H) <= 1e-4 (orientation preservation)
+     • Scale ratio S_max / S_min >= 20.0 (anisotropic stretch/collapse)
+     • Projectivity magnitude sqrt(h31^2 + h32^2) >= 0.05
+     • Fit RMSE > 5.0 px
+     Clean failure reported transparently (e.g., on triplet_new_2022).
+        │
+        ▼
+[ QUALITY GATE 4: Spatial Support & Concentration Check ]
+  └─ Reject if verified inliers cluster exclusively on a single crater rim:
+     • Inliers must span >= 3 distinct spatial grid cells
+     • No single grid cell may contain > 60% of all surviving inliers
+        │
+        ▼
+[ TRIPLET CONSISTENCY CLOSED-LOOP GUARD ]
+  └─ When assessing 3-way circular error (A -> B -> C -> A), if 2+ legs fail,
+     status is "cycle_not_computable" with cycle_rmse_px = null.
+     Never substitute an identity matrix to produce a false numerical cycle RMSE.
+```
+
+### Explicit Qualification: Per-Point Tracking Precision vs. Full-Scene Fit RMSE
+> [!IMPORTANT]
+> **We do not claim blanket "sub-pixel accuracy achieved" across all real orbital crops.**  
+> While individual feature points achieve genuine sub-pixel tracking precision (0.08–0.31 px forward-backward error under Lucas-Kanade optical flow), the overall homography fit RMSE across real Chandrayaan-2 datasets ranges from **0.99 px to 1.83 px** (`region_001`: 1.27 px, `region_003`: 0.99 px, `region_006`: 1.30 px). The project maintains scientific integrity by distinguishing per-point sub-pixel tracking capability from full-scene registration residuals under physical lunar terrain relief.
 
 ---
 
@@ -99,7 +155,7 @@ Empirical evaluation across all 8 multi-sensor Chandrayaan-2 test regions, bench
 
 ---
 
-## 🛠️ Quickstart & Installation
+## 8. Installation & Usage Guide
 
 ### Prerequisites
 - Python 3.10+
@@ -110,23 +166,36 @@ Empirical evaluation across all 8 multi-sensor Chandrayaan-2 test regions, bench
 git clone https://github.com/Fable98/chandrayaan2-crossmatch.git
 cd chandrayaan2-crossmatch
 pip install -r requirements.txt
-cd lunar-frontend && npm install
+cd lunar-frontend && npm install && cd ..
+```
+
+### Running the Test Suite
+```bash
+pytest
 ```
 
 ### Starting the Production Servers
 ```bash
 # Terminal 1: FastAPI Backend (Port 8000)
-python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
+python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 
 # Terminal 2: Next.js Mission Console (Port 3000)
-npm run dev
+cd lunar-frontend && npm run dev
 ```
 
 Run the frontend from within the `lunar-frontend/` directory. The backend exposes REST endpoints for registration, metrics, and product generation consumed by the mission console dashboard.
 
 ---
 
-## References
+## 9. Limitations & Physical Constraints
+
+1. **Planar Projective Approximation**: The homography model operates as a local projective approximation. On steep lunar crater walls (>30° slope), non-planar relief displacement can induce localized residual errors.
+2. **DEM Relief Compensation**: Relief displacement compensation currently uses local vertical height offsets rather than full iterative photogrammetric ray-intersection with a rigorous spacecraft orbital sensor model.
+3. **IIRS Resolution Boundary**: IIRS GSD (~70–80 m) physically limits direct optical tie-point extraction. Hyperspectral information is integrated through co-registration rather than unphysical sub-meter feature correspondence.
+
+---
+
+## 10. Authoritative References
 
 1. **ISRO Chandrayaan-2 Payload Documentation:** ISSDC/PRADAN Planetary Data System (PDS4) standards for OHRC, TMC-2, and IIRS.
 2. **Phase Congruency:** Kovesi, P. (2000). *Phase Congruency Detects Corners and Edges*. DICTA 2000.
