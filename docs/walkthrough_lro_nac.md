@@ -52,9 +52,9 @@ This document details the implementation and empirical validation of **LRO NAC r
 
 | Region ID | OHRC Product ID | LRO NAC Scene ID | Inliers / Raw | In-Sample Fit RMSE | Held-Out Val RMSE | Sub-Pixel ($<1\,\text{px}$) | Spatial Coverage ($10 \times 10$) | Uniformity | Quality Tier |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `region_001` | `ch2_ohr_ncp_20210405t160653` | `M1417670274LC` | 37 / 37 | **0.2702 px** | **0.3391 px** | **TRUE** ($<0.45\,\text{px}$) | 100.0% | 0.9153 | HIGH_CONFIDENCE |
-| `region_003` | `ch2_ohr_ncp_20210405t160653` | `M1417670274LC` | 35 / 35 | **0.2916 px** | **0.4181 px** | **TRUE** ($<0.45\,\text{px}$) | 100.0% | 0.8779 | HIGH_CONFIDENCE |
-| `region_006` | `ch2_ohr_ncp_20220914t083537` | `M1413636095LC` | 36 / 36 | **0.2759 px** | **0.2504 px** | **TRUE** ($<0.45\,\text{px}$) | 100.0% | 0.8953 | HIGH_CONFIDENCE |
+| `region_001` | `ch2_ohr_ncp_20210405t160653` | `M1417670274LC` | 37 / 37 | **0.2702 px** | **0.3391 px** | **TRUE** ($<1\,\text{px}$) | 100.0% | 0.9153 | HIGH_CONFIDENCE |
+| `region_003` | `ch2_ohr_ncp_20210405t160653` | `M1417670274LC` | 35 / 35 | **0.2916 px** | **0.4181 px** | **TRUE** ($<1\,\text{px}$) | 100.0% | 0.8779 | HIGH_CONFIDENCE |
+| `region_006` | `ch2_ohr_ncp_20220914t083537` | `M1413636095LC` | 36 / 36 | **0.2759 px** | **0.2504 px** | **TRUE** ($<1\,\text{px}$) | 100.0% | 0.8953 | HIGH_CONFIDENCE |
 
 ### CLI Runner Output
 
