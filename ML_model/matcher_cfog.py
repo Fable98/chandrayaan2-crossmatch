@@ -1620,6 +1620,23 @@ def match_images_cfog(
             "is_refined": refined,
         })
 
+    # --- PHASE 4: AI MATCH VERIFICATION ---
+    # Use Supervised Machine Learning to filter out false-positive matches
+    from ai_verifier import AIMatchVerifier
+    verifier = AIMatchVerifier()
+    
+    # Since we don't have a pre-trained model yet, this acts as a structural
+    # placeholder for the ML component. It will trust all matches for now.
+    verified_matches, rejected_matches = verifier.filter_matches(refinement_records, threshold=0.5)
+    
+    # Update the points array based on verified matches
+    if len(verified_matches) >= 4:
+        native_pts1 = [[m["source_x"], m["source_y"]] for m in verified_matches]
+        native_pts2 = [[m["target_x"], m["target_y"]] for m in verified_matches]
+        logger.info(f"AI Verifier passed {len(verified_matches)} matches to RANSAC.")
+    else:
+        logger.warning("AI Verifier rejected too many matches. Falling back to original points.")
+
     pts1_arr = np.array(native_pts1, dtype=np.float32)
     pts2_arr = np.array(native_pts2, dtype=np.float32)
 
