@@ -1,0 +1,47 @@
+{
+  "region_id": "region_001",
+  "reference_type": "external_LRO_NAC",
+  "reference_provenance": "real_downloaded_cdr",
+  "provenance_warning": null,
+  "source_sensor": "OHRC",
+  "reference_sensor": "LRO_NAC",
+  "ohrc_product_id": "ch2_ohr_ncp_20210405t1606536730_d_img_d18",
+  "lro_nac_product_id": "M1417670274LC",
+  "ohrc_native_gsd_m": 0.25,
+  "lro_nac_native_gsd_m": 0.914,
+  "scale_ratio": 3.66,
+  "working_tile_size": [
+    512,
+    512
+  ],
+  "bounds": {
+    "west_lon": 336.484646,
+    "east_lon": 336.589455,
+    "south_lat": -3.3748612,
+    "north_lat": -3.2487328
+  },
+  "bounds_optical": {
+    "west_lon": 336.484646,
+    "east_lon": 336.589455,
+    "south_lat": -3.3748612,
+    "north_lat": -3.2487328
+  },
+  "ohrc_sun_azimuth_deg": 269.646098,
+  "lro_nac_sun_azimuth_deg": 137.89,
+  "sun_azimuth_note": "OHRC PDS4 sun azimuth vs LROC sub-solar azimuth; conventions may differ, treat delta as approximate real illumination gap",
+  "ohrc_source_image": "data_preprocessing_pipeline\\lro_nac_real\\region_001\\ohrc_source_512.png",
+  "lro_nac_reference_image": "data_preprocessing_pipeline\\lro_nac_real\\region_001\\lro_nac_reference_512.png",
+  "lro_nac_label": "data_preprocessing_pipeline\\lro_nac_real\\region_001\\lro_nac_reference_512.lbl",
+  "nac_crop_note": "RIGOROUS north-up affine from CDR corners (y0=north -2.18): x2418..5063,y34300..38577 (2645x4277, partial east overlap ~66%), padded square to preserve aspect, resized 512; first south-up hypothesis failed all gates, flipped passes",
+  "nac_source_file": "C:\\Users\\rohit\\Downloads\\M1417670274LC.IMG",
+  "matching_note": "multimodal_pair=True (MI) required; optical NCC=0 candidates; 23 raw/5 inliers, fit 0.8045px sub-pixel, LOW_CONFIDENCE, coverage 5% @10x10, no held-out (<8)",
+  "nac_crop_method": "affine_least_squares_corners_north_up_pad",
+  "overlap_note": "partial: OHRC east edge 336.589 vs NAC east edge ~336.58; scale_ratio absorbs aspect",
+  "result": {
+    "fit_rmse_px": 0.8045,
+    "sub_pixel_accurate": true,
+    "inlier_count": 5,
+    "match_count": 23,
+    "quality_tier": "LOW_CONFIDENCE"
+  }
+}
