@@ -169,7 +169,7 @@ Consequently, this pairing does not require the heavy multi-spectral dimensional
 
 | Region ID | OHRC Product ID | LRO NAC Scene ID | Overlap Lat / Lon | Inliers / Raw | In-Sample Fit RMSE | Held-Out Val RMSE | Sub-Pixel ($<1\,\text{px}$) | Spatial Coverage ($10 \times 10$) | Uniformity | Quality Tier |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `region_001` | `ch2_ohr_ncp_20210405t160653` | `M1417670274LC` (real CDR) | Lat: $[-3.37^\circ, -3.25^\circ]$<br>Lon: $[336.48^\circ, 336.59^\circ]$ | 5 / 23 | **0.8045 px** | null (`insufficient_points_for_holdout`) | **TRUE** ($<1\,\text{px}$) | 5.0% | 0.0135 | LOW_CONFIDENCE |
+| `region_001` | `ch2_ohr_ncp_20210405t160653` | `M1417670274LC` (real CDR) | Lat: $[-3.37^\circ, -3.25^\circ]$<br>Lon: $[336.48^\circ, 336.59^\circ]$ | 6 / 32 | **0.4979 px** | null (`insufficient_points_for_holdout`) | **TRUE** ($<1\,\text{px}$) | 6.0% | 0.0183 | LOW_CONFIDENCE |
 | `region_003` | `ch2_ohr_ncp_20210405t160653` | `M1417670274LC` (real CDR) | Lat: $[-3.04^\circ, -2.91^\circ]$<br>Lon: $[336.48^\circ, 336.59^\circ]$ | 5 / 27 | **0.5957 px** | null (`insufficient_points_for_holdout`) | **TRUE** ($<1\,\text{px}$) | 5.0% | 0.0135 | LOW_CONFIDENCE |
 | `region_006` | `ch2_ohr_ncp_20220914t083537` | `M1413636095LC` (real CDR) | Lat: $[5.15^\circ, 5.35^\circ]$<br>Lon: $[234.40^\circ, 234.53^\circ]$ | 5 / 24 | **0.1792 px** | null (`insufficient_points_for_holdout`) | **TRUE** ($<1\,\text{px}$) | 5.0% | 0.0135 | LOW_CONFIDENCE |
 
@@ -178,8 +178,8 @@ Consequently, this pairing does not require the heavy multi-spectral dimensional
 
 > [!TIP]
 > **Sub-Pixel Precision & Rigorous Metric Integrity (real CDRs)**:
-> - **In-Sample Fit only**: fit RMSE is 0.18–0.80px (sub-pixel, `sub_pixel_accurate=true`), but with 5 inliers / 8-DOF homography the fit is fragile and **held-out validation is not computable** (`insufficient_points_for_holdout` in all 3 regions). Absolute RMSE is 0.19–0.74m. Report fit alongside inlier count and tier, never alone.
-> - **Reference Scene Provenance**: 3 real-CDR regions across 2 distinct orbital scenes (`M1417670274LC`, node D, emi 1.7° for 001/003; `M1413636095LC`, node A, emi 32° for 006). Sun gaps are real (~132°/132°/104° OHRC-vs-NAC, convention-approximate). Residuals <1px: 60% (001), 100% (003, 006); <0.5px: 60% (001, 003), 100% (006). Coverage is 5% canonical 10×10 with uniformity ~0.014 — sparse and `LOW_CONFIDENCE` by design threshold, the priority target for density work.
+> - **In-Sample Fit only**: fit RMSE is 0.18–0.60px (sub-pixel, `sub_pixel_accurate=true`), but with 5–6 inliers / 8-DOF homography the fit is fragile and **held-out validation is not computable** (`insufficient_points_for_holdout` in all 3 regions). Absolute RMSE is 0.19–0.54m. Report fit alongside inlier count and tier, never alone.
+> - **Reference Scene Provenance**: 3 real-CDR regions across 2 distinct orbital scenes (`M1417670274LC`, node D, emi 1.7° for 001/003; `M1413636095LC`, node A, emi 32° for 006). Sun gaps are real (~132°/132°/104° OHRC-vs-NAC, convention-approximate). Residuals <1px: 100% all regions; <0.5px: 67% (001), 60% (003), 100% (006). Coverage is 5–6% canonical 10×10 with uniformity ~0.014–0.018 — sparse and `LOW_CONFIDENCE` by design threshold; overlap-matched native aspect (001: 32/6 @0.50px) beats padded-square (23/5 @0.80px).
 
 ---
 
@@ -187,7 +187,7 @@ Consequently, this pairing does not require the heavy multi-spectral dimensional
 
 | Requirement from Problem Statement | Status | Technical Evidence in Repository |
 | :--- | :--- | :--- |
-| **Lunar Reference Images (LRO NAC)** | **Partial — 3 real-CDR regions, LOW tier** | Real-CDR evidence tiles in [`data_preprocessing_pipeline/lro_nac_real/`](data_preprocessing_pipeline/lro_nac_real/) (`M1417670274LC` ×2, `M1413636095LC` ×1; MI-only, 5 inliers, 0.18–0.80px fit, 5% @10×10). Parser [`ML_model/lro_pds3_parser.py`](ML_model/lro_pds3_parser.py), runner [`scripts/register_lro_nac.py`](scripts/register_lro_nac.py) (manifest native GSDs). Density to ≥15 inliers still required for held-out + HIGH. |
+| **Lunar Reference Images (LRO NAC)** | **Partial — 3 real-CDR regions, LOW tier** | Real-CDR evidence tiles in [`data_preprocessing_pipeline/lro_nac_real/`](data_preprocessing_pipeline/lro_nac_real/) (`M1417670274LC` ×2, `M1413636095LC` ×1; MI-only, 5–6 inliers, 0.18–0.60px fit, 5–6% @10×10). Parser [`ML_model/lro_pds3_parser.py`](ML_model/lro_pds3_parser.py), runner [`scripts/register_lro_nac.py`](scripts/register_lro_nac.py) (manifest native GSDs). Density to ≥15 inliers still required for held-out + HIGH. |
 | **OHRC ↔ TMC-2 Cross-Registration** | **Delivered (single-view primary)** | Single-channel Phase Congruency matching engine in [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py). Single NCF view per region; joint Fore/Nadir/Aft stereo not implemented. |
 | **Multi-Modal Hyperspectral (IIRS)** | **Partial — co-registration overlay only** | Multi-band IIRS reader + PCA-PC1 + chained triplet composition in [`data_preprocessing_pipeline/triplet_evaluator.py`](data_preprocessing_pipeline/triplet_evaluator.py). Direct IIRS legs fail in 6/8 evals; OHRC→IIRS is composed (0 inliers); derived grid points flagged `derived_composed_overlay` in [`ML_model/iirs_multimodal_registrar.py`](ML_model/iirs_multimodal_registrar.py). |
 | **Scale Disparity Handling (~20x)** | **Partial — 20× via resampling; 275× overlay only** | Common physical-GSD area resampling in [`ML_model/matcher_cfog.py`](ML_model/matcher_cfog.py#L650-L700). Not a scale-invariant descriptor; 275–300× never directly matched. |

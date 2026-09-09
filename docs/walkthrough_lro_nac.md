@@ -52,7 +52,7 @@ This document details the implementation and empirical validation of **LRO NAC r
 
 | Region ID | OHRC Product ID | LRO NAC Scene ID | Inliers / Raw | In-Sample Fit RMSE | Held-Out Val RMSE | Sub-Pixel ($<1\,\text{px}$) | Spatial Coverage ($10 \times 10$) | Uniformity | Quality Tier |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| `region_001` | `ch2_ohr_ncp_20210405t160653` | `M1417670274LC` (real CDR) | 5 / 23 | **0.8045 px** | null (insufficient pts) | **TRUE** ($<1\,\text{px}$) | 5.0% | 0.0135 | LOW_CONFIDENCE |
+| `region_001` | `ch2_ohr_ncp_20210405t160653` | `M1417670274LC` (real CDR) | 6 / 32 | **0.4979 px** | null (insufficient pts) | **TRUE** ($<1\,\text{px}$) | 6.0% | 0.0183 | LOW_CONFIDENCE |
 | `region_003` | `ch2_ohr_ncp_20210405t160653` | `M1417670274LC` (real CDR) | 5 / 27 | **0.5957 px** | null (insufficient pts) | **TRUE** ($<1\,\text{px}$) | 5.0% | 0.0135 | LOW_CONFIDENCE |
 | `region_006` | `ch2_ohr_ncp_20220914t083537` | `M1413636095LC` (real CDR) | 5 / 24 | **0.1792 px** | null (insufficient pts) | **TRUE** ($<1\,\text{px}$) | 5.0% | 0.0135 | LOW_CONFIDENCE |
 
@@ -82,7 +82,7 @@ Region: region_006 | Status: success | Raw: 24 | Inliers: 5 | Fit RMSE: 0.1792 p
    - Residuals <1px: 60% (001), 100% (003, 006); <0.5px: 60% (001, 003), 100% (006). Absolute RMSE 0.19–0.74m.
 
 ### Detailed Metrics Breakdown
-- **`region_001`**: Fit RMSE: **0.8045 px** | Val RMSE: **null** | Coverage: 5.0% | Residuals $< 0.5\,\text{px}$: 60.0%
+- **`region_001`**: Fit RMSE: **0.4979 px** | Val RMSE: **null** | Coverage: 6.0% | Residuals $< 0.5\,\text{px}$: 66.7% (overlap-matched native aspect; padded-square gave 0.8045px)
 - **`region_003`**: Fit RMSE: **0.5957 px** | Val RMSE: **null** | Coverage: 5.0% | Residuals $< 0.5\,\text{px}$: 60.0%
 - **`region_006`**: Fit RMSE: **0.1792 px** | Val RMSE: **null** | Coverage: 5.0% | Residuals $< 0.5\,\text{px}$: 100.0%
 
