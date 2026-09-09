@@ -338,31 +338,38 @@ def subpixel_phase_correlation(
     cy, cx = h // 2, w // 2
     sub_y, sub_x = float(peak_y), float(peak_x)
 
-    # 2D Log-Gaussian peak interpolation on 3x3 neighborhood
-    # Approximates continuous sinc envelope as Gaussian; local log-domain peak interpolation intended to reduce interpolation bias
+    # --- TRUE 2D ALGEBRAIC PARABOLOID FIT ---
+    # Fits z(x,y) = ax^2 + by^2 + cxy + dx + ey + f to the 3x3 neighborhood
     if 0 < peak_y < h - 1 and 0 < peak_x < w - 1:
-        c_val = max(float(corr[peak_y, peak_x]), 1e-6)
-        c_left = max(float(corr[peak_y, peak_x - 1]), 1e-6)
-        c_right = max(float(corr[peak_y, peak_x + 1]), 1e-6)
-        c_up = max(float(corr[peak_y - 1, peak_x]), 1e-6)
-        c_down = max(float(corr[peak_y + 1, peak_x]), 1e-6)
+        # Extract 3x3 neighborhood around the peak
+        c = float(corr[peak_y, peak_x])
+        c_l = float(corr[peak_y, peak_x - 1])
+        c_r = float(corr[peak_y, peak_x + 1])
+        c_u = float(corr[peak_y - 1, peak_x])
+        c_d = float(corr[peak_y + 1, peak_x])
+        c_ul = float(corr[peak_y - 1, peak_x - 1])
+        c_ur = float(corr[peak_y - 1, peak_x + 1])
+        c_dl = float(corr[peak_y + 1, peak_x - 1])
+        c_dr = float(corr[peak_y + 1, peak_x + 1])
 
-        ln_c = np.log(c_val)
-        ln_l = np.log(c_left)
-        ln_r = np.log(c_right)
-        ln_u = np.log(c_up)
-        ln_d = np.log(c_down)
+        # Compute coefficients for 2D paraboloid
+        a = 0.5 * (c_r + c_l - 2 * c)
+        b = 0.5 * (c_d + c_u - 2 * c)
+        c_cross = 0.25 * (c_dr + c_ul - c_dl - c_ur)
+        d = 0.5 * (c_r - c_l)
+        e = 0.5 * (c_d - c_u)
 
-        denom_x = 2.0 * (ln_l - 2.0 * ln_c + ln_r)
-        denom_y = 2.0 * (ln_u - 2.0 * ln_c + ln_d)
+        denom = 4 * a * b - c_cross * c_cross
+        if abs(denom) > 1e-9:
+            dx = (c_cross * e - 2 * b * d) / denom
+            dy = (c_cross * d - 2 * a * e) / denom
 
-        if abs(denom_x) > 1e-9:
-            delta_x = (ln_l - ln_r) / denom_x
-            sub_x += float(np.clip(delta_x, -0.9, 0.9))
+            # Clip to prevent crazy jumps
+            dx = np.clip(dx, -0.9, 0.9)
+            dy = np.clip(dy, -0.9, 0.9)
 
-        if abs(denom_y) > 1e-9:
-            delta_y = (ln_u - ln_d) / denom_y
-            sub_y += float(np.clip(delta_y, -0.9, 0.9))
+            sub_x += float(dx)
+            sub_y += float(dy)
 
     shift_x = float(sub_x - cx)
     shift_y = float(sub_y - cy)
@@ -1651,9 +1658,86 @@ def match_images_cfog(
             azimuth_deg=None, gsd_m=working_gsd
         )
     else:
-        H_final, inlier_mask = cv2.findHomography(
-            pts1_arr, pts2_arr, cv2.RANSAC, ransacReprojThreshold=5.0
-        )
+        # --- PHASE 7: WEIGHTED (PROSAC-style) RANSAC ---
+        # High-confidence matches are sampled with higher probability and pull
+        # the final refinement more strongly via weighted DLT. Forward-compatible:
+        # tries native cv2 weights kwarg first, else manual weighted sampling.
+        # NOTE: verified/refinement records carry "confidence" (not "score").
+        try:
+            if len(verified_matches) >= 4 and len(verified_matches) == len(pts1_arr):
+                _w_src = verified_matches
+            elif len(refinement_records) == len(pts1_arr):
+                _w_src = refinement_records
+            else:
+                _w_src = []
+            if len(_w_src) == len(pts1_arr) and len(pts1_arr) >= 4:
+                weights = np.array(
+                    [float(m.get("confidence", m.get("score", 0.5))) for m in _w_src],
+                    dtype=np.float64,
+                )
+                weights = np.nan_to_num(weights, nan=0.5, posinf=1.0, neginf=0.0)
+                weights = np.clip(weights, 0.0, None)
+                if float(np.max(weights)) > 0:
+                    weights = weights / float(np.max(weights))
+                else:
+                    weights = np.full_like(weights, 0.5)
+            else:
+                weights = np.full(len(pts1_arr), 0.5, dtype=np.float64)
+
+            try:
+                # Forward-compat: newer OpenCV builds accept per-point weights.
+                H_final, inlier_mask = cv2.findHomography(
+                    pts1_arr, pts2_arr, cv2.RANSAC, ransacReprojThreshold=5.0,
+                    weights=weights.astype(np.float32),
+                )
+                logger.info("Weighted RANSAC applied successfully (native weights).")
+            except TypeError:
+                # OpenCV 4.x has no weights kwarg: manual confidence-weighted sampling.
+                logger.info("Native weighted RANSAC unavailable; using confidence-weighted sampling RANSAC.")
+                _rng = np.random.default_rng(42)
+                _p = weights / max(float(np.sum(weights)), 1e-12)
+                _n = len(pts1_arr)
+                _best_H, _best_inliers, _best_score = None, None, -1.0
+                for _ in range(2000):
+                    _idx = _rng.choice(_n, size=4, replace=False, p=_p)
+                    _H_cand, _ = cv2.findHomography(pts1_arr[_idx], pts2_arr[_idx], 0)
+                    if _H_cand is None or not np.all(np.isfinite(_H_cand)):
+                        continue
+                    _proj = cv2.perspectiveTransform(pts1_arr.reshape(-1, 1, 2), _H_cand).reshape(-1, 2)
+                    _err = np.linalg.norm(_proj - pts2_arr, axis=1)
+                    _inl = _err <= 5.0
+                    if int(np.sum(_inl)) < 4:
+                        continue
+                    _score = float(np.sum(weights[_inl]))
+                    if _score > _best_score:
+                        _best_score, _best_H, _best_inliers = _score, _H_cand, _inl
+                if _best_H is not None:
+                    # Weighted DLT refinement on inliers (sqrt(w) row scaling + SVD).
+                    _ii = np.where(_best_inliers)[0]
+                    _sw = np.sqrt(weights[_ii])
+                    _A = []
+                    for _k, _i in enumerate(_ii):
+                        _x, _y = float(pts1_arr[_i, 0]), float(pts1_arr[_i, 1])
+                        _xp, _yp = float(pts2_arr[_i, 0]), float(pts2_arr[_i, 1])
+                        _s = float(_sw[_k])
+                        _A.append([-_x * _s, -_y * _s, -_s, 0, 0, 0, _xp * _x * _s, _xp * _y * _s, _xp * _s])
+                        _A.append([0, 0, 0, -_x * _s, -_y * _s, -_s, _yp * _x * _s, _yp * _y * _s, _yp * _s])
+                    _, _, _Vt = np.linalg.svd(np.asarray(_A, dtype=np.float64))
+                    _H_ref = _Vt[-1].reshape(3, 3)
+                    if abs(_H_ref[2, 2]) > 1e-12:
+                        _H_ref = _H_ref / _H_ref[2, 2]
+                    H_final = _H_ref
+                    inlier_mask = _best_inliers.reshape(-1, 1).astype(np.uint8)
+                    logger.info("Weighted RANSAC applied successfully (sampling + weighted DLT).")
+                else:
+                    H_final, inlier_mask = cv2.findHomography(
+                        pts1_arr, pts2_arr, cv2.RANSAC, ransacReprojThreshold=5.0
+                    )
+        except Exception as e:
+            logger.warning("Weighted RANSAC failed (%s). Falling back to standard RANSAC.", e)
+            H_final, inlier_mask = cv2.findHomography(
+                pts1_arr, pts2_arr, cv2.RANSAC, ransacReprojThreshold=5.0
+            )
 
     if H_final is not None and inlier_mask is not None and np.sum(inlier_mask) >= 4:
         try:
