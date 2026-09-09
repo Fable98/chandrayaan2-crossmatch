@@ -114,7 +114,42 @@ def load_as_float_and_color(path: str | Path) -> Tuple[np.ndarray, np.ndarray, D
 
 
 # ---------------------------------------------------------------------------
-# 2. Phase Congruency (Illumination-Robust Structural Features)
+# 2. Phase 1: Adaptive Illumination Normalization
+# ---------------------------------------------------------------------------
+
+def adaptive_illumination_normalization(img_gray: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Phase 1: Adaptive Illumination Normalization
+    Purpose: Mitigate extreme sun angle variations and shadow artifacts
+             before Phase Congruency feature extraction.
+    Method: CLAHE for local contrast equalization + Shadow Masking.
+    Returns: (normalized_image, valid_mask)
+    """
+    # 1. CLAHE to normalize local contrast (sun angle invariance)
+    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
+    img_uint8 = np.clip(img_gray * 255.0, 0, 255).astype(np.uint8)
+    clahe_img = clahe.apply(img_uint8).astype(np.float32) / 255.0
+
+    # 2. Shadow & Saturation Mask Generation
+    # Shadows typically fall in the bottom percentile of pixel intensities.
+    # We create a mask where 1.0 = valid texture, 0.0 = deep shadow or pure white saturation.
+    shadow_threshold = np.percentile(img_gray, 5.0) 
+    saturation_threshold = np.percentile(img_gray, 99.5)
+
+    valid_mask = ((img_gray >= shadow_threshold) & (img_gray <= saturation_threshold)).astype(np.float32)
+
+    # Apply a slight Gaussian blur to the mask to avoid harsh edge artifacts in the FFT
+    valid_mask = cv2.GaussianBlur(valid_mask, (5, 5), 0)
+
+    # 3. Multiply CLAHE image by the mask so shadows become neutral (0.0)
+    # This prevents Phase Congruency from generating false edges in pitch-black shadows
+    normalized_img = clahe_img * valid_mask
+
+    return normalized_img, valid_mask
+
+
+# ---------------------------------------------------------------------------
+# 3. Phase Congruency (Illumination-Robust Structural Features)
 # ---------------------------------------------------------------------------
 
 def compute_phase_congruency(
@@ -783,6 +818,11 @@ def match_images_cfog(
     # Resample to working scale with area averaging
     work1_gray = cv2.resize(raw1_gray, (work_w1, work_h1), interpolation=cv2.INTER_AREA)
     work2_gray = cv2.resize(raw2_gray, (work_w2, work_h2), interpolation=cv2.INTER_AREA)
+
+    # --- PHASE 1: ADAPTIVE ILLUMINATION NORMALIZATION ---
+    # Normalize local contrast and mask out deep lunar shadows to improve Phase Congruency
+    work1_gray, mask1 = adaptive_illumination_normalization(work1_gray)
+    work2_gray, mask2 = adaptive_illumination_normalization(work2_gray)
 
     # --- DYNAMIC SPATIAL GRID SCALING ---
     # Calculate grid size based on the smallest working dimension for INTERNAL
