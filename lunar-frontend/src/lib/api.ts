@@ -65,26 +65,9 @@ export function imageUrl(path: string): string {
     cleanPath = `${cleanPath}.png`;
   }
 
-  // If running in browser on a production domain (like Vercel) and API_BASE points to localhost,
-  // serve relative /images/... so Next.js static public assets load directly without mixed-content errors.
-  if (typeof window !== "undefined") {
-    const isLocalhost =
-      window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1";
-
-    if (!isLocalhost) {
-      if (!API_BASE || API_BASE.includes("localhost") || API_BASE.includes("127.0.0.1")) {
-        return cleanPath;
-      }
-    }
-  }
-
-  // If API_BASE is empty or defaults to localhost, relative paths are supported via public/images
-  if (!API_BASE || API_BASE.includes("localhost") || API_BASE.includes("127.0.0.1")) {
-    return cleanPath;
-  }
-
-  return `${API_BASE}${cleanPath}`;
+  // All static lunar imagery (/images/...) is bundled directly in public/images/
+  // and served by Next.js / Vercel Edge CDN. Never route image assets to external backend hosts (e.g. Render/localhost).
+  return cleanPath;
 }
 
 export const api = {
