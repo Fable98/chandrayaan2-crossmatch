@@ -72,16 +72,19 @@ def get_image(sensor: str, identifier: str):
 
     # Registered products
     if clean_sensor in {"registered", "registration"}:
-        reg_out_dir = Path(repo_root) / "registration_output" / clean_id
-        candidates.append(os.path.join(reg_out_dir, "registered_ohrc.png"))
-        candidates.append(os.path.join(reg_out_dir, "registered_source.png"))
-        candidates.append(os.path.join(reg_out_dir, "blend_overlay.png"))
-        candidates.append(os.path.join(reg_out_dir, "checkerboard_qa.png"))
-        candidates.append(os.path.join(reg_out_dir, identifier))
-        candidates.append(os.path.join(reg_out_dir, f"{identifier}.png"))
-        # Direct identifier match in registration_output (e.g. lro_nac/region_001/blend_overlay.png)
-        candidates.append(str(Path(repo_root) / "registration_output" / identifier))
-        candidates.append(str(Path(repo_root) / "registration_output" / f"{identifier}.png"))
+        for base_reg in [
+            Path(repo_root) / "registration_output",
+            Path(repo_root) / "lunar-frontend" / "public" / "images" / "registered",
+        ]:
+            reg_out_dir = base_reg / clean_id
+            candidates.append(os.path.join(reg_out_dir, "registered_ohrc.png"))
+            candidates.append(os.path.join(reg_out_dir, "registered_source.png"))
+            candidates.append(os.path.join(reg_out_dir, "blend_overlay.png"))
+            candidates.append(os.path.join(reg_out_dir, "checkerboard_qa.png"))
+            candidates.append(os.path.join(reg_out_dir, identifier))
+            candidates.append(os.path.join(reg_out_dir, f"{identifier}.png"))
+            candidates.append(str(base_reg / identifier))
+            candidates.append(str(base_reg / f"{identifier}.png"))
 
     if data_dir:
         if clean_id in {"ohrc", "tmc", "iirs", "dem"} or os.path.isdir(os.path.join(data_dir, clean_id)):

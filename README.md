@@ -183,6 +183,29 @@ Consequently, this pairing does not require the heavy multi-spectral dimensional
 
 ---
 
+## 7.5. Capability Status
+
+The following audit matrix documents the exact operational status of each algorithmic capability in this repository. In accordance with strict photogrammetric integrity, capabilities are marked **✅ Verified** only if supported by passing regression tests or published empirical benchmark outputs in this repository. Capabilities that are implemented in code but lack flight data, end-to-end ground truth validation, or rigorous benchmark verification are transparently tagged **⚠️ Implemented, not verified here**.
+
+| Capability | Status | Verification Reference & Technical Notes |
+| :--- | :---: | :--- |
+| **OHRC ↔ TMC-2 Cross-Registration (~20× scale disparity)** | ✅ Verified | Passing integration test [`tests/test_registration_pipeline.py::test_real_20x_scale_disparity_registration`](tests/test_registration_pipeline.py) and verified across 8 real orbital regions in §6 benchmark table. |
+| **Phase Congruency Structural Feature Representation** | ✅ Verified | Passing tests in [`tests/test_ablation_smoke.py`](tests/test_ablation_smoke.py). Proven tolerant to contrast/gain shifts; fails closed cleanly on diametric 162° azimuth reversal (`triplet_new_2022`). |
+| **Pre-Match Spatial Suppression (ANMS / SSC)** | ✅ Verified | Passing tests in [`tests/test_spatial_uniformity.py`](tests/test_spatial_uniformity.py) (`test_spatial_uniformity_score_distribution`, `test_pre_match_ssc_coverage_gain`). Demonstrates 4×–6× coverage expansion over raw clustering. |
+| **Independent Canonical Metrics (In-Sample vs Held-Out RMSE, Coverage, Absolute RMSE in Meters)** | ✅ Verified | Passing tests in [`tests/test_metrics.py`](tests/test_metrics.py) (4 tests) validating topographic DEM elevation incorporation and 80/20 held-out validation. |
+| **Illumination-Robust Metrics (SSIM, PSNR, NMI, Composite Quality Score)** | ✅ Verified | Passing tests in [`tests/test_illumination_metrics.py`](tests/test_illumination_metrics.py) (5 tests) proving NMI invariance under non-linear illumination offsets and composite score weighting. |
+| **MAGSAC++ Robust Outlier Rejection (`cv2.USAC_MAGSAC`)** | ✅ Verified | Passing tests in [`tests/test_matcher_magsac.py`](tests/test_matcher_magsac.py) validating `outlier_method="magsac"`, estimator selection, and metrics logging. |
+| **Content-Based Overlap Recovery (1D Profiles + 2D Phase Correlation)** | ✅ Verified | Passing tests in [`tests/test_overlap_recovery.py`](tests/test_overlap_recovery.py) proving non-divergent recovery (<0.05° delta) across synthetic translations and real Chandrayaan-2 sample scenes. |
+| **LRO NAC PDS3 Metadata Parser & Header Ingestion** | ✅ Verified | Passing tests in [`tests/test_lro_pds3_parser.py`](tests/test_lro_pds3_parser.py) (4 tests) validating detached `.lbl` labels and attached image headers. |
+| **LRO NAC Real-CDR Cross-Registration (NASA Basemap Reference)** | ✅ Verified | Benchmarked across 3 real orbital CDR footprints in §7 (`region_001`, `region_003`, `region_006`) with 5–6 verified inliers, 0.18–0.60 px fit RMSE (LOW_CONFIDENCE tier). |
+| **IIRS Hyperspectral PCA-PC1 Co-Registration Overlay** | ✅ Verified | Passing tests in [`tests/test_iirs.py`](tests/test_iirs.py) and [`tests/test_registration_pipeline.py::test_iirs_hyperspectral_co_registration_integration`](tests/test_registration_pipeline.py). Co-registration operates via TMC-2 chained bridge ($H_{TI} \cdot H_{OT}$). |
+| **Direct Sub-Meter OHRC ↔ IIRS Point Matching** | ⚠️ Suppressed by design | Intentionally null (0 direct inliers). Direct matching across ~275–320× scale disparity (0.25 m vs 80 m) is physically ungrounded and suppressed to prevent spatial aliasing. |
+| **DEM Relief Displacement Compensation** | ⚠️ Implemented, not verified here | Geometric formulas implemented in [`ML_model/geometry.py`](ML_model/geometry.py) (passing synthetic test `test_geometry.py::test_dem_ray_intersection_math`). Not verified on flight DEM topography due to unavailable sensor line-of-sight azimuth. |
+| **AI Match Verifier (Supervised Random Forest Gate)** | ⚠️ Implemented, not verified here | Structural scaffold in [`ML_model/ai_verifier.py`](ML_model/ai_verifier.py). Operates with heuristic fallback when `.pkl` is absent; not independently benchmarked on verified lunar correspondence ground truth. |
+| **TMC-2 Joint Fore/Nadir/Aft 3-View Stereo Photogrammetry** | ⚠️ Single-view only | Single NCF view implemented per region. Joint 3-view forward/nadir/aft intersection photogrammetry is future work. |
+
+---
+
 ## 8. SIH Problem Statement 26166 Delivery Matrix
 
 | Requirement from Problem Statement | Status | Technical Evidence in Repository |

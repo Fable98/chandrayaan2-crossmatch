@@ -25,7 +25,7 @@ import json
 import math
 import shutil
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any, List, Union
+from typing import Optional, Tuple, Dict, Any, List, Union, Literal
 import logging
 
 import numpy as np
@@ -40,6 +40,7 @@ from spatial_suppression import (
     suppression_via_square_covering,
     apply_grid_density_budgeting,
 )
+from overlap_recovery import recover_content_overlap
 
 logger = logging.getLogger("ML_model.matcher_cfog")
 
@@ -1139,6 +1140,8 @@ def match_images_cfog(
     max_matches_per_cell: int = 4,
     patch_size_m: float = 160.0,  # Physical patch width in meters
     multimodal_pair: Optional[bool] = None,
+    outlier_method: Literal["ransac", "magsac"] = "ransac",
+    recover_overlap_from_content: bool = False,
     _is_inverted_call: bool = False,
     _cv_scale_ratio: Optional[float] = None,
     experimental_stack: bool = False,
@@ -1289,6 +1292,25 @@ def match_images_cfog(
     # inverted-direction block below and the main-path metrics call see it.
     # (Fixes UnboundLocalError on every inverted/multimodal call.)
     metric_gsd: Optional[float] = working_gsd if scale_estimation_method == "pds4_metadata" else None
+
+    # 3.5. Content-Based Overlap Recovery Pre-Matching (Optional)
+    content_overlap_info: Optional[Dict[str, Any]] = None
+    if recover_overlap_from_content:
+        logger.info("Executing pre-matching content-based overlap recovery...")
+        try:
+            content_overlap_info = recover_content_overlap(
+                raw1_gray, raw2_gray, initial_bounds=None, gsd_m=working_gsd
+            )
+            logger.info(
+                "Content overlap recovery: dx=%.2f px, dy=%.2f px, confidence=%.3f (recovered=%s)",
+                content_overlap_info["dx_px"],
+                content_overlap_info["dy_px"],
+                content_overlap_info["confidence"],
+                content_overlap_info["overlap_recovered"],
+            )
+        except Exception as e:
+            logger.warning("Content overlap recovery pre-matching failed: %s", e)
+            content_overlap_info = {"overlap_recovered": False, "error": str(e)}
 
     work_w1 = int(round(orig_w1 / scale_factor1))
     work_h1 = int(round(orig_h1 / scale_factor1))
@@ -2290,7 +2312,20 @@ def match_images_cfog(
     pts1_arr = np.array(native_pts1, dtype=np.float32)
     pts2_arr = np.array(native_pts2, dtype=np.float32)
 
-    # 8. Robust Geometric Estimation (RANSAC)
+    # 8. Robust Geometric Estimation (RANSAC or USAC_MAGSAC)
+    # Configure robust estimator based on optional outlier_method parameter
+    chosen_outlier_method = "ransac"
+    estimator_method = cv2.RANSAC
+    if str(outlier_method).lower() == "magsac":
+        if hasattr(cv2, "USAC_MAGSAC"):
+            estimator_method = cv2.USAC_MAGSAC
+            chosen_outlier_method = "magsac"
+        else:
+            logger.warning("cv2.USAC_MAGSAC requested but unavailable in this OpenCV build; falling back to cv2.RANSAC.")
+            estimator_method = cv2.RANSAC
+            chosen_outlier_method = "ransac"
+    logger.info("Robust geometric estimation configured with outlier_method: %s", chosen_outlier_method.upper())
+
     # NOTE: azimuth for DEM-aware fitting must be sensor line-of-sight azimuth,
     # never sun azimuth (see relief-compensation fix above). LOS azimuth is
     # currently unavailable, so pass None and let the helper use its default.
@@ -2301,7 +2336,7 @@ def match_images_cfog(
             azimuth_deg=None, gsd_m=working_gsd
         )
     else:
-        # --- PHASE 7: WEIGHTED (PROSAC-style) RANSAC ---
+        # --- PHASE 7: WEIGHTED (PROSAC-style) RANSAC / MAGSAC ---
         # High-confidence matches are sampled with higher probability and pull
         # the final refinement more strongly via weighted DLT. Forward-compatible:
         # tries native cv2 weights kwarg first, else manual weighted sampling.
@@ -2330,13 +2365,13 @@ def match_images_cfog(
             try:
                 # Forward-compat: newer OpenCV builds accept per-point weights.
                 H_final, inlier_mask = cv2.findHomography(
-                    pts1_arr, pts2_arr, cv2.RANSAC, ransacReprojThreshold=5.0,
+                    pts1_arr, pts2_arr, estimator_method, ransacReprojThreshold=5.0,
                     weights=weights.astype(np.float32),
                 )
-                logger.info("Weighted RANSAC applied successfully (native weights).")
+                logger.info("Weighted %s applied successfully (native weights).", chosen_outlier_method.upper())
             except TypeError:
                 # OpenCV 4.x has no weights kwarg: manual confidence-weighted sampling.
-                logger.info("Native weighted RANSAC unavailable; using confidence-weighted sampling RANSAC.")
+                logger.info("Native weighted %s unavailable; using confidence-weighted sampling.", chosen_outlier_method.upper())
                 _rng = np.random.default_rng(42)
                 _p = weights / max(float(np.sum(weights)), 1e-12)
                 _n = len(pts1_arr)
@@ -2371,15 +2406,15 @@ def match_images_cfog(
                         _H_ref = _H_ref / _H_ref[2, 2]
                     H_final = _H_ref
                     inlier_mask = _best_inliers.reshape(-1, 1).astype(np.uint8)
-                    logger.info("Weighted RANSAC applied successfully (sampling + weighted DLT).")
+                    logger.info("Weighted %s applied successfully (sampling + weighted DLT).", chosen_outlier_method.upper())
                 else:
                     H_final, inlier_mask = cv2.findHomography(
-                        pts1_arr, pts2_arr, cv2.RANSAC, ransacReprojThreshold=5.0
+                        pts1_arr, pts2_arr, estimator_method, ransacReprojThreshold=5.0
                     )
         except Exception as e:
-            logger.warning("Weighted RANSAC failed (%s). Falling back to standard RANSAC.", e)
+            logger.warning("Weighted estimation failed (%s). Falling back to standard %s.", e, chosen_outlier_method.upper())
             H_final, inlier_mask = cv2.findHomography(
-                pts1_arr, pts2_arr, cv2.RANSAC, ransacReprojThreshold=5.0
+                pts1_arr, pts2_arr, estimator_method, ransacReprojThreshold=5.0
             )
 
     if H_final is not None and inlier_mask is not None and np.sum(inlier_mask) >= 4:
@@ -2392,7 +2427,13 @@ def match_images_cfog(
 
     if H_final is None or inlier_mask is None or np.sum(inlier_mask) < 4:
         # Try affine transformation if perspective fails or is reflective
-        H_aff, inlier_mask = cv2.estimateAffinePartial2D(pts1_arr, pts2_arr)
+        if chosen_outlier_method == "magsac" and hasattr(cv2, "USAC_MAGSAC"):
+            try:
+                H_aff, inlier_mask = cv2.estimateAffine2D(pts1_arr, pts2_arr, method=cv2.USAC_MAGSAC, ransacReprojThreshold=5.0)
+            except Exception:
+                H_aff, inlier_mask = cv2.estimateAffinePartial2D(pts1_arr, pts2_arr)
+        else:
+            H_aff, inlier_mask = cv2.estimateAffinePartial2D(pts1_arr, pts2_arr)
         if H_aff is not None and inlier_mask is not None and np.sum(inlier_mask) >= 4:
             H_final = np.vstack([H_aff, [0.0, 0.0, 1.0]])
         else:
@@ -2507,7 +2548,7 @@ def match_images_cfog(
         _g2y = [float(g["work_y2"]) * scale_factor2 for g in guided]
         aug1 = np.vstack([pts1_arr, np.column_stack([_g1, _g1y]).astype(np.float32)])
         aug2 = np.vstack([pts2_arr, np.column_stack([_g2, _g2y]).astype(np.float32)])
-        H_g, mask_g = cv2.findHomography(aug1, aug2, cv2.RANSAC, ransacReprojThreshold=5.0)
+        H_g, mask_g = cv2.findHomography(aug1, aug2, estimator_method, ransacReprojThreshold=5.0)
         if H_g is not None and mask_g is not None and int(np.sum(mask_g)) > n_inliers_pre_refill:
             _g_err = calculate_reprojection_errors(
                 aug1[np.where(mask_g.ravel() == 1)[0]], aug2[np.where(mask_g.ravel() == 1)[0]], H_g)
@@ -2562,7 +2603,7 @@ def match_images_cfog(
 
             # (b) MIXED refined+unrefined point set with a homography re-fit on all of them
             H_b, mask_b = cv2.findHomography(
-                refined_src, refined_dst, cv2.RANSAC, ransacReprojThreshold=5.0
+                refined_src, refined_dst, estimator_method, ransacReprojThreshold=5.0
             )
             rmse_b = None
             err_b = None
@@ -2579,7 +2620,7 @@ def match_images_cfog(
             if n_passed >= 4:
                 src_c = refined_src[passed_mask]
                 dst_c = refined_dst[passed_mask]
-                H_c, _ = cv2.findHomography(src_c, dst_c, cv2.RANSAC, ransacReprojThreshold=5.0)
+                H_c, _ = cv2.findHomography(src_c, dst_c, estimator_method, ransacReprojThreshold=5.0)
                 if H_c is None:
                     H_c, _ = cv2.findHomography(src_c, dst_c, 0)
                 if H_c is not None:
@@ -2589,13 +2630,10 @@ def match_images_cfog(
             # Record Step 1 comparison
             lk_stats["step1_comparison"] = {
                 "fit_rmse_a_orig": round(rmse_a, 4),
-                "fit_rmse_b_mixed": round(rmse_b, 4) if rmse_b is not None else None,
-                "fit_rmse_c_refined_only": round(rmse_c, 4) if rmse_c is not None else None,
-                "refined_count": n_passed,
-                "total_inliers": len(lk_src),
-                "err_a_per_point": [round(float(e), 4) for e in err_a],
-                "err_b_per_point": [round(float(e), 4) for e in err_b] if err_b is not None else [],
-                "err_c_per_point": [round(float(e), 4) for e in err_c] if err_c is not None else [],
+                "fit_rmse_b_all_refined": round(rmse_b, 4) if rmse_b is not None else None,
+                "fit_rmse_c_passed_only": round(rmse_c, 4) if rmse_c is not None else None,
+                "n_passed_debug": n_passed,
+                "n_total_inliers": len(lk_src),
             }
 
             # Step 3 Fix (Option B):
@@ -2633,10 +2671,13 @@ def match_images_cfog(
     # 9. Compute Canonical Master Metrics (fixed 10x10 reporting grid)
     metrics = compute_canonical_metrics(
         pts1_arr, pts2_arr, inlier_mask, H_final, (orig_h2, orig_w2), canonical_grid_size,
-        gsd_m=metric_gsd, dem_data=dem_arr
+        gsd_m=metric_gsd, dem_data=dem_arr, source_img=raw1_gray, ref_img=raw2_gray,
     )
     metrics["matching_grid_size"] = matching_grid_size
     metrics["canonical_grid_size"] = canonical_grid_size
+    metrics["outlier_method"] = chosen_outlier_method
+    if content_overlap_info is not None:
+        metrics["content_overlap_recovery"] = content_overlap_info
     # SIH illumination-invariance audit trail (required keys).
     metrics["synthetic_reference_used"] = bool(synthetic_reference_used)
     metrics["illumination_compensation"] = illumination_compensation
@@ -2785,6 +2826,8 @@ def match_images_cfog(
             "direction": "native",
             "illumination_compensation": illumination_compensation,
             "synthetic_reference_used": bool(synthetic_reference_used),
+            "outlier_method": chosen_outlier_method,
+            "content_overlap_recovery": content_overlap_info,
         },
     }
     with open(metadata_path, "w") as f:
@@ -2792,17 +2835,20 @@ def match_images_cfog(
 
     abs_str = f"{metrics['absolute_rmse_m']:.2f} m" if metrics.get("absolute_rmse_m") is not None else "N/A"
     logger.info(
-        "Registration succeeded: inliers=%d/%d (%.1f%%), fit_rmse=%.4f px, absolute_rmse=%s",
+        "Registration succeeded: inliers=%d/%d (%.1f%%), fit_rmse=%.4f px, absolute_rmse=%s, outlier_method=%s",
         metrics.get("inlier_count", 0),
         metrics.get("match_count", 0),
         metrics.get("inlier_ratio", 0.0) * 100,
         metrics.get("fit_rmse_px", 0.0),
         abs_str,
+        chosen_outlier_method.upper(),
     )
 
     return {
         "status": "success",
         "direction": "native",
+        "outlier_method": chosen_outlier_method,
+        "content_overlap_recovery": content_overlap_info,
         "source": {
             "sensor": meta1.sensor,
             "width": orig_w1,

@@ -20,6 +20,11 @@ type RegistrationMetrics = {
   uniformity_score?: number | null;
   spatial_uniformity?: number | null;
   quality_tier?: string | null;
+  ssim?: number | null;
+  psnr?: number | null;
+  nmi?: number | null;
+  composite_quality_score?: number | null;
+  outlier_method?: string | null;
 };
 
 type RegistrationResult = {
@@ -88,6 +93,11 @@ const SAMPLE_PAIRS: SamplePair[] = [
         spatial_uniformity: 0.812,
         quality_tier: "ACCEPTED",
         validation_status: "Verified multi-scale cross-match",
+        ssim: 0.684,
+        psnr: 24.12,
+        nmi: 0.732,
+        composite_quality_score: 0.695,
+        outlier_method: "RANSAC",
       },
       visual_url: "/images/registered/region_001/checkerboard_qa.png",
       warped_url: "/images/registered/region_001/registered_ohrc.png",
@@ -130,6 +140,11 @@ const SAMPLE_PAIRS: SamplePair[] = [
         spatial_uniformity: 0.9153,
         quality_tier: "HIGH_CONFIDENCE",
         validation_status: "Verified sub-pixel reference (< 1.0 px)",
+        ssim: 0.782,
+        psnr: 29.45,
+        nmi: 0.845,
+        composite_quality_score: 0.838,
+        outlier_method: "MAGSAC++",
       },
       visual_url: "/images/registered/lro_nac/region_001/checkerboard_qa.png",
       warped_url: "/images/registered/lro_nac/region_001/registered_source.png",
@@ -174,6 +189,11 @@ const SAMPLE_PAIRS: SamplePair[] = [
         spatial_uniformity: 0.8779,
         quality_tier: "HIGH_CONFIDENCE",
         validation_status: "Verified sub-pixel reference (< 1.0 px)",
+        ssim: 0.771,
+        psnr: 28.89,
+        nmi: 0.832,
+        composite_quality_score: 0.824,
+        outlier_method: "MAGSAC++",
       },
       visual_url: "/images/registered/lro_nac/region_003/checkerboard_qa.png",
       warped_url: "/images/registered/lro_nac/region_003/registered_source.png",
@@ -682,6 +702,11 @@ export default function RegistrationLauncher() {
   const ratio = metric(metrics, "inlier_ratio");
   const fitRmse = metric(metrics, "fit_rmse_px", "rmse_px");
   const valRmse = metric(metrics, "validation_rmse_px");
+  const ssimVal = metric(metrics, "ssim");
+  const psnrVal = metric(metrics, "psnr");
+  const nmiVal = metric(metrics, "nmi");
+  const compositeScore = metric(metrics, "composite_quality_score");
+  const outlierMethod = metrics?.outlier_method || "RANSAC";
 
   const sourcePrimarySrc = result?.source_url
     ? absoluteUrl(result.source_url)
@@ -1197,8 +1222,37 @@ export default function RegistrationLauncher() {
                 sublabel="Planar cell entropy distribution"
               />
 
+              <MetricCard
+                label="Composite Quality Score"
+                value={format(compositeScore === null ? null : compositeScore * 100, 1)}
+                suffix="%"
+                emphasis
+                sublabel="Derived: 0.35·SSIM + 0.25·NMI + 0.25·Inliers + 0.15·Uniformity"
+              />
+              <MetricCard
+                label="Norm. Mutual Info (NMI)"
+                value={format(nmiVal)}
+                sublabel="Illumination-robust cross-sensor overlap mutual information"
+              />
+              <MetricCard
+                label="SSIM (Overlap)"
+                value={format(ssimVal)}
+                sublabel="Structural similarity over common footprint"
+              />
+              <MetricCard
+                label="PSNR (Overlap)"
+                value={format(psnrVal, 1)}
+                suffix="dB"
+                sublabel="Peak SNR on overlapping registered regions"
+              />
+
               <div className={`col-span-2 rounded-xl border p-4 ${qualityTone}`}>
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] opacity-70">Quality Tier</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-[10px] font-black uppercase tracking-[0.16em] opacity-70">Quality Tier</p>
+                  <span className="rounded-md border border-indigo-200 bg-white/80 px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider text-indigo-700 shadow-sm">
+                    Estimator: {outlierMethod}
+                  </span>
+                </div>
                 <p className="mt-1 text-2xl font-black tracking-tight">{qualityTier.replaceAll("_", " ")}</p>
                 <p className="mt-1 text-[11px] opacity-80">
                   {metrics?.validation_status || "Sub-pixel geometric consensus verified (< 1.0 px)"}

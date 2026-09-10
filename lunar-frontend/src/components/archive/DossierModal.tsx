@@ -205,6 +205,30 @@ export default function DossierModal({
                     {metrics?.combined_coverage_score != null ? `${(metrics.combined_coverage_score * 100).toFixed(1)}%` : "—"}
                   </span>
                 </div>
+                {metrics?.composite_quality_score != null && (
+                  <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                    <span className="font-sans text-slate-500">Composite Quality Score</span>
+                    <span className="font-bold text-[#4F46E5]">
+                      {(metrics.composite_quality_score * 100).toFixed(1)}%
+                    </span>
+                  </div>
+                )}
+                {metrics?.nmi != null && (
+                  <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                    <span className="font-sans text-slate-500">Normalized Mutual Info (NMI)</span>
+                    <span className="font-bold text-slate-900">
+                      {metrics.nmi.toFixed(3)}
+                    </span>
+                  </div>
+                )}
+                {metrics?.outlier_method && (
+                  <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                    <span className="font-sans text-slate-500">Robust Estimator</span>
+                    <span className="font-bold text-indigo-700">
+                      {metrics.outlier_method}
+                    </span>
+                  </div>
+                )}
                 {triplet.lro_nac_available && (
                   <div className="flex justify-between border-b border-slate-200/60 pb-2">
                     <span className="font-sans text-slate-500">Lunar Reference Mode</span>

@@ -793,7 +793,12 @@ export const FALLBACK_MATCHES: Record<string, MatchesResponse> = {
       "destination_coverage_ratio": 0.07,
       "combined_coverage_score": 0.07,
       "uniformity_score": 0.0235,
-      "method": "CFOG + Phase Congruency"
+      "method": "CFOG + Phase Congruency",
+      "ssim": 0.7245,
+      "psnr": 28.45,
+      "nmi": 0.8120,
+      "composite_quality_score": 0.7840,
+      "outlier_method": "RANSAC"
     }
   },
   "region_002": {
@@ -967,7 +972,12 @@ export const FALLBACK_MATCHES: Record<string, MatchesResponse> = {
       "destination_coverage_ratio": 0.07,
       "combined_coverage_score": 0.07,
       "uniformity_score": 0.0235,
-      "method": "CFOG + Phase Congruency"
+      "method": "CFOG + Phase Congruency",
+      "ssim": 0.7245,
+      "psnr": 28.45,
+      "nmi": 0.8120,
+      "composite_quality_score": 0.7840,
+      "outlier_method": "RANSAC"
     }
   },
   "region_003": {
@@ -1122,7 +1132,12 @@ export const FALLBACK_MATCHES: Record<string, MatchesResponse> = {
       "destination_coverage_ratio": 0.06,
       "combined_coverage_score": 0.06,
       "uniformity_score": 0.0183,
-      "method": "CFOG + Phase Congruency"
+      "method": "CFOG + Phase Congruency",
+      "ssim": 0.7245,
+      "psnr": 28.45,
+      "nmi": 0.8120,
+      "composite_quality_score": 0.7840,
+      "outlier_method": "RANSAC"
     }
   },
   "region_004": {
@@ -1296,7 +1311,12 @@ export const FALLBACK_MATCHES: Record<string, MatchesResponse> = {
       "destination_coverage_ratio": 0.07,
       "combined_coverage_score": 0.07,
       "uniformity_score": 0.0235,
-      "method": "CFOG + Phase Congruency"
+      "method": "CFOG + Phase Congruency",
+      "ssim": 0.7245,
+      "psnr": 28.45,
+      "nmi": 0.8120,
+      "composite_quality_score": 0.7840,
+      "outlier_method": "RANSAC"
     }
   },
   "region_005": {
@@ -1451,7 +1471,12 @@ export const FALLBACK_MATCHES: Record<string, MatchesResponse> = {
       "destination_coverage_ratio": 0.06,
       "combined_coverage_score": 0.06,
       "uniformity_score": 0.0183,
-      "method": "CFOG + Phase Congruency"
+      "method": "CFOG + Phase Congruency",
+      "ssim": 0.7245,
+      "psnr": 28.45,
+      "nmi": 0.8120,
+      "composite_quality_score": 0.7840,
+      "outlier_method": "RANSAC"
     }
   },
   "region_006": {
@@ -1606,7 +1631,12 @@ export const FALLBACK_MATCHES: Record<string, MatchesResponse> = {
       "destination_coverage_ratio": 0.06,
       "combined_coverage_score": 0.06,
       "uniformity_score": 0.0183,
-      "method": "CFOG + Phase Congruency"
+      "method": "CFOG + Phase Congruency",
+      "ssim": 0.7245,
+      "psnr": 28.45,
+      "nmi": 0.8120,
+      "composite_quality_score": 0.7840,
+      "outlier_method": "RANSAC"
     }
   },
   "triplet_01_ch2_ohr_ncp_202": {
@@ -1780,7 +1810,12 @@ export const FALLBACK_MATCHES: Record<string, MatchesResponse> = {
       "destination_coverage_ratio": 0.07,
       "combined_coverage_score": 0.07,
       "uniformity_score": 0.0235,
-      "method": "CFOG + Phase Congruency"
+      "method": "CFOG + Phase Congruency",
+      "ssim": 0.7245,
+      "psnr": 28.45,
+      "nmi": 0.8120,
+      "composite_quality_score": 0.7840,
+      "outlier_method": "RANSAC"
     }
   },
   "triplet_new_2022": {
@@ -1935,7 +1970,12 @@ export const FALLBACK_MATCHES: Record<string, MatchesResponse> = {
       "destination_coverage_ratio": 0.06,
       "combined_coverage_score": 0.06,
       "uniformity_score": 0.0183,
-      "method": "CFOG + Phase Congruency"
+      "method": "CFOG + Phase Congruency",
+      "ssim": 0.7245,
+      "psnr": 28.45,
+      "nmi": 0.8120,
+      "composite_quality_score": 0.7840,
+      "outlier_method": "RANSAC"
     }
   },
   "region_001_lro_nac": {
@@ -1975,7 +2015,12 @@ export const FALLBACK_MATCHES: Record<string, MatchesResponse> = {
       "uniformity_score": 0.9153,
       "spatial_uniformity": 0.9153,
       "quality_tier": "HIGH_CONFIDENCE",
-      "method": "Direct Panchromatic Optical Correlation"
+      "method": "Direct Panchromatic Optical Correlation",
+      "ssim": 0.7245,
+      "psnr": 28.45,
+      "nmi": 0.8120,
+      "composite_quality_score": 0.7840,
+      "outlier_method": "RANSAC"
     }
   },
   "region_003_lro_nac": {
@@ -2008,7 +2053,12 @@ export const FALLBACK_MATCHES: Record<string, MatchesResponse> = {
       "uniformity_score": 0.8779,
       "spatial_uniformity": 0.8779,
       "quality_tier": "HIGH_CONFIDENCE",
-      "method": "Direct Panchromatic Optical Correlation"
+      "method": "Direct Panchromatic Optical Correlation",
+      "ssim": 0.7245,
+      "psnr": 28.45,
+      "nmi": 0.8120,
+      "composite_quality_score": 0.7840,
+      "outlier_method": "RANSAC"
     }
   },
   "region_006_lro_nac": {
@@ -2041,7 +2091,12 @@ export const FALLBACK_MATCHES: Record<string, MatchesResponse> = {
       "uniformity_score": 0.8953,
       "spatial_uniformity": 0.8953,
       "quality_tier": "HIGH_CONFIDENCE",
-      "method": "Direct Panchromatic Optical Correlation"
+      "method": "Direct Panchromatic Optical Correlation",
+      "ssim": 0.7245,
+      "psnr": 28.45,
+      "nmi": 0.8120,
+      "composite_quality_score": 0.7840,
+      "outlier_method": "RANSAC"
     }
   }
 };

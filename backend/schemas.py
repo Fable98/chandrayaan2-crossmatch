@@ -145,6 +145,11 @@ class MatchMetrics(BaseModel):
     method: str | None = None
     orthorectified: bool = False
     terrain_correction: dict | None = None
+    ssim: float | None = None
+    psnr: float | None = None
+    nmi: float | None = None
+    composite_quality_score: float | None = None
+    outlier_method: str | None = None
 
 
 class MatchesResponse(BaseModel):

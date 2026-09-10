@@ -81,6 +81,11 @@ export interface MatchMetrics {
   absolute_rmse_m?: number | null;
   validation_status?: string | null;
   quality_tier?: string | null;
+  ssim?: number | null;
+  psnr?: number | null;
+  nmi?: number | null;
+  composite_quality_score?: number | null;
+  outlier_method?: string | null;
   [key: string]: unknown;
 }
 

@@ -16,6 +16,15 @@ from typing import Optional, Dict, Any, List, Tuple, Union
 import numpy as np
 import cv2
 
+try:
+    from skimage.metrics import structural_similarity as _skimage_ssim
+    from skimage.metrics import peak_signal_noise_ratio as _skimage_psnr
+    HAS_SKIMAGE = True
+except ImportError:
+    _skimage_ssim = None
+    _skimage_psnr = None
+    HAS_SKIMAGE = False
+
 logger = logging.getLogger("ML_model.metrics")
 
 
@@ -418,6 +427,305 @@ def verify_transformation_quality(
 
 
 # ---------------------------------------------------------------------------
+# 4.5. Illumination-Robust Quality & Overlap Metrics
+# ---------------------------------------------------------------------------
+
+def calculate_overlap_mask(
+    warped_source: np.ndarray,
+    ref_img: np.ndarray,
+    nodata: float = 0.0,
+) -> np.ndarray:
+    """
+    Computes a 2D boolean mask indicating valid overlap pixels between warped source
+    and reference images (non-zero, non-nodata, and finite in both rasters).
+    """
+    def _to_2d_gray(img: np.ndarray) -> np.ndarray:
+        arr = np.asarray(img)
+        if arr.ndim == 3 and arr.shape[2] in (3, 4):
+            return cv2.cvtColor(arr.astype(np.float32), cv2.COLOR_BGR2GRAY if arr.shape[2] == 3 else cv2.COLOR_BGRA2GRAY)
+        return arr.astype(np.float32)
+
+    w_gray = _to_2d_gray(warped_source)
+    r_gray = _to_2d_gray(ref_img)
+
+    h = min(w_gray.shape[0], r_gray.shape[0])
+    w = min(w_gray.shape[1], r_gray.shape[1])
+    w_crop = w_gray[:h, :w]
+    r_crop = r_gray[:h, :w]
+
+    valid = (
+        (np.abs(w_crop - nodata) > 1e-4)
+        & (np.abs(r_crop - nodata) > 1e-4)
+        & np.isfinite(w_crop)
+        & np.isfinite(r_crop)
+    )
+    return valid
+
+
+def calculate_psnr_over_overlap(
+    warped_source: np.ndarray,
+    ref_img: np.ndarray,
+    mask: Optional[np.ndarray] = None,
+) -> Optional[float]:
+    """
+    Computes Peak Signal-to-Noise Ratio (PSNR) in decibels (dB) across the valid overlap region.
+    Returns float("inf") if the images are identical with zero MSE.
+    """
+    def _to_2d(img: np.ndarray) -> np.ndarray:
+        arr = np.asarray(img, dtype=np.float64)
+        if arr.ndim == 3:
+            return np.mean(arr, axis=2)
+        return arr
+
+    w_arr = _to_2d(warped_source)
+    r_arr = _to_2d(ref_img)
+
+    h = min(w_arr.shape[0], r_arr.shape[0])
+    w = min(w_arr.shape[1], r_arr.shape[1])
+    w_crop = w_arr[:h, :w]
+    r_crop = r_arr[:h, :w]
+
+    if mask is None:
+        mask = calculate_overlap_mask(w_crop, r_crop)
+    else:
+        mask = mask[:h, :w]
+
+    valid_count = int(np.sum(mask))
+    if valid_count < 16:
+        return None
+
+    w_vals = w_crop[mask]
+    r_vals = r_crop[mask]
+
+    diff = w_vals - r_vals
+    mse = float(np.mean(diff ** 2))
+    if mse <= 1e-12:
+        return float("inf")
+
+    data_range = float(np.ptp(r_vals))
+    if data_range <= 1e-6:
+        data_range = 255.0 if np.max(r_crop) > 1.0 else 1.0
+
+    if HAS_SKIMAGE and _skimage_psnr is not None and np.all(mask):
+        try:
+            return round(float(_skimage_psnr(r_crop, w_crop, data_range=data_range)), 4)
+        except Exception:
+            pass
+
+    psnr_val = 10.0 * np.log10((data_range ** 2) / mse)
+    return round(float(psnr_val), 4)
+
+
+def calculate_ssim_over_overlap(
+    warped_source: np.ndarray,
+    ref_img: np.ndarray,
+    mask: Optional[np.ndarray] = None,
+    win_size: int = 7,
+) -> Optional[float]:
+    """
+    Computes Structural Similarity Index (SSIM) between warped source and reference
+    restricted strictly to the valid overlap region.
+    """
+    def _to_2d(img: np.ndarray) -> np.ndarray:
+        arr = np.asarray(img, dtype=np.float64)
+        if arr.ndim == 3:
+            return np.mean(arr, axis=2)
+        return arr
+
+    w_arr = _to_2d(warped_source)
+    r_arr = _to_2d(ref_img)
+
+    h = min(w_arr.shape[0], r_arr.shape[0])
+    w = min(w_arr.shape[1], r_arr.shape[1])
+    w_crop = w_arr[:h, :w]
+    r_crop = r_arr[:h, :w]
+
+    if mask is None:
+        mask = calculate_overlap_mask(w_crop, r_crop)
+    else:
+        mask = mask[:h, :w]
+
+    if np.sum(mask) < 36:
+        return None
+
+    data_range = float(np.ptp(r_crop[mask]))
+    if data_range <= 1e-6:
+        data_range = 255.0 if np.max(r_crop) > 1.0 else 1.0
+
+    if HAS_SKIMAGE and _skimage_ssim is not None and np.all(mask):
+        try:
+            return round(float(_skimage_ssim(r_crop, w_crop, data_range=data_range, win_size=win_size)), 4)
+        except Exception:
+            pass
+
+    # High-precision NumPy SSIM calculation with Gaussian windowing over masked overlap
+    C1 = (0.01 * data_range) ** 2
+    C2 = (0.03 * data_range) ** 2
+
+    ksize = max(3, win_size if win_size % 2 == 1 else win_size + 1)
+    kernel_1d = cv2.getGaussianKernel(ksize, 1.5)
+    kernel = kernel_1d @ kernel_1d.T
+
+    mu1 = cv2.filter2D(w_crop, -1, kernel)
+    mu2 = cv2.filter2D(r_crop, -1, kernel)
+
+    mu1_sq = mu1 ** 2
+    mu2_sq = mu2 ** 2
+    mu1_mu2 = mu1 * mu2
+
+    sigma1_sq = cv2.filter2D(w_crop ** 2, -1, kernel) - mu1_sq
+    sigma2_sq = cv2.filter2D(r_crop ** 2, -1, kernel) - mu2_sq
+    sigma12 = cv2.filter2D(w_crop * r_crop, -1, kernel) - mu1_mu2
+
+    ssim_map = ((2.0 * mu1_mu2 + C1) * (2.0 * sigma12 + C2)) / (
+        (mu1_sq + mu2_sq + C1) * (sigma1_sq + sigma2_sq + C2) + 1e-12
+    )
+
+    # Avoid boundary artifacts by eroding mask slightly
+    kernel_erode = np.ones((ksize // 2 * 2 + 1, ksize // 2 * 2 + 1), dtype=np.uint8)
+    eroded_mask = cv2.erode(mask.astype(np.uint8), kernel_erode) > 0
+    eval_mask = eroded_mask if np.sum(eroded_mask) >= 16 else mask
+
+    ssim_val = float(np.mean(ssim_map[eval_mask]))
+    return round(float(np.clip(ssim_val, -1.0, 1.0)), 4)
+
+
+def calculate_normalized_mutual_information(
+    img_a: np.ndarray,
+    img_b: np.ndarray,
+    mask: Optional[np.ndarray] = None,
+    bins: int = 32,
+) -> Optional[float]:
+    """
+    Computes Strehl-Ghosh Normalized Mutual Information (NMI) in [0.0, 1.0]:
+        NMI(A, B) = 2 * I(A; B) / (H(A) + H(B))
+    
+    This is an explicitly illumination-robust metric, invariant to non-linear monotonic
+    photometric transformations (e.g. changing solar elevation and shadow angles).
+    """
+    def _to_2d(img: np.ndarray) -> np.ndarray:
+        arr = np.asarray(img, dtype=np.float64)
+        if arr.ndim == 3:
+            return np.mean(arr, axis=2)
+        return arr
+
+    a_arr = _to_2d(img_a)
+    b_arr = _to_2d(img_b)
+
+    h = min(a_arr.shape[0], b_arr.shape[0])
+    w = min(a_arr.shape[1], b_arr.shape[1])
+    a_crop = a_arr[:h, :w]
+    b_crop = b_arr[:h, :w]
+
+    if mask is None:
+        mask = calculate_overlap_mask(a_crop, b_crop)
+    else:
+        mask = mask[:h, :w]
+
+    if np.sum(mask) < 32:
+        return None
+
+    a_vals = a_crop[mask].ravel()
+    b_vals = b_crop[mask].ravel()
+
+    if np.std(a_vals) < 1e-6 or np.std(b_vals) < 1e-6:
+        return 0.0
+
+    hist_2d, _, _ = np.histogram2d(a_vals, b_vals, bins=bins)
+    total = float(np.sum(hist_2d))
+    if total <= 0:
+        return 0.0
+
+    p_ab = hist_2d / total
+    p_a = np.sum(p_ab, axis=1)
+    p_b = np.sum(p_ab, axis=0)
+
+    mask_a = p_a > 0
+    h_a = -float(np.sum(p_a[mask_a] * np.log2(p_a[mask_a])))
+
+    mask_b = p_b > 0
+    h_b = -float(np.sum(p_b[mask_b] * np.log2(p_b[mask_b])))
+
+    mask_ab = p_ab > 0
+    h_ab = -float(np.sum(p_ab[mask_ab] * np.log2(p_ab[mask_ab])))
+
+    mi = max(0.0, h_a + h_b - h_ab)
+    sum_h = h_a + h_b
+    if sum_h <= 1e-12:
+        return 1.0 if np.allclose(a_vals, b_vals) else 0.0
+
+    nmi = (2.0 * mi) / sum_h
+    return round(float(np.clip(nmi, 0.0, 1.0)), 4)
+
+
+def calculate_composite_quality_score(
+    inlier_ratio: float,
+    fit_rmse_px: Optional[float],
+    spatial_uniformity: float,
+    nmi: Optional[float] = None,
+    ssim: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    Computes a single unified composite quality score in [0.0, 1.0].
+    
+    FORMULA & WEIGHTING:
+    When optical/warped image alignment metrics (NMI & SSIM) are available:
+        Q = 0.25 * inlier_ratio
+          + 0.25 * exp(-fit_rmse_px / 2.0)
+          + 0.25 * spatial_uniformity
+          + 0.25 * (0.6 * NMI + 0.4 * max(0.0, SSIM))
+    
+    When image rasters are unavailable (feature-only correspondence evaluation):
+        Q = (1/3) * inlier_ratio
+          + (1/3) * exp(-fit_rmse_px / 2.0)
+          + (1/3) * spatial_uniformity
+    
+    PROVENANCE & INTEGRITY:
+    This is an explicitly derived synthetic heuristic composite score, NOT a
+    directly measured photogrammetric correspondence observation. It summarizes
+    multi-attribute registration fidelity into a single comparative scalar.
+    """
+    inl_term = float(np.clip(inlier_ratio, 0.0, 1.0))
+    if fit_rmse_px is not None and np.isfinite(fit_rmse_px) and fit_rmse_px >= 0:
+        rmse_term = float(np.exp(-float(fit_rmse_px) / 2.0))
+    else:
+        rmse_term = 0.0
+    unif_term = float(np.clip(spatial_uniformity, 0.0, 1.0))
+
+    has_image_metrics = (nmi is not None and np.isfinite(nmi)) or (ssim is not None and np.isfinite(ssim))
+    if has_image_metrics:
+        nmi_val = float(nmi) if nmi is not None and np.isfinite(nmi) else 0.0
+        ssim_val = max(0.0, float(ssim)) if ssim is not None and np.isfinite(ssim) else 0.0
+        align_term = 0.6 * nmi_val + 0.4 * ssim_val
+        composite_score = 0.25 * inl_term + 0.25 * rmse_term + 0.25 * unif_term + 0.25 * align_term
+        formula_desc = "0.25*inlier_ratio + 0.25*exp(-fit_rmse_px/2) + 0.25*spatial_uniformity + 0.25*(0.6*NMI + 0.4*max(0,SSIM))"
+        components = {
+            "inlier_ratio_term": round(inl_term, 4),
+            "rmse_term": round(rmse_term, 4),
+            "uniformity_term": round(unif_term, 4),
+            "alignment_term": round(align_term, 4),
+        }
+    else:
+        composite_score = (inl_term + rmse_term + unif_term) / 3.0
+        formula_desc = "(1/3)*inlier_ratio + (1/3)*exp(-fit_rmse_px/2) + (1/3)*spatial_uniformity"
+        components = {
+            "inlier_ratio_term": round(inl_term, 4),
+            "rmse_term": round(rmse_term, 4),
+            "uniformity_term": round(unif_term, 4),
+            "alignment_term": None,
+        }
+
+    clamped_score = float(np.clip(composite_score, 0.0, 1.0))
+    return {
+        "composite_quality_score": round(clamped_score, 4),
+        "composite_quality_score_is_derived": True,
+        "composite_quality_score_derivation": "Synthetic heuristic combination of geometric consensus, spatial distribution, and photometric/structural alignment.",
+        "composite_quality_score_formula": formula_desc,
+        "composite_quality_score_components": components,
+    }
+
+
+# ---------------------------------------------------------------------------
 # 5. Canonical Master Metrics Computation
 # ---------------------------------------------------------------------------
 
@@ -430,6 +738,9 @@ def compute_canonical_metrics(
     grid_size: int = 10,
     gsd_m: Optional[float] = None,
     dem_data: Optional[np.ndarray] = None,
+    source_img: Optional[np.ndarray] = None,
+    ref_img: Optional[np.ndarray] = None,
+    warped_source: Optional[np.ndarray] = None,
 ) -> Dict[str, Any]:
     """
     Single canonical entry point to compute all registration metrics across the repository.
@@ -445,6 +756,7 @@ def compute_canonical_metrics(
     inlier_ratio = float(inlier_count / max(1, raw_count))
 
     if inlier_count == 0 or H is None:
+        empty_comp = calculate_composite_quality_score(0.0, None, 0.0)
         return {
             "match_count": raw_count,
             "inlier_count": 0,
@@ -465,6 +777,14 @@ def compute_canonical_metrics(
             "spatial_uniformity": 0.0,
             "spatial_distribution": calculate_spatial_distribution(np.zeros((0, 2)), image_shape, grid_size),
             "transform_quality": {"is_valid": False, "reason": "No valid transformation"},
+            "ssim": None,
+            "psnr": None,
+            "nmi": None,
+            "composite_quality_score": empty_comp["composite_quality_score"],
+            "composite_quality_score_is_derived": empty_comp["composite_quality_score_is_derived"],
+            "composite_quality_score_derivation": empty_comp["composite_quality_score_derivation"],
+            "composite_quality_score_formula": empty_comp["composite_quality_score_formula"],
+            "composite_quality_score_components": empty_comp["composite_quality_score_components"],
         }
 
     inliers_src = src_pts_raw[inlier_indices]
@@ -535,6 +855,39 @@ def compute_canonical_metrics(
             except Exception:
                 abs_rmse_m = None
 
+    # Compute image-based photometric & structural alignment metrics if images provided
+    actual_warped = warped_source
+    if actual_warped is None and source_img is not None and H is not None:
+        try:
+            h_out = int(ref_img.shape[0]) if ref_img is not None else image_shape[0]
+            w_out = int(ref_img.shape[1]) if ref_img is not None else image_shape[1]
+            actual_warped = cv2.warpPerspective(
+                source_img, H, (w_out, h_out), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=0
+            )
+        except Exception as e:
+            logger.warning("Failed to warp source image for metrics computation: %s", e)
+            actual_warped = None
+
+    ssim_val = None
+    psnr_val = None
+    nmi_val = None
+    if actual_warped is not None and ref_img is not None:
+        try:
+            mask_overlap = calculate_overlap_mask(actual_warped, ref_img)
+            ssim_val = calculate_ssim_over_overlap(actual_warped, ref_img, mask=mask_overlap)
+            psnr_val = calculate_psnr_over_overlap(actual_warped, ref_img, mask=mask_overlap)
+            nmi_val = calculate_normalized_mutual_information(actual_warped, ref_img, mask=mask_overlap)
+        except Exception as e:
+            logger.warning("Failed to compute photometric/structural metrics: %s", e)
+
+    composite_res = calculate_composite_quality_score(
+        inlier_ratio=inlier_ratio,
+        fit_rmse_px=fit_rmse,
+        spatial_uniformity=dist_metrics["uniformity_score"],
+        nmi=nmi_val,
+        ssim=ssim_val,
+    )
+
     return {
         "match_count": raw_count,
         "inlier_count": inlier_count,
@@ -562,6 +915,14 @@ def compute_canonical_metrics(
         "coverage_relative_to_inlier_count": round(coverage_relative, 4),
         "spatial_distribution": dist_metrics,
         "transform_quality": tx_quality,
+        "ssim": ssim_val,
+        "psnr": psnr_val,
+        "nmi": nmi_val,
+        "composite_quality_score": composite_res["composite_quality_score"],
+        "composite_quality_score_is_derived": composite_res["composite_quality_score_is_derived"],
+        "composite_quality_score_derivation": composite_res["composite_quality_score_derivation"],
+        "composite_quality_score_formula": composite_res["composite_quality_score_formula"],
+        "composite_quality_score_components": composite_res["composite_quality_score_components"],
     }
 
 
