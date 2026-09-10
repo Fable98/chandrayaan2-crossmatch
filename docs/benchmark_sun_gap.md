@@ -6,9 +6,9 @@ Fit RMSE vs sun-azimuth gap across 10 measured pairs under current code
 
 | Sun gap (°) | Pair | Raw / Inl | Fit RMSE (px) | Outcome |
 |---|---|---|---|---|
-| 103.6 | region_006 OHRC→NAC (real CDR) | 24 / 5 | 0.1792 | success, LOW |
-| 131.8 | region_001 OHRC→NAC (real CDR) | 32 / 6 | 0.4979 | success, LOW |
-| 131.8 | region_003 OHRC→NAC (real CDR) | 27 / 5 | 0.5957 | success, LOW |
+| 103.6 | region_006 OHRC→NAC (real CDR) | 24 / 5 | 0.3014 | success, LOW |
+| 131.8 | region_001 OHRC→NAC (real CDR) | 32 / 6 | 0.6333 | success, LOW |
+| 131.8 | region_003 OHRC→NAC (real CDR) | 27 / 5 | 1.2860 | success, LOW (not sub-pixel) |
 | 160.8 | region_001 OHRC→TMC | 41 / 7 | 1.2715 | success, LOW |
 | 160.8 | region_002 OHRC→TMC | 43 / 6 | 1.7868 | success, LOW |
 | 160.8 | region_003 OHRC→TMC | 44 / 6 | 0.9941 | success, LOW |
@@ -19,7 +19,7 @@ Fit RMSE vs sun-azimuth gap across 10 measured pairs under current code
 
 ## Readout
 
-1. **Monotonic degradation, ~+0.1px per 10° past 100°.** 0.18 → 0.5–0.6 → 1.0–1.8px. This replaces the synthetic-brightness stress tests as the illumination-robustness evidence: moderate robustness, not invariance.
+1. **Monotonic degradation, ~+0.1px per 10° past 100°.** 0.30 → 0.63–1.29 → 1.0–1.8px. This replaces the synthetic-brightness stress tests as the illumination-robustness evidence: moderate robustness, not invariance. (Official `register_lro_nac.py` path, seeded RANSAC42 — reproduces exactly.)
 2. **Inlier count is gap-independent (5–7 everywhere).** Density is texture-limited, not illumination-limited — consistent with the four negative density experiments.
 3. **Gap alone does not predict failure.** `triplet_new_2022` fails at 162.3° while `region_005/006` succeed at the same gap — local texture and distortion conditioning (Gate3) decide. The gate correctly refuses instead of forcing a fit.
 

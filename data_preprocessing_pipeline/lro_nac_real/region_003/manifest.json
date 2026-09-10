@@ -31,13 +31,14 @@
   "sun_azimuth_note": "same scene as region_001 (M1417670274LC), second footprint north of it",
   "nac_crop_note": "north-up window x2418..,y23450..27480 (2645x4030, partial east overlap), padded square, resized 512; south-up control also passes but worse (2.20px); consistent with node-crossing D north-up (region_001)",
   "nac_crop_method": "corner_affine_north_up_pad",
-  "matching_note": "multimodal_pair=True (MI) required; optical NCC=0; 27 raw/5 inliers, fit 0.5957px sub-pixel, LOW_CONFIDENCE, 5% @10x10, no held-out",
+  "matching_note": "multimodal_pair=True (MI) via official runner; optical NCC=0; 27 raw/5 inliers, fit 1.2860px, LOW_CONFIDENCE, 5% @10x10, no held-out",
   "result": {
-    "fit_rmse_px": 0.5957,
-    "sub_pixel_accurate": true,
+    "fit_rmse_px": 1.286,
+    "sub_pixel_accurate": false,
     "inlier_count": 5,
     "match_count": 27,
-    "quality_tier": "LOW_CONFIDENCE"
+    "quality_tier": "LOW_CONFIDENCE",
+    "note": "official register_lro_nac.py path (MI default, seeded RANSAC42, paraboloid refiner)"
   },
   "ohrc_source_image": "data_preprocessing_pipeline\\lro_nac_real\\region_003\\ohrc_source_512.png",
   "lro_nac_reference_image": "data_preprocessing_pipeline\\lro_nac_real\\region_003\\lro_nac_reference_512.png",

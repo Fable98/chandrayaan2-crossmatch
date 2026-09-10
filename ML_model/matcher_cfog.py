@@ -1133,6 +1133,7 @@ def match_images_cfog(
     multimodal_pair: Optional[bool] = None,
     _is_inverted_call: bool = False,
     _cv_scale_ratio: Optional[float] = None,
+    experimental_stack: bool = False,
 ) -> Dict[str, Any]:
     """
     Executes the primary cross-sensor registration pipeline:
@@ -1147,6 +1148,15 @@ def match_images_cfog(
     """
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
+
+    # Deterministic RANSAC sampling: with 5-7 inliers, unseeded RANSAC swings
+    # fit RMSE by ~+-0.5px run to run (measured 003: 0.60/1.29 across runs).
+    # Seeding changes nothing about expected quality; it makes published
+    # numbers reproducible for evaluators re-running the pipeline.
+    try:
+        cv2.setRNGSeed(42)
+    except Exception:
+        pass
 
     # 1. Ingest metadata (NON-FATAL: missing GSD triggers the CV fallback below,
     # never a hard crash, so the pipeline stays generic per the SIH requirement).
@@ -1305,10 +1315,33 @@ def match_images_cfog(
     work1_gray = cv2.resize(raw1_gray, (work_w1, work_h1), interpolation=cv2.INTER_AREA)
     work2_gray = cv2.resize(raw2_gray, (work_w2, work_h2), interpolation=cv2.INTER_AREA)
 
-    # --- PHASE 1: ADAPTIVE ILLUMINATION NORMALIZATION ---
-    # Normalize local contrast and mask out deep lunar shadows to improve Phase Congruency
-    work1_gray, mask1 = adaptive_illumination_normalization(work1_gray)
-    work2_gray, mask2 = adaptive_illumination_normalization(work2_gray)
+    # --- PHASE 1: ADAPTIVE ILLUMINATION NORMALIZATION (OPT-IN ONLY) ---
+    # Measured 2026-09-10, full 8-region primary benchmark with the stack ON:
+    # region_003 6@0.99 SUCCESS -> 0 inliers FAIL; triplet_new_2022 honest FAIL
+    # -> 5@0.17 "success" (selection-bias consensus); all other fits shifted
+    # unpredictably. LRO: 001 32/6@0.63, 003 Gate2-FAIL, 006 degraded.
+    # Global on/off is unjustifiable either way: Phase 1 + RF stay behind
+    # experimental_stack=True until validated per pair. Default path is the
+    # committed classical behavior so published numbers reproduce exactly.
+    try:
+        from metadata import normalize_sensor_name as _raw_norm_s
+
+        def _norm_s(x):
+            return _raw_norm_s(x) if x else ""
+    except Exception:
+        def _norm_s(x):
+            return str(x or "").strip().upper()
+    _pair_sensors = {_norm_s(getattr(meta1, "sensor", "")),
+                     _norm_s(getattr(meta2, "sensor", "")),
+                     _norm_s(source_sensor), _norm_s(reference_sensor)}
+    _classical_ohrc_tmc = not ({"IIRS", "LRO_NAC"} & _pair_sensors)
+    _use_new_stack = bool(experimental_stack)
+    if _use_new_stack:
+        work1_gray, mask1 = adaptive_illumination_normalization(work1_gray)
+        work2_gray, mask2 = adaptive_illumination_normalization(work2_gray)
+    else:
+        mask1 = mask2 = None
+        logger.info("Phase 1 off (default classical path; opt in via experimental_stack=True).")
 
     # --- DYNAMIC SPATIAL GRID SCALING ---
     # Calculate grid size based on the smallest working dimension for INTERNAL
@@ -1368,6 +1401,7 @@ def match_images_cfog(
             multimodal_pair=multimodal_pair,
             _cv_scale_ratio=estimated_scale_ratio,
             _is_inverted_call=True,
+            experimental_stack=experimental_stack,
         )
 
         if inv_temp_dir and inv_temp_dir.exists():
@@ -2191,15 +2225,32 @@ def match_images_cfog(
             is_refined=bool(refined),
         ))
 
-    # --- PHASE 4: AI MATCH VERIFICATION ---
-    # Use Supervised Machine Learning to filter out false-positive matches
+    # --- PHASE 4: AI MATCH VERIFICATION (OPT-IN ONLY) ---
+    # Measured 2026-09-10: with the stack ON, all 3 real-CDR LRO pairs
+    # Gate2-FAIL (RF vetoes true low-MI matches pre-RANSAC) and the primary
+    # benchmark flips outcomes both ways (003 success->fail, triplet_new_2022
+    # honest-fail->5@0.17 pseudo-success). Same opt-in rule as Phase 1:
+    # default path passes refinement records straight to RANSAC.
     from ai_verifier import AIMatchVerifier
-    verifier = AIMatchVerifier()
-    
-    # Since we don't have a pre-trained model yet, this acts as a structural
-    # placeholder for the ML component. It will trust all matches for now.
-    verified_matches, rejected_matches = verifier.filter_matches(refinement_records, threshold=0.5)
-    
+    try:
+        from metadata import normalize_sensor_name as _raw_norm_s4
+
+        def _norm_s4(x):
+            return _raw_norm_s4(x) if x else ""
+    except Exception:
+        def _norm_s4(x):
+            return str(x or "").strip().upper()
+    _s4 = {_norm_s4(getattr(meta1, "sensor", "")),
+           _norm_s4(getattr(meta2, "sensor", "")),
+           _norm_s4(source_sensor), _norm_s4(reference_sensor)}
+    _use_verifier = bool(experimental_stack)
+    if _use_verifier:
+        verifier = AIMatchVerifier()
+        verified_matches, rejected_matches = verifier.filter_matches(refinement_records, threshold=0.5)
+    else:
+        verified_matches, rejected_matches = list(refinement_records), []
+        logger.info("AI Verifier off (default classical path; opt in via experimental_stack=True).")
+
     # Update the points array based on verified matches
     if len(verified_matches) >= 4:
         native_pts1 = [[m["source_x"], m["source_y"]] for m in verified_matches]
