@@ -261,6 +261,10 @@ data_preprocessing_pipeline/.uploads/
 # processed_triplets/*/manifest.json + ohrc/tmc/iirs/dem_512.png (triplet list
 # + /images serving) and data_preprocessing_pipeline/matches/*.json (match
 # points). Fresh deploys return REGIONS (0) without them. Do NOT untrack.
+# METRICS seed files (also force-tracked, tiny JSON only — PNG/TIF rasters
+# stay local): benchmarks/.../registration_benchmark_summary.json (regular
+# KPIs) + registration_output/lro_nac/*/metrics.json|ohrc_to_nac_homography.json
+# (LRO absolute/composite). Without them production cards dash with reasons.
 # Census/gradient/lbp/large variants, evaluation/registration outputs stay local.
 evaluation_output/
 registration_output/

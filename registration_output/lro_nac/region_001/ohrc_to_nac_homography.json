@@ -1,0 +1,35 @@
+{
+  "region_id": "region_001",
+  "reference_type": "external_LRO_NAC",
+  "reference_provenance": "real_downloaded_cdr",
+  "provenance_warning": null,
+  "source_sensor": "OHRC",
+  "reference_sensor": "LRO_NAC",
+  "ohrc_native_gsd_m": 0.25,
+  "lro_nac_native_gsd_m": 0.914,
+  "scale_ratio": 3.66,
+  "status": "success",
+  "homography": [
+    [
+      0.5466077312071305,
+      0.08118529612905956,
+      33.581186139557865
+    ],
+    [
+      -0.1985374950632804,
+      0.8012139337827959,
+      40.39335504474272
+    ],
+    [
+      -0.0007841448262331825,
+      0.00013803840222099208,
+      1.0
+    ]
+  ],
+  "inlier_count": 0,
+  "raw_match_count": 6,
+  "fit_rmse_px": 0.6333,
+  "fit_rmse_is_in_sample": true,
+  "validation_rmse_px": null,
+  "sub_pixel_accurate": false
+}
