@@ -1267,6 +1267,11 @@ def match_images_cfog(
                 },
             }
 
+    # Metric GSD for absolute-RMSE reporting: defined once here so BOTH the
+    # inverted-direction block below and the main-path metrics call see it.
+    # (Fixes UnboundLocalError on every inverted/multimodal call.)
+    metric_gsd: Optional[float] = working_gsd if scale_estimation_method == "pds4_metadata" else None
+
     work_w1 = int(round(orig_w1 / scale_factor1))
     work_h1 = int(round(orig_h1 / scale_factor1))
     work_w2 = int(round(orig_w2 / scale_factor2))
