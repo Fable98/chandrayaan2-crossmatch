@@ -69,7 +69,7 @@ class SensorMetadata:
 # Used only as fallback when product header or API parameters are unavailable
 SENSOR_SPECS = {
     "OHRC": {
-        "gsd_m": 0.25,  # ~0.25–0.32 m at 100 km nominal circular orbit
+        "gsd_m": 0.25,  # ~0.25 m nominal at 100 km circular orbit
         "wavelength_range_um": (0.45, 0.70),  # Panchromatic optical
         "nominal_emission_deg": 0.0,
     },

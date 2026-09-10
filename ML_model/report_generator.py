@@ -42,12 +42,16 @@ from reportlab.platypus import (
 
 logger = logging.getLogger("ML_model.report_generator")
 
-SENSOR_GSD = {
-    "OHRC": 0.3,
-    "TMC": 5.0,
-    "TMC-2": 5.0,
-    "IIRS": 80.0,
-}
+try:
+    from ML_model.config import SENSOR_GSD_MAP, SEED
+except Exception:
+    try:
+        from config import SENSOR_GSD_MAP, SEED
+    except Exception:
+        SEED = 42
+        SENSOR_GSD_MAP = {"OHRC": 0.25, "TMC": 5.0, "TMC-2": 5.0, "IIRS": 80.0, "LRO_NAC": 0.5}
+
+SENSOR_GSD = SENSOR_GSD_MAP
 
 _PHASE_ORDER = ["CFOG", "Crater", "Kornia", "SubPixel", "Distribution"]
 
@@ -452,7 +456,7 @@ class ISROReportGenerator:
             rx_scale = ref_r.shape[1] / float(ref_img.shape[1])
             composite = np.hstack([src_r, ref_r])
             x_off = src_r.shape[1]
-            rng = np.random.RandomState(42)
+            rng = np.random.RandomState(SEED)
             palette = (rng.randint(0, 255, size=(max(n, 1), 3))).astype(int)
             for i in range(n):
                 color = tuple(int(c) for c in palette[i])

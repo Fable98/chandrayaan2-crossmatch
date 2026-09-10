@@ -23,9 +23,16 @@ try:
 except ImportError:
     _skimage_ssim = None
     _skimage_psnr = None
-    HAS_SKIMAGE = False
-
 logger = logging.getLogger("ML_model.metrics")
+
+try:
+    from ML_model.config import SEED
+except Exception:
+    try:
+        from config import SEED
+    except Exception:
+        SEED = 42
+
 
 
 # ---------------------------------------------------------------------------
@@ -216,7 +223,7 @@ def evaluate_held_out_validation(
     inliers_src: np.ndarray,
     inliers_dst: np.ndarray,
     test_ratio: float = 0.2,
-    random_seed: int = 42,
+    random_seed: int = SEED,
 ) -> Dict[str, Any]:
     """
     Evaluates held-out inlier correspondence validation error by splitting verified inliers into

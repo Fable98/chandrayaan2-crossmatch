@@ -141,43 +141,6 @@ def _solve_perspective_matrix(
     return H
 
 
-def compute_homography_from_points(
-    src_points: list[tuple[float, float]],
-    dst_points: list[tuple[float, float]],
-) -> list[list[float]] | None:
-    """
-    Re-derive a 3×3 homography matrix from matched point pairs.
-
-    The ML team's matcher.py computes H via cv2.findHomography for RANSAC
-    filtering but does not serialize it to matches.json. This function
-    re-derives H from the surviving inlier points using a standard
-    least-squares solve.
-
-    Returns the 3×3 matrix as a list of lists, or None if fewer than 4
-    point pairs are provided (underdetermined system).
-    """
-    if len(src_points) < 4:
-        return None
-
-    src = np.array(src_points, dtype=np.float64)
-    dst = np.array(dst_points, dtype=np.float64)
-
-    if len(src_points) == 4:
-        H = _solve_perspective_matrix(src, dst)
-    else:
-        A = []
-        for (sx, sy), (dx, dy) in zip(src, dst):
-            A.append([-sx, -sy, -1, 0, 0, 0, dx * sx, dx * sy, dx])
-            A.append([0, 0, 0, -sx, -sy, -1, dy * sx, dy * sy, dy])
-
-        A_mat = np.array(A, dtype=np.float64)
-        _, _, Vt = np.linalg.svd(A_mat)
-        H = Vt[-1].reshape(3, 3)
-        H /= H[2, 2]
-
-    return [[float(H[i, j]) for j in range(3)] for i in range(3)]
-
-
 # ---------------------------------------------------------------------------
 # Legacy functions (Unused in live path; kept for backward reference)
 # ---------------------------------------------------------------------------

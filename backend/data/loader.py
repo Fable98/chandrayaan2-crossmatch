@@ -8,14 +8,16 @@ It NEVER writes to the data directory or re-runs any ML computation.
 """
 
 import json
+import logging
 import os
 import sys
 from pathlib import Path
 
 from geo import (
     pixel_to_latlon_from_bounds_batch,
-    compute_homography_from_points,
 )
+
+logger = logging.getLogger("backend.data.loader")
 
 # ---------------------------------------------------------------------------
 # Data directories — override via env vars
@@ -85,6 +87,7 @@ _matches: dict[str, dict] = {}        # keyed by triplet id
 def _parse_ml_matches(
     raw_matches: list[dict],
     bounds: dict,
+    homography: list[list[float]] | None = None,
 ) -> tuple[list[dict], list[list[float]] | None]:
     """
     Transform raw ML match output into the backend's MatchPoint shape.
@@ -95,7 +98,7 @@ def _parse_ml_matches(
     Output:
         - List of MatchPoint-shaped dicts (with ohrc_px, tmc_px,
           ohrc_latlon, tmc_latlon, confidence)
-        - Re-derived 3×3 homography matrix (or None if < 4 points)
+        - Serialized 3×3 homography matrix loaded from transform.json
     """
     if not raw_matches:
         return [], None
@@ -128,9 +131,6 @@ def _parse_ml_matches(
             "tmc_latlon": tmc_latlons[i],
             "confidence": float(m.get("confidence", 1.0)),
         })
-
-    # Re-derive homography from the inlier match points
-    homography = compute_homography_from_points(ohrc_pixels, tmc_pixels)
 
     return points, homography
 
@@ -337,11 +337,12 @@ def load_all() -> None:
             _triplet_list.append(t)
 
     # -------------------------------------------------------------------
-    # Load match files from two sources:
-    #   1. processed_user/matches/{triplet_id}_matches.json
-    #   2. ML_model/matches.json (mapped to region_001)
+    # Load match and transform files from two sources:
+    #   1. processed_user/matches/ — one file per triplet
+    #   2. ML_model/matches.json / transform.json (mapped to region_001)
     # -------------------------------------------------------------------
     _matches = {}
+    _transforms = {}
 
     # Source 1: processed_user/matches/ — one file per triplet
     matches_dir = os.path.join(DATA_DIR, "matches")
@@ -352,6 +353,13 @@ def load_all() -> None:
                 triplet_id = filename.replace("_matches.json", "")
                 raw = _load_match_file(filepath)
                 _matches[triplet_id] = raw
+                tx_file = os.path.join(matches_dir, f"{triplet_id}_transform.json")
+                if os.path.isfile(tx_file):
+                    try:
+                        with open(tx_file, "r") as f:
+                            _transforms[triplet_id] = json.load(f).get("matrix")
+                    except Exception:
+                        pass
 
     # Source 2: ML_model/matches.json — mapped to region_001
     ml_matches_path = os.path.join(ML_OUTPUT_DIR, "matches.json")
@@ -359,9 +367,16 @@ def load_all() -> None:
         raw = _load_match_file(ml_matches_path)
         if raw:
             _matches["region_001"] = raw
+    ml_transform_path = os.path.join(ML_OUTPUT_DIR, "transform.json")
+    if os.path.isfile(ml_transform_path):
+        try:
+            with open(ml_transform_path, "r") as f:
+                _transforms["region_001"] = json.load(f).get("matrix")
+        except Exception:
+            pass
 
     # -------------------------------------------------------------------
-    # Enrich all match data with lat/lon + homography
+    # Enrich all match data with lat/lon + loaded homography
     # -------------------------------------------------------------------
     enriched: dict[str, dict] = {}
     for triplet_id, raw_points in _matches.items():
@@ -378,7 +393,19 @@ def load_all() -> None:
             }
             continue
 
-        points, homography = _parse_ml_matches(raw_points, bounds)
+        loaded_homography = _transforms.get(triplet_id)
+        if loaded_homography is None:
+            region_dir = triplet.get("region_dir")
+            if region_dir:
+                candidate_tx = os.path.join(region_dir, "transform.json")
+                if os.path.isfile(candidate_tx):
+                    try:
+                        with open(candidate_tx, "r") as f:
+                            loaded_homography = json.load(f).get("matrix")
+                    except Exception:
+                        pass
+
+        points, homography = _parse_ml_matches(raw_points, bounds, homography=loaded_homography)
 
         metrics_data = None
         if compute_canonical_metrics and len(raw_points) >= 4 and homography is not None:
@@ -479,9 +506,10 @@ def load_all() -> None:
 
     _matches = enriched
 
-    print(
-        f"[loader] Loaded {len(_triplets)} triplet(s) and "
-        f"{len(_matches)} match file(s)"
+    logger.info(
+        "Loaded %d triplet(s) and %d match file(s)",
+        len(_triplets),
+        len(_matches),
     )
 
 

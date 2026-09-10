@@ -39,6 +39,11 @@ from pathlib import Path
 import joblib
 import numpy as np
 
+try:
+    from config import SEED
+except ImportError:
+    from ML_model.config import SEED
+
 logger = logging.getLogger("ML_model.train_ai_verifier")
 
 # Feature order is the contract with ai_verifier.AIMatchVerifier.extract_features.
@@ -156,7 +161,7 @@ def load_matches_from_file(path: Path) -> list[dict]:
 def build_dataset(search_roots: list[Path]) -> tuple[np.ndarray, np.ndarray, dict]:
     """Parse all match files into (X, y, stats). Rows without labels are skipped."""
     files = iter_match_files(search_roots)
-    print(f"Found {len(files)} *matches.json file(s) to parse.")
+    logger.info("Found %d *matches.json file(s) to parse.", len(files))
     X_rows: list[list[float]] = []
     y_rows: list[int] = []
     # Several output dirs contain byte-identical copies of the same matches
@@ -200,10 +205,10 @@ def build_dataset(search_roots: list[Path]) -> tuple[np.ndarray, np.ndarray, dic
         stats["parsed"] += n_in + n_out
         stats["skipped_no_label"] += n_skip
         stats["per_file"].append({"file": str(f), "inliers": n_in, "outliers": n_out, "skipped": n_skip})
-        print(f"  {f}: {n_in} unique inliers, {n_out} unique outliers, {n_skip} skipped (no label)")
+        logger.info("  %s: %d unique inliers, %d unique outliers, %d skipped (no label)", f, n_in, n_out, n_skip)
     stats["duplicates_removed"] = n_duplicates
     if n_duplicates:
-        print(f"Removed {n_duplicates} exact-duplicate row(s) shared across output dirs.")
+        logger.info("Removed %d exact-duplicate row(s) shared across output dirs.", n_duplicates)
     X = np.asarray(X_rows, dtype=np.float64)
     y = np.asarray(y_rows, dtype=np.int64)
     return X, y, stats
@@ -217,7 +222,7 @@ def train(
     X: np.ndarray,
     y: np.ndarray,
     test_size: float = 0.25,
-    random_state: int = 42,
+    random_state: int = SEED,
     n_estimators: int = 100,
 ):
     from sklearn.ensemble import RandomForestClassifier
@@ -247,16 +252,14 @@ def train(
         )
     else:
         X_tr, y_tr, X_te, y_te = X, y, X, y
-        print("Minority class has <2 samples: evaluating on the training set.")
+        logger.info("Minority class has <2 samples: evaluating on the training set.")
 
     clf.fit(X_tr, y_tr)
     y_pred = clf.predict(X_te)
-    print("\n=== Classification report ===")
-    print(classification_report(y_te, y_pred, target_names=["outlier(0)", "inlier(1)"]))
-    print("Confusion matrix (rows=true, cols=pred):")
-    print(confusion_matrix(y_te, y_pred))
-    print(f"Train size: {len(y_tr)}, Test size: {len(y_te)}")
-    print(f"Feature importances ({FEATURE_NAMES}): {np.round(clf.feature_importances_, 4).tolist()}")
+    logger.info("\n=== Classification report ===\n%s", classification_report(y_te, y_pred, target_names=["outlier(0)", "inlier(1)"]))
+    logger.info("Confusion matrix (rows=true, cols=pred):\n%s", confusion_matrix(y_te, y_pred))
+    logger.info("Train size: %d, Test size: %d", len(y_tr), len(y_te))
+    logger.info("Feature importances (%s): %s", FEATURE_NAMES, np.round(clf.feature_importances_, 4).tolist())
     return clf
 
 
@@ -270,7 +273,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--output", default=None,
                         help="Where to save the .pkl (default: <this-dir>/ai_verifier_model.pkl).")
     parser.add_argument("--test-size", type=float, default=0.25)
-    parser.add_argument("--random-state", type=int, default=42)
+    parser.add_argument("--random-state", type=int, default=SEED)
     parser.add_argument("--n-estimators", type=int, default=100)
     args = parser.parse_args(argv)
 
@@ -286,18 +289,22 @@ def main(argv: list[str] | None = None) -> int:
             search_roots.append(this_dir / Path(rel).name)
 
     X, y, stats = build_dataset(search_roots)
-    print(f"\nTotal labeled matches: {len(y)} "
-          f"({int(np.sum(y == 1))} inliers, {int(np.sum(y == 0))} outliers), "
-          f"{stats['skipped_no_label']} skipped.")
+    logger.info(
+        "Total labeled matches: %d (%d inliers, %d outliers), %d skipped.",
+        len(y),
+        int(np.sum(y == 1)),
+        int(np.sum(y == 0)),
+        stats["skipped_no_label"],
+    )
     if len(y) == 0:
-        print("ERROR: no labeled matches found. Nothing to train on.", file=sys.stderr)
+        logger.error("ERROR: no labeled matches found. Nothing to train on.")
         return 2
 
     try:
         clf = train(X, y, test_size=args.test_size,
                     random_state=args.random_state, n_estimators=args.n_estimators)
     except ValueError as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
+        logger.error("ERROR: %s", exc)
         return 2
 
     out_path = Path(args.output) if args.output else (this_dir / "ai_verifier_model.pkl")
@@ -308,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
         "class_counts": {int(k): int(v) for k, v in zip(*np.unique(y, return_counts=True))},
     }
     joblib.dump(bundle, out_path)
-    print(f"\nSaved trained verifier -> {out_path}")
+    logger.info("Saved trained verifier -> %s", out_path)
     return 0
 
 

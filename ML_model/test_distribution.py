@@ -1,32 +1,43 @@
 """Quick verification test for spatial_distribution.py"""
-import numpy as np
+import logging
 import sys
+from pathlib import Path
+import numpy as np
+
 sys.path.insert(0, '.')
 
+try:
+    from config import SEED
+except ImportError:
+    from ML_model.config import SEED
+
 from ML_model.spatial_distribution import UniformDistributionFilter
+
+logger = logging.getLogger("test_distribution")
+
 
 def test_basic():
     """Test with points spread across the image"""
     filt = UniformDistributionFilter(grid_rows=4, grid_cols=4, points_per_cell=2)
 
     # Create 20 fake points spread across a 1000x1000 image
-    np.random.seed(42)
+    np.random.seed(SEED)
     src_pts = np.random.uniform(0, 1000, size=(20, 2)).astype(np.float32)
     ref_pts = src_pts + np.random.uniform(-5, 5, size=(20, 2)).astype(np.float32)
     scores = np.random.uniform(0.5, 1.0, size=(20,)).astype(np.float32)
 
     result = filt.filter_points(src_pts, ref_pts, 1000, 1000, scores)
 
-    print(f"Status: {result['status']}")
-    print(f"Original: {result['original_count']}, Filtered: {result['filtered_count']}")
-    print(f"Coverage: {result['coverage_ratio']:.2%}")
-    print(f"Balance: {result['balance_score']:.2f}")
-    print(f"Grid occupancy:\n{result['grid_occupancy']}")
+    logger.info("Status: %s", result['status'])
+    logger.info("Original: %s, Filtered: %s", result['original_count'], result['filtered_count'])
+    logger.info("Coverage: %.2f%%", result['coverage_ratio'] * 100)
+    logger.info("Balance: %.2f", result['balance_score'])
+    logger.info("Grid occupancy:\n%s", result['grid_occupancy'])
 
     assert result['status'] == 'success', "Basic test failed"
     assert result['filtered_count'] <= 4 * 4 * 2, "Too many points returned"
     assert result['filtered_src_pts'].shape[1] == 2, "Wrong shape"
-    print("✅ test_basic PASSED\n")
+
 
 def test_clustered():
     """Test with all points in one corner (worst case)"""
@@ -38,13 +49,13 @@ def test_clustered():
 
     result = filt.filter_points(src_pts, ref_pts, 1000, 1000)
 
-    print(f"Status: {result['status']}")
-    print(f"Original: {result['original_count']}, Filtered: {result['filtered_count']}")
-    print(f"Coverage: {result['coverage_ratio']:.2%} (should be low)")
+    logger.info("Status: %s", result['status'])
+    logger.info("Original: %s, Filtered: %s", result['original_count'], result['filtered_count'])
+    logger.info("Coverage: %.2f%% (should be low)", result['coverage_ratio'] * 100)
 
     assert result['status'] == 'success', "Clustered test failed"
     assert result['coverage_ratio'] < 0.5, "Coverage should be low for clustered points"
-    print("✅ test_clustered PASSED\n")
+
 
 def test_empty():
     """Test with empty input"""
@@ -54,7 +65,7 @@ def test_empty():
     )
     assert result['status'] == 'empty', "Empty test failed"
     assert result['filtered_count'] == 0
-    print("✅ test_empty PASSED\n")
+
 
 def test_out_of_bounds():
     """Test with points outside image"""
@@ -70,16 +81,15 @@ def test_out_of_bounds():
 
     result = filt.filter_points(src_pts, ref_pts, 1000, 1000)
 
-    print(f"Original: {result['original_count']}, Filtered: {result['filtered_count']}")
+    logger.info("Original: %s, Filtered: %s", result['original_count'], result['filtered_count'])
     assert result['filtered_count'] == 2, f"Expected 2 valid points, got {result['filtered_count']}"
-    print("✅ test_out_of_bounds PASSED\n")
+
 
 if __name__ == "__main__":
-    print("=" * 50)
-    print("Running spatial_distribution.py verification tests")
-    print("=" * 50)
+    logging.basicConfig(level=logging.INFO)
+    logger.info("Running spatial_distribution.py verification tests")
     test_basic()
     test_clustered()
     test_empty()
     test_out_of_bounds()
-    print("🎉 ALL TESTS PASSED!")
+    logger.info("ALL TESTS PASSED!")

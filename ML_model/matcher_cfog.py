@@ -42,6 +42,14 @@ from spatial_suppression import (
 )
 from overlap_recovery import recover_content_overlap
 
+try:
+    from ML_model.config import SEED
+except Exception:
+    try:
+        from config import SEED
+    except Exception:
+        SEED = 42
+
 logger = logging.getLogger("ML_model.matcher_cfog")
 
 
@@ -2434,7 +2442,7 @@ def match_images_cfog(
             except TypeError:
                 # OpenCV 4.x has no weights kwarg: manual confidence-weighted sampling.
                 logger.info("Native weighted %s unavailable; using confidence-weighted sampling.", chosen_outlier_method.upper())
-                _rng = np.random.default_rng(42)
+                _rng = np.random.default_rng(SEED)
                 _p = weights / max(float(np.sum(weights)), 1e-12)
                 _n = len(pts1_arr)
                 _best_H, _best_inliers, _best_score = None, None, -1.0

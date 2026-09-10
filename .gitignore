@@ -240,6 +240,7 @@ weights/
 
 # --- Tile cache / generated outputs ---
 tiles/
+output/
 outputs/
 *.geojson.cache
 registration_output_demo/

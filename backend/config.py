@@ -100,3 +100,32 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# Re-export canonical ML configuration constants
+try:
+    import sys
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.append(str(REPO_ROOT))
+    if str(REPO_ROOT / "ML_model") not in sys.path:
+        sys.path.append(str(REPO_ROOT / "ML_model"))
+    from ML_model.config import (
+        OHRC_GSD,
+        TMC_GSD,
+        IIRS_GSD,
+        LRO_NAC_GSD,
+        SEED,
+        SENSOR_GSD_MAP,
+        get_seed,
+        get_sensor_gsd,
+    )
+except Exception:
+    OHRC_GSD = 0.25
+    TMC_GSD = 5.0
+    IIRS_GSD = 80.0
+    LRO_NAC_GSD = 0.5
+    SEED = 42
+    SENSOR_GSD_MAP = {"OHRC": 0.25, "TMC": 5.0, "TMC-2": 5.0, "IIRS": 80.0, "LRO_NAC": 0.5}
+    def get_seed() -> int:
+        return SEED
+    def get_sensor_gsd(s: str, f: float = 1.0) -> float:
+        return SENSOR_GSD_MAP.get(str(s).upper(), f)

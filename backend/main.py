@@ -14,10 +14,18 @@ from typing import Optional
 from pathlib import Path
 from contextlib import asynccontextmanager
 
-logger = logging.getLogger(__name__)
+# Ensure repository root and backend directory are on sys.path
+BACKEND_DIR = Path(__file__).resolve().parent
+REPO_ROOT = BACKEND_DIR.parent
+if str(REPO_ROOT) not in sys.path:
+    sys.path.append(str(REPO_ROOT))
+if str(BACKEND_DIR) in sys.path:
+    sys.path.remove(str(BACKEND_DIR))
+sys.path.insert(0, str(BACKEND_DIR))
 
-# Ensure backend directory is on sys.path for direct imports (data, routers, schemas)
-sys.path.insert(0, str(Path(__file__).resolve().parent))
+from utils.logger import setup_logging
+setup_logging()
+logger = logging.getLogger("backend.main")
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
 from fastapi.concurrency import run_in_threadpool
@@ -31,7 +39,7 @@ try:
     from routers import registration as registration_router
 except Exception as _reg_exc:
     registration_router = None
-    print(f"[main] WARNING: registration router unavailable: {_reg_exc}")
+    logger.warning("Registration router unavailable: %s", _reg_exc)
 from schemas import HealthResponse, RegisterResponse
 
 import shutil
@@ -123,7 +131,7 @@ images_dir = os.path.join(loader.DATA_DIR, "images")
 if os.path.isdir(images_dir):
     app.mount("/images", StaticFiles(directory=images_dir), name="images")
 else:
-    print(f"[main] WARNING: images directory not found at {images_dir}")
+    logger.warning("Images directory not found at %s", images_dir)
 
 # Mount for dynamically generated registration outputs
 dynamic_runs_dir = os.path.join(loader.DATA_DIR, "dynamic_runs")

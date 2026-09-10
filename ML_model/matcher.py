@@ -233,6 +233,8 @@ def match_images(img_path1, img_path2, output_dir="output"):
     }
 
 if __name__ == "__main__":
-    # Test run
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger("ML_model.matcher")
     res = match_images("ohrc_512.jpeg", "tmc_512.jpeg", output_dir="test_output")
-    print(res)
+    logger.info("%s", res)

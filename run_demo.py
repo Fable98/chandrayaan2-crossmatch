@@ -31,6 +31,7 @@ sys.path.insert(0, str(REPO_ROOT / "evaluation"))
 from utils.logger import setup_logging
 from data.ingestion.pds4_reader import parse_pds4_or_vicar_label
 from ML_model.matcher_cfog import match_images_cfog
+from ML_model.config import SEED
 from evaluation.run_ablation import run_ablation_study
 
 logger = logging.getLogger("run_demo")
@@ -57,10 +58,20 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Skip the 4-way baseline ablation study to accelerate execution",
     )
+    parser.add_argument(
+        "--seed",
+        type=int,
+        default=SEED,
+        help=f"Random seed for reproducible stochastic operations (default: {SEED})",
+    )
     return parser.parse_args()
 
 
-def run_pipeline_demo(input_dir: str | Path, output_dir: str | Path, skip_ablation: bool = False) -> int:
+def run_pipeline_demo(input_dir: str | Path, output_dir: str | Path, skip_ablation: bool = False, seed: int = SEED) -> int:
+    import numpy as np
+    import random
+    np.random.seed(seed)
+    random.seed(seed)
     start_time = time.time()
     in_path = Path(input_dir).resolve()
     out_path = Path(output_dir).resolve()
@@ -250,7 +261,7 @@ For full mathematical derivations of the Frequency-Domain Phase Congruency, Chan
 
 def main() -> None:
     args = parse_args()
-    code = run_pipeline_demo(args.input_dir, args.output_dir, args.skip_ablation)
+    code = run_pipeline_demo(args.input_dir, args.output_dir, args.skip_ablation, seed=args.seed)
     sys.exit(code)
 
 
