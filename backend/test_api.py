@@ -7,6 +7,8 @@ No server needs to be running — TestClient spins the app in-process.
 
 import os
 
+import pytest
+
 os.environ.setdefault(
     "JWT_SECRET_KEY",
     "test-only-jwt-secret-that-is-long-enough-for-the-32-char-minimum-0123456789",
@@ -556,6 +558,46 @@ def test_ingest_results_not_found():
     """Verify /api/ingest/results/{job_id} returns 404 for invalid job."""
     r = client.get("/api/ingest/results/nonexistent_job")
     assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Metric completeness: values computed upstream must survive to the API
+# (regression: absolute_rmse_m / composite were stripped by the schema)
+# ---------------------------------------------------------------------------
+
+def test_lro_matches_serve_pipeline_metrics_unstripped():
+    """region_001 LRO: on-disk pipeline numbers reach the API response."""
+    _ensure_loaded()
+    r = client.get("/triplets/region_001_lro_nac/matches")
+    assert r.status_code == 200
+    m = r.json()["metrics"]
+    assert m is not None
+    assert m["fit_rmse_px"] == pytest.approx(0.6333)
+    assert m["absolute_rmse_m"] == pytest.approx(0.5788)
+    assert m["absolute_rmse_m_provenance"] == "pipeline_metrics_json"
+    assert m["composite_quality_score"] == pytest.approx(0.3115)
+    # Photometric overlap metrics computed from committed rasters.
+    assert isinstance(m["ssim"], float) and 0.0 <= m["ssim"] <= 1.0
+    assert isinstance(m["psnr"], float) and m["psnr"] > 0
+    assert isinstance(m["nmi"], float) and m["nmi"] >= 0.0
+    # Honest nulls carry reasons, not bare dashes.
+    assert m["validation_rmse_px"] is None
+    assert "held-out" in m["metric_notes"]["validation_rmse_px"] or "holdout" in m["metric_notes"]["validation_rmse_px"].lower() or "8 inliers" in m["metric_notes"]["validation_rmse_px"]
+
+
+def test_regular_matches_serve_planar_absolute_and_composite():
+    """TMC-mode regions: planar absolute + feature-only composite served."""
+    _ensure_loaded()
+    r = client.get("/triplets/region_001/matches")
+    assert r.status_code == 200
+    m = r.json()["metrics"]
+    assert m is not None
+    assert m["fit_rmse_px"] == pytest.approx(1.2715)
+    assert m["absolute_rmse_m"] is not None and m["absolute_rmse_m"] > 0
+    assert m["absolute_rmse_m_provenance"] == "planar_footprint_gsd_no_dem"
+    assert m["absolute_rmse_m"] == pytest.approx(m["fit_rmse_px"] * 6.2, abs=1.0)
+    assert m["composite_quality_score"] is not None
+    assert m["metric_notes"]["validation_rmse_px"].startswith("held-out")
 
 
 # ---------------------------------------------------------------------------

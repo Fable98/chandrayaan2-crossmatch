@@ -156,6 +156,13 @@ class MatchMetrics(BaseModel):
     nmi: float | None = None
     composite_quality_score: float | None = None
     outlier_method: str | None = None
+    # Step 13 fix: these were computed upstream but silently stripped by the
+    # response model, rendering "—" cards for values that exist on disk.
+    absolute_rmse_m: float | None = None
+    absolute_rmse_m_provenance: str | None = None
+    # Per-metric unavailability reasons (shown as card hints instead of a
+    # bare dash), e.g. {"validation_rmse_px": "held-out needs >=8 inliers"}.
+    metric_notes: dict | None = None
 
 
 class MatchesResponse(BaseModel):

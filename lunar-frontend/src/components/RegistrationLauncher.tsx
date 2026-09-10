@@ -133,7 +133,7 @@ const SAMPLE_PAIRS: SamplePair[] = [
       metrics: {
         fit_rmse_px: 0.6333,
         validation_rmse_px: null,
-        absolute_rmse_m: null,
+        absolute_rmse_m: 0.5788,
         num_inliers: 6,
         inlier_count: 6,
         inlier_ratio: 0.1875,
@@ -142,10 +142,10 @@ const SAMPLE_PAIRS: SamplePair[] = [
         spatial_uniformity: 0.0183,
         quality_tier: "LOW_CONFIDENCE",
         validation_status: "insufficient_points_for_holdout",
-        ssim: null,
-        psnr: null,
-        nmi: null,
-        composite_quality_score: null,
+        ssim: 0.1441,
+        psnr: 15.0171,
+        nmi: 0.0029,
+        composite_quality_score: 0.3115,
         outlier_method: "RANSAC",
       },
       visual_url: "/images/registered/lro_nac/region_001/checkerboard_qa.png",
@@ -184,7 +184,7 @@ const SAMPLE_PAIRS: SamplePair[] = [
       metrics: {
         fit_rmse_px: 1.286,
         validation_rmse_px: null,
-        absolute_rmse_m: null,
+        absolute_rmse_m: 1.1754,
         num_inliers: 5,
         inlier_count: 5,
         inlier_ratio: 0.1852,
@@ -193,10 +193,10 @@ const SAMPLE_PAIRS: SamplePair[] = [
         spatial_uniformity: 0.0135,
         quality_tier: "LOW_CONFIDENCE",
         validation_status: "insufficient_points_for_holdout",
-        ssim: null,
-        psnr: null,
-        nmi: null,
-        composite_quality_score: null,
+        ssim: 0.1915,
+        psnr: 13.4525,
+        nmi: 0.004,
+        composite_quality_score: 0.2415,
         outlier_method: "RANSAC",
       },
       visual_url: "/images/registered/lro_nac/region_003/checkerboard_qa.png",
@@ -389,23 +389,40 @@ function MetricCard({
   suffix,
   emphasis,
   sublabel,
+  hint,
 }: {
   label: string;
   value: string;
   suffix?: string;
   emphasis?: boolean;
   sublabel?: string;
+  // Shown in place of the sublabel when the value is unavailable ("—") so a
+  // missing number always carries its reason, never a bare dash.
+  hint?: string | null;
 }) {
+  const missing = value === "—";
   return (
     <div className={`rounded-xl border p-4 ${emphasis ? "border-indigo-200 bg-indigo-50/60" : "border-slate-200 bg-white"}`}>
       <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{label}</p>
       <p className={`mt-2 text-2xl font-black tracking-tight ${emphasis ? "text-[#4F46E5]" : "text-slate-900"}`}>
         {value}
-        {suffix && <span className="ml-1 text-xs font-bold text-slate-500">{suffix}</span>}
+        {suffix && !missing && <span className="ml-1 text-xs font-bold text-slate-500">{suffix}</span>}
       </p>
-      {sublabel && <p className="mt-1 text-[10px] text-slate-400">{sublabel}</p>}
+      {missing && hint ? (
+        <p className="mt-1 text-[10px] font-semibold text-amber-600">{hint}</p>
+      ) : (
+        sublabel && <p className="mt-1 text-[10px] text-slate-400">{sublabel}</p>
+      )}
     </div>
   );
+}
+
+// Local unavailability reasons derived from displayed values only (works for
+// snapshots and live runs alike — no backend dependency).
+function valHint(inliers: number | null): string | null {
+  if (inliers === null) return "No verified matches in this run";
+  if (inliers < 8) return `Held-out needs ≥8 inliers (have ${inliers})`;
+  return null;
 }
 
 function DownloadLink({ href, label }: { href?: string | null; label: string }) {
@@ -1243,12 +1260,18 @@ export default function RegistrationLauncher() {
                 suffix="px"
                 emphasis
                 sublabel="Out-of-sample holdout generalization"
+                hint={valRmse === null ? valHint(inliers) : null}
               />
               <MetricCard
                 label="Absolute Topographic RMSE"
                 value={format(metric(metrics, "absolute_rmse_m"), 2)}
                 suffix="m"
                 sublabel="Physical ground precision"
+                hint={
+                  metric(metrics, "absolute_rmse_m") === null
+                    ? "No DEM/GSD in this run — cannot convert px to meters"
+                    : null
+                }
               />
               {isIIRSPair ? (
                 <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
@@ -1289,22 +1312,26 @@ export default function RegistrationLauncher() {
                 suffix="%"
                 emphasis
                 sublabel="Derived: 0.25·Inliers + 0.25·RMSE + 0.25·Uniformity + 0.25·Alignment(NMI/SSIM)"
+                hint={compositeScore === null ? "Unavailable for this run" : null}
               />
               <MetricCard
                 label="Norm. Mutual Info (NMI)"
                 value={format(nmiVal)}
                 sublabel="Illumination-robust cross-sensor overlap mutual information"
+                hint={nmiVal === null ? "No overlap rasters in this run" : null}
               />
               <MetricCard
                 label="SSIM (Overlap)"
                 value={format(ssimVal)}
                 sublabel="Structural similarity over common footprint"
+                hint={ssimVal === null ? "No overlap rasters in this run" : null}
               />
               <MetricCard
                 label="PSNR (Overlap)"
                 value={format(psnrVal, 1)}
                 suffix="dB"
                 sublabel="Peak SNR on overlapping registered regions"
+                hint={psnrVal === null ? "No overlap rasters in this run" : null}
               />
 
               <div className={`col-span-2 rounded-xl border p-4 ${qualityTone}`}>

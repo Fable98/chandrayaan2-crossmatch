@@ -194,6 +194,18 @@ export default function DossierModal({
                   </span>
                 </div>
                 <div className="flex justify-between border-b border-slate-200/60 pb-2">
+                  <span className="font-sans text-slate-500">Absolute Topographic RMSE</span>
+                  <span className="font-bold text-slate-900">
+                    {metrics?.absolute_rmse_m != null
+                      ? `${metrics.absolute_rmse_m.toFixed(2)} m${
+                          metrics?.absolute_rmse_m_provenance === "planar_footprint_gsd_no_dem"
+                            ? " (planar, no DEM)"
+                            : ""
+                        }`
+                      : "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between border-b border-slate-200/60 pb-2">
                   <span className="font-sans text-slate-500">Post-RANSAC Inliers</span>
                   <span className="font-bold text-slate-900">
                     {metrics?.num_inliers ?? "—"} matches ({metrics?.inlier_ratio != null ? `${(metrics.inlier_ratio * 100).toFixed(1)}%` : "100%"})

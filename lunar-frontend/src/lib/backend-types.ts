@@ -100,6 +100,11 @@ export interface MatchMetrics {
   "nmi"?: number | null;
   "composite_quality_score"?: number | null;
   "outlier_method"?: string | null;
+  "absolute_rmse_m"?: number | null;
+  "absolute_rmse_m_provenance"?: string | null;
+  "metric_notes"?: {
+  [key: string]: unknown;
+} | null;
 }
 
 export interface MatchPoint {

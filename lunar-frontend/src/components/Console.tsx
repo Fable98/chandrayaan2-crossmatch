@@ -553,7 +553,13 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-indigo-100">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-300" />
-                <span>DEM-corrected physical accuracy</span>
+                <span>
+                  {metrics?.absolute_rmse_m == null
+                    ? "No DEM/GSD — cannot convert px to meters"
+                    : metrics?.absolute_rmse_m_provenance === "planar_footprint_gsd_no_dem"
+                    ? "Planar estimate (no DEM)"
+                    : "DEM-corrected physical accuracy"}
+                </span>
               </div>
             </div>
 
@@ -584,7 +590,13 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
               </div>
               <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
                 <span className={`h-1.5 w-1.5 rounded-full ${((metrics?.fit_rmse_px ?? metrics?.rmse_px ?? 99) < 1.0) ? "bg-emerald-500" : "bg-amber-500"}`} />
-                <span>Sub-pixel target &lt; 1.00 px verified</span>
+                <span>
+                  {metrics == null
+                    ? "No verified matches — registration did not verify"
+                    : metrics.validation_rmse_px == null
+                    ? `Held-out needs ≥8 inliers (have ${metrics.num_inliers ?? 0})`
+                    : "Sub-pixel target < 1.00 px verified"}
+                </span>
               </div>
             </div>
 

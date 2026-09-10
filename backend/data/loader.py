@@ -135,6 +135,154 @@ def _parse_ml_matches(
     return points, homography
 
 
+def _footprint_gsd_m(bounds: dict, image_px: int = 512) -> float | None:
+    """Planar meters-per-pixel from shared-bounds footprint width.
+
+    Used ONLY for the honest planar absolute-RMSE fallback (no DEM): the
+    512 common grid spans [west_lon, east_lon] on a lunar sphere.
+    Returns None when bounds are missing/deenerate.
+    """
+    try:
+        import math
+
+        w_lon = float(bounds["west_lon"])
+        e_lon = float(bounds["east_lon"])
+        mid_lat = float(bounds["south_lat"] + bounds["north_lat"]) / 2.0
+        width_m = abs(e_lon - w_lon) * math.pi / 180.0 * 1737400.0 * abs(math.cos(math.radians(mid_lat)))
+        gsd = width_m / max(int(image_px), 1)
+        return float(gsd) if gsd > 0 and gsd == gsd else None
+    except Exception:
+        return None
+
+
+def _lro_overlap_photometrics(reg_id: str) -> dict:
+    """SSIM/PSNR/NMI over the valid overlap of committed LRO rasters.
+
+    Compares registration_output/lro_nac/{id}/registered_source.png (warped
+    OHRC) against the real-CDR reference tile with the shared overlap-mask
+    math from ML_model/metrics.py. Returns Nones (never raises) when assets
+    are absent — the UI then shows the documented reason, not a number.
+    """
+    out: dict = {"ssim": None, "psnr": None, "nmi": None, "overlap_frac": None}
+    try:
+        import cv2  # noqa: F401  (already a backend dependency)
+
+        from metrics import (
+            calculate_overlap_mask,
+            calculate_ssim_over_overlap,
+            calculate_psnr_over_overlap,
+            calculate_normalized_mutual_information,
+        )
+
+        warped_path = os.path.join(REPO_ROOT, "registration_output", "lro_nac", reg_id, "registered_source.png")
+        ref_path = os.path.join(
+            REPO_ROOT, "data_preprocessing_pipeline", "lro_nac_real", reg_id, "lro_nac_reference_512.png"
+        )
+        if not (os.path.isfile(warped_path) and os.path.isfile(ref_path)):
+            return out
+        warped = cv2.imread(warped_path, cv2.IMREAD_UNCHANGED)
+        ref = cv2.imread(ref_path, cv2.IMREAD_UNCHANGED)
+        if warped is None or ref is None:
+            return out
+        mask = calculate_overlap_mask(warped, ref)
+        out["overlap_frac"] = round(float(mask.mean()), 4) if mask.size else 0.0
+        if int(mask.sum()) < 16:
+            return out
+        out["ssim"] = calculate_ssim_over_overlap(warped, ref, mask=mask)
+        out["psnr"] = calculate_psnr_over_overlap(warped, ref, mask=mask)
+        out["nmi"] = calculate_normalized_mutual_information(warped, ref, mask=mask)
+    except Exception as exc:
+        logger.warning("LRO photometric metrics unavailable for %s: %s", reg_id, exc)
+    return out
+
+
+_BENCHMARK_SUMMARY: dict | None = None
+_BENCHMARK_LOADED = False
+
+
+def _benchmark_row(triplet_id: str) -> dict | None:
+    """Committed pipeline benchmark row for this region, if published."""
+    global _BENCHMARK_SUMMARY, _BENCHMARK_LOADED
+    if not _BENCHMARK_LOADED:
+        _BENCHMARK_LOADED = True
+        try:
+            with open(
+                os.path.join(
+                    REPO_ROOT, "benchmarks", "registration_benchmark_output",
+                    "registration_benchmark_summary.json",
+                ),
+                "r",
+            ) as f:
+                _BENCHMARK_SUMMARY = json.load(f)
+        except Exception as exc:
+            logger.warning("Benchmark summary unavailable: %s", exc)
+            _BENCHMARK_SUMMARY = None
+    try:
+        for row in (_BENCHMARK_SUMMARY or {}).get("regions", []):
+            if row.get("region_id") == triplet_id:
+                return row
+    except Exception:
+        pass
+    return None
+
+
+def _metrics_from_benchmark_summary(triplet_id: str, bounds: dict, n_served: int) -> dict | None:
+    """Metrics for regions whose pipeline numbers are published.
+
+    Counts/fit/coverage/uniformity/validation come straight from the committed
+    summary. Planar absolute RMSE = fit × footprint GSD (no DEM available to
+    this loader — provenance-labeled, never shown as DEM-corrected).
+    Composite = feature-only formula over the published numbers (no rasters).
+    """
+    row = _benchmark_row(triplet_id)
+    if not row or row.get("status") != "success":
+        return None
+    fit = row.get("fit_rmse_px")
+    n_inl = int(row.get("inlier_count", 0) or 0)
+    planar_abs_m = None
+    gsd_m = _footprint_gsd_m(bounds) if bounds else None
+    if fit is not None and gsd_m is not None:
+        planar_abs_m = round(float(fit) * gsd_m, 4)
+    composite = None
+    try:
+        from metrics import calculate_composite_quality_score
+
+        composite = calculate_composite_quality_score(
+            inlier_ratio=float(row.get("inlier_ratio", 0.0) or 0.0),
+            fit_rmse_px=float(fit) if fit is not None else None,
+            spatial_uniformity=float(row.get("spatial_uniformity", 0.0) or 0.0),
+        ).get("composite_quality_score")
+    except Exception as exc:
+        logger.warning("Composite score unavailable for %s: %s", triplet_id, exc)
+    notes: dict = {}
+    if row.get("validation_rmse_px") is None:
+        notes["validation_rmse_px"] = f"held-out needs ≥8 inliers (have {n_inl})"
+    if planar_abs_m is None:
+        notes["absolute_rmse_m"] = "no footprint GSD available"
+    for key in ("ssim", "psnr", "nmi"):
+        notes[key] = "no registered overlap rasters on disk for this region"
+    return {
+        "num_inliers": n_inl,
+        "num_raw_matches": int(row.get("match_count", n_served) or n_served),
+        "inlier_ratio": float(row.get("inlier_ratio", 0.0) or 0.0),
+        "rmse_px": float(fit) if fit is not None else 0.0,
+        "fit_rmse_px": fit,
+        "absolute_rmse_m": planar_abs_m,
+        "absolute_rmse_m_provenance": "planar_footprint_gsd_no_dem" if planar_abs_m is not None else None,
+        "validation_rmse_px": row.get("validation_rmse_px"),
+        "validation_status": row.get("validation_status"),
+        "sub_pixel_accurate": bool(fit is not None and row.get("validation_rmse_px") is not None
+                                   and fit < 1.0 and row["validation_rmse_px"] < 1.0),
+        "source_coverage_ratio": float(row.get("spatial_coverage", 0.0) or 0.0),
+        "destination_coverage_ratio": float(row.get("spatial_coverage", 0.0) or 0.0),
+        "combined_coverage_score": float(row.get("spatial_coverage", 0.0) or 0.0),
+        "uniformity_score": float(row.get("spatial_uniformity", 0.0) or 0.0),
+        "composite_quality_score": composite,
+        "method": "CFOG + Phase Congruency (benchmark summary)",
+        "metric_notes": notes or None,
+    }
+
+
 def _load_match_file(filepath: str) -> list[dict]:
     """
     Load a match file, handling both the ML team's bare-list format
@@ -407,32 +555,12 @@ def load_all() -> None:
 
         points, homography = _parse_ml_matches(raw_points, bounds, homography=loaded_homography)
 
-        metrics_data = None
-        if compute_canonical_metrics and len(raw_points) >= 4 and homography is not None:
-            import numpy as np
-            src_pts = np.array([[float(m.get("image1_x", m.get("source_x"))), float(m.get("image1_y", m.get("source_y")))] for m in raw_points], dtype=np.float32)
-            dst_pts = np.array([[float(m.get("image2_x", m.get("target_x"))), float(m.get("image2_y", m.get("target_y")))] for m in raw_points], dtype=np.float32)
-            inlier_mask = np.ones((len(raw_points), 1), dtype=np.uint8)
-            canon = compute_canonical_metrics(src_pts, dst_pts, inlier_mask, np.array(homography))
-            metrics_data = {
-                "num_inliers": canon.get("inlier_count", len(raw_points)),
-                "num_raw_matches": canon.get("match_count", len(raw_points)),
-                "inlier_ratio": canon.get("inlier_ratio", 1.0),
-                "rmse_px": canon.get("fit_rmse_px", 0.0) or 0.0,
-                "fit_rmse_px": canon.get("fit_rmse_px"),
-                "validation_rmse_px": canon.get("validation_rmse_px"),
-                "validation_status": canon.get("validation_status"),
-                "mean_reprojection_error_px": canon.get("mean_reprojection_error_px", 0.0) or 0.0,
-                "median_reprojection_error_px": canon.get("median_reprojection_error_px", 0.0) or 0.0,
-                "max_reprojection_error_px": canon.get("max_reprojection_error_px", 0.0) or 0.0,
-                "sub_pixel_accurate": canon.get("sub_pixel_accurate", False),
-                "fraction_below_1px": canon.get("fraction_below_1px", 0.0) or 0.0,
-                "source_coverage_ratio": canon.get("spatial_coverage", 0.0),
-                "destination_coverage_ratio": canon.get("spatial_coverage", 0.0),
-                "combined_coverage_score": canon.get("spatial_coverage", 0.0),
-                "uniformity_score": canon.get("spatial_uniformity", 0.0),
-                "method": "CFOG + Phase Congruency",
-            }
+        # Primary metrics source: the pipeline's own committed benchmark
+        # summary (no refit, no contradictions with published tables).
+        # Derived fields (planar absolute, feature-only composite) are computed
+        # from those numbers with documented provenance; anything unavailable
+        # stays null with a reason in metric_notes.
+        metrics_data = _metrics_from_benchmark_summary(triplet_id, bounds, len(raw_points))
 
         enriched[triplet_id] = {
             "triplet_id": triplet_id,
@@ -473,15 +601,32 @@ def load_all() -> None:
                             })
 
                     bounds = (_triplets.get(reg_id) or {}).get("bounds")
-                    if bounds and raw_lro_matches:
-                        pts, derived_h = _parse_ml_matches(raw_lro_matches, bounds)
+                    if bounds:
+                        pts, derived_h = _parse_ml_matches(raw_lro_matches, bounds) if raw_lro_matches else ([], None)
+                        # Photometric overlap metrics from the committed rasters
+                        # (warped OHRC vs real-CDR reference). Missing assets →
+                        # honest nulls, never synthesized.
+                        photo = _lro_overlap_photometrics(reg_id)
+                        n_lro = int(m_json.get("inlier_count", len(raw_lro_matches)))
+                        lro_notes: dict = {}
+                        if not raw_lro_matches and n_lro > 0:
+                            lro_notes["matches"] = (
+                                f"pipeline run reported {n_lro} inliers but persisted no "
+                                "correspondence points; dots unavailable"
+                            )
+                        if m_json.get("validation_rmse_px") is None:
+                            lro_notes["validation_rmse_px"] = f"held-out needs ≥8 inliers (have {n_lro})"
+                        if photo["ssim"] is None:
+                            lro_notes["ssim"] = lro_notes["psnr"] = lro_notes["nmi"] = \
+                                "overlap rasters unavailable for this region"
                         metrics_data = {
-                            "num_inliers": m_json.get("inlier_count", len(raw_lro_matches)),
+                            "num_inliers": n_lro,
                             "num_raw_matches": m_json.get("match_count", len(raw_lro_matches)),
                             "inlier_ratio": m_json.get("inlier_ratio", 1.0),
                             "rmse_px": m_json.get("fit_rmse_px") or 0.0,
                             "fit_rmse_px": m_json.get("fit_rmse_px"),
                             "absolute_rmse_m": m_json.get("absolute_rmse_m"),
+                            "absolute_rmse_m_provenance": "pipeline_metrics_json" if m_json.get("absolute_rmse_m") is not None else None,
                             "validation_rmse_px": m_json.get("validation_rmse_px"),
                             "validation_status": m_json.get("validation_status", "evaluated"),
                             "mean_reprojection_error_px": m_json.get("mean_reprojection_error_px", 0.0),
@@ -493,7 +638,12 @@ def load_all() -> None:
                             "destination_coverage_ratio": m_json.get("spatial_coverage", 1.0),
                             "combined_coverage_score": m_json.get("spatial_coverage", 1.0),
                             "uniformity_score": m_json.get("spatial_uniformity", 0.9),
+                            "ssim": photo["ssim"],
+                            "psnr": photo["psnr"],
+                            "nmi": photo["nmi"],
+                            "composite_quality_score": m_json.get("composite_quality_score"),
                             "method": "OHRC-to-LRO-NAC Phase Correlation / LK",
+                            "metric_notes": lro_notes or None,
                         }
                         enriched[f"{reg_id}_lro_nac"] = {
                             "triplet_id": f"{reg_id}_lro_nac",

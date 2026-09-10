@@ -107,6 +107,8 @@ export interface MatchMetrics {
   method?: string | null;
   orthorectified?: boolean;
   absolute_rmse_m?: number | null;
+  absolute_rmse_m_provenance?: string | null;
+  metric_notes?: Record<string, string> | null;
   validation_status?: string | null;
   quality_tier?: string | null;
   ssim?: number | null;
