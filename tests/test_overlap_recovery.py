@@ -138,5 +138,110 @@ def test_matcher_cfog_recover_overlap_flag():
         assert "content_overlap_recovery" in res
         assert res["content_overlap_recovery"] is not None
         assert "dx_px" in res["content_overlap_recovery"]
+        assert "shift_applied" in res["content_overlap_recovery"]
         assert "metrics" in res
         assert "content_overlap_recovery" in res["metrics"]
+
+
+def test_overlap_recovery_recenter_large_offset_integration():
+    """
+    Integration test proving that content-based overlap recovery actually improves
+    matching quality by re-centering the search window:
+    - When an offset exceeds the unshifted search window radius (> search_half_w),
+      recover_overlap_from_content=False fails to find correspondences.
+    - When recover_overlap_from_content=True, the recovered offset re-centers the
+      coarse search window, enabling successful matching, high inliers, and
+      accurate homography recovery.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        tmp_path = Path(tmpdir)
+        h, w = 384, 384
+        np.random.seed(99)
+        img1 = np.full((h, w), 120, dtype=np.uint8)
+        for _ in range(40):
+            cx = np.random.randint(60, w - 60)
+            cy = np.random.randint(60, h - 60)
+            r = np.random.randint(12, 24)
+            val = int(np.random.randint(170, 255))
+            cv2.circle(img1, (cx, cy), r, val, -1)
+            cv2.circle(img1, (cx, cy), max(3, r - 5), int(val * 0.3), -1)
+        img1 = cv2.GaussianBlur(img1, (7, 7), 1.5)
+
+        # Apply a large shift (dx=+80, dy=+60) exceeding search_half_w = 384 // 6 = 64
+        gt_dx, gt_dy = 80.0, 60.0
+        M = np.float32([[1, 0, gt_dx], [0, 1, gt_dy]])
+        img2 = cv2.warpAffine(img1, M, (w, h))
+
+        p1 = tmp_path / "source_offset.png"
+        p2 = tmp_path / "reference_offset.png"
+        cv2.imwrite(str(p1), img1)
+        cv2.imwrite(str(p2), img2)
+
+        initial_bounds = {
+            "west_lon": 336.48,
+            "east_lon": 336.58,
+            "south_lat": -3.37,
+            "north_lat": -3.25,
+        }
+
+        # 1. Baseline WITHOUT overlap recovery: search window misses shifted features
+        res_off = match_images_cfog(
+            p1,
+            p2,
+            output_dir=tmp_path / "out_off",
+            explicit_gsd1=2.5,
+            explicit_gsd2=2.5,
+            recover_overlap_from_content=False,
+            grid_size=6,
+        )
+        inliers_off = res_off.get("metrics", {}).get("inlier_count", 0) if res_off.get("metrics") else 0
+        H_off = np.array(res_off["homography"], dtype=np.float64) if res_off.get("homography") else None
+
+        # Baseline either fails or finds a bogus transform diverging by > 30 px from ground truth
+        if res_off["status"] == "success" and H_off is not None:
+            baseline_tx_err = abs(H_off[0, 2] - gt_dx)
+            baseline_ty_err = abs(H_off[1, 2] - gt_dy)
+            assert baseline_tx_err > 30.0 or baseline_ty_err > 30.0, (
+                f"Baseline unexpectedly recovered true shift without recentering: tx={H_off[0, 2]}, ty={H_off[1, 2]}"
+            )
+
+        # 2. WITH overlap recovery: search bounds re-center onto true shift
+        res_on = match_images_cfog(
+            p1,
+            p2,
+            output_dir=tmp_path / "out_on",
+            explicit_gsd1=2.5,
+            explicit_gsd2=2.5,
+            recover_overlap_from_content=True,
+            initial_bounds=initial_bounds,
+            grid_size=6,
+        )
+
+        assert res_on["status"] == "success", f"Overlap-recovery matching failed: {res_on.get('message')}"
+        rec_info = res_on.get("content_overlap_recovery", {})
+        assert rec_info.get("overlap_recovered") is True
+        assert "shift_applied" in rec_info
+        shift_applied = rec_info["shift_applied"]
+        assert abs(shift_applied["shift_work_x"] - gt_dx) < 2.0
+        assert abs(shift_applied["shift_work_y"] - gt_dy) < 2.0
+
+        inliers_on = res_on["metrics"]["inlier_count"]
+        assert inliers_on >= 20, f"Expected >= 20 inliers with re-centered search bounds, got {inliers_on}"
+        assert inliers_on >= 2 * inliers_off, (
+            f"Expected inliers_on ({inliers_on}) to double baseline ({inliers_off})"
+        )
+
+        # Verify that estimated homography translation strictly matches ground truth within 1.0 px
+        H_on = np.array(res_on["homography"], dtype=np.float64)
+        assert abs(H_on[0, 2] - gt_dx) < 1.0, f"Homography tx={H_on[0, 2]:.2f} diverges from ground truth {gt_dx}"
+        assert abs(H_on[1, 2] - gt_dy) < 1.0, f"Homography ty={H_on[1, 2]:.2f} diverges from ground truth {gt_dy}"
+        assert abs(H_on[0, 0] - 1.0) < 0.05, f"Scale x diverged: {H_on[0, 0]}"
+        assert abs(H_on[1, 1] - 1.0) < 0.05, f"Scale y diverged: {H_on[1, 1]}"
+
+        # Verify initial_bounds were updated into recovered_bounds
+        assert rec_info.get("initial_bounds") == initial_bounds
+        rec_bounds = rec_info.get("recovered_bounds")
+        assert rec_bounds is not None
+        assert rec_bounds != initial_bounds
+        assert rec_info.get("bounds_shift_meters") is not None
+

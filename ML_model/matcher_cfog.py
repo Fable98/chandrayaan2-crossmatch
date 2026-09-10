@@ -1142,6 +1142,7 @@ def match_images_cfog(
     multimodal_pair: Optional[bool] = None,
     outlier_method: Literal["ransac", "magsac"] = "ransac",
     recover_overlap_from_content: bool = False,
+    initial_bounds: Optional[Dict[str, float]] = None,
     _is_inverted_call: bool = False,
     _cv_scale_ratio: Optional[float] = None,
     experimental_stack: bool = False,
@@ -1293,24 +1294,10 @@ def match_images_cfog(
     # (Fixes UnboundLocalError on every inverted/multimodal call.)
     metric_gsd: Optional[float] = working_gsd if scale_estimation_method == "pds4_metadata" else None
 
-    # 3.5. Content-Based Overlap Recovery Pre-Matching (Optional)
+    # 3.5. Content-Based Overlap Recovery Setup
     content_overlap_info: Optional[Dict[str, Any]] = None
-    if recover_overlap_from_content:
-        logger.info("Executing pre-matching content-based overlap recovery...")
-        try:
-            content_overlap_info = recover_content_overlap(
-                raw1_gray, raw2_gray, initial_bounds=None, gsd_m=working_gsd
-            )
-            logger.info(
-                "Content overlap recovery: dx=%.2f px, dy=%.2f px, confidence=%.3f (recovered=%s)",
-                content_overlap_info["dx_px"],
-                content_overlap_info["dy_px"],
-                content_overlap_info["confidence"],
-                content_overlap_info["overlap_recovered"],
-            )
-        except Exception as e:
-            logger.warning("Content overlap recovery pre-matching failed: %s", e)
-            content_overlap_info = {"overlap_recovered": False, "error": str(e)}
+    shift_work_x: float = 0.0
+    shift_work_y: float = 0.0
 
     work_w1 = int(round(orig_w1 / scale_factor1))
     work_h1 = int(round(orig_h1 / scale_factor1))
@@ -1344,6 +1331,63 @@ def match_images_cfog(
     # Resample to working scale with area averaging
     work1_gray = cv2.resize(raw1_gray, (work_w1, work_h1), interpolation=cv2.INTER_AREA)
     work2_gray = cv2.resize(raw2_gray, (work_w2, work_h2), interpolation=cv2.INTER_AREA)
+
+    # Pre-matching Content-Based Overlap Recovery on Working-Scale Imagery
+    if recover_overlap_from_content:
+        logger.info("Executing pre-matching content-based overlap recovery on working scale...")
+        effective_bounds = initial_bounds
+        if effective_bounds is None:
+            if getattr(meta1, "bounds", None) is not None:
+                effective_bounds = {
+                    "west_lon": float(meta1.bounds[0]),
+                    "east_lon": float(meta1.bounds[1]),
+                    "south_lat": float(meta1.bounds[2]),
+                    "north_lat": float(meta1.bounds[3]),
+                }
+            elif getattr(meta2, "bounds", None) is not None:
+                effective_bounds = {
+                    "west_lon": float(meta2.bounds[0]),
+                    "east_lon": float(meta2.bounds[1]),
+                    "south_lat": float(meta2.bounds[2]),
+                    "north_lat": float(meta2.bounds[3]),
+                }
+
+        try:
+            content_overlap_info = recover_content_overlap(
+                work1_gray, work2_gray, initial_bounds=effective_bounds, gsd_m=working_gsd
+            )
+            if content_overlap_info.get("overlap_recovered"):
+                target_w = min(work_w1, work_w2)
+                target_h = min(work_h1, work_h2)
+                scale_to_work_x = work_w2 / float(target_w) if target_w > 0 else 1.0
+                scale_to_work_y = work_h2 / float(target_h) if target_h > 0 else 1.0
+                shift_work_x = float(content_overlap_info["dx_px"]) * scale_to_work_x
+                shift_work_y = float(content_overlap_info["dy_px"]) * scale_to_work_y
+                content_overlap_info["shift_applied"] = {
+                    "shift_work_x": round(shift_work_x, 3),
+                    "shift_work_y": round(shift_work_y, 3),
+                }
+            else:
+                content_overlap_info["shift_applied"] = {
+                    "shift_work_x": 0.0,
+                    "shift_work_y": 0.0,
+                }
+            logger.info(
+                "Content overlap recovery: dx=%.2f px, dy=%.2f px (working_shift=[%.2f, %.2f]), confidence=%.3f (recovered=%s)",
+                content_overlap_info["dx_px"],
+                content_overlap_info["dy_px"],
+                shift_work_x,
+                shift_work_y,
+                content_overlap_info["confidence"],
+                content_overlap_info["overlap_recovered"],
+            )
+        except Exception as e:
+            logger.warning("Content overlap recovery pre-matching failed: %s", e)
+            content_overlap_info = {
+                "overlap_recovered": False,
+                "shift_applied": {"shift_work_x": 0.0, "shift_work_y": 0.0},
+                "error": str(e),
+            }
 
     # --- PHASE 1: ADAPTIVE ILLUMINATION NORMALIZATION (OPT-IN ONLY) ---
     # Measured 2026-09-10, full 8-region primary benchmark with the stack ON:
@@ -1429,6 +1473,9 @@ def match_images_cfog(
             max_matches_per_cell=max_matches_per_cell,
             patch_size_m=patch_size_m,
             multimodal_pair=multimodal_pair,
+            outlier_method=outlier_method,
+            recover_overlap_from_content=recover_overlap_from_content,
+            initial_bounds=initial_bounds,
             _cv_scale_ratio=estimated_scale_ratio,
             _is_inverted_call=True,
             experimental_stack=experimental_stack,
@@ -1765,6 +1812,7 @@ def match_images_cfog(
             "homography": H_ab.tolist(),
             "terrain_correction": full_metadata["terrain_correction"],
             "spatial_attempts": res_ba.get("spatial_attempts", 0),
+            "content_overlap_recovery": res_ba.get("content_overlap_recovery"),
             "matches": [m for m in inverted_all_matches if m.get("is_inlier", False)],
             "all_matches": inverted_all_matches,
             "outputs": {
@@ -1940,13 +1988,15 @@ def match_images_cfog(
         if float(np.std(tmpl)) < 1e-4:
             continue
 
-        cx2 = int(cx * (work_w2 / float(work_w1)))
-        cy2 = int(cy * (work_h2 / float(work_h1)))
+        cx2 = int(round(cx * (work_w2 / float(work_w1)) + shift_work_x))
+        cy2 = int(round(cy * (work_h2 / float(work_h1)) + shift_work_y))
 
         s_min_x = max(0, cx2 - search_half_w)
         s_max_x = min(work_w2, cx2 + search_half_w)
         s_min_y = max(0, cy2 - search_half_h)
         s_max_y = min(work_h2, cy2 + search_half_h)
+        if s_max_x <= s_min_x or s_max_y <= s_min_y:
+            continue
 
         search_region = pc2[s_min_y:s_max_y, s_min_x:s_max_x]
         if (
@@ -1998,7 +2048,10 @@ def match_images_cfog(
         max_distance = max(search_half_w, search_half_h)
         used_c2 = set()
         for x1, y1 in centroids1:
-            expected = np.array([x1 * work_w2 / float(work_w1), y1 * work_h2 / float(work_h1)])
+            expected = np.array([
+                x1 * work_w2 / float(work_w1) + shift_work_x,
+                y1 * work_h2 / float(work_h1) + shift_work_y,
+            ])
             if len(centroids2) == 0:
                 break
             distances = np.linalg.norm(centroids2 - expected, axis=1)
@@ -2056,13 +2109,15 @@ def match_images_cfog(
             if float(np.std(tmpl)) < 1e-4:
                 continue
 
-            cx2 = int(cx * (work_w2 / float(work_w1)))
-            cy2 = int(cy * (work_h2 / float(work_h1)))
+            cx2 = int(round(cx * (work_w2 / float(work_w1)) + shift_work_x))
+            cy2 = int(round(cy * (work_h2 / float(work_h1)) + shift_work_y))
 
             s_min_x = max(0, cx2 - search_half_w)
             s_max_x = min(work_w2, cx2 + search_half_w)
             s_min_y = max(0, cy2 - search_half_h)
             s_max_y = min(work_h2, cy2 + search_half_h)
+            if s_max_x <= s_min_x or s_max_y <= s_min_y:
+                continue
 
             search_region = pc2[s_min_y:s_max_y, s_min_x:s_max_x]
             if (
@@ -2131,12 +2186,14 @@ def match_images_cfog(
             tmpl = pc1[cy - half_patch_c : cy + half_patch_c, cx - half_patch_c : cx + half_patch_c]
             if float(np.std(tmpl)) < 1e-5:
                 continue
-            cx2 = int(cx * (work_w2 / float(work_w1)))
-            cy2 = int(cy * (work_h2 / float(work_h1)))
+            cx2 = int(round(cx * (work_w2 / float(work_w1)) + shift_work_x))
+            cy2 = int(round(cy * (work_h2 / float(work_h1)) + shift_work_y))
             s_min_x = max(0, cx2 - search_half_w)
             s_max_x = min(work_w2, cx2 + search_half_w)
             s_min_y = max(0, cy2 - search_half_h)
             s_max_y = min(work_h2, cy2 + search_half_h)
+            if s_max_x <= s_min_x or s_max_y <= s_min_y:
+                continue
             search_region = pc2[s_min_y:s_max_y, s_min_x:s_max_x]
             if search_region.shape[0] <= tmpl.shape[0] or search_region.shape[1] <= tmpl.shape[1]:
                 continue
