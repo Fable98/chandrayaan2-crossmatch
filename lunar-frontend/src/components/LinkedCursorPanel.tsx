@@ -7,10 +7,11 @@ import GeoRefBadge from "./GeoRefBadge";
 
 const TILE_PX = 512;
 const NEARBY_PX = 45;
-// Fixed square viewport each pane renders into. The raster is letterboxed
-// (contain-fit) inside it — never cropped — and the coordinate frame below
-// is matched exactly to the displayed image rect (see ImagePane).
-const PANE_PX = 340;
+// Maximum pane size. Panes are fluid (full column width, square aspect) so
+// they shrink on narrow viewports instead of overflowing their grid column.
+// The raster is letterboxed (contain-fit) inside — never cropped — and the
+// coordinate frame is matched exactly to the displayed image rect.
+const PANE_MAX_PX = 340;
 
 interface Props {
   tripletId: string;
@@ -304,24 +305,43 @@ function ImagePane({
   onHoverIndex: (idx: number | null) => void;
 }) {
   // Natural raster dimensions: tiles are not guaranteed square (e.g. cropped
-  // LRO swaths), so the displayed rect is contain-fit into the square
-  // viewport and the click/dot frame is matched to it — never object-cover,
-  // which clips edges and silently breaks the px-fraction mapping.
+  // LRO swaths), so the displayed rect is contain-fit into the measured
+  // square viewport and the click/dot frame is matched to it — never
+  // object-cover, which clips edges and silently breaks the px-fraction
+  // mapping. The viewport is measured (ResizeObserver) so panes shrink on
+  // narrow screens instead of overflowing their grid column.
   const [nat, setNat] = useState({ w: TILE_PX, h: TILE_PX });
+  const [box, setBox] = useState(PANE_MAX_PX);
+  const boxRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     setNat({ w: TILE_PX, h: TILE_PX });
   }, [src]);
-  const scale = Math.min(PANE_PX / Math.max(nat.w, 1), PANE_PX / Math.max(nat.h, 1));
-  const dispW = Math.max(1, Math.round(nat.w * scale));
-  const dispH = Math.max(1, Math.round(nat.h * scale));
-  const offX = Math.round((PANE_PX - dispW) / 2);
-  const offY = Math.round((PANE_PX - dispH) / 2);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const measure = () => {
+      const w = el.clientWidth;
+      if (w > 0) setBox(w);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+  const S = Math.max(1, Math.min(box, PANE_MAX_PX));
+  const scale = Math.min(S / Math.max(nat.w, 1), S / Math.max(nat.h, 1));
+  const dispW = Math.max(1, nat.w * scale);
+  const dispH = Math.max(1, nat.h * scale);
+  const offX = (S - dispW) / 2;
+  const offY = (S - dispH) / 2;
 
   return (
-    <div className="flex flex-col items-center gap-2.5">
+    <div className="flex w-full min-w-0 flex-col items-center gap-2.5">
       <div
-        className="group relative overflow-hidden rounded-xl border border-border bg-panel-raised shadow-2xl select-none"
-        style={{ width: PANE_PX, height: PANE_PX }}
+        ref={boxRef}
+        className="group relative w-full overflow-hidden rounded-xl border border-border bg-panel-raised shadow-2xl select-none"
+        style={{ maxWidth: PANE_MAX_PX, aspectRatio: "1 / 1" }}
       >
         {/* Sensor raster tile: explicit contain-fit size, never cropped. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -429,7 +449,7 @@ function ImagePane({
         </div>
       </div>
 
-      <span className="font-mono text-2xs text-ink-dim tracking-wide">
+      <span className="font-mono text-2xs text-ink-dim tracking-wide text-center">
         {label}
       </span>
     </div>
