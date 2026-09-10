@@ -320,6 +320,14 @@ def test_real_20x_scale_disparity_registration():
         # Verify inlier count
         assert res["metrics"]["inlier_count"] >= 4
 
+        # Verify Step 6 native tiling & coarse-to-fine timing
+        assert res["metadata"]["native_tiling_applied"] is True
+        assert res["metadata"]["native_tile_count"] > 0
+        timing = res["metadata"]["coarse_to_fine_timing"]
+        assert "L2_s" in timing and timing["L2_s"] >= 0.0
+        assert "L1_s" in timing and timing["L1_s"] >= 0.0
+        assert "L0_s" in timing and timing["L0_s"] >= 0.0
+
 
 # ---------------------------------------------------------------------------
 # Test 10: Metadata Safety Rejects Unknown Sensor Without Explicit GSD

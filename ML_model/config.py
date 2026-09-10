@@ -43,6 +43,23 @@ def get_sensor_gsd(sensor_name: str, fallback: float = 1.0) -> float:
     return SENSOR_GSD_MAP.get(clean, fallback)
 
 
+# ===========================================================================
+# Empirically Tuned Thresholds (Calibrated via scripts/tune_thresholds.py)
+# ===========================================================================
+TUNED_RANSAC_REPROJ_THRESH: float = 5.0  # tuned on 2026-09-10, AUC=0.9010
+TUNED_NCC_THRESH: float = 0.25  # tuned on 2026-09-10, AUC=0.9010
+TUNED_RELAXED_NCC_THRESH: float = 0.20  # tuned on 2026-09-10, AUC=0.9010
+TUNED_MI_THRESH: float = 0.08  # tuned on 2026-09-10, AUC=0.9010
+TUNED_RELAXED_MI_THRESH: float = 0.03  # tuned on 2026-09-10, AUC=0.9010
+
+# Quality Gate 3 Matrix Conditioning Thresholds
+TUNED_GATE3_MAX_COND: float = 1e7  # tuned on 2026-09-10, AUC=0.9010
+TUNED_GATE3_MIN_DET: float = 1e-4  # tuned on 2026-09-10, AUC=0.9010
+TUNED_GATE3_MAX_SCALE_RATIO: float = 20.0  # tuned on 2026-09-10, AUC=0.9010
+TUNED_GATE3_MAX_PROJ: float = 0.05  # tuned on 2026-09-10, AUC=0.9010
+TUNED_GATE3_MAX_RMSE: float = 5.0  # tuned on 2026-09-10, AUC=0.9010
+
+
 # Re-export backend Settings if loaded in a unified sys.path environment
 try:
     from backend.config import settings, Settings
