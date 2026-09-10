@@ -181,6 +181,7 @@ class RegisterResponse(BaseModel):
     reference_url: str | None = None
     matches_url: str | None = None
     raster_url: str | None = None
+    quiver_url: str | None = None
     metadata: dict | None = None
 
 

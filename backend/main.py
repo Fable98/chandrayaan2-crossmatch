@@ -244,6 +244,7 @@ async def register_images(
             warped_url=None,
             matches_url=None,
             raster_url=None,
+            quiver_url=None,
             metadata=result.get("metadata"),
         )
 
@@ -274,6 +275,11 @@ async def register_images(
         reference_url=reference_url,
         matches_url=f"/dynamic_runs/{run_id}/output/matches.json",
         raster_url=f"/dynamic_runs/{run_id}/output/registered_source.tif",
+        quiver_url=(
+            f"/dynamic_runs/{run_id}/output/registered_quiver.png"
+            if (output_dir / "registered_quiver.png").is_file()
+            else None
+        ),
         metadata=result.get("metadata"),
     )
 

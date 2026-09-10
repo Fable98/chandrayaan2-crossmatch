@@ -1672,6 +1672,20 @@ def match_images_cfog(
         checker_path = out_path / "registered_checkerboard.png"
         cv2.imwrite(str(checker_path), blended)
 
+        # Displacement-vector quiver QA (best effort; never fails the run).
+        quiver_path = out_path / "registered_quiver.png"
+        try:
+            from quiver import create_displacement_quiver
+            _qm = np.where(inlier_mask_arr.ravel() == 1)[0]
+            if len(_qm) >= 3 and H_ab is not None:
+                create_displacement_quiver(
+                    pts1_arr[_qm], pts2_arr[_qm], np.asarray(H_ab, dtype=np.float64),
+                    (orig_h2, orig_w2), quiver_path)
+            else:
+                quiver_path = None
+        except Exception:
+            quiver_path = None
+
         matches_path = out_path / "matches.json"
         dump_matches_json(
             [m for m in inverted_all_matches if m.get("is_inlier", False)],
@@ -1735,6 +1749,7 @@ def match_images_cfog(
                 "registered_raster": str(tif_path),
                 "preview": str(preview_path),
                 "checkerboard": str(checker_path),
+                "quiver": str(quiver_path) if quiver_path is not None else None,
                 "matches": str(matches_path),
                 "metrics": str(metrics_path),
                 "transform": str(transform_path),
@@ -2707,6 +2722,20 @@ def match_images_cfog(
     checker_path = out_path / "registered_checkerboard.png"
     cv2.imwrite(str(checker_path), blended)
 
+    # D2. Displacement-vector quiver QA (best effort; never fails the run).
+    quiver_path = out_path / "registered_quiver.png"
+    try:
+        from quiver import create_displacement_quiver
+        _qm = np.where(inlier_mask.ravel() == 1)[0]
+        if len(_qm) >= 3 and H_final is not None:
+            create_displacement_quiver(
+                pts1_arr[_qm], pts2_arr[_qm], np.asarray(H_final, dtype=np.float64),
+                (orig_h2, orig_w2), quiver_path)
+        else:
+            quiver_path = None
+    except Exception:
+        quiver_path = None
+
     # E. Save matches JSON (sub-pixel precision preserved, indent=2)
     matches_path = out_path / "matches.json"
     dump_matches_json(refinement_records, matches_path, indent=2)
@@ -2804,6 +2833,7 @@ def match_images_cfog(
             "registered_raster": str(tif_path),
             "preview": str(preview_path),
             "checkerboard": str(checker_path),
+            "quiver": str(quiver_path) if quiver_path is not None else None,
             "matches": str(matches_path),
             "metrics": str(metrics_path),
             "transform": str(transform_path),

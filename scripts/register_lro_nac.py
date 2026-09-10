@@ -38,6 +38,7 @@ from scripts.register import (
     warp_source_to_reference,
     create_blend_overlay,
     create_checkerboard_qa,
+    create_displacement_quiver,
     save_geotiff,
     bounds_to_eqc_transform,
 )
@@ -182,6 +183,23 @@ def run_registration_for_region(
         cv2.imwrite(str(reg_png_path), warped_src)
         cv2.imwrite(str(blend_path), blend)
         cv2.imwrite(str(checker_path), checkerboard)
+        quiver_lro_path = region_out / "displacement_quiver.png"
+        try:
+            _qin = np.array([[m.get("image1_x", m.get("source_x", 0)),
+                              m.get("image1_y", m.get("source_y", 0))] for m in inliers],
+                            dtype=np.float64)
+            _qout = np.array([[m.get("image2_x", m.get("target_x", 0)),
+                               m.get("image2_y", m.get("target_y", 0))] for m in inliers],
+                             dtype=np.float64)
+            if len(_qin) < 3 or H_mat is None:
+                raise ValueError("insufficient inliers for quiver")
+            if create_displacement_quiver(_qin, _qout, np.asarray(H_mat, dtype=np.float64),
+                                          (dst_img.shape[0], dst_img.shape[1]),
+                                          quiver_lro_path) is None:
+                quiver_lro_path = None
+        except Exception as exc:
+            logger.warning("Quiver QA skipped for %s: %s", region_id, exc)
+            quiver_lro_path = None
         # Georeference from pair-manifest shared-footprint bounds (lunar EQC).
         _lro_geo = bounds_to_eqc_transform(
             pair_bounds, warped_src.shape[1], warped_src.shape[0]) if pair_bounds else None
@@ -233,6 +251,7 @@ def run_registration_for_region(
             "registered_source_tif": str(geotiff_path),
             "blend_overlay": str(blend_path),
             "checkerboard_qa": str(checker_path),
+            "displacement_quiver": str(quiver_lro_path) if quiver_lro_path is not None else None,
         }
 
     # 4. Write Transform & Metrics JSON sidecars
