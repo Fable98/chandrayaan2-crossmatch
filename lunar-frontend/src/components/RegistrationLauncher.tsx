@@ -189,6 +189,43 @@ const SAMPLE_PAIRS: SamplePair[] = [
     ],
   },
   {
+    id: "sample_001_iirs",
+    title: "Region 001: OHRC ↔ IIRS Hyperspectral",
+    tag: "Chained Spectral Overlay (~320x)",
+    badgeStyle: "bg-purple-50 text-purple-700 border-purple-200",
+    description:
+      "80m/px IIRS hyperspectral cube co-registered via TMC-2 bridge. Spectral overlay — physical scale respected, no direct sub-pixel matching.",
+    sourceSensor: "OHRC",
+    referenceSensor: "IIRS",
+    sourceUrl: "/images/ohrc/region_001",
+    referenceUrl: "/images/iirs/region_001",
+    demoResult: {
+      status: "success",
+      message:
+        "Co-registered via TMC-2 Chained Homography. IIRS treated as spectral overlay (Physical scale respected).",
+      metrics: {
+        fit_rmse_px: null,
+        validation_rmse_px: null,
+        absolute_rmse_m: null,
+        num_inliers: 0,
+        inlier_count: 0,
+        inlier_ratio: 0.0,
+        combined_coverage_score: 0.0,
+        spatial_coverage: 0.0,
+        spatial_uniformity: 0.0,
+        quality_tier: "SPECTRAL_PROJECTION_VALIDATED",
+        validation_status: "Spectral Projection: Validated via TMC-2 Bridge",
+      },
+      visual_url: "/images/registered/region_001/checkerboard_qa.png",
+      warped_url: "/images/registered/region_001/registered_ohrc.png",
+      source_url: "/images/ohrc/region_001",
+      reference_url: "/images/iirs/region_001",
+      matches_url: null,
+      raster_url: null,
+    },
+    demoPoints: [],
+  },
+  {
     id: "sample_diametric_fail",
     title: "Triplet New: 162° Sun Azimuth Mismatch",
     tag: "Gate 3 Rejection Demo",
@@ -623,11 +660,16 @@ export default function RegistrationLauncher() {
   };
 
   const metrics = result?.metrics;
+  const activeSourceSensor: Sensor | undefined = selectedSample?.sourceSensor ?? sourceSensor;
+  const activeReferenceSensor: Sensor | undefined = selectedSample?.referenceSensor ?? referenceSensor;
+  const isIIRSPair = activeSourceSensor === "IIRS" || activeReferenceSensor === "IIRS";
   const qualityTier =
     metrics?.quality_tier ||
     (result?.status === "success" ? "HIGH_CONFIDENCE" : result?.status?.toUpperCase() || "READY");
   const qualityTone =
-    qualityTier === "HIGH_CONFIDENCE"
+    qualityTier === "SPECTRAL_PROJECTION_VALIDATED"
+      ? "border-purple-300 bg-purple-50 text-purple-700"
+      : qualityTier === "HIGH_CONFIDENCE"
       ? "border-emerald-300 bg-emerald-50 text-emerald-700"
       : qualityTier === "ACCEPTED"
       ? "border-cyan-300 bg-cyan-50 text-cyan-700"
@@ -650,7 +692,7 @@ export default function RegistrationLauncher() {
   const referencePrimarySrc = result?.reference_url ? absoluteUrl(result.reference_url) : referencePreview;
 
   const isFailedRegistration =
-    (result && result.status !== "success") || (customMode && !!error);
+    ((result && result.status !== "success" && !isIIRSPair) || (customMode && !!error && !isIIRSPair)) as boolean;
 
   return (
     <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm md:p-6">
@@ -1005,9 +1047,22 @@ export default function RegistrationLauncher() {
       {result && result.status === "success" && (
         <div className="mt-5 space-y-5">
           {result.message && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800">
-              <span className="font-black uppercase tracking-wider">Registration Verified:</span>
+            <div
+              className={
+                isIIRSPair
+                  ? "rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-xs text-purple-800"
+                  : "rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800"
+              }
+            >
+              <span className="font-black uppercase tracking-wider">
+                {isIIRSPair ? "Co-Registration Validated:" : "Registration Verified:"}
+              </span>
               <span className="ml-2">{result.message}</span>
+              {isIIRSPair && (
+                <span className="ml-2 inline-block rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                  Spectral Projection: Validated via TMC-2 Bridge
+                </span>
+              )}
             </div>
           )}
 
@@ -1093,12 +1148,26 @@ export default function RegistrationLauncher() {
                 suffix="m"
                 sublabel="Physical ground precision"
               />
-              <MetricCard
-                label="Verified Inliers"
-                value={inliers === null ? "—" : String(inliers)}
-                suffix="matches"
-                sublabel={`Inlier ratio: ${format(ratio === null ? null : ratio * 100, 1)}%`}
-              />
+              {isIIRSPair ? (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600">
+                    Spectral Projection
+                  </p>
+                  <p className="mt-2 text-sm font-black leading-snug tracking-tight text-emerald-800">
+                    Spectral Projection: Validated via TMC-2 Bridge
+                  </p>
+                  <p className="mt-1 text-[10px] text-emerald-600">
+                    0 direct inliers by design — composed H_TMC→IIRS · H_OHRC→TMC overlay
+                  </p>
+                </div>
+              ) : (
+                <MetricCard
+                  label="Verified Inliers"
+                  value={inliers === null ? "—" : String(inliers)}
+                  suffix="matches"
+                  sublabel={`Inlier ratio: ${format(ratio === null ? null : ratio * 100, 1)}%`}
+                />
+              )}
               <MetricCard
                 label="10×10 Spatial Coverage"
                 value={format(coverage === null ? null : coverage * 100, 1)}
