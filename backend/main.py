@@ -9,14 +9,18 @@ serve over HTTP with correct CORS headers.
 
 import os
 import sys
+import logging
 from typing import Optional
 from pathlib import Path
 from contextlib import asynccontextmanager
+
+logger = logging.getLogger(__name__)
 
 # Ensure backend directory is on sys.path for direct imports (data, routers, schemas)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -152,6 +156,20 @@ async def register_images(
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ML_model"))
     from matcher_cfog import match_images_cfog, load_as_float_and_color
 
+    ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
+    MAX_FILE_SIZE = 20 * 1024 * 1024
+
+    # Validate extensions BEFORE touching disk: rejected uploads must never
+    # be written (security: no stray .php/.exe payloads in dynamic_runs).
+    for file_obj in (source_file, reference_file):
+        filename = file_obj.filename or "uploaded_image"
+        ext = os.path.splitext(filename)[1].lower()
+        if ext not in ALLOWED_EXTENSIONS:
+            raise HTTPException(
+                status_code=415,
+                detail=f"Unsupported file type '{ext}'. Allowed: .jpg, .jpeg, .png, .tif, .tiff",
+            )
+
     run_id = str(uuid.uuid4())
     run_dir = Path(loader.DATA_DIR) / "dynamic_runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
@@ -174,18 +192,8 @@ async def register_images(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save uploads: {str(e)}")
 
-    ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
-    MAX_FILE_SIZE = 20 * 1024 * 1024
-
     for file_obj, path in [(source_file, source_path), (reference_file, ref_path)]:
         filename = file_obj.filename or "uploaded_image"
-        ext = os.path.splitext(filename)[1].lower()
-
-        if ext not in ALLOWED_EXTENSIONS:
-            raise HTTPException(
-                status_code=415,
-                detail=f"Unsupported file type '{ext}'. Allowed: .jpg, .jpeg, .png, .tif, .tiff",
-            )
 
         file_size = os.path.getsize(path)
         if file_size > MAX_FILE_SIZE:
@@ -206,10 +214,15 @@ async def register_images(
     try:
         if method.lower() == "loftr":
             from matcher import match_images
-            result = match_images(str(source_path), str(ref_path), output_dir=str(output_dir))
+            # Heavy CV runs in a threadpool so the async event loop stays
+            # responsive (Render free tier serves concurrent dashboard polls).
+            result = await run_in_threadpool(
+                match_images, str(source_path), str(ref_path), output_dir=str(output_dir)
+            )
         else:
             # Default to primary Phase Congruency & CFOG multi-scale matching
-            result = match_images_cfog(
+            result = await run_in_threadpool(
+                match_images_cfog,
                 str(source_path),
                 str(ref_path),
                 dem_path=str(dem_path) if dem_path else None,

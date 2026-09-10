@@ -184,15 +184,12 @@ def match_images(img_path1, img_path2, output_dir="output"):
     # Warp Image 1 to Image 2's perspective
     warped_img1 = cv2.warpPerspective(img1_color, H_final, (orig_w2, orig_h2))
     
-    # Create a Checkerboard Blend to visually prove alignment
+    # Create a Checkerboard Blend to visually prove alignment (vectorized;
+    # identical output to the old nested per-block loops).
     block_size = 50
-    blended = np.zeros_like(img2_color)
-    for y in range(0, orig_h2, block_size):
-        for x in range(0, orig_w2, block_size):
-            if ((x // block_size) + (y // block_size)) % 2 == 0:
-                blended[y:y+block_size, x:x+block_size] = warped_img1[y:y+block_size, x:x+block_size]
-            else:
-                blended[y:y+block_size, x:x+block_size] = img2_color[y:y+block_size, x:x+block_size]
+    yy, xx = np.mgrid[0:orig_h2, 0:orig_w2]
+    mask = ((xx // block_size) + (yy // block_size)) % 2 == 0
+    blended = np.where(mask[..., None], warped_img1, img2_color)
                 
     vis_path = os.path.join(output_dir, "registered_checkerboard.jpg")
     cv2.imwrite(vis_path, blended)

@@ -32,8 +32,28 @@ from schemas_registration import (
 router = APIRouter(prefix="/api/registration", tags=["Registration"])
 logger = logging.getLogger(__name__)
 
-# Pixel size of OHRC in meters (approx) for rmse_pixels -> rmse_meters.
-OHRC_GSD_M = 0.32
+
+def _resolve_gsd_m(result: Dict[str, Any]) -> float:
+    """Single-source-of-truth pixel size in meters for display conversion.
+
+    Precedence: per-job result metadata (PDS4/manifest-derived) ->
+    ML_model SENSOR_SPECS OHRC spec (0.25) -> literal 0.25 fallback.
+    The old hardcoded 0.32 constant is gone: it silently disagreed with the
+    sensor spec and corrupted every moon-globe rmse_meters value by 28%.
+    """
+    for key in ("gsd_m", "working_gsd_m"):
+        try:
+            val = result.get(key, result.get("metadata", {}).get(key))
+            if val is not None and float(val) > 0:
+                return float(val)
+        except (TypeError, ValueError, AttributeError):
+            continue
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "ML_model"))
+        from metadata import SENSOR_SPECS
+        return float(SENSOR_SPECS["OHRC"]["gsd_m"])
+    except Exception:
+        return 0.25
 
 
 # ---------------------------------------------------------------------------
@@ -453,7 +473,7 @@ async def get_moon_points(job_id: str) -> MoonPointsResponse:
         points=points,
         transformation_matrix=matrix,
         rmse_pixels=rmse_px,
-        rmse_meters=rmse_px * OHRC_GSD_M,
+        rmse_meters=rmse_px * _resolve_gsd_m(result),
     )
 
 

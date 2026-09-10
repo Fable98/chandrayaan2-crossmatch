@@ -115,7 +115,7 @@ def find_pairs(input_dir: Path, use_dem: bool = True) -> List[Dict[str, Optional
             )
             continue
         dem = dems.get(pid) if use_dem else None
-        if use_dem and dem is None and pid in dems is False:
+        if use_dem and dem is None and pid not in dems:
             logger.warning("DEM missing for pair id '%s' — falling back to dem_path=None.", pid)
         pairs.append({"id": pid, "source": src, "reference": ref, "dem": dem})
     return pairs
