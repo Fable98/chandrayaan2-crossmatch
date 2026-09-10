@@ -14,7 +14,13 @@ from typing import Any, Dict, List, Optional
 
 import numpy as np
 from fastapi import APIRouter, HTTPException
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import FileResponse
+
+try:
+    from job_store import build_job_store
+except ImportError:  # pragma: no cover - direct-router test path
+    from backend.job_store import build_job_store  # type: ignore
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "ML_model"))
 
@@ -62,72 +68,57 @@ def _resolve_gsd_m(result: Dict[str, Any]) -> float:
 
 
 class JobManager:
-    """Thread-safe in-memory job store (use Redis/DB in production)."""
+    """Job facade over a pluggable store (Redis -> DB -> process memory).
 
-    def __init__(self) -> None:
-        self.jobs: Dict[str, Dict[str, Any]] = {}
-        self._lock = threading.Lock()
+    Workers stay background threads (never block the event loop); only the
+    RESULT storage moved to Redis/DB via job_store.build_job_store().
+    """
+
+    def __init__(self, store: Any = None) -> None:
+        self._store = store or build_job_store()
+        # Back-compat mirror: populated only by the in-memory backend.
+        self.jobs: Dict[str, Dict[str, Any]] = getattr(self._store, "jobs", {})
 
     def create_job(self, job_id: str, job_type: str) -> None:
-        with self._lock:
-            self.jobs[job_id] = {
-                "status": JobStatus.PENDING,
-                "type": job_type,
-                "progress": 0.0,
-                "current_phase": "",
-                "result": None,
-                "error": None,
-                "logs": [],
-            }
+        self._store.create(job_id, {
+            "status": JobStatus.PENDING,
+            "type": job_type,
+            "progress": 0.0,
+            "current_phase": "",
+            "result": None,
+            "error": None,
+            "logs": [],
+        })
         logger.info("Job created: %s (type=%s)", job_id, job_type)
 
     def update_job(self, job_id: str, **kwargs: Any) -> None:
-        with self._lock:
-            if job_id in self.jobs:
-                self.jobs[job_id].update(kwargs)
+        self._store.update(job_id, dict(kwargs))
         if kwargs:
             logger.info("Job %s update: %s", job_id, kwargs)
 
     def append_log(self, job_id: str, line: str, cap: int = 200) -> None:
-        """Append a timestamped line to a job's in-memory log ring.
+        """Append a timestamped line to a job's bounded log ring.
 
         Same pattern as the ingest router's log_lines: bounded, per-job,
         served via GET /logs/{job_id}. Never raises; logging must not fail jobs.
         """
         try:
-            from datetime import datetime, timezone
-            stamp = datetime.now(timezone.utc).strftime("%H:%M:%S")
-            with self._lock:
-                job = self.jobs.get(job_id)
-                if job is None:
-                    return
-                logs = job.setdefault("logs", [])
-                logs.append(f"[{stamp}] {line}")
-                if len(logs) > cap:
-                    del logs[: len(logs) - cap]
+            self._store.append_log(job_id, line, cap=cap)
         except Exception:
             pass
 
     def get_logs(self, job_id: str, after: int = 0) -> Optional[Dict[str, Any]]:
         """Return log lines after index `after` plus the current total."""
-        with self._lock:
-            job = self.jobs.get(job_id)
-            if job is None:
-                return None
-            logs = list(job.get("logs", []))
-        after = max(0, int(after))
-        return {"job_id": job_id, "total": len(logs), "after": after,
-                "lines": logs[after:], "status": job.get("status")}
+        return self._store.get_logs(job_id, after=after)
 
     def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
-        with self._lock:
-            job = self.jobs.get(job_id)
-            return dict(job) if job is not None else None
+        return self._store.get(job_id)
 
 
 job_manager = JobManager()
 
-# Back-compat alias (some callers import `jobs` directly).
+# Back-compat alias (some callers import `jobs` directly; live only for the
+# in-memory backend — prefer job_manager.get_job()).
 jobs: dict = job_manager.jobs
 
 
@@ -438,7 +429,8 @@ async def run_bundle_adjustment(request: BundleAdjustmentRequest) -> Dict[str, A
             if not src_id or not ref_id:
                 continue
             adjuster.add_pairwise_constraint(src_id, ref_id, src_pts, ref_pts, matrix)
-        result = adjuster.optimize(max_iterations=request.max_iterations)
+        # scipy least_squares blocks: keep it off the event loop (Step 12).
+        result = await run_in_threadpool(adjuster.optimize, max_iterations=request.max_iterations)
         return _to_jsonable(result)
     except HTTPException:
         raise
@@ -457,30 +449,32 @@ def _pixel_to_latlon(
     py: float,
     width: float = 512.0,
     height: float = 512.0,
-    bounds: tuple | None = None,
-) -> tuple:
-    """Map pixel -> lat/lon.
+    bounds: Any = None,
+) -> tuple | None:
+    """Map pixel -> (lat, lon) via the shared geo.py affine transform.
 
-    When per-product geographic bounds (min_lon, max_lon, min_lat, max_lat) are
-    supplied (from manifest/PDS metadata), performs a bilinear interpolation
-    within those bounds. Otherwise falls back to the legacy demo patch
-    lon in [336, 337], lat in [-4, -3] and flags it as approximate.
+    Step 13: the legacy demo patch (lon = 336 + fx, lat = -4 + fy) is
+    DELETED. Without product bounds there is no honest coordinate to return,
+    so this returns None and the point is served with georeferenced=false
+    (the frontend renders a no-georef badge) instead of fabricated lat/lon.
     """
-    w = max(float(width), 1.0)
-    h = max(float(height), 1.0)
-    fx = min(max(float(px) / w, 0.0), 1.0)
-    fy = min(max(float(py) / h, 0.0), 1.0)
-    if bounds is not None:
-        try:
-            min_lon, max_lon, min_lat, max_lat = (float(v) for v in bounds)
-            lon = min_lon + fx * (max_lon - min_lon)
-            lat = max_lat - fy * (max_lat - min_lat)
-            return lat, lon
-        except Exception:
-            pass
-    lon = 336.0 + fx
-    lat = -4.0 + fy
-    return lat, lon
+    if bounds is None:
+        return None
+    try:
+        from geo import pixel_to_latlon_from_bounds
+    except ImportError:  # pragma: no cover - direct-router test path
+        from backend.geo import pixel_to_latlon_from_bounds  # type: ignore
+    try:
+        if isinstance(bounds, (list, tuple)) and len(bounds) == 4:
+            bounds = {
+                "west_lon": float(bounds[0]),
+                "east_lon": float(bounds[1]),
+                "south_lat": float(bounds[2]),
+                "north_lat": float(bounds[3]),
+            }
+        return pixel_to_latlon_from_bounds(px, py, bounds, width, height)
+    except Exception:
+        return None
 
 
 @router.get("/moon-points/{job_id}", response_model=MoonPointsResponse)
@@ -498,34 +492,51 @@ async def get_moon_points(job_id: str) -> MoonPointsResponse:
     # Prefer stored match points; fall back to an empty globe layer.
     ref_pts: List[Any] = result.get("filtered_ref_pts") or result.get("ref_pts") or []
     src_pts: List[Any] = result.get("filtered_src_pts") or result.get("src_pts") or []
-    # Use product bounds when available; otherwise _pixel_to_latlon falls back
-    # to the demo patch (flagged approximate in API docs).
-    bounds = result.get("bounds") or result.get("metadata", {}).get("bounds") if isinstance(result.get("metadata"), dict) else result.get("bounds")
+    # Product bounds when available; WITHOUT bounds every point is served
+    # with georeferenced=false (no fabricated coordinates — Step 13).
+    meta = result.get("metadata")
+    bounds = result.get("bounds") or (meta.get("bounds") if isinstance(meta, dict) else None)
     img_w = float(result.get("width", 512.0) or 512.0)
     img_h = float(result.get("height", 512.0) or 512.0)
     points: List[MoonPoint] = []
+    n_georeferenced = 0
     try:
         for i, pt in enumerate(ref_pts):
             try:
                 px, py = float(pt[0]), float(pt[1])
             except Exception:
                 continue
-            lat, lon = _pixel_to_latlon(px, py, width=img_w, height=img_h, bounds=bounds)
+            latlon = _pixel_to_latlon(px, py, width=img_w, height=img_h, bounds=bounds)
             conf = 0.0
             try:
                 conf = float((result.get("confidences") or [])[i])
             except Exception:
                 conf = 0.8 if src_pts else 0.0
-            points.append(
-                MoonPoint(
-                    latitude=lat,
-                    longitude=lon,
-                    altitude=0.0,
-                    confidence=conf,
-                    pixel_x=px,
-                    pixel_y=py,
+            if latlon is None:
+                points.append(
+                    MoonPoint(
+                        latitude=None,  # type: ignore[arg-type]
+                        longitude=None,  # type: ignore[arg-type]
+                        altitude=0.0,
+                        confidence=conf,
+                        pixel_x=px,
+                        pixel_y=py,
+                        georeferenced=False,
+                    )
                 )
-            )
+            else:
+                n_georeferenced += 1
+                points.append(
+                    MoonPoint(
+                        latitude=latlon[0],
+                        longitude=latlon[1],
+                        altitude=0.0,
+                        confidence=conf,
+                        pixel_x=px,
+                        pixel_y=py,
+                        georeferenced=True,
+                    )
+                )
     except Exception as exc:
         logger.warning("Moon point conversion failed for job %s: %s", job_id, exc)
 
@@ -536,6 +547,12 @@ async def get_moon_points(job_id: str) -> MoonPointsResponse:
         transformation_matrix=matrix,
         rmse_pixels=rmse_px,
         rmse_meters=rmse_px * _resolve_gsd_m(result),
+        georeferenced=n_georeferenced > 0,
+        georef_note=(
+            None
+            if n_georeferenced > 0
+            else "No product bounds available: points carry pixel coordinates only."
+        ),
     )
 
 
@@ -552,8 +569,16 @@ async def download_report(job_id: str) -> FileResponse:
         raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
     result = job.get("result") or {}
     pdf_path = result.get("pdf_path")
-    if not pdf_path or not Path(pdf_path).is_file():
+    if not pdf_path:
         raise HTTPException(status_code=404, detail=f"Report not ready for job {job_id}")
+    # Step 12: report must live under the reports root (no absolute-path escape
+    # via a crafted job result).
+    try:
+        from uploads import check_file_response_allowed
+    except ImportError:  # pragma: no cover
+        from backend.uploads import check_file_response_allowed  # type: ignore
+    real = check_file_response_allowed(
+        pdf_path, [Path.cwd() / "reports", Path("reports")], {".pdf"})
     return FileResponse(
-        path=str(pdf_path), media_type="application/pdf", filename=Path(pdf_path).name
+        path=str(real), media_type="application/pdf", filename=real.name
     )

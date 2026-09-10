@@ -659,9 +659,9 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                               ? "bg-white text-slate-900 shadow-sm"
                               : "text-slate-500 hover:text-slate-800"
                           }`}
-                          title="Chandrayaan-2 TMC-2 stereo reference (~21x scale ratio)"
+                          title="Chandrayaan-2 TMC-2 single-view reference (~21x scale ratio)"
                         >
-                          TMC-2 (Stereo)
+                          TMC-2 (Mono)
                         </button>
                         <button
                           onClick={() => setReferenceMode("lro_nac")}
@@ -728,7 +728,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                             <span className="text-[11px] text-amber-700">· Orbit GSD ~0.91m ({detail.lro_nac_product_id ?? "M1417670274LC"})</span>
                           </div>
                           <span className="font-mono text-[11px] font-bold text-amber-900">
-                            Fit RMSE: {metrics?.fit_rmse_px?.toFixed(3) ?? metrics?.rmse_px?.toFixed(3) ?? "0.270"} px
+                            Fit RMSE: {metrics?.fit_rmse_px?.toFixed(3) ?? metrics?.rmse_px?.toFixed(3) ?? "—"} px
                           </span>
                         </div>
                       )}
@@ -855,7 +855,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                   </div>
                   <div>
                     <div className="flex justify-between text-slate-700 font-semibold mb-1">
-                      <span>TMC-2 Terrain Stereo</span>
+                      <span>TMC-2 Single View</span>
                       <span>4.0 m/px</span>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">

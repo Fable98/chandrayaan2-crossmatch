@@ -1,0 +1,45 @@
+{
+  "_comment": "Step 14 LRO NAC expansion registry: 15-CDR target. Entries with status real_downloaded_cdr are the ONLY rows any benchmark table may cite. pending_acquisition slots carry NO product IDs and NO numbers — they are acquisition tickets, not data. This file is the single source of truth for scripts/register_lro_nac.py --regions all-real and scripts/validate_lro_cdrs.py.",
+  "program": "LRO NAC external reference expansion",
+  "target_cdrs": 15,
+  "real_cdrs": [
+    {
+      "slot": 1,
+      "region_id": "region_001",
+      "status": "real_downloaded_cdr",
+      "lro_nac_product_id": "M1417670274LC",
+      "manifest": "lro_nac_real/region_001/manifest.json",
+      "result": {"fit_rmse_px": 0.6333, "inlier_count": 6, "match_count": 32, "quality_tier": "LOW_CONFIDENCE"}
+    },
+    {
+      "slot": 2,
+      "region_id": "region_003",
+      "status": "real_downloaded_cdr",
+      "lro_nac_product_id": "M1417670274LC",
+      "manifest": "lro_nac_real/region_003/manifest.json",
+      "result": {"fit_rmse_px": 1.286, "inlier_count": 5, "match_count": 27, "quality_tier": "LOW_CONFIDENCE"}
+    },
+    {
+      "slot": 3,
+      "region_id": "region_006",
+      "status": "real_downloaded_cdr",
+      "lro_nac_product_id": "M1413636095LC",
+      "manifest": "lro_nac_real/region_006/manifest.json",
+      "result": {"fit_rmse_px": 0.3014, "inlier_count": 5, "match_count": 24, "quality_tier": "LOW_CONFIDENCE"}
+    }
+  ],
+  "pending_acquisition": [
+    {"slot": 4, "region_id": "region_002", "status": "pending_acquisition", "lro_nac_product_id": null, "selection_criteria": "Chandrayaan-2 highland region overlapping LROC NAC EDR coverage; CDR TBD at acquisition"},
+    {"slot": 5, "region_id": "region_004", "status": "pending_acquisition", "lro_nac_product_id": null, "selection_criteria": "Chandrayaan-2 highland region overlapping LROC NAC EDR coverage; CDR TBD at acquisition"},
+    {"slot": 6, "region_id": "region_005", "status": "pending_acquisition", "lro_nac_product_id": null, "selection_criteria": "Chandrayaan-2 highland region overlapping LROC NAC EDR coverage; CDR TBD at acquisition"},
+    {"slot": 7, "region_id": null, "status": "pending_acquisition", "lro_nac_product_id": null, "selection_criteria": "Additional mare/highland boundary region with <130deg sun-gap overlap; CDR TBD at acquisition"},
+    {"slot": 8, "region_id": null, "status": "pending_acquisition", "lro_nac_product_id": null, "selection_criteria": "Additional mare/highland boundary region with <130deg sun-gap overlap; CDR TBD at acquisition"},
+    {"slot": 9, "region_id": null, "status": "pending_acquisition", "lro_nac_product_id": null, "selection_criteria": "Additional south-polar-adjacent region with NAC coverage; CDR TBD at acquisition"},
+    {"slot": 10, "region_id": null, "status": "pending_acquisition", "lro_nac_product_id": null, "selection_criteria": "Additional south-polar-adjacent region with NAC coverage; CDR TBD at acquisition"},
+    {"slot": 11, "region_id": null, "status": "pending_acquisition", "lro_nac_product_id": null, "selection_criteria": "Repeat-coverage region for cross-sun-angle validation; CDR TBD at acquisition"},
+    {"slot": 12, "region_id": null, "status": "pending_acquisition", "lro_nac_product_id": null, "selection_criteria": "Repeat-coverage region for cross-sun-angle validation; CDR TBD at acquisition"},
+    {"slot": 13, "region_id": null, "status": "pending_acquisition", "lro_nac_product_id": null, "selection_criteria": "Fresh-crater morphology region for ejecta-blanket matching; CDR TBD at acquisition"},
+    {"slot": 14, "region_id": null, "status": "pending_acquisition", "lro_nac_product_id": null, "selection_criteria": "Mare basalt region for low-contrast matching stress; CDR TBD at acquisition"},
+    {"slot": 15, "region_id": null, "status": "pending_acquisition", "lro_nac_product_id": null, "selection_criteria": "Held-out reserve region (never used for tuning); CDR TBD at acquisition"}
+  ]
+}

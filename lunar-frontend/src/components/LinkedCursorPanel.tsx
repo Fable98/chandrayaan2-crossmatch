@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { MatchPoint } from "@/lib/types";
 import { imageUrl } from "@/lib/api";
+import GeoRefBadge from "./GeoRefBadge";
 
 const TILE_PX = 512;
 const NEARBY_PX = 45;
@@ -256,9 +257,13 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
               <span className="text-teal font-semibold">
                 {(activeMatch.confidence * 100).toFixed(1)}%
               </span>
-              {activeMatch.ohrc_latlon && (
+              {activeMatch.ohrc_latlon ? (
                 <span className="ml-3 text-ink-dim">
                   Lat/Lon: ({activeMatch.ohrc_latlon[0].toFixed(3)}°, {activeMatch.ohrc_latlon[1].toFixed(3)}°)
+                </span>
+              ) : (
+                <span className="ml-3">
+                  <GeoRefBadge />
                 </span>
               )}
             </span>

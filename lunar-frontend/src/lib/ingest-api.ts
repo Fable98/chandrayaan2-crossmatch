@@ -1,11 +1,16 @@
 /**
  * API service for the ingest pipeline.
+ *
+ * Step 13 contract: single API base imported from ./api (no second base
+ * URL), and every ingest call carries the operator's Bearer token.
  */
 
-const BACKEND_BASE =
-  process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, '') ??
-  'http://localhost:8000';
-const API_BASE = `${BACKEND_BASE}/api/ingest`;
+import { API_BASE as SINGLE_API_BASE } from './api';
+import { getAuthHeaders } from './auth';
+
+const API_BASE = `${SINGLE_API_BASE}/api/ingest`;
+
+export { SINGLE_API_BASE as API_BASE_ROOT };
 
 export interface IngestConfig {
   containment: number;
@@ -67,6 +72,7 @@ export async function uploadZips(
 
   const res = await fetch(`${API_BASE}/upload`, {
     method: 'POST',
+    headers: { ...getAuthHeaders() },
     body: form,
   });
 
@@ -82,7 +88,9 @@ export async function uploadZips(
  * Poll the status of a running ingest job.
  */
 export async function pollStatus(jobId: string): Promise<JobStatus> {
-  const res = await fetch(`${API_BASE}/status/${jobId}`);
+  const res = await fetch(`${API_BASE}/status/${jobId}`, {
+    headers: { ...getAuthHeaders() },
+  });
   if (!res.ok) {
     throw new Error(`Status check failed: ${res.statusText}`);
   }
@@ -93,7 +101,9 @@ export async function pollStatus(jobId: string): Promise<JobStatus> {
  * Get the final results of a completed ingest job.
  */
 export async function getResults(jobId: string): Promise<JobResult> {
-  const res = await fetch(`${API_BASE}/results/${jobId}`);
+  const res = await fetch(`${API_BASE}/results/${jobId}`, {
+    headers: { ...getAuthHeaders() },
+  });
   if (!res.ok) {
     throw new Error(`Results fetch failed: ${res.statusText}`);
   }

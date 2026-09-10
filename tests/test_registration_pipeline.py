@@ -34,9 +34,45 @@ from fastapi.testclient import TestClient
 from main import app
 
 
+_TEST_JWT_SECRET = (
+    "test-only-jwt-secret-that-is-long-enough-for-the-32-char-minimum-0123456789"
+)
+
+
+def _ensure_test_secret():
+    """Step 12: guarantee a JWT secret even if another test module imported
+    backend.config first (the settings singleton reads env at construction)."""
+    os.environ.setdefault("JWT_SECRET_KEY", _TEST_JWT_SECRET)
+    try:
+        from config import settings as _settings
+
+        if not _settings.JWT_SECRET_KEY:
+            _settings.JWT_SECRET_KEY = _TEST_JWT_SECRET
+    except Exception:
+        pass
+
+
+_ensure_test_secret()
+
+
 @pytest.fixture
 def test_client():
     return TestClient(app)
+
+
+@pytest.fixture
+def auth_headers(test_client):
+    """Step 12: /register requires a Bearer token."""
+    import uuid
+
+    _ensure_test_secret()
+    email = f"reg-pipe-{uuid.uuid4().hex[:8]}@example.com"
+    r = test_client.post(
+        "/auth/register",
+        json={"name": "T", "email": email, "password": "correct-horse-123"},
+    )
+    assert r.status_code == 201, r.text[:200]
+    return {"Authorization": f"Bearer {r.json()['access_token']}"}
 
 
 @pytest.fixture
@@ -204,8 +240,23 @@ def test_degenerate_matrix_rejection():
 # ---------------------------------------------------------------------------
 # Test 8: HTTP /register Endpoint Integration Test
 # ---------------------------------------------------------------------------
-def test_register_api_endpoint(test_client, synthetic_lunar_pair):
+def test_register_api_endpoint(test_client, auth_headers, synthetic_lunar_pair):
+    # Step 12: unauthenticated registration is refused...
     p1, p2, _, _ = synthetic_lunar_pair
+    with open(p1, "rb") as f1, open(p2, "rb") as f2:
+        resp_anon = test_client.post(
+            "/register",
+            files={
+                "source_file": ("source.png", f1, "image/png"),
+                "reference_file": ("ref.png", f2, "image/png"),
+            },
+            data={
+                "source_sensor": "TMC-2",
+                "reference_sensor": "TMC-2",
+                "method": "cfog",
+            },
+        )
+        assert resp_anon.status_code == 401
     with open(p1, "rb") as f1, open(p2, "rb") as f2:
         files = {
             "source_file": ("source.png", f1, "image/png"),
@@ -216,7 +267,7 @@ def test_register_api_endpoint(test_client, synthetic_lunar_pair):
             "reference_sensor": "TMC-2",
             "method": "cfog",
         }
-        resp = test_client.post("/register", files=files, data=data)
+        resp = test_client.post("/register", files=files, data=data, headers=auth_headers)
         assert resp.status_code == 200
         res_json = resp.json()
         assert res_json["status"] == "success"

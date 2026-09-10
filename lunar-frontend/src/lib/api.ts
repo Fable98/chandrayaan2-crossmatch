@@ -5,23 +5,28 @@ import type {
   IIRSOverlay,
 } from "./types";
 import { getAuthHeaders } from "./auth";
-import { FALLBACK_TRIPLETS, FALLBACK_MATCHES } from "./fallbackData";
 
+// Single API base for the whole frontend (Step 13 contract). ingest-api.ts
+// imports API_BASE from here — no second base URL is allowed, so staging /
+// production can never split-brain between two backends.
+//
 // Point this at your running FastAPI instance. Override at build/run time
 // with NEXT_PUBLIC_API_BASE_URL if the backend isn't on localhost:8000 —
 // e.g. NEXT_PUBLIC_API_BASE_URL=http://192.168.1.20:8000 npm run dev
-const API_BASE =
+export const API_BASE =
   process.env.NEXT_PUBLIC_API_BASE_URL?.replace(/\/$/, "") ??
   "http://localhost:8000";
 
-class ApiError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public url: string
-  ) {
+export class ApiError extends Error {
+  // Plain field declarations (no TS parameter properties) so node
+  // type-stripping can import this module in scripts/smoke.mjs.
+  status: number;
+  url: string;
+  constructor(message: string, status: number, url: string) {
     super(message);
     this.name = "ApiError";
+    this.status = status;
+    this.url = url;
   }
 }
 
@@ -52,69 +57,46 @@ export function imageUrl(path: string): string {
   if (!path) return "";
   if (path.startsWith("http")) return path;
 
-  let cleanPath = path.startsWith("/") ? path : `/${path}`;
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
 
-  // Ensure .png extension is attached so browsers receive content-type: image/png
-  if (
-    cleanPath.startsWith("/images/") &&
-    !cleanPath.endsWith(".png") &&
-    !cleanPath.endsWith(".jpg") &&
-    !cleanPath.endsWith(".jpeg") &&
-    !cleanPath.endsWith(".json")
-  ) {
-    cleanPath = `${cleanPath}.png`;
+  // Backend-computed artifacts (/dynamic_runs/...) live on the FastAPI host,
+  // NOT on the Next.js origin: a relative URL would resolve against the
+  // frontend and silently 404. Prefix the single API base (Step 13 fix).
+  if (cleanPath.startsWith("/dynamic_runs/")) {
+    return `${API_BASE}${cleanPath}`;
   }
 
-  // All static lunar imagery (/images/...) is bundled directly in public/images/
-  // and served by Next.js / Vercel Edge CDN. Never route image assets to external backend hosts (e.g. Render/localhost).
-  return cleanPath;
+  // Bundled static lunar imagery (/images/...) ships in public/images/ and
+  // is served by Next.js / Vercel Edge CDN.
+  if (cleanPath.startsWith("/images/")) {
+    if (
+      !cleanPath.endsWith(".png") &&
+      !cleanPath.endsWith(".jpg") &&
+      !cleanPath.endsWith(".jpeg") &&
+      !cleanPath.endsWith(".json")
+    ) {
+      // Ensure an image extension so browsers receive an image content-type.
+      return `${cleanPath}.png`;
+    }
+    return cleanPath;
+  }
+
+  // Unknown relative path: assume a backend route and make it absolute so a
+  // missing backend surfaces as a fetch error, never a same-origin 404 page.
+  return `${API_BASE}${cleanPath}`;
 }
 
+// Step 13 contract: NO silent fallback data. Every method below throws
+// ApiError when the backend is unreachable or returns an error status, and
+// callers render the shared error banner (Console: "Archive Connection
+// Failed"). Kill-backend => error banner, never fabricated archive data.
 export const api = {
-  listTriplets: async (): Promise<TripletListResponse> => {
-    try {
-      return await getJson<TripletListResponse>("/triplets");
-    } catch {
-      console.warn("FastAPI backend offline, loading fallback lunar archive data.");
-      return { triplets: FALLBACK_TRIPLETS };
-    }
-  },
-  getTriplet: async (id: string): Promise<TripletSummary> => {
-    try {
-      return await getJson<TripletSummary>(`/triplets/${id}`);
-    } catch {
-      const found = FALLBACK_TRIPLETS.find((t) => t.id === id);
-      return found ?? FALLBACK_TRIPLETS[0];
-    }
-  },
-  getMatches: async (id: string): Promise<MatchesResponse> => {
-    try {
-      return await getJson<MatchesResponse>(`/triplets/${id}/matches`);
-    } catch {
-      if (FALLBACK_MATCHES[id]) return FALLBACK_MATCHES[id];
-      return {
-        triplet_id: id,
-        num_matches: 0,
-        homography: null,
-        matches: [],
-        metrics: null,
-      };
-    }
-  },
-  getIirsOverlay: async (id: string): Promise<IIRSOverlay> => {
-    try {
-      return await getJson<IIRSOverlay>(`/triplets/${id}/iirs-overlay`);
-    } catch {
-      const triplet = FALLBACK_TRIPLETS.find((t) => t.id === id) ?? FALLBACK_TRIPLETS[0];
-      return {
-        triplet_id: id,
-        image_url: "/images/iirs_overlay.png",
-        bounds: triplet.bounds,
-        opacity_hint: 0.65,
-      };
-    }
-  },
+  listTriplets: (): Promise<TripletListResponse> =>
+    getJson<TripletListResponse>("/triplets"),
+  getTriplet: (id: string): Promise<TripletSummary> =>
+    getJson<TripletSummary>(`/triplets/${id}`),
+  getMatches: (id: string): Promise<MatchesResponse> =>
+    getJson<MatchesResponse>(`/triplets/${id}/matches`),
+  getIirsOverlay: (id: string): Promise<IIRSOverlay> =>
+    getJson<IIRSOverlay>(`/triplets/${id}/iirs-overlay`),
 };
-
-export { ApiError, API_BASE };
-

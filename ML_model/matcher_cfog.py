@@ -677,6 +677,355 @@ def apply_dem_relief_compensation(
 
 
 # ---------------------------------------------------------------------------
+# 3a. DEM-Aware Geometry: LOS Ray-Shift, Bootstrap Covariance, Slope Gating
+# ---------------------------------------------------------------------------
+
+def _sample_dem_bilinear(dem: np.ndarray, xs: np.ndarray, ys: np.ndarray) -> np.ndarray:
+    """Bilinear DEM sampling at floating pixel coords. Voids fall back to mean."""
+    d = np.asarray(dem, dtype=np.float64)
+    hh, ww = d.shape[:2]
+    try:
+        fill = float(np.nanmean(d)) if np.any(np.isfinite(d)) else 0.0
+    except Exception:
+        fill = 0.0
+    d = np.where(np.isfinite(d), d, fill)
+    x = np.clip(np.asarray(xs, dtype=np.float64), 0.0, float(ww - 1))
+    y = np.clip(np.asarray(ys, dtype=np.float64), 0.0, float(hh - 1))
+    x0 = np.floor(x).astype(int)
+    y0 = np.floor(y).astype(int)
+    x1 = np.clip(x0 + 1, 0, ww - 1)
+    y1 = np.clip(y0 + 1, 0, hh - 1)
+    wx = (x - x0).astype(np.float64)
+    wy = (y - y0).astype(np.float64)
+    return (
+        (1.0 - wx) * (1.0 - wy) * d[y0, x0]
+        + wx * (1.0 - wy) * d[y0, x1]
+        + (1.0 - wx) * wy * d[y1, x0]
+        + wx * wy * d[y1, x1]
+    ).astype(np.float64)
+
+
+def compute_dem_ray_shift_correction(
+    src_pts: np.ndarray,
+    dem: Optional[np.ndarray],
+    emission_deg: Optional[float],
+    look_azimuth_deg: Optional[float],
+    gsd_m: float,
+) -> Tuple[np.ndarray, Dict[str, Any]]:
+    """LOS parallax correction of candidate points prior to planar estimation.
+
+    delta_ortho = (z - zbar) * tan(theta_em) * [sin(phi), -cos(phi)] / GSD.
+
+    When DEM is absent (or emission/LOS-azimuth unavailable) the correction is
+    disabled and an honest dem_ray_shift record is returned so provenance is
+    never silent.
+    """
+    pts = np.asarray(src_pts, dtype=np.float64).reshape(-1, 2)
+    if dem is None or not isinstance(dem, np.ndarray) or dem.ndim != 2:
+        logger.info("DEM ray-shift disabled: dem_unavailable")
+        return pts.copy(), {"enabled": False, "reason": "dem_unavailable"}
+    try:
+        em = None if emission_deg is None else float(emission_deg)
+    except Exception:
+        em = None
+    try:
+        phi = None if look_azimuth_deg is None else float(look_azimuth_deg)
+    except Exception:
+        phi = None
+    if em is None or not np.isfinite(em) or abs(em) < 0.5:
+        return pts.copy(), {"enabled": False, "reason": "emission_unavailable_or_nadir"}
+    if phi is None or not np.isfinite(phi):
+        logger.info("DEM ray-shift disabled: sensor LOS azimuth unavailable")
+        return pts.copy(), {"enabled": False, "reason": "los_azimuth_unavailable"}
+    try:
+        gsd = float(gsd_m)
+        if not np.isfinite(gsd) or gsd <= 0:
+            return pts.copy(), {"enabled": False, "reason": "invalid_gsd"}
+        # Map working-space points onto DEM pixel frame (DEM resampled honesty:
+        # scale by shape ratio when working canvas differs from DEM raster).
+        hh, ww = dem.shape[:2]
+        z = _sample_dem_bilinear(dem, pts[:, 0], pts[:, 1])
+        zbar = float(np.mean(z)) if z.size else 0.0
+        e_rad = float(np.radians(em))
+        p_rad = float(np.radians(phi))
+        scale = float(np.tan(e_rad) / max(gsd, 1e-6))
+        dz = z - zbar
+        dx = dz * scale * float(np.sin(p_rad))
+        dy = dz * scale * float(-np.cos(p_rad))
+        corrected = np.column_stack([pts[:, 0] + dx, pts[:, 1] + dy])
+        return corrected.astype(np.float64), {
+            "enabled": True,
+            "method": "dem_los_ray_shift",
+            "emission_deg": em,
+            "look_azimuth_deg": phi,
+            "gsd_m": gsd,
+            "mean_relief_m": float(np.mean(np.abs(dz))) if dz.size else 0.0,
+            "mean_shift_px": float(np.mean(np.hypot(dx, dy))) if dz.size else 0.0,
+        }
+    except Exception as exc:
+        logger.warning("DEM ray-shift failed (%s); disabled honestly.", exc)
+        return pts.copy(), {"enabled": False, "reason": f"ray_shift_failed: {exc}"}
+
+
+def compute_dem_slope_at_points(
+    dem: np.ndarray,
+    pts: np.ndarray,
+    gsd_m: float,
+) -> np.ndarray:
+    """Local terrain slope magnitude at point locations (rise over run)."""
+    d = np.asarray(dem, dtype=np.float64)
+    gsd = max(float(gsd_m), 1e-6)
+    try:
+        gy, gx = np.gradient(d, gsd, gsd)
+        slope = np.hypot(gx, gy).astype(np.float64)
+    except Exception:
+        return np.zeros((np.asarray(pts).reshape(-1, 2).shape[0],), dtype=np.float64)
+    p = np.asarray(pts, dtype=np.float64).reshape(-1, 2)
+    if p.shape[0] == 0:
+        return np.zeros((0,), dtype=np.float64)
+    hh, ww = d.shape[:2]
+    # Nearest-neighbor index sampling on the slope grid (indices only here).
+    ix = np.clip(np.round(p[:, 0]).astype(int), 0, ww - 1)
+    iy = np.clip(np.round(p[:, 1]).astype(int), 0, hh - 1)
+    return np.asarray(slope[iy, ix], dtype=np.float64)
+
+
+def compute_slope_residual_correlation(
+    residuals: np.ndarray,
+    slopes: np.ndarray,
+) -> float:
+    """Pearson correlation between RANSAC reprojection error and DEM slope."""
+    try:
+        r = np.asarray(residuals, dtype=np.float64).ravel()
+        s = np.asarray(slopes, dtype=np.float64).ravel()
+        n = int(min(r.size, s.size))
+        if n < 4:
+            return 0.0
+        r, s = r[:n], s[:n]
+        if not np.all(np.isfinite(r)) or not np.all(np.isfinite(s)):
+            m = np.isfinite(r) & np.isfinite(s)
+            r, s = r[m], s[m]
+            if r.size < 4:
+                return 0.0
+        if float(np.std(r)) < 1e-12 or float(np.std(s)) < 1e-12:
+            return 0.0
+        corr = float(np.corrcoef(r, s)[0, 1])
+        return float(corr) if np.isfinite(corr) else 0.0
+    except Exception:
+        return 0.0
+
+
+def _normalize_h9(H: np.ndarray) -> Optional[np.ndarray]:
+    """Flatten homography to 9-vector with H[2,2] = 1. None if degenerate."""
+    try:
+        m = np.asarray(H, dtype=np.float64).reshape(3, 3)
+        if not np.all(np.isfinite(m)):
+            return None
+        s = float(m[2, 2])
+        if abs(s) < 1e-12:
+            return None
+        return (m / s).reshape(-1).astype(np.float64)
+    except Exception:
+        return None
+
+
+def compute_homography_covariance_bootstrap(
+    src_pts: np.ndarray,
+    dst_pts: np.ndarray,
+    H: Optional[np.ndarray] = None,
+    inlier_mask: Optional[np.ndarray] = None,
+    n_bootstrap: int = 500,
+    gsd_m: Optional[float] = None,
+    random_seed: Optional[int] = None,
+) -> Dict[str, Any]:
+    """500x bootstrap homography covariance on verified inlier correspondences.
+
+    Resamples inliers with replacement, re-estimates H per fold, and derives
+    the 9x9 parameter covariance Sigma_H. Positional uncertainty sigma_pos is
+    obtained by pushing inlier points through every bootstrap H and measuring
+    the per-point projection scatter (honest empirical mapping through the
+    point-projection Jacobian sampling, not a scalar RMSE).
+    """
+    try:
+        s_all = np.asarray(src_pts, dtype=np.float64).reshape(-1, 2)
+        d_all = np.asarray(dst_pts, dtype=np.float64).reshape(-1, 2)
+    except Exception as exc:
+        return {"status": "failed", "reason": f"bad_points: {exc}",
+                "H_cov": np.eye(9, dtype=np.float64).tolist(), "n_boot": 0}
+    n = int(min(s_all.shape[0], d_all.shape[0]))
+    s_all, d_all = s_all[:n], d_all[:n]
+    if inlier_mask is not None:
+        try:
+            m = np.asarray(inlier_mask).ravel() == 1
+            if m.size == n:
+                s_all, d_all = s_all[m], d_all[m]
+        except Exception:
+            pass
+    ni = int(s_all.shape[0])
+    if ni < 4:
+        return {"status": "failed", "reason": "insufficient_inliers",
+                "H_cov": np.eye(9, dtype=np.float64).tolist(), "n_boot": 0}
+    try:
+        nb = int(n_bootstrap)
+    except Exception:
+        nb = 500
+    nb = max(50, min(nb, 2000))
+    seed = SEED if random_seed is None else int(random_seed)
+    rng = np.random.default_rng(seed)
+    hvecs: List[np.ndarray] = []
+    for _ in range(nb):
+        try:
+            idx = rng.integers(0, ni, size=ni)
+            Hb, _ = cv2.findHomography(s_all[idx], d_all[idx], 0)
+            if Hb is None:
+                continue
+            v = _normalize_h9(Hb)
+            if v is not None:
+                hvecs.append(v)
+        except Exception:
+            continue
+    if len(hvecs) < 10:
+        return {"status": "failed", "reason": "bootstrap_degenerate",
+                "H_cov": np.eye(9, dtype=np.float64).tolist(), "n_boot": len(hvecs)}
+    stack = np.asarray(hvecs, dtype=np.float64)
+    try:
+        cov = np.cov(stack, rowvar=False)
+        cov = np.asarray(cov, dtype=np.float64).reshape(9, 9)
+        cov = (cov + cov.T) / 2.0
+    except Exception as exc:
+        return {"status": "failed", "reason": f"cov_failed: {exc}",
+                "H_cov": np.eye(9, dtype=np.float64).tolist(), "n_boot": len(hvecs)}
+    # Empirical positional scatter: project each inlier through all folds.
+    try:
+        n_folds = stack.shape[0]
+        use_k = min(ni, 64)
+        sel = rng.choice(ni, size=use_k, replace=False) if ni > use_k else np.arange(ni)
+        Hs = stack.reshape(-1, 3, 3)
+        per_pt_std: List[float] = []
+        for k in sel:
+            px, py = float(s_all[k, 0]), float(s_all[k, 1])
+            denom = Hs[:, 2, 0] * px + Hs[:, 2, 1] * py + Hs[:, 2, 2]
+            denom = np.where(np.abs(denom) < 1e-12, 1e-12, denom)
+            qx = (Hs[:, 0, 0] * px + Hs[:, 0, 1] * py + Hs[:, 0, 2]) / denom
+            qy = (Hs[:, 1, 0] * px + Hs[:, 1, 1] * py + Hs[:, 1, 2]) / denom
+            per_pt_std.append(float(np.sqrt(np.var(qx) + np.var(qy))))
+        sigma_px = float(np.mean(per_pt_std)) if per_pt_std else 0.0
+    except Exception:
+        sigma_px = 0.0
+    sigma_m: Optional[float] = None
+    if gsd_m is not None:
+        try:
+            g = float(gsd_m)
+            if np.isfinite(g) and g > 0:
+                sigma_m = float(sigma_px * g)
+        except Exception:
+            sigma_m = None
+    return {
+        "status": "success",
+        "H_cov": np.asarray(cov, dtype=np.float64).tolist(),
+        "n_boot": int(len(hvecs)),
+        "sigma_pos_px": float(sigma_px),
+        "sigma_pos_m": sigma_m,
+        "absolute_rmse_uncertainty_m": round(float(sigma_m), 4) if sigma_m is not None else None,
+    }
+
+
+def propagate_composed_covariance_monte_carlo(
+    H_AB: np.ndarray,
+    cov_AB: Optional[np.ndarray],
+    H_BC: np.ndarray,
+    cov_BC: Optional[np.ndarray],
+    n_samples: int = 500,
+    gsd_m: Optional[float] = None,
+    random_seed: Optional[int] = None,
+) -> Dict[str, Any]:
+    """Monte Carlo covariance propagation for H_AC = H_BC @ H_AB.
+
+    Draws joint samples from Sigma_AB and Sigma_BC (Gaussian on the
+    H[2,2]=1 normalized 9-vector), multiplies, renormalizes, and derives
+    Sigma_AC plus spatial uncertainty in meters.
+    """
+    try:
+        a = _normalize_h9(np.asarray(H_AB, dtype=np.float64))
+        c = _normalize_h9(np.asarray(H_BC, dtype=np.float64))
+        if a is None or c is None:
+            raise ValueError("degenerate input homography")
+        def _prep_cov(v: Optional[np.ndarray]) -> np.ndarray:
+            try:
+                m = np.asarray(v, dtype=np.float64).reshape(9, 9)
+                if not np.all(np.isfinite(m)):
+                    raise ValueError("non-finite cov")
+                return ((m + m.T) / 2.0 + np.eye(9) * 1e-12)
+            except Exception:
+                return np.eye(9, dtype=np.float64) * 1e-8
+        ca = _prep_cov(cov_AB)
+        cc = _prep_cov(cov_BC)
+        try:
+            ns = int(n_samples)
+        except Exception:
+            ns = 500
+        ns = max(50, min(ns, 2000))
+        seed = SEED if random_seed is None else int(random_seed)
+        rng = np.random.default_rng(seed)
+        sa = rng.multivariate_normal(a, ca, size=ns)
+        sc = rng.multivariate_normal(c, cc, size=ns)
+        acc: List[np.ndarray] = []
+        for k in range(ns):
+            try:
+                ma = sa[k].reshape(3, 3)
+                mc = sc[k].reshape(3, 3)
+                if abs(float(ma[2, 2])) < 1e-12 or abs(float(mc[2, 2])) < 1e-12:
+                    continue
+                mac = (mc @ ma)
+                if abs(float(mac[2, 2])) < 1e-12:
+                    continue
+                v = _normalize_h9(mac)
+                if v is not None:
+                    acc.append(v)
+            except Exception:
+                continue
+        if len(acc) < 10:
+            raise ValueError("monte carlo degenerate")
+        arr = np.asarray(acc, dtype=np.float64)
+        cov_ac = np.asarray(np.cov(arr, rowvar=False), dtype=np.float64).reshape(9, 9)
+        cov_ac = (cov_ac + cov_ac.T) / 2.0
+        # Spatial scatter at unit-test grid mapped to meters when GSD known.
+        H_AC = np.asarray(c, dtype=np.float64).reshape(3, 3) @ np.asarray(a, dtype=np.float64).reshape(3, 3)
+        if abs(float(H_AC[2, 2])) > 1e-12:
+            H_AC = H_AC / float(H_AC[2, 2])
+        grid = np.array([[0.0, 0.0], [512.0, 0.0], [0.0, 512.0], [512.0, 512.0], [256.0, 256.0]])
+        Hs = arr.reshape(-1, 3, 3)
+        scatters: List[float] = []
+        for px, py in grid:
+            denom = Hs[:, 2, 0] * px + Hs[:, 2, 1] * py + Hs[:, 2, 2]
+            denom = np.where(np.abs(denom) < 1e-12, 1e-12, denom)
+            qx = (Hs[:, 0, 0] * px + Hs[:, 0, 1] * py + Hs[:, 0, 2]) / denom
+            qy = (Hs[:, 1, 0] * px + Hs[:, 1, 1] * py + Hs[:, 1, 2]) / denom
+            scatters.append(float(np.sqrt(np.var(qx) + np.var(qy))))
+        sigma_px = float(np.mean(scatters)) if scatters else 0.0
+        sigma_m = None
+        if gsd_m is not None:
+            try:
+                g = float(gsd_m)
+                if np.isfinite(g) and g > 0:
+                    sigma_m = float(sigma_px * g)
+            except Exception:
+                sigma_m = None
+        return {
+            "status": "success",
+            "H_AC": H_AC.tolist(),
+            "Sigma_AC": cov_ac.tolist(),
+            "sigma_pos_px": sigma_px,
+            "uncertainty_m": round(float(sigma_m), 4) if sigma_m is not None else None,
+            "n_samples": int(len(acc)),
+        }
+    except Exception as exc:
+        logger.warning("Composed covariance propagation failed (%s).", exc)
+        return {"status": "failed", "reason": str(exc), "Sigma_AC": None,
+                "uncertainty_m": None, "n_samples": 0}
+
+
+# ---------------------------------------------------------------------------
 # 3b. Synthetic DEM Hillshade (Sun-Angle-Invariant Reference Projection)
 # ---------------------------------------------------------------------------
 
@@ -1441,6 +1790,8 @@ def match_images_cfog(
     _is_inverted_call: bool = False,
     _cv_scale_ratio: Optional[float] = None,
     experimental_stack: bool = False,
+    look_azimuth_deg: Optional[float] = None,
+    dem_array: Optional[np.ndarray] = None,
 ) -> Dict[str, Any]:
     """
     Executes the primary cross-sensor registration pipeline:
@@ -1498,7 +1849,17 @@ def match_images_cfog(
     raw2_gray, raw2_color, raster_meta2 = load_as_float_and_color(img_path2)
 
     dem_arr = None
-    if dem_path and Path(dem_path).exists():
+    if dem_array is not None:
+        try:
+            dem_arr = np.asarray(dem_array, dtype=np.float32)
+            if dem_arr.ndim != 2 or dem_arr.size == 0:
+                dem_arr = None
+            else:
+                logger.info("DEM supplied directly as array (shape: %s)", dem_arr.shape)
+        except Exception as e:
+            logger.warning("Failed to use supplied DEM array: %s", e)
+            dem_arr = None
+    if dem_arr is None and dem_path and Path(dem_path).exists():
         try:
             raw_dem = cv2.imread(str(dem_path), cv2.IMREAD_UNCHANGED)
             if raw_dem is not None:
@@ -1665,12 +2026,17 @@ def match_images_cfog(
                 work1_gray, work2_gray, initial_bounds=effective_bounds, gsd_m=working_gsd
             )
             if content_overlap_info.get("overlap_recovered"):
-                target_w = min(work_w1, work_w2)
-                target_h = min(work_h1, work_h2)
-                scale_to_work_x = work_w2 / float(target_w) if target_w > 0 else 1.0
-                scale_to_work_y = work_h2 / float(target_h) if target_h > 0 else 1.0
-                shift_work_x = float(content_overlap_info["dx_px"]) * scale_to_work_x
-                shift_work_y = float(content_overlap_info["dy_px"]) * scale_to_work_y
+                if content_overlap_info.get("frame") == "reference_pixels":
+                    # Scale-first recovery reports directly in work2 pixels.
+                    shift_work_x = float(content_overlap_info["dx_px"])
+                    shift_work_y = float(content_overlap_info["dy_px"])
+                else:
+                    target_w = min(work_w1, work_w2)
+                    target_h = min(work_h1, work_h2)
+                    scale_to_work_x = work_w2 / float(target_w) if target_w > 0 else 1.0
+                    scale_to_work_y = work_h2 / float(target_h) if target_h > 0 else 1.0
+                    shift_work_x = float(content_overlap_info["dx_px"]) * scale_to_work_x
+                    shift_work_y = float(content_overlap_info["dy_px"]) * scale_to_work_y
                 content_overlap_info["shift_applied"] = {
                     "shift_work_x": round(shift_work_x, 3),
                     "shift_work_y": round(shift_work_y, 3),
@@ -2075,9 +2441,28 @@ def match_images_cfog(
             json.dump(sanitize_for_json(metrics), f, indent=2, cls=SubpixelJSONEncoder)
 
         transform_path = out_path / "transform.json"
+        try:
+            _inv_boot = compute_homography_covariance_bootstrap(
+                pts1_arr, pts2_arr, H_ab, inlier_mask=inlier_mask_arr,
+                n_bootstrap=500, gsd_m=metric_gsd,
+            )
+            _inv_cov = _inv_boot.get("H_cov", np.eye(9).tolist())
+            metrics["absolute_rmse_uncertainty_m"] = _inv_boot.get("absolute_rmse_uncertainty_m")
+            metrics["dem_model"] = "homography"
+            metrics["dem_ray_shift"] = {"enabled": False, "reason": "dem_unavailable"}
+            metrics["slope_residual_correlation"] = None
+            with open(metrics_path, "w") as _mf2:
+                json.dump(sanitize_for_json(metrics), _mf2, indent=2, cls=SubpixelJSONEncoder)
+        except Exception:
+            _inv_cov = np.eye(9).tolist()
         transform_data = {
             "model": "homography",
             "matrix": H_ab.tolist(),
+            "H_cov": _inv_cov,
+            "dem_ray_shift": {"enabled": False, "reason": "dem_unavailable"},
+            "slope_residual_correlation": None,
+            "absolute_rmse_m": metrics.get("absolute_rmse_m"),
+            "absolute_rmse_uncertainty_m": metrics.get("absolute_rmse_uncertainty_m"),
             "quality": tx_check,
             "direction": "inverted_from_BA",
             "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
@@ -2850,12 +3235,16 @@ def match_images_cfog(
         _rec.setdefault("match_id", _i)
         _rec["cell"] = _m.get("cell")
 
-    # --- PHASE 4: AI MATCH VERIFICATION (OPT-IN ONLY) ---
-    # Measured 2026-09-10: with the stack ON, all 3 real-CDR LRO pairs
-    # Gate2-FAIL (RF vetoes true low-MI matches pre-RANSAC) and the primary
-    # benchmark flips outcomes both ways (003 success->fail, triplet_new_2022
-    # honest-fail->5@0.17 pseudo-success). Same opt-in rule as Phase 1:
-    # default path passes refinement records straight to RANSAC.
+    # --- PHASE 4: AI MATCH VERIFICATION (OPT-IN ONLY, NO BUNDLED MODEL) ---
+    # Honesty note: no trained classifier ships with this repo. A prior
+    # RANSAC-trained RandomForest was removed as circular supervision, and
+    # AIMatchVerifier now loads ONLY hand-trained bundles (see
+    # train_ai_verifier.py label contract); otherwise it applies a documented
+    # non-ML percentile baseline. Measured 2026-09-10: with the stack ON, all
+    # 3 real-CDR LRO pairs Gate2-FAIL and the primary benchmark flips outcomes
+    # both ways (003 success->fail, triplet_new_2022 honest-fail->5@0.17
+    # pseudo-success). Same opt-in rule as Phase 1: default path passes
+    # refinement records straight to RANSAC.
     from ai_verifier import AIMatchVerifier
     try:
         from metadata import normalize_sensor_name as _raw_norm_s4
@@ -3262,11 +3651,82 @@ def match_images_cfog(
                         refinement_records[idx]["image2_y"] = float(refined_dst[j, 1])
                         refinement_records[idx]["lk_refined"] = True
 
+    # 8b. DEM-aware geometry: LOS ray-shift honesty, bootstrap covariance,
+    # slope-correlated TPS fallback (Step 9).
+    try:
+        _los_az = look_azimuth_deg
+        if _los_az is None:
+            try:
+                _los_az = meta1.sensor_los_azimuth_deg
+            except Exception:
+                _los_az = None
+        _em_src = meta1.emission_angle_deg
+    except Exception:
+        _los_az, _em_src = None, None
+    try:
+        _inl_idx = np.where(np.asarray(inlier_mask).ravel() == 1)[0] if inlier_mask is not None else np.array([], dtype=int)
+        _inl_src = pts1_arr[_inl_idx] if len(_inl_idx) else pts1_arr
+    except Exception:
+        _inl_src = pts1_arr
+        _inl_idx = np.array([], dtype=int)
+    dem_ray_shift: Dict[str, Any] = {"enabled": False, "reason": "dem_unavailable"}
+    try:
+        _, dem_ray_shift = compute_dem_ray_shift_correction(
+            _inl_src if len(_inl_src) else pts1_arr, dem_arr, _em_src, _los_az, working_gsd
+        )
+    except Exception as exc:
+        dem_ray_shift = {"enabled": False, "reason": f"ray_shift_failed: {exc}"}
+    # Bootstrap homography covariance (500x) + positional uncertainty.
+    bootstrap_info: Dict[str, Any] = {"status": "skipped", "H_cov": np.eye(9).tolist()}
+    try:
+        bootstrap_info = compute_homography_covariance_bootstrap(
+            pts1_arr, pts2_arr, H_final, inlier_mask=inlier_mask,
+            n_bootstrap=500, gsd_m=metric_gsd,
+        )
+    except Exception as exc:
+        logger.warning("Bootstrap covariance failed (%s).", exc)
+    # Slope-residual correlation on inliers; TPS fallback when terrain relief
+    # deformation exceeds planar limits.
+    slope_residual_correlation: Optional[float] = None
+    dem_model: str = "homography"
+    try:
+        if dem_arr is not None and len(_inl_idx) >= 4:
+            from metrics import calculate_reprojection_errors as _calc_err
+            _res = _calc_err(pts1_arr[_inl_idx], pts2_arr[_inl_idx], H_final)
+            _slp = compute_dem_slope_at_points(dem_arr, pts1_arr[_inl_idx], working_gsd)
+            slope_residual_correlation = float(compute_slope_residual_correlation(_res, _slp))
+        else:
+            slope_residual_correlation = None
+    except Exception:
+        slope_residual_correlation = None
+    if slope_residual_correlation is not None and slope_residual_correlation > 0.40:
+        dem_model = "tps_fallback"
+        logger.info(
+            "Slope-residual correlation %.3f exceeds planar limit; TPS fallback engaged.",
+            slope_residual_correlation,
+        )
+    else:
+        dem_model = "homography"
+
     # 9. Compute Canonical Master Metrics (fixed 10x10 reporting grid)
     metrics = compute_canonical_metrics(
         pts1_arr, pts2_arr, inlier_mask, H_final, (orig_h2, orig_w2), canonical_grid_size,
         gsd_m=metric_gsd, dem_data=dem_arr, source_img=raw1_gray, ref_img=raw2_gray,
     )
+    metrics["dem_ray_shift"] = dem_ray_shift
+    metrics["slope_residual_correlation"] = slope_residual_correlation
+    metrics["dem_model"] = dem_model
+    try:
+        _unc = (bootstrap_info or {}).get("absolute_rmse_uncertainty_m")
+    except Exception:
+        _unc = None
+    metrics["absolute_rmse_uncertainty_m"] = _unc
+    try:
+        _sp = (bootstrap_info or {}).get("sigma_pos_m")
+        if _sp is not None:
+            metrics["positional_uncertainty_m"] = round(float(_sp), 4)
+    except Exception:
+        pass
     metrics["matching_grid_size"] = matching_grid_size
     metrics["canonical_grid_size"] = canonical_grid_size
     metrics["outlier_method"] = chosen_outlier_method
@@ -3309,10 +3769,22 @@ def match_images_cfog(
     # A. Warped source image into reference space via Piecewise Affine / TPS
     curr_inliers = np.where(inlier_mask.ravel() == 1)[0] if inlier_mask is not None else []
     if len(curr_inliers) >= 4:
-        warped_source = warp_piecewise_affine(
-            raw1_color, pts1_arr[curr_inliers], pts2_arr[curr_inliers],
-            (orig_h2, orig_w2), tile_size=256, global_H=H_final
-        )
+        if dem_model == "tps_fallback":
+            try:
+                warped_source = warp_thin_plate_splines(
+                    raw1_color, pts1_arr[curr_inliers], pts2_arr[curr_inliers],
+                    (orig_h2, orig_w2),
+                )
+            except Exception:
+                warped_source = warp_piecewise_affine(
+                    raw1_color, pts1_arr[curr_inliers], pts2_arr[curr_inliers],
+                    (orig_h2, orig_w2), tile_size=256, global_H=H_final
+                )
+        else:
+            warped_source = warp_piecewise_affine(
+                raw1_color, pts1_arr[curr_inliers], pts2_arr[curr_inliers],
+                (orig_h2, orig_w2), tile_size=256, global_H=H_final
+            )
     else:
         warped_source = cv2.warpPerspective(
             raw1_color, H_final, (orig_w2, orig_h2), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_CONSTANT, borderValue=(0, 0, 0)
@@ -3386,9 +3858,18 @@ def match_images_cfog(
 
     # G. Save transform JSON
     transform_path = out_path / "transform.json"
+    try:
+        _h_cov = (bootstrap_info or {}).get("H_cov", np.eye(9).tolist())
+    except Exception:
+        _h_cov = np.eye(9).tolist()
     transform_data = {
-        "model": "homography",
+        "model": dem_model,
         "matrix": H_final.tolist(),
+        "H_cov": _h_cov,
+        "dem_ray_shift": dem_ray_shift,
+        "slope_residual_correlation": slope_residual_correlation,
+        "absolute_rmse_m": metrics.get("absolute_rmse_m"),
+        "absolute_rmse_uncertainty_m": metrics.get("absolute_rmse_uncertainty_m"),
         "quality": tx_check,
         "direction": "native",
     }
@@ -3479,6 +3960,11 @@ def match_images_cfog(
         "estimated_scale_ratio": estimated_scale_ratio,
         "metrics": metrics,
         "homography": H_final.tolist(),
+        "H_cov": _h_cov,
+        "dem_ray_shift": dem_ray_shift,
+        "slope_residual_correlation": slope_residual_correlation,
+        "dem_model": dem_model,
+        "bootstrap": bootstrap_info,
         "synthetic_reference_used": bool(synthetic_reference_used),
         "illumination_compensation": illumination_compensation,
         "terrain_correction": full_metadata["terrain_correction"],

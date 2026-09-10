@@ -68,6 +68,12 @@ class TripletSummary(BaseModel):
     ohrc_product_id: str | None = None
     tmc2_product_id: str | None = None
     iirs_product_id: str | None = None
+    # Step 13: the loader has enriched triplets with these LRO fields for a
+    # while, but the response model silently stripped them — the frontend LRO
+    # toggle was dead against the real backend. They are contract now.
+    lro_nac_available: bool = False
+    lro_nac_product_id: str | None = None
+    lro_nac_gsd_m: float | None = None
     dem_available: bool = False
     dem_url: str | None = None
 

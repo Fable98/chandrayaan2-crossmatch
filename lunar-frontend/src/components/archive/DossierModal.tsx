@@ -92,13 +92,13 @@ export default function DossierModal({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={imageUrl(`/images/tmc/${triplet.id}`)}
-                    alt="TMC-2 terrain stereo"
+                    alt="TMC-2 single-view terrain"
                     className="h-full w-full object-cover"
                   />
                 </div>
                 <div className="text-xs">
                   <span className="text-slate-900 font-bold block">TMC-2 Reference</span>
-                  <p className="text-[10px] text-slate-400">~4–5 m/px Stereo</p>
+                  <p className="text-[10px] text-slate-400">~4–5 m/px Single View</p>
                 </div>
               </div>
 

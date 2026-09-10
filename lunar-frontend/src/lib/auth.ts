@@ -66,128 +66,73 @@ function getStoredUser(): AuthUser | null {
 /**
  * Register a new user account.
  * On success, the JWT token is stored and the user is "logged in".
+ *
+ * Step 13: NO offline fallback. A forged local token would bypass every
+ * Step 12 backend control (auth on /register, /refresh, ingest upload).
+ * Network failures are re-thrown so the UI shows the error banner.
  */
 export async function register(
   name: string,
   email: string,
   password: string
 ): Promise<TokenResponse> {
+  let res: Response;
   try {
-    const res = await fetch(`${API_BASE}/auth/register`, {
+    res = await fetch(`${API_BASE}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name, email, password }),
     });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: "Registration failed" }));
-      throw new Error(err.detail || "Registration failed");
-    }
-
-    const data: TokenResponse = await res.json();
-    setToken(data.access_token);
-    setStoredUser(data.user);
-    return data;
-  } catch (err: unknown) {
-    if (
-      err instanceof Error &&
-      err.message !== "Failed to fetch" &&
-      !err.message.toLowerCase().includes("network") &&
-      !err.message.toLowerCase().includes("fetch")
-    ) {
-      throw err;
-    }
-    // Graceful offline fallback for standalone / demo deployments
-    console.warn("Auth service unreachable at " + API_BASE + ". Activating offline operator session.");
-    const fallbackUser: AuthUser = {
-      id: "usr_local_" + Date.now(),
-      name: name.trim() || "ISRO Flight Operator",
-      email: email.trim(),
-      created_at: new Date().toISOString(),
-    };
-    const fallbackToken = "offline_jwt_" + Date.now();
-    setToken(fallbackToken);
-    setStoredUser(fallbackUser);
-    return {
-      access_token: fallbackToken,
-      token_type: "bearer",
-      user: fallbackUser,
-    };
+  } catch {
+    throw new Error(
+      `Could not reach the auth service at ${API_BASE}. Check that the backend is running.`
+    );
   }
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Registration failed" }));
+    throw new Error(err.detail || "Registration failed");
+  }
+
+  const data: TokenResponse = await res.json();
+  setToken(data.access_token);
+  setStoredUser(data.user);
+  return data;
 }
 
 /**
  * Log in with email and password.
  * On success, the JWT token is stored locally.
+ *
+ * Step 13: NO offline fallback and NO demo bypass (see register()). A
+ * backend-issued token is the only credential this app accepts.
  */
 export async function login(
   email: string,
   password: string
 ): Promise<TokenResponse> {
+  let res: Response;
   try {
-    const res = await fetch(`${API_BASE}/auth/login`, {
+    res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password }),
     });
-
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ detail: "Login failed" }));
-      throw new Error(err.detail || "Invalid email or password");
-    }
-
-    const data: TokenResponse = await res.json();
-    setToken(data.access_token);
-    setStoredUser(data.user);
-    return data;
-  } catch (err: unknown) {
-    if (
-      err instanceof Error &&
-      err.message !== "Failed to fetch" &&
-      !err.message.toLowerCase().includes("network") &&
-      !err.message.toLowerCase().includes("fetch")
-    ) {
-      throw err;
-    }
-    // Graceful offline fallback for standalone / demo deployments
-    console.warn("Auth service unreachable at " + API_BASE + ". Activating offline operator session.");
-    const derivedName =
-      email.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "ISRO Pilot";
-    const fallbackUser: AuthUser = {
-      id: "usr_local_" + Date.now(),
-      name: derivedName,
-      email: email.trim(),
-      created_at: new Date().toISOString(),
-    };
-    const fallbackToken = "offline_jwt_" + Date.now();
-    setToken(fallbackToken);
-    setStoredUser(fallbackUser);
-    return {
-      access_token: fallbackToken,
-      token_type: "bearer",
-      user: fallbackUser,
-    };
+  } catch {
+    throw new Error(
+      `Could not reach the auth service at ${API_BASE}. Check that the backend is running.`
+    );
   }
-}
 
-/**
- * Quick one-click demo login helper
- */
-export function loginAsDemo(): TokenResponse {
-  const demoUser: AuthUser = {
-    id: "usr_demo_isro",
-    name: "ISRO Pilot",
-    email: "flight.ops@isro.gov.in",
-    created_at: new Date().toISOString(),
-  };
-  const demoToken = "demo_jwt_" + Date.now();
-  setToken(demoToken);
-  setStoredUser(demoUser);
-  return {
-    access_token: demoToken,
-    token_type: "bearer",
-    user: demoUser,
-  };
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: "Login failed" }));
+    throw new Error(err.detail || "Invalid email or password");
+  }
+
+  const data: TokenResponse = await res.json();
+  setToken(data.access_token);
+  setStoredUser(data.user);
+  return data;
 }
 
 /**

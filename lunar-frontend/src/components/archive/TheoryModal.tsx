@@ -41,7 +41,7 @@ export default function TheoryModal({ onClose }: Props) {
 
           <div className="border-t border-slate-100 pt-4 text-xs leading-relaxed text-slate-600 space-y-4">
             <p>
-              In planetary cross-matching between high-resolution optical cameras (OHRC, 0.25 m/px) and stereo/hyperspectral terrain cameras (TMC-2, 4 m/px), sensor viewing geometries differ radically. Due to non-repeat orbital tracks, the angle of solar incidence often reverses by &gt;160°, rendering traditional pixel intensity metrics invalid.
+              In planetary cross-matching between high-resolution optical cameras (OHRC, 0.25 m/px) and monoscopic terrain camera (TMC-2 single view, 4 m/px) and hyperspectral camera, sensor viewing geometries differ radically. Due to non-repeat orbital tracks, the angle of solar incidence often reverses by &gt;160°, rendering traditional pixel intensity metrics invalid.
             </p>
 
             <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-4 text-xs">

@@ -1,6 +1,5 @@
 import numpy as np
 from pathlib import Path
-from sklearn.ensemble import RandomForestClassifier
 from typing import List, Dict, Any, Tuple, Optional
 import logging
 
@@ -13,19 +12,24 @@ DEFAULT_MODEL_PATH = Path(__file__).resolve().parent / "ai_verifier_model.pkl"
 
 class AIMatchVerifier:
     """
-    Phase 4: AI Match Verification
-    Purpose: Use Supervised Machine Learning to filter out false-positive matches.
-    Method: RandomForestClassifier trained on match confidence features.
+    Phase 4: AI Match Verification (EXPERIMENTAL, ships WITHOUT a model).
 
-    If a trained ``ai_verifier_model.pkl`` (written by train_ai_verifier.py)
-    exists next to this file it is loaded in __init__ and used for
-    predict_proba. Otherwise the verifier falls back to the legacy
-    percentile heuristic.
+    Honesty note: no trained classifier is bundled with this repository. An
+    earlier RandomForest trained on RANSAC inlier/outlier labels was removed
+    because it was circular — RANSAC consensus labels cannot supervise a
+    filter that runs BEFORE RANSAC; the model just memorized the coarse
+    matcher's own confidence scores and vetoed true low-MI matches on real
+    CDR pairs (measured 2026-09-10: LRO pairs Gate2-FAIL with the stack on).
+
+    A model file (``ai_verifier_model.pkl``) is loaded ONLY if it was trained
+    by train_ai_verifier.py on HAND-LABELLED true/false correspondences (see
+    its --label-key / --allow-ransac-labels contract). Otherwise the verifier
+    falls back to a documented non-ML percentile baseline, and the matcher
+    keeps this entire phase opt-in (experimental_stack=True) with the
+    classical path as default.
     """
     def __init__(self, model_path: Optional[str | Path] = None):
-        self.model: RandomForestClassifier = RandomForestClassifier(
-            n_estimators=100, random_state=42, max_depth=None, class_weight="balanced"
-        )
+        self.model: Any = None
         self.is_trained = False
         self.model_path = Path(model_path) if model_path else DEFAULT_MODEL_PATH
         self.feature_names = list(FEATURE_NAMES)
@@ -33,19 +37,25 @@ class AIMatchVerifier:
         logger.info(f"AIMatchVerifier initialized (trained={self.is_trained}).")
 
     def _try_load_model(self, path: Path) -> bool:
-        """Load a joblib bundle (or bare classifier); return True on success."""
+        """Load a hand-trained joblib bundle; return True on success."""
         try:
             if not path.exists():
-                logger.info(f"No trained model at {path}; using heuristic fallback.")
+                logger.info(f"No trained model at {path}; using non-ML baseline (no model ships).")
                 return False
             import joblib
             loaded = joblib.load(path)
             # train_ai_verifier saves {"model": clf, "feature_names": [...], ...}
             if isinstance(loaded, dict) and "model" in loaded:
+                if loaded.get("label_source") not in ("hand", "hand_labelled"):
+                    logger.warning("Model bundle label_source=%r is not hand-labelled; refusing to load "
+                                   "(RANSAC-derived bundles are circular).",
+                                   loaded.get("label_source"))
+                    return False
                 self.model = loaded["model"]
                 self.feature_names = list(loaded.get("feature_names", FEATURE_NAMES))
             else:
-                self.model = loaded
+                logger.warning("Model bundle at %s lacks provenance metadata; refusing to load.", path)
+                return False
             # Sanity check: must expose predict_proba (i.e. actually fitted).
             if not hasattr(self.model, "predict_proba"):
                 raise AttributeError("loaded object has no predict_proba")
@@ -58,7 +68,8 @@ class AIMatchVerifier:
             logger.info(f"Loaded trained AI verifier from {path}.")
             return True
         except Exception as e:
-            logger.warning(f"Could not load AI verifier model from {path}: {e}. Using heuristic fallback.")
+            logger.warning(f"Could not load AI verifier model from {path}: {e}. Using non-ML baseline.")
+            self.model = None
             self.is_trained = False
             return False
 
@@ -91,8 +102,9 @@ class AIMatchVerifier:
         ], dtype=np.float32)
 
         if not self.is_trained:
-            # HEURISTIC FALLBACK (only when no .pkl model file exists):
-            # Reject matches that fall below the 25th percentile of the current batch.
+            # NON-ML BASELINE (not a learned model): keep matches at or above
+            # the 25th percentile of the current batch. Documented as a weak
+            # heuristic, NOT an AI verdict.
             threshold = float(np.percentile(scores, 25)) if len(scores) > 4 else 0.3
             # Return 1.0 for pass, 0.0 for fail (simulating probability)
             return (scores >= threshold).astype(np.float32)
@@ -115,7 +127,7 @@ class AIMatchVerifier:
             return (scores >= 0.3).astype(np.float32)
 
     def filter_matches(self, matches: List[Dict[str, Any]], threshold: float = 0.5) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """AI-powered outlier rejection."""
+        """Outlier rejection via the loaded model, or the non-ML baseline."""
         confidences = self.predict_confidence(matches)
         kept = []
         rejected = []

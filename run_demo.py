@@ -210,7 +210,7 @@ def run_pipeline_demo(input_dir: str | Path, output_dir: str | Path, skip_ablati
 | Parameter | Value | Standard Requirement / Target |
 | :--- | :--- | :--- |
 | **Source Sensor** | OHRC (~0.25 m/px nominal) | Ultra-high resolution lander assessment |
-| **Reference Sensor** | TMC-2 (~5.0 m/px nominal) | Topographic stereo triplet mapping |
+| **Reference Sensor** | TMC-2 (~5.0 m/px nominal, single NCF view) | Single-view topographic reference mapping |
 | **Working Physical Scale** | 5.00 m/px | Common-GSD scale-space normalization |
 | **Verified Inlier Correspondences** | **{inlier_count}** | \u2265 4 verified tie-points |
 | **Inlier Ratio** | **{(metrics.get('inlier_ratio') or 0.0) * 100:.1f}%** | Robust to out-of-plane parallax |

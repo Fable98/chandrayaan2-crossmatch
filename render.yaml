@@ -6,6 +6,6 @@ services:
     startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: PYTHON_VERSION
-        value: 3.11.9
+        value: 3.14.0
       - key: ALLOWED_ORIGINS
         value: "https://chandrayaan2-crossmatch-56fjycajj-fable98s-projects.vercel.app,http://localhost:3000,http://127.0.0.1:3000"

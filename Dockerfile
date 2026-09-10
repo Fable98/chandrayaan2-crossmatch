@@ -1,5 +1,8 @@
 # SIH PS 26166 Backend Dockerfile
-FROM python:3.11-slim
+# Python 3.14 to match requirements.txt's 2026-era pins (no 3.11 wheels exist
+# for e.g. tifffile==2026.8.23) and the CI runner. Do not downgrade without
+# re-pinning every dependency.
+FROM python:3.14-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

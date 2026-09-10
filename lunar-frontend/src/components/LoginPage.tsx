@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { login, register, loginAsDemo } from "@/lib/auth";
+import { login, register } from "@/lib/auth";
 
 interface Props {
   onLoginSuccess: () => void;
@@ -46,14 +46,6 @@ export default function LoginPage({ onLoginSuccess }: Props) {
     },
     [resetForm]
   );
-
-  const handleDemoAccess = () => {
-    loginAsDemo();
-    setShowSuccess(true);
-    setTimeout(() => {
-      onLoginSuccess();
-    }, 600);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -366,15 +358,6 @@ export default function LoginPage({ onLoginSuccess }: Props) {
                   </span>
                 </button>
 
-                {/* Quick Demo Bypass Button */}
-                <button
-                  type="button"
-                  onClick={handleDemoAccess}
-                  className="w-full rounded-xl border border-white/[0.1] bg-white/[0.04] py-2.5 text-xs font-semibold text-slate-300 hover:bg-white/[0.08] hover:text-white transition-all flex items-center justify-center gap-2"
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>Quick Demo Access (One-Click Bypass)</span>
-                </button>
               </form>
 
               {/* Divider */}

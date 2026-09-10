@@ -27,13 +27,26 @@ from utils.logger import setup_logging
 setup_logging()
 logger = logging.getLogger("backend.main")
 
-from fastapi import FastAPI, UploadFile, File, HTTPException, Form
+from fastapi import Depends, FastAPI, Request, UploadFile, File, HTTPException, Form
 from fastapi.concurrency import run_in_threadpool
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
+from config import settings
 from data import loader
 from routers import triplets, footprint, matches, images, auth, ingest
+from routers.auth import get_current_user
+from rate_limit import get_limiter
+from uploads import (
+    ALLOWED_UPLOAD_EXTENSIONS,
+    max_upload_bytes,
+    purge_expired_runs,
+    sanitize_upload_filename,
+    save_upload_capped,
+)
 
 try:
     from routers import registration as registration_router
@@ -78,6 +91,15 @@ if not allowed_origins_list:
 async def lifespan(app: FastAPI):
     """Load all data into memory before the app starts accepting requests."""
     loader.load_all()
+    # Step 12: fail-closed secret check + purge stale compute runs on boot.
+    try:
+        settings.require_jwt_secret()
+    except RuntimeError as exc:
+        logger.error("SECURITY: %s Auth endpoints will refuse to issue tokens.", exc)
+    try:
+        purge_expired_runs(loader.DATA_DIR)
+    except Exception as exc:
+        logger.warning("Startup run purge skipped: %s", exc)
     yield
     # No cleanup needed — data is read-only in-memory dicts
 
@@ -106,6 +128,27 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Step 12: rate-limit state + handler (limits are declared on /auth/* routes).
+limiter = get_limiter()
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+@app.middleware("http")
+async def block_path_traversal(request: Request, call_next):
+    """Step 12: reject any request path that smuggles '..' segments (404).
+
+    Defense-in-depth in front of StaticFiles / FileResponse routers; the
+    per-file allowlist gates in uploads.py remain authoritative.
+    """
+    try:
+        raw_path = request.scope.get("path", "") or ""
+        if ".." in raw_path.split("/"):
+            return JSONResponse(status_code=404, content={"detail": "Not found"})
+    except Exception:
+        pass
+    return await call_next(request)
 
 
 # ---------------------------------------------------------------------------
@@ -147,16 +190,19 @@ async def register_images(
     source_sensor: str = Form("OHRC"),
     reference_sensor: str = Form("TMC"),
     method: str = Form("cfog"),
+    current_user: dict = Depends(get_current_user),
 ):
     """
     Dynamically register an uploaded source image against an uploaded reference image.
+    Requires a valid Bearer token (Step 12).
 
     Features:
     - 2D Phase Congruency & CFOG structural matching (illumination-robust structural representation).
     - DEM-based relief displacement compensation (when DEM elevation is provided).
     - Multi-scale patch Phase Correlation with empirically benchmarked sub-pixel refinement.
     - Common physical-GSD normalization across multi-resolution sensor pairs.
-    - Safety checks: File type, size limit, and robust multi-band reading.
+    - Safety checks: auth, extension allowlist, streamed size cap, traversal-safe
+      names, and robust multi-band reading — for source, reference, AND DEM.
     """
     import sys
     from pathlib import Path
@@ -164,59 +210,67 @@ async def register_images(
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ML_model"))
     from matcher_cfog import match_images_cfog, load_as_float_and_color
 
-    ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".tif", ".tiff"}
-    MAX_FILE_SIZE = 20 * 1024 * 1024
-
     # Validate extensions BEFORE touching disk: rejected uploads must never
     # be written (security: no stray .php/.exe payloads in dynamic_runs).
-    for file_obj in (source_file, reference_file):
-        filename = file_obj.filename or "uploaded_image"
-        ext = os.path.splitext(filename)[1].lower()
-        if ext not in ALLOWED_EXTENSIONS:
-            raise HTTPException(
-                status_code=415,
-                detail=f"Unsupported file type '{ext}'. Allowed: .jpg, .jpeg, .png, .tif, .tiff",
-            )
+    # DEM uploads go through the exact same gate (Step 12).
+    uploads_to_check: list = [source_file, reference_file]
+    if dem_file is not None and dem_file.filename:
+        uploads_to_check.append(dem_file)
+    for file_obj in uploads_to_check:
+        sanitize_upload_filename(file_obj.filename, ALLOWED_UPLOAD_EXTENSIONS)
+
+    # Opportunistically purge stale runs (TTL) so the disk cannot fill.
+    try:
+        purge_expired_runs(loader.DATA_DIR)
+    except Exception:
+        pass
 
     run_id = str(uuid.uuid4())
     run_dir = Path(loader.DATA_DIR) / "dynamic_runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
 
-    source_path = run_dir / "source_img.png"
-    ref_path = run_dir / "reference_img.png"
+    # Fixed server-side stems: only the allowlisted extension is reused, so
+    # client filenames (and any '..') never reach the filesystem.
+    def _fixed_name(upload: UploadFile, stem: str) -> Path:
+        safe = sanitize_upload_filename(upload.filename, ALLOWED_UPLOAD_EXTENSIONS)
+        return run_dir / f"{stem}{os.path.splitext(safe)[1].lower()}"
+
+    source_path = _fixed_name(source_file, "source_img")
+    ref_path = _fixed_name(reference_file, "reference_img")
     dem_path = None
     output_dir = run_dir / "output"
     output_dir.mkdir(exist_ok=True)
 
+    cap_bytes = max_upload_bytes()
     try:
-        with source_path.open("wb") as buffer:
-            shutil.copyfileobj(source_file.file, buffer)
-        with ref_path.open("wb") as buffer:
-            shutil.copyfileobj(reference_file.file, buffer)
-        if dem_file and dem_file.filename:
-            dem_path = run_dir / "dem_img.png"
-            with dem_path.open("wb") as buffer:
-                shutil.copyfileobj(dem_file.file, buffer)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save uploads: {str(e)}")
+        await save_upload_capped(source_file, source_path, cap_bytes)
+        await save_upload_capped(reference_file, ref_path, cap_bytes)
+        if dem_file is not None and dem_file.filename:
+            dem_path = _fixed_name(dem_file, "dem_img")
+            await save_upload_capped(dem_file, dem_path, cap_bytes)
+    except HTTPException:
+        # Rejected uploads leave no residue (empty run dirs are removed too).
+        shutil.rmtree(run_dir, ignore_errors=True)
+        raise
 
     for file_obj, path in [(source_file, source_path), (reference_file, ref_path)]:
         filename = file_obj.filename or "uploaded_image"
 
-        file_size = os.path.getsize(path)
-        if file_size > MAX_FILE_SIZE:
-            raise HTTPException(
-                status_code=413,
-                detail=f"File '{filename}' exceeds the 20MB limit.",
-            )
-
         # Validate that image can be parsed by multi-band loader
         try:
-            load_as_float_and_color(path)
+            await run_in_threadpool(load_as_float_and_color, path)
         except Exception:
             raise HTTPException(
                 status_code=400,
                 detail=f"Could not read image file: {filename}",
+            )
+    if dem_path is not None:
+        try:
+            await run_in_threadpool(load_as_float_and_color, dem_path)
+        except Exception:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Could not read DEM file: {dem_file.filename if dem_file else 'dem'}",
             )
 
     try:
@@ -256,19 +310,26 @@ async def register_images(
             metadata=result.get("metadata"),
         )
 
-    # Generate 8-bit web-compatible PNG previews for source and reference so browsers can display any uploaded GeoTIFF / TIFF
-    import cv2
-    source_url = None
-    reference_url = None
-    try:
+    # Generate 8-bit web-compatible PNG previews for source and reference so browsers can display any uploaded GeoTIFF / TIFF.
+    # All cv2 work runs in a threadpool so the async event loop stays responsive.
+    def _make_previews() -> tuple:
+        import cv2 as _cv2
+
         _, src_color, _ = load_as_float_and_color(source_path)
         _, ref_color, _ = load_as_float_and_color(ref_path)
         src_png_path = output_dir / "source_preview.png"
         ref_png_path = output_dir / "reference_preview.png"
-        cv2.imwrite(str(src_png_path), src_color)
-        cv2.imwrite(str(ref_png_path), ref_color)
-        source_url = f"/dynamic_runs/{run_id}/output/source_preview.png"
-        reference_url = f"/dynamic_runs/{run_id}/output/reference_preview.png"
+        _cv2.imwrite(str(src_png_path), src_color)
+        _cv2.imwrite(str(ref_png_path), ref_color)
+        return (
+            f"/dynamic_runs/{run_id}/output/source_preview.png",
+            f"/dynamic_runs/{run_id}/output/reference_preview.png",
+        )
+
+    source_url = None
+    reference_url = None
+    try:
+        source_url, reference_url = await run_in_threadpool(_make_previews)
     except Exception as e:
         logger.warning("Could not generate source/reference web previews: %s", e)
 
@@ -321,12 +382,11 @@ def health_check():
 
 
 @app.get("/refresh", response_model=HealthResponse, tags=["system"])
-def refresh_data():
+def refresh_data(current_user: dict = Depends(get_current_user)):
     """
-    Reload all data from disk.
-
-    Use this during the hackathon when the data/ML teams update their output
-    files and you want the backend to pick up the changes without a restart.
+    Reload all data from disk. Requires a valid Bearer token (Step 12):
+    an unauthenticated refresh lets anyone flush the in-memory cache and
+    hammer disk I/O on shared tiers.
     """
     loader.load_all()
     return HealthResponse(

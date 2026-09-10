@@ -53,8 +53,34 @@ def test_backend_logger_defined():
 
 
 def test_register_rejects_bad_extension_without_writing():
+    import importlib.util
+    import uuid
+
+    # Step 12: /register requires auth. Guarantee a secret even if another
+    # test module already constructed the backend.config singleton.
+    _secret = (
+        "test-only-jwt-secret-that-is-long-enough-for-the-32-char-minimum-0123456789"
+    )
+    os.environ.setdefault("JWT_SECRET_KEY", _secret)
+    os.environ.setdefault("ENVIRONMENT", "test")
+    try:
+        from config import settings as _settings
+
+        if not _settings.JWT_SECRET_KEY:
+            _settings.JWT_SECRET_KEY = _secret
+    except Exception:
+        pass
     from fastapi.testclient import TestClient
-    from data import loader
+
+    # NOTE: repo-root data/ shadows backend/data/ on sys.path, so load the
+    # backend loader by file path instead of `from data import loader`.
+    _spec = importlib.util.spec_from_file_location(
+        "backend_data_loader", REPO_ROOT / "backend" / "data" / "loader.py"
+    )
+    assert _spec is not None and _spec.loader is not None
+    loader = importlib.util.module_from_spec(_spec)
+    sys.modules["backend_data_loader"] = loader
+    _spec.loader.exec_module(loader)
     from main import app
 
     dyn = Path(loader.DATA_DIR) / "dynamic_runs"
@@ -67,8 +93,28 @@ def test_register_rejects_bad_extension_without_writing():
     ref_bytes = buf.tobytes()
 
     with TestClient(app, raise_server_exceptions=False) as client:
+        # No token -> 401 and nothing written.
+        resp_anon = client.post(
+            "/register",
+            files={
+                "source_file": ("evil.php", b"<?php echo 'pwn';", "application/x-php"),
+                "reference_file": ("ref.png", ref_bytes, "image/png"),
+            },
+            data={"source_sensor": "OHRC", "reference_sensor": "TMC", "method": "cfog"},
+        )
+        assert resp_anon.status_code == 401, f"expected 401, got {resp_anon.status_code}"
+        assert set(os.listdir(dyn)) == before
+
+        reg = client.post(
+            "/auth/register",
+            json={"name": "S", "email": f"sih-{uuid.uuid4().hex[:8]}@example.com",
+                  "password": "correct-horse-123"},
+        )
+        assert reg.status_code == 201, reg.text[:200]
+        headers = {"Authorization": f"Bearer {reg.json()['access_token']}"}
         resp = client.post(
             "/register",
+            headers=headers,
             files={
                 "source_file": ("evil.php", b"<?php echo 'pwn';", "application/x-php"),
                 "reference_file": ("ref.png", ref_bytes, "image/png"),

@@ -375,8 +375,24 @@ def main():
     )
 
     args = parser.parse_args()
+    regions = list(args.regions)
+    # Step 14: --regions all-real expands from the CDR registry (validated
+    # real_downloaded_cdr entries only; pending slots are never scheduled).
+    if len(regions) == 1 and regions[0] == "all-real":
+        registry_path = REPO_ROOT / "data_preprocessing_pipeline" / "lro_cdr_registry.json"
+        try:
+            registry = json.loads(registry_path.read_text(encoding="utf-8"))
+            regions = [e["region_id"] for e in registry.get("real_cdrs", [])
+                       if e.get("status") == "real_downloaded_cdr" and e.get("region_id")]
+            logger.info("Registry expansion: %d real CDR region(s): %s", len(regions), regions)
+        except Exception as exc:
+            logger.error("Could not read CDR registry (%s); aborting.", exc)
+            return
+        if not regions:
+            logger.error("Registry lists zero real CDRs; nothing to run.")
+            return
     summary = []
-    for reg in args.regions:
+    for reg in regions:
         res = run_registration_for_region(
             region_id=reg,
             output_base_dir=args.output_dir,

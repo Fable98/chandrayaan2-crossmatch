@@ -95,20 +95,44 @@ def enhance_iirs_structural_features(
     else:
         pc1_norm = np.zeros((h, w), dtype=np.float32)
 
-    # 2. Lunar Spectral Index (e.g. R950 / R750 ratio for pyroxene / crater rim delineation)
-    # If wavelengths are provided, locate nearest bands; otherwise pick proxy bands
-    if wavelengths is not None and len(wavelengths) == b:
-        idx_750 = int(np.argmin(np.abs(wavelengths - 750.0)))
-        idx_950 = int(np.argmin(np.abs(wavelengths - 950.0)))
-    else:
-        # Proxies: early NIR band and later NIR band
-        idx_750 = min(b // 4, b - 1)
-        idx_950 = min((3 * b) // 4, b - 1)
+    # 2. Lunar Spectral Index (physical R950/R750 only when calibrated).
+    # Honest radiometry: fabricated proxy bands (b//4, 3b//4) plus synthetic
+    # blending and CLAHE distort physical I/F radiometry, so they are disabled
+    # unless calibrated wavelengths with true 750 nm and 950 nm coverage exist.
+    # Without calibration we return linearly normalized PC1 directly.
+    wl = None
+    try:
+        if wavelengths is not None:
+            wl = np.asarray(wavelengths, dtype=np.float64).ravel()
+    except Exception:
+        wl = None
+    has_calibrated_ratio = False
+    idx_750: int = -1
+    idx_950: int = -1
+    if wl is not None and wl.size == b and np.all(np.isfinite(wl)):
+        try:
+            wmin, wmax = float(np.min(wl)), float(np.max(wl))
+            if wmin <= 750.0 <= wmax and wmin <= 950.0 <= wmax:
+                c750 = int(np.argmin(np.abs(wl - 750.0)))
+                c950 = int(np.argmin(np.abs(wl - 950.0)))
+                # Nearest calibrated band must actually sample the feature.
+                if abs(float(wl[c750]) - 750.0) <= 150.0 and abs(float(wl[c950]) - 950.0) <= 150.0 and c750 != c950:
+                    idx_750, idx_950 = c750, c950
+                    has_calibrated_ratio = True
+        except Exception:
+            has_calibrated_ratio = False
+
+    if not has_calibrated_ratio:
+        logger.info(
+            "No calibrated 750/950 nm coverage; returning linearly normalized "
+            "PC1 without synthetic ratio or CLAHE to preserve radiometry."
+        )
+        return np.clip(pc1_norm, 0.0, 1.0).astype(np.float32)
 
     band_750 = arr[:, :, idx_750]
     band_950 = arr[:, :, idx_950]
 
-    # Ratio highlighting absorption and composition contrast
+    # Physical ratio highlighting pyroxene absorption contrast.
     ratio = band_950 / np.maximum(band_750, 1e-4)
     rp2, rp98 = float(np.percentile(ratio, 2)), float(np.percentile(ratio, 98))
     if rp98 > rp2:
@@ -116,16 +140,97 @@ def enhance_iirs_structural_features(
     else:
         ratio_norm = np.zeros((h, w), dtype=np.float32)
 
-    # 3. Structural Fusion (75% PC1 + 25% Spectral Index)
+    # 3. Structural Fusion (75% PC1 + 25% physical Spectral Index)
     structural_map = 0.75 * pc1_norm + 0.25 * ratio_norm
 
-    # Contrast enhancement for phase congruency
+    # Contrast enhancement for phase congruency (calibrated path only)
     u8 = (np.clip(structural_map, 0.0, 1.0) * 255.0).astype(np.uint8)
     clahe = cv2.createCLAHE(clipLimit=2.5, tileGridSize=(8, 8))
     enhanced_u8 = clahe.apply(u8)
     enhanced_float = enhanced_u8.astype(np.float32) / 255.0
 
     return enhanced_float
+
+
+def compute_sam_angle_map(
+    hypercube: np.ndarray,
+    reference_spectrum: Optional[np.ndarray] = None,
+    eps: float = 1e-8,
+) -> np.ndarray:
+    """Per-pixel Spectral Angle Mapper divergence in radians.
+
+    theta_SAM = arccos(dot(S, R_ref) / (|S| |R_ref| + eps)).
+
+    Args:
+        hypercube: (H, W, B) or (B, H, W) spectral cube.
+        reference_spectrum: (B,) reference vector; defaults to spatial mean.
+        eps: small stabilizer for the denominator.
+
+    Returns:
+        (H, W) float32 array of spectral angles in radians in [0, pi].
+    """
+    arr = np.asarray(hypercube, dtype=np.float64)
+    if arr.ndim == 3 and arr.shape[0] < arr.shape[1] and arr.shape[0] < arr.shape[2]:
+        arr = np.transpose(arr, (1, 2, 0))
+    if arr.ndim != 3:
+        raise ValueError(f"hypercube must be 3D, got shape {arr.shape}")
+    h, w, nb = arr.shape
+    flat = arr.reshape(-1, nb)
+    if reference_spectrum is None:
+        ref = np.mean(flat, axis=0)
+    else:
+        ref = np.asarray(reference_spectrum, dtype=np.float64).ravel()
+    norm_ref = float(np.linalg.norm(ref))
+    norm_flat = np.linalg.norm(flat, axis=1)
+    denom = norm_flat * norm_ref + float(eps)
+    cos_a = np.clip(np.sum(flat * ref, axis=1) / np.maximum(denom, 1e-12), -1.0, 1.0)
+    theta = np.arccos(cos_a).reshape(h, w)
+    return np.clip(theta, 0.0, float(np.pi)).astype(np.float32)
+
+
+def apply_sam_gate_to_overlay(
+    overlay: np.ndarray,
+    sam_map: np.ndarray,
+    threshold_rad: float = 0.35,
+    fill_value: Optional[float] = None,
+) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
+    """Gate a PC1 blend overlay by SAM divergence.
+
+    Pixels with theta_SAM above threshold (saturated pixels, shadow
+    artifacts, anomalous spectra) are rejected from the visualization.
+
+    Args:
+        overlay: (H, W) blended visualization to gate.
+        sam_map: (H, W) SAM angles in radians (see compute_sam_angle_map).
+        threshold_rad: rejection threshold in radians.
+        fill_value: replacement for rejected pixels; defaults to overlay median.
+
+    Returns:
+        (gated_overlay, valid_mask, info) where valid_mask is True for kept
+        pixels and info reports rejected_fraction and threshold used.
+    """
+    ov = np.asarray(overlay, dtype=np.float32)
+    sam = np.asarray(sam_map, dtype=np.float32)
+    if ov.shape[:2] != sam.shape[:2]:
+        raise ValueError(f"shape mismatch overlay {ov.shape} vs sam {sam.shape}")
+    thresh = float(threshold_rad)
+    valid = np.isfinite(sam) & (sam <= thresh)
+    if fill_value is None:
+        try:
+            fill = float(np.median(ov[np.isfinite(ov)])) if np.any(np.isfinite(ov)) else 0.0
+        except Exception:
+            fill = 0.0
+    else:
+        fill = float(fill_value)
+    gated = ov.copy()
+    gated[~valid] = fill
+    info: Dict[str, Any] = {
+        "threshold_rad": thresh,
+        "rejected_fraction": float(1.0 - np.mean(valid)) if valid.size else 0.0,
+        "num_rejected": int(np.sum(~valid)),
+        "num_valid": int(np.sum(valid)),
+    }
+    return gated.astype(np.float32), valid, info
 
 
 def quantify_iirs_residuals(

@@ -248,11 +248,15 @@ benchmarks/registration_benchmark_output/
 dynamic_runs/
 
 # --- Generated evaluation / registration artifacts (keep local only) ---
+# Scratch upload dirs from ingest tests/runs (self-cleaned by tests, but never tracked).
+data_preprocessing_pipeline/.uploads/
 # NOTE: lunar-frontend/public/images/ is intentionally TRACKED — it is the
-# offline/demo fallback served by Next.js (api.ts imageUrl() → /images/...
+# bundled static tile set served by Next.js (api.ts imageUrl() → /images/...
 # → app/images/[...slug]/route.ts reads public/images on disk). No build step
 # regenerates it (render.yaml builds backend only), so a clean Vercel checkout
-# without these files 404s every fallback image including LRO NAC outputs.
+# without these files 404s every static tile including LRO NAC outputs.
+# (Step 13: these are tiles, not API fallback data — the JSON API layer has
+# no fallback and throws ApiError when the backend is unreachable.)
 # NOTE: backend runtime seed files are force-tracked despite the ignores below:
 # processed_triplets/*/manifest.json + ohrc/tmc/iirs/dem_512.png (triplet list
 # + /images serving) and data_preprocessing_pipeline/matches/*.json (match

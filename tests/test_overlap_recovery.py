@@ -143,6 +143,63 @@ def test_matcher_cfog_recover_overlap_flag():
         assert "content_overlap_recovery" in res["metrics"]
 
 
+def test_overlap_recovery_estimates_scale_before_translation():
+    """
+    Step 11: scale must be estimated FIRST — inputs must NOT be resized to
+    min(H, W) (which erases the scale gap). A 4x same-footprint pair must
+    report scale_ratio ~= 4 and map the shift back to reference pixels.
+    """
+    h, w = 256, 256
+    np.random.seed(7)
+    base = np.random.uniform(50, 200, (h, w)).astype(np.float32)
+    base = cv2.GaussianBlur(base, (11, 11), 2.5)
+
+    # 4x coarser sampling of the same footprint + a known fine-scale shift.
+    gt_dx_fine, gt_dy_fine = 20.0, 12.0
+    M = np.float32([[1, 0, gt_dx_fine], [0, 1, gt_dy_fine]])
+    shifted = cv2.warpAffine(base, M, (w, h))
+    coarse = cv2.resize(shifted, (w // 4, h // 4), interpolation=cv2.INTER_AREA)
+
+    res = recover_content_overlap(base, coarse, gsd_m=5.0)
+
+    assert res["frame"] == "reference_pixels"
+    assert abs(res["scale_ratio"] - 4.0) <= 1.0, f"scale not estimated first: {res['scale_ratio']}"
+    assert res["overlap_recovered"] is True
+    # Shift mapped back to (coarse) reference pixels: 20/4, 12/4.
+    assert abs(res["dx_px"] - gt_dx_fine / 4.0) <= 1.5, f"dx={res['dx_px']}"
+    assert abs(res["dy_px"] - gt_dy_fine / 4.0) <= 1.5, f"dy={res['dy_px']}"
+
+
+def test_overlap_recovery_20x_scale_gap_capped_and_honest():
+    """
+    Step 11: ~20x gaps (OHRC<->TMC-2 natives) exceed the documented 10x cap.
+    The module must clamp (scale_capped), must NOT hallucinate a confident
+    shift, and must leave bounds untouched.
+    """
+    h, w = 512, 512
+    np.random.seed(11)
+    base = np.random.uniform(50, 200, (h, w)).astype(np.float32)
+    base = cv2.GaussianBlur(base, (11, 11), 2.5)
+    tiny = cv2.resize(base, (w // 20, h // 20), interpolation=cv2.INTER_AREA)
+    assert tiny.shape == (25, 25) or tiny.shape == (26, 26)
+
+    initial_bounds = {
+        "west_lon": 336.48,
+        "east_lon": 336.58,
+        "south_lat": -3.37,
+        "north_lat": -3.25,
+    }
+    res = recover_content_overlap(
+        base, tiny, initial_bounds=initial_bounds, gsd_m=5.0,
+    )
+
+    # Documented cap behavior: clamped or scale-uncertain, never confident.
+    assert res["scale_capped"] is True or res["scale_ratio"] >= 10.0 or res["confidence"] < 0.30
+    assert res["overlap_recovered"] is False
+    # Bounds must not diverge on a refused recovery.
+    assert res["recovered_bounds"] == initial_bounds
+
+
 def test_overlap_recovery_recenter_large_offset_integration():
     """
     Integration test proving that content-based overlap recovery actually improves

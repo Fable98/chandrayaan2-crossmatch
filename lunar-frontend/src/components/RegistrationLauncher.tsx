@@ -73,26 +73,26 @@ const SAMPLE_PAIRS: SamplePair[] = [
     title: "Region 001: OHRC ↔ TMC-2",
     tag: "Primary 21x Scale Gap",
     badgeStyle: "bg-blue-50 text-blue-700 border-blue-200",
-    description: "0.25m/px Narrow-Angle OHRC matched to 4.0m/px TMC-2 surface stereo in Sinus Medii.",
+    description: "0.25m/px Narrow-Angle OHRC matched to 4.0m/px single-view TMC-2 in Sinus Medii.",
     sourceSensor: "OHRC",
     referenceSensor: "TMC",
     sourceUrl: "/images/ohrc/region_001",
     referenceUrl: "/images/tmc/region_001",
     demoResult: {
       status: "success",
-      message: "Registration verified across 21x scale disparity (Quality Gates 1-3 Passed).",
+      message: "Registration across 21x scale disparity (Quality Gates 1-3 Passed; fragile 7-inlier consensus).",
       metrics: {
-        fit_rmse_px: 1.27,
+        fit_rmse_px: 1.2715,
         validation_rmse_px: null,
         absolute_rmse_m: 0.92,
         num_inliers: 7,
         inlier_count: 7,
-        inlier_ratio: 0.171,
+        inlier_ratio: 0.1707,
         combined_coverage_score: 0.4375,
         spatial_coverage: 0.4375,
-        spatial_uniformity: 0.812,
-        quality_tier: "ACCEPTED",
-        validation_status: "Verified multi-scale cross-match",
+        spatial_uniformity: 0.3113,
+        quality_tier: "LOW_CONFIDENCE",
+        validation_status: "insufficient_points_for_holdout",
         ssim: 0.684,
         psnr: 24.12,
         nmi: 0.732,
@@ -118,33 +118,35 @@ const SAMPLE_PAIRS: SamplePair[] = [
   {
     id: "sample_001_lro",
     title: "Region 001: OHRC ↔ NASA LRO NAC",
-    tag: "PS Lunar Reference (~3.6x)",
+    tag: "PS Lunar Reference (~3.6x, real CDR)",
     badgeStyle: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    description: "NASA LRO NAC M1417670274LC panchromatic reference closing explicit SIH PS 26166 requirement.",
+    description:
+      "NASA LRO NAC M1417670274LC real-CDR panchromatic reference (MI path; optical NCC finds 0 candidates on real CDRs).",
     sourceSensor: "OHRC",
     referenceSensor: "LRO_NAC",
     sourceUrl: "/images/ohrc/region_001",
     referenceUrl: "/images/lro_nac/region_001",
     demoResult: {
       status: "success",
-      message: "Sub-pixel reference registration verified: Fit RMSE 0.270 px | Val RMSE 0.339 px.",
+      message:
+        "Real-CDR reference registration: Fit RMSE 0.633 px, 6/32 inliers, LOW_CONFIDENCE (fragile, MI path).",
       metrics: {
-        fit_rmse_px: 0.2702,
-        validation_rmse_px: 0.3391,
-        absolute_rmse_m: 0.2702,
-        num_inliers: 37,
-        inlier_count: 37,
-        inlier_ratio: 1.0,
-        combined_coverage_score: 1.0,
-        spatial_coverage: 1.0,
-        spatial_uniformity: 0.9153,
-        quality_tier: "HIGH_CONFIDENCE",
-        validation_status: "Verified sub-pixel reference (< 1.0 px)",
-        ssim: 0.782,
-        psnr: 29.45,
-        nmi: 0.845,
-        composite_quality_score: 0.838,
-        outlier_method: "MAGSAC++",
+        fit_rmse_px: 0.6333,
+        validation_rmse_px: null,
+        absolute_rmse_m: null,
+        num_inliers: 6,
+        inlier_count: 6,
+        inlier_ratio: 0.1875,
+        combined_coverage_score: 0.06,
+        spatial_coverage: 0.06,
+        spatial_uniformity: 0.0183,
+        quality_tier: "LOW_CONFIDENCE",
+        validation_status: "insufficient_points_for_holdout",
+        ssim: null,
+        psnr: null,
+        nmi: null,
+        composite_quality_score: null,
+        outlier_method: "RANSAC",
       },
       visual_url: "/images/registered/lro_nac/region_001/checkerboard_qa.png",
       warped_url: "/images/registered/lro_nac/region_001/registered_source.png",
@@ -167,33 +169,35 @@ const SAMPLE_PAIRS: SamplePair[] = [
   {
     id: "sample_003_lro",
     title: "Region 003: OHRC ↔ NASA LRO NAC",
-    tag: "Held-Out Generalization",
+    tag: "Real CDR, distinct topography",
     badgeStyle: "bg-purple-50 text-purple-700 border-purple-200",
-    description: "Evaluated across distinct crater topography (Fit: 0.29 px, Out-of-sample Val: 0.42 px).",
+    description:
+      "Real-CDR M1417670274LC across distinct crater topography (Fit: 1.286 px — NOT sub-pixel; honest LOW_CONFIDENCE).",
     sourceSensor: "OHRC",
     referenceSensor: "LRO_NAC",
     sourceUrl: "/images/ohrc/region_003",
     referenceUrl: "/images/lro_nac/region_003",
     demoResult: {
       status: "success",
-      message: "Sub-pixel reference registration verified: Fit RMSE 0.292 px | Val RMSE 0.418 px.",
+      message:
+        "Real-CDR reference registration: Fit RMSE 1.286 px (>1 px, not sub-pixel), 5/27 inliers, LOW_CONFIDENCE.",
       metrics: {
-        fit_rmse_px: 0.2916,
-        validation_rmse_px: 0.4181,
-        absolute_rmse_m: 0.2916,
-        num_inliers: 35,
-        inlier_count: 35,
-        inlier_ratio: 1.0,
-        combined_coverage_score: 1.0,
-        spatial_coverage: 1.0,
-        spatial_uniformity: 0.8779,
-        quality_tier: "HIGH_CONFIDENCE",
-        validation_status: "Verified sub-pixel reference (< 1.0 px)",
-        ssim: 0.771,
-        psnr: 28.89,
-        nmi: 0.832,
-        composite_quality_score: 0.824,
-        outlier_method: "MAGSAC++",
+        fit_rmse_px: 1.286,
+        validation_rmse_px: null,
+        absolute_rmse_m: null,
+        num_inliers: 5,
+        inlier_count: 5,
+        inlier_ratio: 0.1852,
+        combined_coverage_score: 0.05,
+        spatial_coverage: 0.05,
+        spatial_uniformity: 0.0135,
+        quality_tier: "LOW_CONFIDENCE",
+        validation_status: "insufficient_points_for_holdout",
+        ssim: null,
+        psnr: null,
+        nmi: null,
+        composite_quality_score: null,
+        outlier_method: "RANSAC",
       },
       visual_url: "/images/registered/lro_nac/region_003/checkerboard_qa.png",
       warped_url: "/images/registered/lro_nac/region_003/registered_source.png",
@@ -282,7 +286,7 @@ const SAMPLE_PAIRS: SamplePair[] = [
 
 const SENSOR_OPTIONS: { value: Sensor; label: string }[] = [
   { value: "OHRC", label: "OHRC (0.25 m/px Panchromatic Optical)" },
-  { value: "TMC", label: "TMC-2 (4.0 m/px Surface Stereo Optical)" },
+  { value: "TMC", label: "TMC-2 (4.0 m/px Single-View Optical)" },
   { value: "LRO_NAC", label: "NASA LRO NAC (0.5–1.2 m/px Lunar Reference)" },
   { value: "IIRS", label: "IIRS (69 m/px Infrared Hyperspectral)" },
 ];
@@ -502,6 +506,9 @@ export default function RegistrationLauncher() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<RegistrationResult | null>(defaultSample.demoResult);
+  // Provenance of the currently displayed result: the pre-loaded committed
+  // benchmark snapshot vs a genuinely live backend run (Step 13 honesty).
+  const [resultProvenance, setResultProvenance] = useState<"snapshot" | "live">("snapshot");
   const [points, setPoints] = useState<MatchPoint[]>(defaultSample.demoPoints);
   const [selectedSample, setSelectedSample] = useState<SamplePair | null>(defaultSample);
   const [customMode, setCustomMode] = useState(false);
@@ -544,12 +551,14 @@ export default function RegistrationLauncher() {
     setDemFile(null);
     setError(null);
     setResult(sample.demoResult);
+    setResultProvenance("snapshot");
     setPoints(sample.demoPoints);
   };
 
   const reset = () => {
     setResult(null);
     setPoints([]);
+    setResultProvenance("snapshot");
     setError(null);
     setSelectedSample(null);
     setCustomMode(true);
@@ -603,51 +612,71 @@ export default function RegistrationLauncher() {
     setResult(null);
     setPoints([]);
 
-    // If a sample is loaded, attempt backend execution; fallback to pre-computed demo result if offline on Vercel
+    // If a sample is loaded, execute against the live backend. Step 13: NO
+    // silent snapshot fallback — a dead backend surfaces the error banner,
+    // never the committed snapshot presented as a live result.
     if (selectedSample && !sourceFile) {
       try {
         const body = new FormData();
         body.append("source_sensor", selectedSample.sourceSensor);
         body.append("reference_sensor", selectedSample.referenceSensor);
 
-        // Fetch sample images as blobs to submit to real backend if running
+        // Fetch sample images as blobs to submit to the live backend.
         const [sBlob, rBlob] = await Promise.all([
-          fetch(absoluteUrl(selectedSample.sourceUrl)!).then((r) => r.blob()).catch(() => null),
-          fetch(absoluteUrl(selectedSample.referenceUrl)!).then((r) => r.blob()).catch(() => null),
+          fetch(absoluteUrl(selectedSample.sourceUrl)!).then((r) => {
+            if (!r.ok) throw new Error(`sample source fetch failed (${r.status})`);
+            return r.blob();
+          }),
+          fetch(absoluteUrl(selectedSample.referenceUrl)!).then((r) => {
+            if (!r.ok) throw new Error(`sample reference fetch failed (${r.status})`);
+            return r.blob();
+          }),
         ]);
 
-        if (sBlob && rBlob) {
-          body.append("source_file", sBlob, "source.png");
-          body.append("reference_file", rBlob, "reference.png");
-          const response = await fetch(`${API_BASE}/register`, { method: "POST", body });
-          if (response.ok) {
-            const data = (await response.json()) as RegistrationResult;
-            setResult(data);
-            if (data.matches_url) {
-              const mRes = await fetch(absoluteUrl(data.matches_url)!);
-              if (mRes.ok) setPoints((await mRes.json()) as MatchPoint[]);
-            }
-            setLoading(false);
-            return;
-          }
+        body.append("source_file", sBlob, "source.png");
+        body.append("reference_file", rBlob, "reference.png");
+        const { getAuthHeaders } = await import("@/lib/auth");
+        const response = await fetch(`${API_BASE}/register`, {
+          method: "POST",
+          headers: { ...getAuthHeaders() },
+          body,
+        });
+        const data = (await response.json().catch(() => null)) as
+          | RegistrationResult
+          | { detail?: string }
+          | null;
+        if (!response.ok) {
+          throw new Error(
+            data && "detail" in (data as object)
+              ? (data as { detail?: string }).detail
+              : `Registration failed (${response.status}).`
+          );
         }
-      } catch {
-        // Backend offline or unreachable on Vercel preview — hydrate authentic committed benchmark result
-      }
-
-      // Standalone / Vercel fallback hydration
-      setTimeout(() => {
-        setResult(selectedSample.demoResult);
-        setPoints(selectedSample.demoPoints);
-        if (selectedSample.demoResult.status !== "success") {
-          setError(selectedSample.demoResult.message || "Geometric verification rejected this pair.");
+        const live = data as RegistrationResult;
+        setResult(live);
+        setResultProvenance("live");
+        if (live.matches_url) {
+          const mRes = await fetch(absoluteUrl(live.matches_url)!);
+          if (mRes.ok) setPoints((await mRes.json()) as MatchPoint[]);
+          else setPoints([]);
+        } else {
+          setPoints([]);
         }
+        if (live.status !== "success") {
+          setError(live.message || "The backend could not verify this registration.");
+        }
+      } catch (err) {
+        // Backend unreachable or rejected: error banner, NOT the snapshot.
+        setResult(null);
+        setPoints([]);
+        setError(err instanceof Error ? err.message : "Registration failed unexpectedly.");
+      } finally {
         setLoading(false);
-      }, 400);
+      }
       return;
     }
 
-    // User-uploaded files execution
+    // User-uploaded files execution (authenticated: /register requires Bearer).
     try {
       if (!sourceFile || !referenceFile) {
         throw new Error("Both source and reference files are required.");
@@ -659,13 +688,22 @@ export default function RegistrationLauncher() {
       body.append("reference_sensor", referenceSensor);
       if (demFile) body.append("dem_file", demFile);
 
-      const response = await fetch(`${API_BASE}/register`, { method: "POST", body });
+      const { getAuthHeaders: uploadAuthHeaders } = await import("@/lib/auth");
+      const response = await fetch(`${API_BASE}/register`, {
+        method: "POST",
+        headers: { ...uploadAuthHeaders() },
+        body,
+      });
       const data = (await response.json().catch(() => null)) as RegistrationResult | { detail?: string } | null;
+      if (response.status === 401) {
+        throw new Error("Session expired or missing — please sign in again, then retry.");
+      }
       if (!response.ok) {
         throw new Error(data && "detail" in data ? data.detail : `Registration failed (${response.status}).`);
       }
       const registration = data as RegistrationResult;
       setResult(registration);
+      setResultProvenance("live");
       if (registration.matches_url) {
         const matchesResponse = await fetch(absoluteUrl(registration.matches_url)!);
         if (matchesResponse.ok) setPoints((await matchesResponse.json()) as MatchPoint[]);
@@ -735,10 +773,33 @@ export default function RegistrationLauncher() {
           </p>
         </div>
 
-        <div className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${result ? qualityTone : "border-slate-200 bg-slate-50 text-slate-500"}`}>
-          {loading ? "PROCESSING..." : result ? qualityTier.replaceAll("_", " ") : "READY TO RUN"}
+        <div className="flex items-center gap-2">
+          {result && resultProvenance === "snapshot" && (
+            <span
+              className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-amber-700"
+              title="Committed benchmark snapshot from the repo manifests — press Run to verify live against the backend."
+            >
+              Snapshot · run live to verify
+            </span>
+          )}
+          {result && resultProvenance === "live" && (
+            <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-700">
+              Live backend run
+            </span>
+          )}
+          <div className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${result ? qualityTone : "border-slate-200 bg-slate-50 text-slate-500"}`}>
+            {loading ? "PROCESSING..." : result ? qualityTier.replaceAll("_", " ") : "READY TO RUN"}
+          </div>
         </div>
       </div>
+
+      {/* Live-run error banner (Step 13: backend failures surface, never snapshots) */}
+      {error && !customMode && (
+        <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+          <span className="font-black uppercase tracking-wider">Backend error:</span>
+          <span className="ml-2">{error}</span>
+        </div>
+      )}
 
       {/* 1. Benchmark Pair Selector (Always Accessible) */}
       <div className="mt-5">

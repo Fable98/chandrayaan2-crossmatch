@@ -15,10 +15,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      # Must track the pinned dependency era: requirements.txt pins 2026-era
+      # wheels (tifffile==2026.8.23, …) with no Python 3.11 distribution, so a
+      # 3.11 runner fails at `pip install` before a single test runs. 3.14 is
+      # the locally verified interpreter (see pip freeze audit in PR).
+      - name: Set up Python 3.14
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.14"
           cache: "pip"
 
       - name: Install system dependencies
@@ -34,7 +38,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest pytest-asyncio httpx
+          # Pinned: unpinned httpx/pytest drift reds the tree without any code
+          # change (a httpx major bump breaks starlette TestClient). These pins
+          # match the locally verified environment.
+          pip install "pytest==9.1.1" "pytest-asyncio==1.4.0" "httpx==0.28.1"
 
       - name: Run Pytest suite
         env:

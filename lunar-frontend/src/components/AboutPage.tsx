@@ -141,6 +141,7 @@ export default function AboutPage({ onBackToHero, onOpenConsole }: Props) {
               <p className="mt-2 text-xs leading-relaxed text-[#9a958e]">
                 Along-track stereo camera producing Fore, Nadir, and Aft view strips used to derive 3D Digital
                 Elevation Models (DEMs). Provides intermediate regional topographic context across a 20× scale gap.
+                Pipeline scope: a single NCF view is ingested per region — joint Fore/Nadir/Aft stereo is future work.
               </p>
               <div className="mt-4 border-t border-[#23211d] pt-3 font-mono text-2xs text-ink-faint">
                 Role: Fixed / Geometric Reference ($I_2$)

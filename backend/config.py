@@ -70,10 +70,12 @@ class Settings(BaseSettings):
         description="Override path for ML output directory (default: repo root / ML_model)",
     )
 
-    # JWT Authentication
-    JWT_SECRET_KEY: str = Field(
-        default="chandrayaan2-crossmatch-dev-secret-change-in-production",
-        description="Secret key for signing JWT tokens (override in production!)",
+    # JWT Authentication — Step 12: NO default secret. The server refuses to
+    # sign/verify tokens until JWT_SECRET_KEY is provided via env/.env.
+    # (The old embedded dev secret meant anyone could forge admin tokens.)
+    JWT_SECRET_KEY: Optional[str] = Field(
+        default=None,
+        description="REQUIRED: secret key for signing JWT tokens (min 32 chars). No default.",
     )
     JWT_ALGORITHM: str = Field(
         default="HS256",
@@ -83,6 +85,33 @@ class Settings(BaseSettings):
         default=1440,
         description="JWT token expiry time in minutes (default: 24 hours)",
     )
+
+    # Step 12 hardening knobs
+    BCRYPT_ROUNDS: int = Field(default=12, description="bcrypt cost factor for password hashing")
+    AUTH_RATE_LIMIT: str = Field(default="10/minute", description="SlowAPI limit for /auth/* routes")
+    AUTH_LOCKOUT_ATTEMPTS: int = Field(default=5, description="Failed logins before temporary lockout")
+    AUTH_LOCKOUT_MINUTES: int = Field(default=15, description="Lockout duration in minutes")
+    USERS_DATABASE_URL: Optional[str] = Field(
+        default=None,
+        description="Optional dedicated users DB URL (defaults to DATABASE_URL). "
+                    "When set, accounts live in Postgres, not the JSON flat file.",
+    )
+    REDIS_URL: Optional[str] = Field(
+        default=None,
+        description="Optional Redis URL for rate-limit/job backends (falls back to memory).",
+    )
+    MAX_UPLOAD_MB: int = Field(default=20, description="Per-file upload cap in MB")
+    DYNAMIC_RUNS_TTL_HOURS: int = Field(default=24, description="Age after which dynamic_runs are purged")
+
+    def require_jwt_secret(self) -> str:
+        """Return the configured secret or raise (fail closed, no fallback)."""
+        secret = (self.JWT_SECRET_KEY or "").strip()
+        if len(secret) < 32:
+            raise RuntimeError(
+                "JWT_SECRET_KEY is not configured (min 32 chars). Set it in the "
+                "environment — authentication is disabled until then."
+            )
+        return secret
 
     @property
     def cors_origins_list(self) -> List[str]:

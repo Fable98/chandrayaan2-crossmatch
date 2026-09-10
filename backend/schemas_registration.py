@@ -69,14 +69,16 @@ class JobStatusResponse(BaseModel):
 
 
 class MoonPoint(BaseModel):
-    """One tie point expressed in lunar geographic coordinates."""
+    """One tie point: pixel coordinates always; geographic only when the
+    product carries bounds (georeferenced=false otherwise — never fabricated)."""
 
-    latitude: float
-    longitude: float
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     altitude: float = 0.0
     confidence: float = 0.0
     pixel_x: float = 0.0
     pixel_y: float = 0.0
+    georeferenced: bool = True
 
 
 class MoonPointsResponse(BaseModel):
@@ -87,3 +89,5 @@ class MoonPointsResponse(BaseModel):
     transformation_matrix: Optional[List[List[float]]] = None
     rmse_pixels: float = 0.0
     rmse_meters: float = 0.0
+    georeferenced: bool = True
+    georef_note: Optional[str] = None

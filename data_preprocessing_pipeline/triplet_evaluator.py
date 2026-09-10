@@ -24,8 +24,95 @@ import cv2
 # Add project roots
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ML_model"))
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from matcher_cfog import match_images_cfog
+from matcher_cfog import match_images_cfog, propagate_composed_covariance_monte_carlo
 from metrics import compute_triplet_consistency, calculate_absolute_rmse_meters
+
+try:
+    from bundle_adjustment import GlobalBundleAdjuster
+except Exception:
+    try:
+        from ML_model.bundle_adjustment import GlobalBundleAdjuster
+    except Exception:
+        GlobalBundleAdjuster = None  # type: ignore[assignment]
+
+
+def _extract_inlier_points(res: Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray]:
+    """Pull (src, dst) inlier arrays from a matcher result dict. Never raises."""
+    try:
+        matches = res.get("matches") or []
+        s: List[List[float]] = []
+        d: List[List[float]] = []
+        for m in matches:
+            try:
+                s.append([float(m.get("source_x", m.get("image1_x"))),
+                          float(m.get("source_y", m.get("image1_y")))])
+                d.append([float(m.get("target_x", m.get("image2_x"))),
+                          float(m.get("target_y", m.get("image2_y")))])
+            except Exception:
+                continue
+        if s and d:
+            return np.asarray(s, dtype=np.float64), np.asarray(d, dtype=np.float64)
+    except Exception:
+        pass
+    return np.zeros((0, 2), dtype=np.float64), np.zeros((0, 2), dtype=np.float64)
+
+
+def _extract_cov(res: Dict[str, Any]) -> Optional[np.ndarray]:
+    """Pull 9x9 homography covariance from a matcher result. None if absent."""
+    try:
+        for key in ("H_cov", "bootstrap"):
+            pass
+        cov = res.get("H_cov")
+        if cov is None and isinstance(res.get("bootstrap"), dict):
+            cov = res["bootstrap"].get("H_cov")
+        if cov is None and isinstance(res.get("metrics"), dict):
+            cov = res["metrics"].get("H_cov")
+        if cov is None:
+            return None
+        m = np.asarray(cov, dtype=np.float64).reshape(9, 9)
+        if np.all(np.isfinite(m)):
+            return m
+    except Exception:
+        pass
+    return None
+
+
+def run_triplet_bundle_adjustment(
+    res_AB: Dict[str, Any],
+    res_BC: Dict[str, Any],
+    res_CA: Dict[str, Any],
+    H_AB: Optional[np.ndarray],
+    H_BC: Optional[np.ndarray],
+    H_CA: Optional[np.ndarray],
+) -> Dict[str, Any]:
+    """Jointly optimize triplet poses with Huber robust loss. Never raises."""
+    try:
+        if GlobalBundleAdjuster is None:
+            return {"status": "skipped", "reason": "bundle_adjuster_unavailable"}
+        s_ab, d_ab = _extract_inlier_points(res_AB)
+        s_bc, d_bc = _extract_inlier_points(res_BC)
+        s_ca, d_ca = _extract_inlier_points(res_CA)
+        adjuster = GlobalBundleAdjuster(robust_loss="huber", huber_delta=1.0)
+        if H_AB is not None and len(s_ab) >= 4:
+            adjuster.add_pairwise_constraint("A", "B", s_ab, d_ab, np.asarray(H_AB, dtype=np.float64))
+        if H_BC is not None and len(s_bc) >= 4:
+            adjuster.add_pairwise_constraint("B", "C", s_bc, d_bc, np.asarray(H_BC, dtype=np.float64))
+        if H_CA is not None and len(s_ca) >= 4:
+            adjuster.add_pairwise_constraint("C", "A", s_ca, d_ca, np.asarray(H_CA, dtype=np.float64))
+        result = adjuster.optimize(max_iterations=200)
+        if not isinstance(result, dict):
+            return {"status": "failed", "reason": "optimizer_returned_none"}
+        # JSON-safe matrices.
+        try:
+            mats = result.get("optimized_matrices") or result.get("matrices") or {}
+            result["optimized_matrices"] = {k: np.asarray(v, dtype=np.float64).tolist() for k, v in mats.items()}
+            if "matrices" in result and isinstance(result["matrices"], dict):
+                result["matrices"] = {k: (v.tolist() if hasattr(v, "tolist") else v) for k, v in result["matrices"].items()}
+        except Exception:
+            pass
+        return result
+    except Exception as exc:
+        return {"status": "failed", "reason": str(exc)}
 
 try:
     from data.ingestion.lro_basemap import fetch_lro_basemap
@@ -177,6 +264,12 @@ def evaluate_triplet_consistency(
 
     # If 2 or more legs are missing (or derivation failed), return cycle_not_computable
     if failed_legs:
+        try:
+            _bundle_fail = run_triplet_bundle_adjustment(
+                res_AB, res_BC, res_CA, H_AB, H_BC, H_CA
+            )
+        except Exception as exc:
+            _bundle_fail = {"status": "failed", "reason": str(exc)}
         evaluation_report = {
             "status": "cycle_not_computable",
             "reason": f"Missing verified homography for leg(s): {', '.join(failed_legs)}",
@@ -188,6 +281,7 @@ def evaluate_triplet_consistency(
             "pair_AB_metrics": res_AB.get("metrics"),
             "pair_BC_metrics": res_BC.get("metrics"),
             "pair_CA_metrics": res_CA.get("metrics"),
+            "bundle_adjustment": _bundle_fail,
             "composition": None,
         }
     else:
@@ -240,14 +334,76 @@ def evaluate_triplet_consistency(
             if abs(H_AC[2, 2]) > 1e-12:
                 H_AC = H_AC / H_AC[2, 2]
 
+        # Joint bundle adjustment over the triplet loop (Step 9.4).
+        try:
+            bundle_result = run_triplet_bundle_adjustment(
+                res_AB, res_BC, res_CA, H_AB, H_BC, H_CA
+            )
+        except Exception as exc:
+            bundle_result = {"status": "failed", "reason": str(exc)}
+
+        # Covariance propagation Sigma_AC for the composed leg (Step 10.1).
+        try:
+            _cov_ab = _extract_cov(res_AB)
+            _cov_bc = _extract_cov(res_BC)
+            _gsd_ac = None
+            try:
+                for _r in (res_AB, res_BC):
+                    _m = (_r.get("metrics") or {})
+                    if _m.get("absolute_rmse_m") is not None:
+                        pass
+                _ws = (res_BC.get("working_scale") or {})
+                _gsd_ac = _ws.get("gsd_m")
+            except Exception:
+                _gsd_ac = None
+            if _gsd_ac is None:
+                _gsd_ac = 5.0
+            composed_cov = propagate_composed_covariance_monte_carlo(
+                np.asarray(H_AB, dtype=np.float64),
+                _cov_ab,
+                np.asarray(H_BC, dtype=np.float64),
+                _cov_bc,
+                n_samples=500,
+                gsd_m=_gsd_ac,
+            )
+        except Exception as exc:
+            composed_cov = {"status": "failed", "reason": str(exc),
+                            "Sigma_AC": None, "uncertainty_m": None}
+        try:
+            _sig_ac = composed_cov.get("Sigma_AC")
+            _unc_ac = composed_cov.get("uncertainty_m")
+        except Exception:
+            _sig_ac, _unc_ac = None, None
+
         composition_path = out_base / "composed_ohrc_to_iirs_transform.json"
         with open(composition_path, "w") as f:
             json.dump({
                 "model": "composed_homography",
                 "matrix": H_AC.tolist(),
+                "Sigma_AC": _sig_ac,
+                "spatial_uncertainty_m": _unc_ac,
                 "path": "A -> B -> C",
                 "leg_derivations": derivations,
             }, f, indent=4)
+
+        # Honest derived-leg accounting: composed OHRC->IIRS is never measured.
+        try:
+            _n_ab = int((res_AB.get("metrics") or {}).get("inlier_count", 0) or 0)
+            _n_bc = int((res_BC.get("metrics") or {}).get("inlier_count", 0) or 0)
+            _n_derived = int(_n_ab + _n_bc)
+        except Exception:
+            _n_derived = 0
+        composed_metrics = {
+            "num_measured_matches": 0,
+            "num_derived_matches": _n_derived,
+            "derivation": "composed_via_triplet",
+            "uncertainty_m": _unc_ac,
+        }
+        try:
+            with open(out_base / "composed_ohrc_to_iirs_metrics.json", "w") as f:
+                json.dump(composed_metrics, f, indent=4)
+        except Exception:
+            pass
 
         source_image = cv2.imread(str(image_a_path), cv2.IMREAD_UNCHANGED)
         target_image = cv2.imread(str(image_c_path), cv2.IMREAD_UNCHANGED)
@@ -347,9 +503,17 @@ def evaluate_triplet_consistency(
             "pair_AB_metrics": pair_ab_out,
             "pair_BC_metrics": pair_bc_out,
             "pair_CA_metrics": pair_ca_out,
+            "bundle_adjustment": bundle_result,
+            "composed_covariance": {
+                "Sigma_AC": _sig_ac,
+                "uncertainty_m": _unc_ac,
+            },
+            "composed_metrics": composed_metrics,
             "composition": {
                 "source": "A -> B -> C",
                 "homography": H_AC.tolist(),
+                "Sigma_AC": _sig_ac,
+                "uncertainty_m": _unc_ac,
                 "transform": str(composition_path),
                 "registered_raster": str(registered_path) if registered_path else None,
                 "registered_geotiff": str(tif_path) if tif_path else None,

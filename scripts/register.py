@@ -340,6 +340,31 @@ def register_composed_ohrc_to_iirs(
 
     warped = warp_source_to_reference(src_img, dst_img, H_AC, (dst_img.shape[1], dst_img.shape[0]))
     blend = create_blend_overlay(warped, dst_img)
+    # SAM-gated PC1 overlay (best effort): reject spectrally divergent pixels
+    # from the blended visualization when a hyperspectral IIRS cube is readable.
+    try:
+        import sys as _sys2
+        _sys2.path.insert(0, str(Path(__file__).resolve().parent.parent / "ML_model"))
+        from spectral import compute_sam_angle_map, apply_sam_gate_to_overlay
+        _cube = None
+        try:
+            import rasterio as _rio
+            with _rio.open(str(iirs_path)) as _src:
+                if _src.count and int(_src.count) >= 3:
+                    _cube = _src.read().astype(np.float32)
+        except Exception:
+            _cube = None
+        if _cube is not None:
+            _sam = compute_sam_angle_map(_cube)
+            _bh, _bw = blend.shape[:2]
+            if _sam.shape[:2] != (_bh, _bw):
+                _sam = cv2.resize(_sam.astype(np.float32), (_bw, _bh), interpolation=cv2.INTER_LINEAR)
+            _gray = cv2.cvtColor(blend, cv2.COLOR_BGR2GRAY).astype(np.float32) / 255.0
+            _gated, _mask, _info = apply_sam_gate_to_overlay(_gray, _sam, threshold_rad=0.35)
+            _gated_u8 = (np.clip(_gated, 0.0, 1.0) * 255.0).astype(np.uint8)
+            blend = cv2.cvtColor(_gated_u8, cv2.COLOR_GRAY2BGR)
+    except Exception:
+        pass
     checker = create_checkerboard_qa(warped, dst_img)
 
     warped_path = region_out / "registered_ohrc_to_iirs_composed.png"
@@ -364,6 +389,32 @@ def register_composed_ohrc_to_iirs(
     else:
         saved_tif = save_geotiff(warped, tif_path)
 
+    # Honest derived-leg accounting: composed OHRC->IIRS is never measured.
+    try:
+        _cm = report_data.get("composed_metrics") or {}
+        _n_derived = _cm.get("num_derived_matches")
+        if _n_derived is None:
+            _n_derived = 0
+            for _k in ("pair_AB_metrics", "pair_BC_metrics"):
+                try:
+                    _n_derived += int((report_data.get(_k) or {}).get("inlier_count", 0) or 0)
+                except Exception:
+                    pass
+        _unc = _cm.get("uncertainty_m")
+        if _unc is None:
+            _unc = (composition or {}).get("uncertainty_m")
+    except Exception:
+        _n_derived, _unc = 0, None
+    composed_metrics = {
+        "num_measured_matches": 0,
+        "num_derived_matches": int(_n_derived),
+        "derivation": "composed_via_triplet",
+        "uncertainty_m": _unc,
+    }
+    metrics_path = region_out / "metrics_ohrc_to_iirs_composed.json"
+    with open(metrics_path, "w") as f:
+        json.dump(composed_metrics, f, indent=4)
+
     # Write registered products manifest
     manifest_path = region_out / "registered_products_manifest.json"
     manifest = {
@@ -371,6 +422,7 @@ def register_composed_ohrc_to_iirs(
         "mode": "composed_registration",
         "chain": "OHRC -> TMC-2 -> IIRS",
         "homography_composed": H_AC.tolist(),
+        "composed_metrics": composed_metrics,
         "products": {
             "registered_ohrc_png": str(region_out / "registered_ohrc.png"),
             "registered_ohrc_tif": str(region_out / "registered_ohrc.tif"),
@@ -380,6 +432,7 @@ def register_composed_ohrc_to_iirs(
             "registered_ohrc_to_iirs_tif": saved_tif,
             "blend_ohrc_iirs": str(blend_path),
             "checkerboard_ohrc_iirs": str(checker_path),
+            "metrics_ohrc_iirs_composed": str(metrics_path),
         }
     }
     with open(manifest_path, "w") as f:
@@ -391,6 +444,7 @@ def register_composed_ohrc_to_iirs(
         "blend_composed": str(blend_path),
         "checkerboard_composed": str(checker_path),
         "manifest": str(manifest_path),
+        "metrics_composed": str(metrics_path),
     }
 
 

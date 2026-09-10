@@ -1,9 +1,13 @@
 """
-train_ai_verifier.py — Train the AIMatchVerifier RandomForest from RANSAC-labeled matches.
+train_ai_verifier.py — Train the AIMatchVerifier RandomForest from HAND-LABELLED matches.
 
-Parses every ``*matches.json`` produced by the CFOG pipeline
-(RANSAC has already labeled each correspondence as inlier / outlier via
-geometric consensus) and trains a lightweight binary classifier.
+Training on RANSAC inlier/outlier consensus is CIRCULAR (the filter runs
+before RANSAC, so the model memorizes the coarse matcher's own confidence
+and vetoes true low-confidence matches on real CDR pairs) and is REFUSED by
+default. Supply hand-labelled true/false correspondences instead: each match
+record must carry a human verdict under ``human_label`` (aliases
+``hand_label``, ``manual_label``, ``verified_label``; 1/True = true
+correspondence, 0/False = false).
 
 Features (per match, all read with ``.get()`` defaults so missing keys are safe):
     1. ``confidence``               (falls back to ``score``)
@@ -12,21 +16,24 @@ Features (per match, all read with ``.get()`` defaults so missing keys are safe)
     4. ``spatial_quality_score``    (default 0.5; falls back to ``spatial_score``,
        else 1.0 if ``is_refined`` else 0.5 so legacy files still carry signal)
 
-Labels (RANSAC consensus):
-    1 for inliers, 0 for outliers. Accepts ``is_inlier`` (bool/int/str),
-    plus legacy aliases ``inlier`` / ``label`` / ``ransac_inlier``.
-
 Model:
     ``RandomForestClassifier(n_estimators=100, class_weight='balanced')`` —
     no deep learning, fast inference.
 
 Output:
     ``ai_verifier_model.pkl`` (joblib) next to this script by default, as a
-    bundle dict ``{"model": clf, "feature_names": [...], ...}`` so
-    ``ai_verifier.AIMatchVerifier`` can load it directly.
+    bundle dict ``{"model": clf, "feature_names": [...], "label_source": "hand", ...}``
+    so ``ai_verifier.AIMatchVerifier`` can load it directly. Bundles trained
+    with --allow-ransac-labels are stamped label_source="ransac-acknowledged"
+    and are REFUSED at load time (research artifacts only).
+
+Failure contract (loud, non-zero exit):
+    * no hand-labelled rows found  -> exit 2 with an explicit error.
+    * single-class labels          -> exit 2 with an explicit error
+      (a one-sided set cannot supervise a binary verifier).
 
 Usage:
-    python train_ai_verifier.py [--output ai_verifier_model.pkl] [--test-size 0.25]
+    python train_ai_verifier.py --inputs hand_labels/matches.json [--output ai_verifier_model.pkl]
 """
 from __future__ import annotations
 
@@ -84,19 +91,34 @@ def _as_bool_label(value) -> bool | None:
     return None
 
 
-def extract_label(match: dict) -> int | None:
-    """RANSAC consensus label: 1 = inlier, 0 = outlier, None = unknown/skip."""
-    for key in ("is_inlier", "inlier", "ransac_inlier", "label"):
+HAND_LABEL_KEYS = ("human_label", "hand_label", "manual_label", "verified_label")
+RANSAC_LABEL_KEYS = ("is_inlier", "inlier", "ransac_inlier", "label")
+
+
+def extract_label(match: dict, allow_ransac: bool = False,
+                  hand_keys: tuple[str, ...] = HAND_LABEL_KEYS) -> tuple[int | None, str]:
+    """Hand-verdict label: 1 = true, 0 = false. Returns (label, source).
+
+    source is "hand", "ransac" (only when allow_ransac=True), or "none".
+    RANSAC consensus keys are IGNORED unless explicitly allowed, because they
+    are circular supervision for a pre-RANSAC filter.
+    """
+    for key in hand_keys:
         if key in match:
             b = _as_bool_label(match.get(key))
             if b is not None:
-                return 1 if b else 0
-    # Explicit outlier flag without an inlier flag.
-    if "is_outlier" in match:
-        b = _as_bool_label(match.get("is_outlier"))
-        if b is not None:
-            return 0 if b else 1
-    return None
+                return (1 if b else 0), "hand"
+    if allow_ransac:
+        for key in RANSAC_LABEL_KEYS:
+            if key in match:
+                b = _as_bool_label(match.get(key))
+                if b is not None:
+                    return (1 if b else 0), "ransac"
+        if "is_outlier" in match:
+            b = _as_bool_label(match.get("is_outlier"))
+            if b is not None:
+                return (0 if b else 1), "ransac"
+    return None, "none"
 
 
 def extract_feature_row(match: dict) -> list[float]:
@@ -158,7 +180,8 @@ def load_matches_from_file(path: Path) -> list[dict]:
     return [m for m in data if isinstance(m, dict)]
 
 
-def build_dataset(search_roots: list[Path]) -> tuple[np.ndarray, np.ndarray, dict]:
+def build_dataset(search_roots: list[Path], allow_ransac: bool = False,
+                  hand_keys: tuple[str, ...] = HAND_LABEL_KEYS) -> tuple[np.ndarray, np.ndarray, dict]:
     """Parse all match files into (X, y, stats). Rows without labels are skipped."""
     files = iter_match_files(search_roots)
     logger.info("Found %d *matches.json file(s) to parse.", len(files))
@@ -170,15 +193,20 @@ def build_dataset(search_roots: list[Path]) -> tuple[np.ndarray, np.ndarray, dic
     # train/test split.
     seen_rows: set[tuple] = set()
     n_duplicates = 0
-    stats = {"files": len(files), "parsed": 0, "skipped_no_label": 0, "per_file": []}
+    stats = {"files": len(files), "parsed": 0, "skipped_no_label": 0, "per_file": [],
+             "n_hand": 0, "n_ransac": 0, "allow_ransac": bool(allow_ransac)}
     for f in files:
         records = load_matches_from_file(f)
         n_in, n_out, n_skip = 0, 0, 0
         for m in records:
-            label = extract_label(m)
+            label, source = extract_label(m, allow_ransac=allow_ransac, hand_keys=hand_keys)
             if label is None:
                 n_skip += 1
                 continue
+            if source == "hand":
+                stats["n_hand"] += 1
+            else:
+                stats["n_ransac"] += 1
             try:
                 row = extract_feature_row(m)
             except Exception:
@@ -239,9 +267,9 @@ def train(
     if len(classes) < 2:
         raise ValueError(
             f"Cannot train a binary verifier: only class {classes.tolist()} present "
-            f"(n={len(y)}). The parsed matches.json files contain no outlier "
-            f"(is_inlier=False) examples. Re-run the CFOG matcher so failed legs "
-            f"persist 'all_matches' with RANSAC labels instead of inliers only."
+            f"(n={len(y)}). A one-sided label set cannot supervise a true/false "
+            f"filter — collect hand-labelled counterexamples of the missing class "
+            f"and re-run. Refusing to save a degenerate single-class model."
         )
 
     # Stratified split; fall back to train-on-all if the minority class is tiny.
@@ -275,6 +303,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--test-size", type=float, default=0.25)
     parser.add_argument("--random-state", type=int, default=SEED)
     parser.add_argument("--n-estimators", type=int, default=100)
+    parser.add_argument("--label-key", default="human_label",
+                        help="Match-record key holding the HAND verdict (aliases: hand_label, "
+                             "manual_label, verified_label). RANSAC consensus keys are ignored "
+                             "unless --allow-ransac-labels is passed.")
+    parser.add_argument("--allow-ransac-labels", action="store_true",
+                        help="DANGEROUS: fall back to RANSAC consensus labels. The saved bundle "
+                             "is stamped label_source=ransac-acknowledged and is REFUSED by "
+                             "AIMatchVerifier at load time (research artifact only).")
     args = parser.parse_args(argv)
 
     this_dir = Path(__file__).resolve().parent
@@ -288,16 +324,31 @@ def main(argv: list[str] | None = None) -> int:
             search_roots.append(project_root / rel)
             search_roots.append(this_dir / Path(rel).name)
 
-    X, y, stats = build_dataset(search_roots)
+    hand_keys: tuple[str, ...] = (args.label_key,) + tuple(
+        k for k in HAND_LABEL_KEYS if k != args.label_key
+    )
+    if args.allow_ransac_labels:
+        logger.warning(
+            "DANGEROUS: --allow-ransac-labels accepted. RANSAC consensus labels are "
+            "circular supervision for a pre-RANSAC filter; the saved bundle will be "
+            "stamped label_source=ransac-acknowledged and REFUSED by AIMatchVerifier."
+        )
+    X, y, stats = build_dataset(search_roots, allow_ransac=args.allow_ransac_labels,
+                                hand_keys=hand_keys)
     logger.info(
-        "Total labeled matches: %d (%d inliers, %d outliers), %d skipped.",
+        "Total labeled matches: %d (%d true, %d false), %d skipped (no hand label).",
         len(y),
         int(np.sum(y == 1)),
         int(np.sum(y == 0)),
         stats["skipped_no_label"],
     )
     if len(y) == 0:
-        logger.error("ERROR: no labeled matches found. Nothing to train on.")
+        logger.error(
+            "ERROR: no hand-labelled matches found under key '%s' (aliases: %s). "
+            "Nothing to train on. Label correspondences by hand as true/false and "
+            "re-run; RANSAC consensus labels are refused without --allow-ransac-labels.",
+            args.label_key, ", ".join(HAND_LABEL_KEYS),
+        )
         return 2
 
     try:
@@ -311,6 +362,8 @@ def main(argv: list[str] | None = None) -> int:
     bundle = {
         "model": clf,
         "feature_names": FEATURE_NAMES,
+        "label_source": "ransac-acknowledged" if args.allow_ransac_labels else "hand",
+        "label_key": args.label_key,
         "n_train": int(len(y)),
         "class_counts": {int(k): int(v) for k, v in zip(*np.unique(y, return_counts=True))},
     }

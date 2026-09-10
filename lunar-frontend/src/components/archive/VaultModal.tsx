@@ -192,7 +192,7 @@ export default function VaultModal({
                   {/* Actions */}
                   <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
                     <span className="text-[10px] font-medium text-slate-500">
-                      {t.dem_available ? "DEM available" : "Stereo"}
+                      {t.dem_available ? "DEM available" : "Mono"}
                     </span>
                     <button
                       onClick={() => {

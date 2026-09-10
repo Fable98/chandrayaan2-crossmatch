@@ -220,7 +220,7 @@ export default function AstralynxHero({ onOpenConsole }: Props) {
 
           {/* Second line in elegant italic serif font, teal-tinted */}
           <p className="mt-1 font-serif text-lg italic tracking-normal text-[#8be2ef] drop-shadow-[0_2px_12px_rgba(0,0,0,0.85)] sm:text-xl md:text-2xl">
-            Harmonizing Optical, Stereo, and Hyperspectral Vision.
+            Harmonizing Optical, Terrain, and Hyperspectral Vision.
           </p>
         </div>
 

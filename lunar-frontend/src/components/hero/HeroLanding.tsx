@@ -65,7 +65,7 @@ export default function HeroLanding({ onLaunchConsole }: Props) {
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-ink-dim">
             <span className="h-1.5 w-1.5 rounded-full bg-cyan-400" />
-            TMC-2 Stereo
+            TMC-2 Mono
           </span>
           <span className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] text-ink-dim">
             <span className="h-1.5 w-1.5 rounded-full bg-purple-400" />

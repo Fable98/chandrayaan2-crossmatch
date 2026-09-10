@@ -19,12 +19,34 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, File, Form, UploadFile, HTTPException
+from fastapi import APIRouter, Depends, File, Form, UploadFile, HTTPException
 from pydantic import BaseModel
+
+try:
+    from routers.auth import get_current_user
+except ImportError:  # pragma: no cover - direct-router test path
+    from backend.routers.auth import get_current_user  # type: ignore
+
+try:
+    from uploads import (
+        ALLOWED_INGEST_EXTENSIONS,
+        max_upload_bytes,
+        sanitize_upload_filename,
+    )
+except ImportError:  # pragma: no cover - direct-router test path
+    from backend.uploads import (  # type: ignore
+        ALLOWED_INGEST_EXTENSIONS,
+        max_upload_bytes,
+        sanitize_upload_filename,
+    )
 
 LOG = logging.getLogger("ingest_router")
 
 router = APIRouter()
+
+# Step 12: hard caps so one upload cannot fill the disk or exhaust memory.
+MAX_INGEST_FILES = 10
+MAX_INGEST_TOTAL_BYTES = 200 * 1024 * 1024
 
 # ---------------------------------------------------------------------------
 # In-memory job store (suitable for single-server local/preview tool)
@@ -183,23 +205,58 @@ async def upload_and_ingest(
     no_invariants: bool = Form(False),
     max_time_gap_days: float | None = Form(None),
     require_dates: bool = Form(False),
+    current_user: dict = Depends(get_current_user),
 ):
-    """Accept zip file uploads, save them, and start the ingest pipeline."""
+    """Accept zip file uploads, save them, and start the ingest pipeline.
+
+    Step 13: requires a valid Bearer token — this endpoint writes to disk
+    and spawns the ingest subprocess, so anonymous uploads are refused.
+    Status/results/jobs reads stay public.
+    """
+    if len(files) > MAX_INGEST_FILES:
+        raise HTTPException(
+            status_code=413, detail=f"Too many files (max {MAX_INGEST_FILES})."
+        )
     job_id = str(uuid.uuid4())[:8]
     upload_dir = _UPLOAD_ROOT / job_id
     upload_dir.mkdir(parents=True, exist_ok=True)
 
-    saved_files = []
+    # Extension gate BEFORE any disk write; traversal-safe fixed names after.
     for f in files:
-        if f.filename:
-            dest = upload_dir / f.filename
+        sanitize_upload_filename(f.filename, ALLOWED_INGEST_EXTENSIONS)
+
+    per_file_cap = max_upload_bytes()
+    saved_files = []
+    total_bytes = 0
+    try:
+        for i, f in enumerate(files):
+            if not f.filename:
+                continue
+            safe = sanitize_upload_filename(f.filename, ALLOWED_INGEST_EXTENSIONS)
+            dest = upload_dir / f"upload_{i}{Path(safe).suffix.lower()}"
+            size = 0
             with dest.open("wb") as out:
-                content = await f.read()
-                out.write(content)
+                while True:
+                    chunk = await f.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    size += len(chunk)
+                    total_bytes += len(chunk)
+                    if size > per_file_cap or total_bytes > MAX_INGEST_TOTAL_BYTES:
+                        raise HTTPException(status_code=413, detail="Upload exceeds size limits.")
+                    out.write(chunk)
+            try:
+                await f.close()
+            except Exception:
+                pass
             saved_files.append(str(dest))
-            LOG.info("Saved upload: %s (%d bytes)", dest.name, len(content))
+            LOG.info("Saved upload: %s (%d bytes)", dest.name, size)
+    except HTTPException:
+        shutil.rmtree(upload_dir, ignore_errors=True)
+        raise
 
     if not saved_files:
+        shutil.rmtree(upload_dir, ignore_errors=True)
         raise HTTPException(status_code=400, detail="No files uploaded")
 
     config = IngestConfig(

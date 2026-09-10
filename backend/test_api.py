@@ -5,6 +5,15 @@ Run with:  pytest test_api.py -v
 No server needs to be running — TestClient spins the app in-process.
 """
 
+import os
+
+os.environ.setdefault(
+    "JWT_SECRET_KEY",
+    "test-only-jwt-secret-that-is-long-enough-for-the-32-char-minimum-0123456789",
+)
+os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("AUTH_RATE_LIMIT", "1000/minute")
+
 from fastapi.testclient import TestClient
 from main import app
 from geo import (
@@ -14,6 +23,26 @@ from geo import (
 
 client = TestClient(app)
 
+
+_CACHED_AUTH_HEADERS: dict | None = None
+
+
+def _auth_headers():
+    """Register a throwaway user once and reuse its Bearer header (Step 12)."""
+    global _CACHED_AUTH_HEADERS
+    if _CACHED_AUTH_HEADERS is not None:
+        return _CACHED_AUTH_HEADERS
+    import uuid
+
+    email = f"api-test-{uuid.uuid4().hex[:8]}@example.com"
+    r = client.post(
+        "/auth/register",
+        json={"name": "API Test", "email": email, "password": "correct-horse-123"},
+    )
+    assert r.status_code == 201, r.text[:200]
+    _CACHED_AUTH_HEADERS = {"Authorization": f"Bearer {r.json()['access_token']}"}
+    return _CACHED_AUTH_HEADERS
+
 VALID_ID = "region_001"
 INVALID_ID = "nonexistent_region"
 
@@ -22,7 +51,7 @@ BOUNDS_KEYS = {"west_lon", "east_lon", "south_lat", "north_lat"}
 
 def _ensure_loaded():
     """Ensure data is loaded (lifespan may not have fired yet in TestClient)."""
-    client.get("/refresh")
+    client.get("/refresh", headers=_auth_headers())
 
 
 # ---------------------------------------------------------------------------
@@ -53,7 +82,9 @@ def test_health():
 
 
 def test_refresh():
-    r = client.get("/refresh")
+    # Step 12: /refresh requires auth.
+    assert client.get("/refresh").status_code == 401
+    r = client.get("/refresh", headers=_auth_headers())
     assert r.status_code == 200
     assert r.json()["status"] == "refreshed"
     assert r.json()["triplets_loaded"] >= 6
@@ -525,6 +556,152 @@ def test_ingest_results_not_found():
     """Verify /api/ingest/results/{job_id} returns 404 for invalid job."""
     r = client.get("/api/ingest/results/nonexistent_job")
     assert r.status_code == 404
+
+
+# ---------------------------------------------------------------------------
+# Step 14: ingest upload auth gate + job lifecycle + concurrency
+# ---------------------------------------------------------------------------
+
+def _ingest_auth_headers():
+    """Step 12/13: ingest upload requires a Bearer token."""
+    return _auth_headers()
+
+
+def test_ingest_upload_requires_auth():
+    """POST /api/ingest/upload without a token is refused before disk writes."""
+    r = client.post(
+        "/api/ingest/upload",
+        files={"files": ("data.zip", b"PK\x03\x04", "application/zip")},
+    )
+    assert r.status_code == 401
+
+
+def test_ingest_upload_rejects_non_zip():
+    """Non-zip uploads are rejected with 415 (extension gate before write)."""
+    r = client.post(
+        "/api/ingest/upload",
+        headers=_ingest_auth_headers(),
+        files={"files": ("evil.php", b"<?php", "application/x-php")},
+    )
+    assert r.status_code == 415
+
+
+def test_ingest_upload_starts_job_and_tracks_lifecycle():
+    """A .zip upload creates a job; status/results endpoints track it."""
+    import io
+    import zipfile
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("note.txt", "no PDS4 products here")
+    r = client.post(
+        "/api/ingest/upload",
+        headers=_ingest_auth_headers(),
+        files={"files": ("empty.zip", buf.getvalue(), "application/zip")},
+    )
+    assert r.status_code == 200, r.text[:300]
+    job_id = r.json()["job_id"]
+    assert job_id
+
+    # Status is immediately pollable (pending/running/completed/failed).
+    s = client.get(f"/api/ingest/status/{job_id}")
+    assert s.status_code == 200
+    assert s.json()["job_id"] == job_id
+    assert s.json()["status"] in ("pending", "running", "completed", "failed")
+
+    # Results: 409 while running, or the terminal payload once done.
+    res = client.get(f"/api/ingest/results/{job_id}")
+    assert res.status_code in (200, 409)
+
+    # Jobs index includes the new job.
+    jobs = client.get("/api/ingest/jobs").json()
+    assert any(j["job_id"] == job_id for j in jobs)
+
+    # Self-cleaning: remove the scratch upload dir for this job.
+    import shutil as _shutil
+
+    from pathlib import Path as _Path
+
+    _uproot = _Path("data_preprocessing_pipeline") / ".uploads"
+    if not _uproot.is_dir():
+        _uproot = _Path(__file__).resolve().parent.parent / "data_preprocessing_pipeline" / ".uploads"
+    _shutil.rmtree(_uproot / job_id, ignore_errors=True)
+
+
+def test_registration_bundle_adjust_concurrent_load():
+    """N parallel bundle-adjust calls all succeed with distinct results.
+
+    Exercises the async job/compute path under concurrency (Step 14): the
+    scipy solve runs in a threadpool, so parallel requests must not block
+    each other or corrupt shared state.
+    """
+    import concurrent.futures
+
+    import numpy as np
+
+    def _one(seed: int) -> dict:
+        rng = np.random.RandomState(seed)
+        src = (rng.rand(12, 2) * 100).tolist()
+        dst = [[x + 5.0, y - 3.0] for x, y in src]
+        body = {
+            "constraints": [
+                {
+                    "img_id_src": "A",
+                    "img_id_ref": "B",
+                    "src_pts": src,
+                    "ref_pts": dst,
+                    "initial_matrix": [[1, 0, 5], [0, 1, -3], [0, 0, 1]],
+                },
+                {
+                    "img_id_src": "B",
+                    "img_id_ref": "C",
+                    "src_pts": dst,
+                    "ref_pts": [[x - 2.0, y + 7.0] for x, y in dst],
+                    "initial_matrix": [[1, 0, -2], [0, 1, 7], [0, 0, 1]],
+                },
+            ],
+            "robust_loss": "huber",
+            "max_iterations": 50,
+        }
+        r = client.post("/api/registration/bundle-adjust", json=body)
+        assert r.status_code == 200, r.text[:300]
+        return r.json()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+        results = list(pool.map(_one, range(8)))
+    assert len(results) == 8
+    for res in results:
+        assert res.get("status") in ("success", "converged_with_warnings")
+        assert "optimized_matrices" in res or "matrices" in res
+
+
+def test_job_manager_thread_safety_all_backends(tmp_path):
+    """Concurrent create/update/log/get stays consistent (memory + sqlite)."""
+    import concurrent.futures
+
+    from job_store import MemoryJobStore, DbJobStore
+
+    stores = [MemoryJobStore()]
+    try:
+        stores.append(DbJobStore(f"sqlite:///{tmp_path}/jobs.db"))
+    except Exception as exc:
+        raise AssertionError(f"sqlite job store unavailable: {exc}")
+
+    for store in stores:
+        def _worker(i: int) -> None:
+            jid = f"job-{i}"
+            store.create(jid, {"status": "pending", "logs": []})
+            for k in range(5):
+                store.update(jid, {"progress": float(k)})
+                store.append_log(jid, f"line-{k}")
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(_worker, range(16)))
+        for i in range(16):
+            job = store.get(f"job-{i}")
+            assert job is not None
+            assert job["progress"] == 4.0
+            assert len(job["logs"]) == 5
 
 
 

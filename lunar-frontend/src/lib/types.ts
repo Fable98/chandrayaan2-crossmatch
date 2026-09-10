@@ -1,20 +1,23 @@
-// Mirrors backend/schemas.py exactly. Keep in sync with the backend —
-// these are not independently designed, they're the frontend's view of
-// the same contract the backend team already tested against real data.
+// Step 13 contract: backend-identical shapes are re-exported from the
+// GENERATED ./backend-types.ts (run `npm run gen:api`; CI runs
+// `npm run gen:api:check`). Only UI-strict shapes (pixel tuples, index
+// signatures, null-latlon, frontend-only extras) are hand-written below —
+// each carries a note naming the backend schema it tracks.
 
-export interface TripletBounds {
-  west_lon: number;
-  east_lon: number;
-  south_lat: number;
-  north_lat: number;
-}
+export type {
+  TripletBounds,
+  HealthResponse,
+  IIRSOverlay,
+  TokenResponse,
+  UserResponse,
+  RegisterResponse,
+  JobStatusResponse,
+} from "./backend-types";
 
-export interface SensorMeta {
-  sensor: string;
-  gsd_m: number;
-  sun_elevation_deg?: number | null;
-  sun_azimuth_deg?: number | null;
-  incidence_angle_deg?: number | null;
+import type { TripletBounds, SensorMeta as BackendSensorMeta } from "./backend-types";
+
+// Tracks backend SensorMeta + frontend-only tile_id.
+export interface SensorMeta extends BackendSensorMeta {
   tile_id?: string | null;
 }
 
@@ -49,9 +52,34 @@ export interface TripletListResponse {
 export interface MatchPoint {
   ohrc_px: [number, number];
   tmc_px: [number, number];
-  ohrc_latlon: [number, number];
-  tmc_latlon: [number, number];
+  // Step 13: geographic coordinates are present ONLY when product bounds
+  // exist. Pixel-only points carry null + georeferenced=false (the backend's
+  // 336+fx demo patch is deleted) and render the shared no-georef badge.
+  ohrc_latlon: [number, number] | null;
+  tmc_latlon: [number, number] | null;
+  georeferenced?: boolean;
   confidence: number;
+}
+
+// Moon-globe tie points (GET /api/registration/moon-points/{job_id}).
+export interface MoonPoint {
+  latitude: number | null;
+  longitude: number | null;
+  altitude?: number;
+  confidence?: number;
+  pixel_x?: number;
+  pixel_y?: number;
+  georeferenced: boolean;
+}
+
+export interface MoonPointsResponse {
+  job_id: string;
+  points: MoonPoint[];
+  transformation_matrix?: number[][] | null;
+  rmse_pixels?: number;
+  rmse_meters?: number;
+  georeferenced: boolean;
+  georef_note?: string | null;
 }
 
 export interface MatchMetrics {
@@ -96,13 +124,6 @@ export interface MatchesResponse {
   matches: MatchPoint[];
   metrics?: MatchMetrics | null;
   [key: string]: unknown;
-}
-
-export interface IIRSOverlay {
-  triplet_id: string;
-  image_url: string;
-  bounds: TripletBounds;
-  opacity_hint: number;
 }
 
 export type SensorKind = "ohrc" | "tmc" | "iirs" | "dem" | "lro_nac";

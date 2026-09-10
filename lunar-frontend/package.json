@@ -6,7 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "gen:api": "node scripts/gen-openapi.mjs",
+    "gen:api:check": "node scripts/gen-openapi.mjs --check",
+    "typecheck": "tsc --noEmit",
+    "smoke": "node --test scripts/smoke.mjs"
   },
   "dependencies": {
     "@types/three": "^0.185.4",

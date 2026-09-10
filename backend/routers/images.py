@@ -16,7 +16,30 @@ from fastapi.responses import FileResponse
 
 from data import loader
 
+try:
+    from uploads import check_file_response_allowed
+except ImportError:  # pragma: no cover - direct-router test path
+    from backend.uploads import check_file_response_allowed  # type: ignore
+
 router = APIRouter(tags=["images"])
+
+# Step 12: every FileResponse below must resolve inside one of these roots
+# AND carry an image extension — otherwise 404 (no traversal, no /etc/passwd).
+ALLOWED_IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".tif", ".tiff"}
+
+
+def _allowed_roots(repo_root: Path, triplets_dir: str | None, data_dir: str | None) -> list[Path]:
+    roots = [
+        Path(repo_root) / "registration_output",
+        Path(repo_root) / "lunar-frontend" / "public" / "images" / "registered",
+        Path(repo_root) / "data_preprocessing_pipeline",
+    ]
+    if triplets_dir:
+        roots.append(Path(triplets_dir))
+    if data_dir:
+        roots.append(Path(data_dir))
+        roots.append(Path(data_dir) / "images")
+    return roots
 
 
 @router.get("/images/{sensor}/{identifier:path}")
@@ -25,6 +48,9 @@ def get_image(sensor: str, identifier: str):
     Serve lunar imagery for any sensor (ohrc, tmc, iirs, dem) by region ID or filename.
     """
     clean_sensor = sensor.lower()
+    # Reject traversal attempts up front (the allowlist gate re-checks).
+    if ".." in identifier.split("/") or ".." in clean_sensor.split("/"):
+        raise HTTPException(status_code=404, detail="Image not found")
     clean_id = identifier.replace(".png", "")
 
     candidates = []
@@ -98,9 +124,14 @@ def get_image(sensor: str, identifier: str):
         candidates.append(os.path.join(images_dir, clean_sensor, f"{identifier}.png"))
         candidates.append(os.path.join(images_dir, clean_sensor, f"{clean_id}_{clean_sensor}_512.png"))
 
+    roots = _allowed_roots(repo_root, triplets_dir, data_dir)
     for path in candidates:
         if os.path.isfile(path):
-            return FileResponse(path, media_type="image/png")
+            try:
+                real = check_file_response_allowed(path, roots, ALLOWED_IMAGE_EXTS)
+            except HTTPException:
+                continue
+            return FileResponse(str(real), media_type="image/png")
 
     raise HTTPException(
         status_code=404,
