@@ -5,6 +5,7 @@ Run with:  pytest test_api.py -v
 No server needs to be running — TestClient spins the app in-process.
 """
 
+import json
 import os
 
 import pytest
@@ -565,9 +566,37 @@ def test_ingest_results_not_found():
 # (regression: absolute_rmse_m / composite were stripped by the schema)
 # ---------------------------------------------------------------------------
 
-def test_lro_matches_serve_pipeline_metrics_unstripped():
-    """region_001 LRO: on-disk pipeline numbers reach the API response."""
-    _ensure_loaded()
+def test_lro_metrics_survive_response_model(monkeypatch):
+    """Computed values must not be stripped by the response schema.
+
+    Hermetic: injects a loader entry directly, so this holds on CI checkouts
+    where registration_output/ (local-only artifacts) does not exist.
+    """
+    from data import loader as loader_mod
+
+    monkeypatch.setattr(loader_mod, "_matches", {
+        "region_001_lro_nac": {
+            "triplet_id": "region_001_lro_nac",
+            "matches": [],
+            "homography": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]],
+            "metrics": {
+                "num_inliers": 6,
+                "num_raw_matches": 32,
+                "inlier_ratio": 0.1875,
+                "rmse_px": 0.6333,
+                "fit_rmse_px": 0.6333,
+                "absolute_rmse_m": 0.5788,
+                "absolute_rmse_m_provenance": "pipeline_metrics_json",
+                "validation_rmse_px": None,
+                "validation_status": "insufficient_points_for_holdout",
+                "ssim": 0.1441,
+                "psnr": 15.0171,
+                "nmi": 0.0029,
+                "composite_quality_score": 0.3115,
+                "metric_notes": {"validation_rmse_px": "held-out needs ≥8 inliers (have 6)"},
+            },
+        }
+    })
     r = client.get("/triplets/region_001_lro_nac/matches")
     assert r.status_code == 200
     m = r.json()["metrics"]
@@ -576,27 +605,105 @@ def test_lro_matches_serve_pipeline_metrics_unstripped():
     assert m["absolute_rmse_m"] == pytest.approx(0.5788)
     assert m["absolute_rmse_m_provenance"] == "pipeline_metrics_json"
     assert m["composite_quality_score"] == pytest.approx(0.3115)
-    # Photometric overlap metrics computed from committed rasters.
-    assert isinstance(m["ssim"], float) and 0.0 <= m["ssim"] <= 1.0
-    assert isinstance(m["psnr"], float) and m["psnr"] > 0
-    assert isinstance(m["nmi"], float) and m["nmi"] >= 0.0
-    # Honest nulls carry reasons, not bare dashes.
-    assert m["validation_rmse_px"] is None
-    assert "held-out" in m["metric_notes"]["validation_rmse_px"] or "holdout" in m["metric_notes"]["validation_rmse_px"].lower() or "8 inliers" in m["metric_notes"]["validation_rmse_px"]
+    assert m["ssim"] == pytest.approx(0.1441)
+    assert m["metric_notes"]["validation_rmse_px"] == "held-out needs ≥8 inliers (have 6)"
 
 
-def test_regular_matches_serve_planar_absolute_and_composite():
-    """TMC-mode regions: planar absolute + feature-only composite served."""
-    _ensure_loaded()
-    r = client.get("/triplets/region_001/matches")
-    assert r.status_code == 200
-    m = r.json()["metrics"]
+def test_lro_assembly_from_disk_artifacts(tmp_path, monkeypatch):
+    """End-to-end loader assembly from a synthetic artifact tree.
+
+    Mirrors registration_output/lro_nac/<id>/ + lro_nac_real/<id>/ with
+    generated PNGs (no repo artifacts needed): pipeline numbers must pass
+    through exactly, photometrics must compute, honest nulls must be noted.
+    """
+    import cv2
+    import numpy as np
+    from data import loader as loader_mod
+
+    reg_dir = tmp_path / "registration_output" / "lro_nac" / "region_001"
+    reg_dir.mkdir(parents=True)
+    (reg_dir / "metrics.json").write_text(json.dumps({
+        "fit_rmse_px": 0.6333,
+        "validation_rmse_px": None,
+        "validation_status": "insufficient_points_for_holdout",
+        "absolute_rmse_m": 0.5788,
+        "inlier_count": 6,
+        "match_count": 32,
+        "inlier_ratio": 0.1875,
+        "mean_reprojection_error_px": 0.5,
+        "median_reprojection_error_px": 0.45,
+        "max_reprojection_error_px": 1.2,
+        "fraction_below_1px": 0.9,
+        "spatial_coverage": 0.06,
+        "spatial_uniformity": 0.0183,
+        "composite_quality_score": 0.3115,
+        "lk_refinement": {"debug_points": []},
+    }))
+    (reg_dir / "ohrc_to_nac_homography.json").write_text(json.dumps(
+        {"homography": [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.0, 0.0, 1.0]]}))
+    rng = np.random.RandomState(0)
+    cv2.imwrite(
+        str(reg_dir / "registered_source.png"),
+        (rng.rand(64, 64) * 255).astype(np.uint8),
+    )
+    ref_dir = tmp_path / "data_preprocessing_pipeline" / "lro_nac_real" / "region_001"
+    ref_dir.mkdir(parents=True)
+    cv2.imwrite(
+        str(ref_dir / "lro_nac_reference_512.png"),
+        (rng.rand(64, 64) * 255).astype(np.uint8),
+    )
+
+    monkeypatch.setattr(loader_mod, "REPO_ROOT", tmp_path)
+    monkeypatch.setattr(loader_mod, "_BENCHMARK_SUMMARY", None)
+    monkeypatch.setattr(loader_mod, "_BENCHMARK_LOADED", True)
+    loader_mod.load_all()
+
+    entry = loader_mod.get_matches("region_001_lro_nac")
+    assert entry is not None
+    m = entry["metrics"]
+    assert m["absolute_rmse_m"] == pytest.approx(0.5788)
+    assert m["composite_quality_score"] == pytest.approx(0.3115)
+    assert isinstance(m["ssim"], float)
+    assert isinstance(m["psnr"], float)
+    assert isinstance(m["nmi"], float)
+    assert "8 inliers" in m["metric_notes"]["validation_rmse_px"]
+    assert "dots unavailable" in m["metric_notes"]["matches"]
+    # NOTE: monkeypatched REPO_ROOT/_BENCHMARK_* revert automatically; later
+    # tests re-trigger load_all via /refresh with real paths.
+
+
+def test_regular_metrics_from_benchmark_summary(monkeypatch):
+    """Planar absolute + feature-only composite derive correctly.
+
+    Hermetic unit test over a synthetic summary row (the committed summary
+    is local-only and absent on CI checkouts).
+    """
+    from data import loader as loader_mod
+
+    monkeypatch.setattr(loader_mod, "_BENCHMARK_SUMMARY", {"regions": [{
+        "region_id": "region_001",
+        "status": "success",
+        "fit_rmse_px": 1.2715,
+        "inlier_count": 7,
+        "match_count": 41,
+        "inlier_ratio": 0.1707,
+        "spatial_coverage": 0.4375,
+        "spatial_uniformity": 0.3113,
+        "validation_rmse_px": None,
+        "validation_status": "insufficient_points_for_holdout",
+    }]})
+    monkeypatch.setattr(loader_mod, "_BENCHMARK_LOADED", True)
+    bounds = {"west_lon": 336.484646, "east_lon": 336.589455,
+              "south_lat": -3.374861, "north_lat": -3.248733}
+    m = loader_mod._metrics_from_benchmark_summary("region_001", bounds, 7)
     assert m is not None
     assert m["fit_rmse_px"] == pytest.approx(1.2715)
-    assert m["absolute_rmse_m"] is not None and m["absolute_rmse_m"] > 0
+    assert m["num_inliers"] == 7 and m["num_raw_matches"] == 41
+    assert m["inlier_ratio"] == pytest.approx(0.1707)
+    expected_gsd = loader_mod._footprint_gsd_m(bounds)
+    assert m["absolute_rmse_m"] == pytest.approx(1.2715 * expected_gsd, rel=1e-3)
     assert m["absolute_rmse_m_provenance"] == "planar_footprint_gsd_no_dem"
-    assert m["absolute_rmse_m"] == pytest.approx(m["fit_rmse_px"] * 6.2, abs=1.0)
-    assert m["composite_quality_score"] is not None
+    assert 0.0 <= m["composite_quality_score"] <= 1.0
     assert m["metric_notes"]["validation_rmse_px"].startswith("held-out")
 
 
