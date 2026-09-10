@@ -7,6 +7,10 @@ import GeoRefBadge from "./GeoRefBadge";
 
 const TILE_PX = 512;
 const NEARBY_PX = 45;
+// Fixed square viewport each pane renders into. The raster is letterboxed
+// (contain-fit) inside it — never cropped — and the coordinate frame below
+// is matched exactly to the displayed image rect (see ImagePane).
+const PANE_PX = 340;
 
 interface Props {
   tripletId: string;
@@ -299,24 +303,44 @@ function ImagePane({
   onSelectIndex: (idx: number) => void;
   onHoverIndex: (idx: number | null) => void;
 }) {
+  // Natural raster dimensions: tiles are not guaranteed square (e.g. cropped
+  // LRO swaths), so the displayed rect is contain-fit into the square
+  // viewport and the click/dot frame is matched to it — never object-cover,
+  // which clips edges and silently breaks the px-fraction mapping.
+  const [nat, setNat] = useState({ w: TILE_PX, h: TILE_PX });
+  useEffect(() => {
+    setNat({ w: TILE_PX, h: TILE_PX });
+  }, [src]);
+  const scale = Math.min(PANE_PX / Math.max(nat.w, 1), PANE_PX / Math.max(nat.h, 1));
+  const dispW = Math.max(1, Math.round(nat.w * scale));
+  const dispH = Math.max(1, Math.round(nat.h * scale));
+  const offX = Math.round((PANE_PX - dispW) / 2);
+  const offY = Math.round((PANE_PX - dispH) / 2);
+
   return (
     <div className="flex flex-col items-center gap-2.5">
       <div
-        ref={innerRef}
-        onClick={onCanvasClick}
-        className="group relative h-[340px] w-[340px] overflow-hidden rounded-xl border border-border bg-panel-raised shadow-2xl cursor-crosshair select-none"
+        className="group relative overflow-hidden rounded-xl border border-border bg-panel-raised shadow-2xl select-none"
+        style={{ width: PANE_PX, height: PANE_PX }}
       >
-        {/* Sensor raster tile */}
+        {/* Sensor raster tile: explicit contain-fit size, never cropped. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           key={src}
           src={src}
           alt={label}
-          className="h-full w-full select-none object-cover lunar-tile-contrast"
           draggable={false}
+          onLoad={(e) => {
+            const img = e.currentTarget as HTMLImageElement;
+            if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+              setNat({ w: img.naturalWidth, h: img.naturalHeight });
+            }
+          }}
           onError={(e) => {
             (e.currentTarget as HTMLImageElement).style.display = "none";
           }}
+          className="absolute select-none lunar-tile-contrast"
+          style={{ left: offX, top: offY, width: dispW, height: dispH }}
         />
 
         {/* Sensor Label Tag overlay */}
@@ -324,6 +348,14 @@ function ImagePane({
           {sensor.toUpperCase()}
         </div>
 
+        {/* Coordinate frame: exactly the displayed image rect, so % fractions
+            map 1:1 to tile px for both markers and click handling. */}
+        <div
+          ref={innerRef}
+          onClick={onCanvasClick}
+          className="absolute cursor-crosshair"
+          style={{ left: offX, top: offY, width: dispW, height: dispH }}
+        >
         {/* All Verified Correspondence Markers */}
         {points.map((p, idx) => {
           const coords = p[coordKey];
@@ -394,6 +426,7 @@ function ImagePane({
             </div>
           );
         })}
+        </div>
       </div>
 
       <span className="font-mono text-2xs text-ink-dim tracking-wide">
