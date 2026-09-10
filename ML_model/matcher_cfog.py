@@ -2316,6 +2316,8 @@ def match_images_cfog(
     # Configure robust estimator based on optional outlier_method parameter
     chosen_outlier_method = "ransac"
     estimator_method = cv2.RANSAC
+    outlier_method_fallback = False
+    outlier_method_fallback_reason: Optional[str] = None
     if str(outlier_method).lower() == "magsac":
         if hasattr(cv2, "USAC_MAGSAC"):
             estimator_method = cv2.USAC_MAGSAC
@@ -2324,7 +2326,10 @@ def match_images_cfog(
             logger.warning("cv2.USAC_MAGSAC requested but unavailable in this OpenCV build; falling back to cv2.RANSAC.")
             estimator_method = cv2.RANSAC
             chosen_outlier_method = "ransac"
-    logger.info("Robust geometric estimation configured with outlier_method: %s", chosen_outlier_method.upper())
+            outlier_method_fallback = True
+            outlier_method_fallback_reason = "cv2.USAC_MAGSAC missing from OpenCV build"
+    logger.info("Robust geometric estimation configured with outlier_method: %s (fallback: %s)",
+                chosen_outlier_method.upper(), outlier_method_fallback)
 
     # NOTE: azimuth for DEM-aware fitting must be sensor line-of-sight azimuth,
     # never sun azimuth (see relief-compensation fix above). LOS azimuth is
@@ -2676,6 +2681,10 @@ def match_images_cfog(
     metrics["matching_grid_size"] = matching_grid_size
     metrics["canonical_grid_size"] = canonical_grid_size
     metrics["outlier_method"] = chosen_outlier_method
+    metrics["outlier_method_requested"] = str(outlier_method).lower()
+    metrics["outlier_method_fallback"] = outlier_method_fallback
+    if outlier_method_fallback_reason:
+        metrics["outlier_method_fallback_reason"] = outlier_method_fallback_reason
     if content_overlap_info is not None:
         metrics["content_overlap_recovery"] = content_overlap_info
     # SIH illumination-invariance audit trail (required keys).
@@ -2827,6 +2836,9 @@ def match_images_cfog(
             "illumination_compensation": illumination_compensation,
             "synthetic_reference_used": bool(synthetic_reference_used),
             "outlier_method": chosen_outlier_method,
+            "outlier_method_requested": str(outlier_method).lower(),
+            "outlier_method_fallback": outlier_method_fallback,
+            "outlier_method_fallback_reason": outlier_method_fallback_reason,
             "content_overlap_recovery": content_overlap_info,
         },
     }

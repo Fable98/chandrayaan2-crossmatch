@@ -1227,7 +1227,7 @@ export default function RegistrationLauncher() {
                 value={format(compositeScore === null ? null : compositeScore * 100, 1)}
                 suffix="%"
                 emphasis
-                sublabel="Derived: 0.35·SSIM + 0.25·NMI + 0.25·Inliers + 0.15·Uniformity"
+                sublabel="Derived: 0.25·Inliers + 0.25·RMSE + 0.25·Uniformity + 0.25·Alignment(NMI/SSIM)"
               />
               <MetricCard
                 label="Norm. Mutual Info (NMI)"
