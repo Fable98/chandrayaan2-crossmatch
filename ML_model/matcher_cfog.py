@@ -848,14 +848,10 @@ def match_images_cfog(
     work1_gray = cv2.resize(raw1_gray, (work_w1, work_h1), interpolation=cv2.INTER_AREA)
     work2_gray = cv2.resize(raw2_gray, (work_w2, work_h2), interpolation=cv2.INTER_AREA)
 
-    # --- PHASE 1: ADAPTIVE ILLUMINATION NORMALIZATION (DISABLED 2026-09-10) ---
-    # Benchmarked on merged main: helps OHRC-TMC (1.27->0.97px) but REGRESSES all
-    # three real LRO-CDR pairs (001: 32/6@0.50 -> 27/5@1.37; 003: success -> Gate2
-    # FAIL; 006: 24/5@0.18 -> 26/5@0.34). Shadow-mask zeroing deletes texture the
-    # MI matcher uses on 16-bit CDR radiometry. Do NOT re-enable globally without
-    # a per-sensor-pair benchmark; candidate design is gate-by-pair, not global.
-    # work1_gray, mask1 = adaptive_illumination_normalization(work1_gray)
-    # work2_gray, mask2 = adaptive_illumination_normalization(work2_gray)
+    # --- PHASE 1: ADAPTIVE ILLUMINATION NORMALIZATION ---
+    # Normalize local contrast and mask out deep lunar shadows to improve Phase Congruency
+    work1_gray, mask1 = adaptive_illumination_normalization(work1_gray)
+    work2_gray, mask2 = adaptive_illumination_normalization(work2_gray)
 
     # --- DYNAMIC SPATIAL GRID SCALING ---
     # Calculate grid size based on the smallest working dimension for INTERNAL
