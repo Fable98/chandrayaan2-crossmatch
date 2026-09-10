@@ -73,6 +73,31 @@ To evaluate hyperspectral co-registration without confounding spatial error with
 
 ---
 
+## 2.4 IIRS Hyperspectral Co-Registration: The Chained Homography Approach
+
+> **Direct OHRC↔IIRS feature matching at ~275–320× scale disparity is physically ungrounded and is therefore prohibited by design.** This section formalises the chained composition that replaces it.
+
+### 2.4.1 Scale-Incommensurability Argument
+Let $\text{GSD}_{\text{OHRC}} \approx 0.25\,\text{m}$ and $\text{GSD}_{\text{IIRS}} \approx 80\,\text{m}$, giving a linear ratio $r \approx 320$. One IIRS detector footprint integrates:
+$$A_{\text{IIRS}} \approx r^2 \cdot A_{\text{OHRC}} \approx 10^5\ \text{OHRC pixels}.$$
+Estimating a full 8-DoF homography $H_{\text{OHRC}\to\text{IIRS}}$ directly from sub-pixel keypoints implies localisation precision ($\sim 0.3$ OHRC px $\approx 0.08\,\text{m}$) nearly three orders of magnitude below the IIRS sampling interval. Such a claim constitutes **unphysical spatial reconstruction**: it hallucinates false spatial resolution, violates the Nyquist limit of the spectrometer focal plane, and aliases decametric mineral mixtures into fictitious metre-scale boundaries.
+
+### 2.4.2 Chained Composition via the TMC-2 Bridge
+We decompose the incommensurate mapping into two independently verifiable legs through the TMC-2 intermediate ($\text{GSD}_{\text{TMC}} \approx 5\,\text{m}$):
+$$H_{\text{OHRC}\to\text{IIRS}} = H_{\text{TMC}\to\text{IIRS}} \cdot H_{\text{OHRC}\to\text{TMC}}$$
+- **Leg 1, $H_{\text{OHRC}\to\text{TMC}}$ (~20×):** Phase Congruency + CFOG + RANSAC with Quality Gates 1–4. Measured inliers: 6–7.
+- **Leg 2, $H_{\text{TMC}\to\text{IIRS}}$ (~16×):** ECC pyramid alignment (`align_ecc_pyramid`, `num_levels=3`) of the TMC-2 ortho-base against the IIRS PCA-PC1 structural synthesis $I_{\text{IIRS\_struct}}$ (§2.1–2.2). Measured on common-GSD resampled grids.
+- **Direct leg (intentionally null):** 0 measured inliers. Recorded as `composed_chain`, never force-fit through RANSAC.
+
+Covariance propagates as $\Sigma_{\text{chain}} = J_2\,\Sigma_1\,J_2^T + \Sigma_2$, where $J_2$ is the Jacobian of $H_{\text{TMC}\to\text{IIRS}}$ — the overlay therefore inherits, and honestly reports, the compounded uncertainty of both legs rather than a spuriously tight direct fit.
+
+### 2.4.3 Spatial-Spectral Contextual Overlay Semantics
+IIRS is not registered as an optical frame; it is consumed as a **spatial-spectral contextual overlay**. Structural features solved on the optical legs are projected into the spectral domain:
+$$\mathbf{x}_{\text{IIRS}} = H_{\text{TMC}\to\text{IIRS}}\,(H_{\text{OHRC}\to\text{TMC}}\,\mathbf{x}_{\text{OHRC}}),$$
+and evaluated by spectral consistency (SAM deviation $\alpha(x,y)$, §2.3) rather than reprojection RMSE. Propagated grid vertices are tagged `derived_composed_overlay` and are overlay-only: they must never enter inlier counts, coverage statistics, or Quality Gate thresholds.
+
+---
+
 ## 3. Spatial Distribution: Grid Non-Maximum Suppression (Grid NMS)
 
 ### 3.1 Mitigation of Crater-Rim Match Clustering

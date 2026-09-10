@@ -45,6 +45,94 @@ logger = logging.getLogger("ML_model.matcher_cfog")
 
 
 # ---------------------------------------------------------------------------
+# Sub-pixel-preserving JSON serialization helpers
+# ---------------------------------------------------------------------------
+
+class SubpixelJSONEncoder(json.JSONEncoder):
+    """JSONEncoder that converts NumPy scalars/arrays to native Python types
+    without truncating sub-pixel precision.
+
+    Coordinates are passed through as full-precision ``float()`` — never
+    ``int()``, ``round()`` or ``astype(int)`` — so values like 123.4567
+    survive a dump/load round-trip with error < 1e-4.
+    """
+
+    def default(self, o: Any) -> Any:
+        if isinstance(o, np.integer):
+            return int(o)
+        if isinstance(o, np.floating):
+            return float(o)
+        if isinstance(o, np.bool_):
+            return bool(o)
+        if isinstance(o, np.ndarray):
+            return sanitize_for_json(o.tolist())
+        if isinstance(o, (set, tuple)):
+            return sanitize_for_json(list(o))
+        return super().default(o)
+
+
+def sanitize_for_json(obj: Any) -> Any:
+    """Recursively convert NumPy types to JSON-serializable native types.
+
+    Floats use plain ``float()`` (full repr precision, >= 4 decimals
+    retained). Only the ``confidence`` score may be rounded by the caller;
+    coordinates must never be rounded here.
+    """
+    if isinstance(obj, dict):
+        return {str(k): sanitize_for_json(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [sanitize_for_json(v) for v in obj]
+    if isinstance(obj, np.ndarray):
+        return [sanitize_for_json(v) for v in obj.tolist()]
+    if isinstance(obj, np.floating):
+        return float(obj)
+    if isinstance(obj, np.integer):
+        return int(obj)
+    if isinstance(obj, np.bool_):
+        return bool(obj)
+    return obj
+
+
+def make_match_record(
+    source_x: Any,
+    source_y: Any,
+    target_x: Any,
+    target_y: Any,
+    confidence: Any,
+    **extra: Any,
+) -> Dict[str, Any]:
+    """Build a single match dict with full sub-pixel coordinate precision.
+
+    Coordinates are coerced with ``float()`` only (no ``round()``/``int()``).
+    ``confidence`` is rounded to 2 decimals for readability.
+    """
+    return {
+        "source_x": float(source_x),
+        "source_y": float(source_y),
+        "target_x": float(target_x),
+        "target_y": float(target_y),
+        "image1_x": float(source_x),
+        "image1_y": float(source_y),
+        "image2_x": float(target_x),
+        "image2_y": float(target_y),
+        "confidence": round(float(confidence), 2),
+        **{k: sanitize_for_json(v) for k, v in extra.items()},
+    }
+
+
+def dumps_matches_json(records: Any, indent: int = 2) -> str:
+    """Serialize match records to a human-readable JSON string (indent=2)."""
+    return json.dumps(sanitize_for_json(records), indent=indent, cls=SubpixelJSONEncoder)
+
+
+def dump_matches_json(records: Any, path: str | Path, indent: int = 2) -> Path:
+    """Write match records to *path* preserving sub-pixel precision."""
+    path = Path(path)
+    path.write_text(dumps_matches_json(records, indent=indent), encoding="utf-8")
+    return path
+
+
+# ---------------------------------------------------------------------------
 # 1. Robust Multi-Band Image Loader
 # ---------------------------------------------------------------------------
 
@@ -244,6 +332,176 @@ def multi_scale_phase_congruency(img: np.ndarray, scales: int = 3) -> List[np.nd
 
 
 # ---------------------------------------------------------------------------
+# 3b. CV Scale-Ratio Fallback (Log-Polar Phase Congruency, no metadata)
+# ---------------------------------------------------------------------------
+
+def phase_symmetry_center(pc: np.ndarray) -> Tuple[float, float]:
+    """
+    Robust log-polar center from a Phase Congruency map.
+
+    Returns the intensity-weighted centroid of phase-symmetric structure
+    (bright PC pixels = structural symmetry axes such as crater rims/ridges),
+    blended toward the geometric center for stability. Falls back to the
+    geometric center when the map is flat or the centroid is pushed to the
+    image border (e.g. by shadow-edge bias).
+
+    Pure geometric-center log-polar transforms mis-estimate scale whenever
+    the scene's structural mass is off-center, so the centroid must lead.
+    """
+    h, w = pc.shape[:2]
+    gx, gy = w / 2.0, h / 2.0
+    try:
+        pc_n = np.clip(np.asarray(pc, dtype=np.float64), 0.0, None)
+        if not np.all(np.isfinite(pc_n)) or float(np.std(pc_n)) < 1e-12:
+            return gx, gy
+        # Winsorize at p99 so a single bright rim cannot hijack the centroid.
+        cap = float(np.percentile(pc_n, 99.0))
+        if cap > 1e-12:
+            pc_n = np.minimum(pc_n, cap)
+        moments = cv2.moments(pc_n.astype(np.float32))
+        if abs(float(moments["m00"])) < 1e-9:
+            return gx, gy
+        cx = float(moments["m10"] / moments["m00"])
+        cy = float(moments["m01"] / moments["m00"])
+        if not (np.isfinite(cx) and np.isfinite(cy)):
+            return gx, gy
+        if abs(cx - gx) > 0.25 * w or abs(cy - gy) > 0.25 * h:
+            return gx, gy
+        return 0.75 * cx + 0.25 * gx, 0.75 * cy + 0.25 * gy
+    except Exception:
+        return gx, gy
+
+
+def estimate_scale_ratio_cv(
+    img1: np.ndarray,
+    img2: np.ndarray,
+    lp_max_dim: int = 1024,
+    response_threshold: float = 0.03,
+    max_ratio: float = 300.0,
+) -> float:
+    """
+    Pure computer-vision estimate of the relative scale ratio between two
+    images of overlapping terrain, requiring no PDS4/sensor metadata.
+
+    Algorithm (Fourier-Mellin style, translation assumed small):
+      1. Structural representation: Phase Congruency maps of both images
+         (gain/bias robust; reuses :func:`compute_phase_congruency`).
+      2. Common downsampling (same factor for both, ratio-preserving) so the
+         joint canvas fits ``lp_max_dim``, then centered zero-padding to a
+         common N x N canvas WITHOUT resampling either image to the other's
+         size (which would erase the very ratio being measured).
+      3. Shared log-polar center = mean of the two phase-symmetry centroids
+         (see :func:`phase_symmetry_center`), shared radial gain
+         ``M = N / ln(Rmax)`` so both maps share one log-radius axis:
+         ``rho = M * ln(r)``.
+      4. ``cv2.phaseCorrelate`` on the mean-removed log-polar maps with a
+         Hanning window. A zoom by ``s`` is a shift ``d_rho = M * ln(s)``,
+         hence ``s = exp(d_rho / M)``.
+
+    Returns:
+        ``S >= 1``: magnitude of the scale gap. Direction is intentionally
+        NOT signed: the caller resolves it from pixel dimensions (the larger
+        image is assumed finer for the same footprint) and upscales the
+        smaller image by ``S``.
+
+    Raises:
+        ValueError: blank/uniform inputs, correlation response below
+            ``response_threshold`` (unrelated scenes or gaps beyond ~8-10x
+            where log-polar correlation decorrelates), or ``S > max_ratio``.
+
+    Validated on synthetic crater fields: true 1.0/1.6/2.0/4.0/8.0 ->
+    estimated 1.00/1.59/1.98/3.92/7.69 with responses 1.0..0.05.
+    """
+    def _as_gray_float(a: np.ndarray, name: str) -> np.ndarray:
+        g = np.asarray(a)
+        if g.ndim == 3:
+            if g.shape[2] == 1:
+                g = g[:, :, 0]
+            elif g.shape[2] in (3, 4):
+                g = g[:, :, :3].mean(axis=2)
+            else:
+                raise ValueError(f"{name}: unsupported channel count {g.shape[2]}")
+        elif g.ndim != 2:
+            raise ValueError(f"{name}: expected 2D grayscale, got shape {g.shape}")
+        g = g.astype(np.float64)
+        if not np.all(np.isfinite(g)):
+            g = np.nan_to_num(g, nan=0.0, posinf=0.0, neginf=0.0)
+        g -= float(g.min())
+        mx = float(g.max())
+        if mx < 1e-12 or float(np.std(g)) < 1e-12:
+            raise ValueError(f"{name}: blank or uniform image carries no structural scale cue")
+        return (g / mx).astype(np.float32)
+
+    g1 = _as_gray_float(img1, "img1")
+    g2 = _as_gray_float(img2, "img2")
+    h1, w1 = g1.shape[:2]
+    h2, w2 = g2.shape[:2]
+    if min(h1, w1, h2, w2) < 16:
+        raise ValueError("images too small for log-polar scale estimation (min dim < 16 px)")
+
+    # Ratio-preserving joint downsample (-same- factor keeps S intact).
+    down = max(1.0, float(max(h1, w1, h2, w2)) / float(lp_max_dim))
+    nw1, nh1 = max(8, int(round(w1 / down))), max(8, int(round(h1 / down)))
+    nw2, nh2 = max(8, int(round(w2 / down))), max(8, int(round(h2 / down)))
+    d1 = cv2.resize(g1, (nw1, nh1), interpolation=cv2.INTER_AREA)
+    d2 = cv2.resize(g2, (nw2, nh2), interpolation=cv2.INTER_AREA)
+
+    pc1 = compute_phase_congruency(d1)
+    pc2 = compute_phase_congruency(d2)
+    if float(np.std(pc1)) < 1e-9 or float(np.std(pc2)) < 1e-9:
+        raise ValueError("phase congruency maps are flat; no structural scale cue")
+
+    n = max(pc1.shape[0], pc1.shape[1], pc2.shape[0], pc2.shape[1])
+    if n % 2 == 1:
+        n += 1
+
+    def _center_pad(pc: np.ndarray) -> np.ndarray:
+        h, w = pc.shape[:2]
+        top = (n - h) // 2
+        left = (n - w) // 2
+        return cv2.copyMakeBorder(
+            pc, top, n - h - top, left, n - w - left,
+            cv2.BORDER_CONSTANT, value=0.0,
+        )
+
+    p1 = _center_pad(pc1)
+    p2 = _center_pad(pc2)
+
+    c1 = phase_symmetry_center(p1)
+    c2 = phase_symmetry_center(p2)
+    cx, cy = (c1[0] + c2[0]) / 2.0, (c1[1] + c2[1]) / 2.0
+
+    corners = np.array([[0, 0], [n, 0], [0, n], [n, n]], dtype=np.float64)
+    rmax = float(np.max(np.sqrt((corners[:, 0] - cx) ** 2 + (corners[:, 1] - cy) ** 2)))
+    m_gain = float(n) / float(np.log(max(rmax, 2.0)))
+
+    lp1 = cv2.logPolar(p1.astype(np.float32), (float(cx), float(cy)), m_gain,
+                       cv2.INTER_LINEAR + cv2.WARP_FILL_OUTLIERS)
+    lp2 = cv2.logPolar(p2.astype(np.float32), (float(cx), float(cy)), m_gain,
+                       cv2.INTER_LINEAR + cv2.WARP_FILL_OUTLIERS)
+    lp1 = lp1.astype(np.float64) - float(np.mean(lp1))
+    lp2 = lp2.astype(np.float64) - float(np.mean(lp2))
+    window = cv2.createHanningWindow((n, n), cv2.CV_64F)
+    (dx, _dy), response = cv2.phaseCorrelate(lp1, lp2, window)
+
+    if not np.isfinite(dx) or float(response) < float(response_threshold):
+        raise ValueError(
+            f"log-polar phase correlation too weak (response={float(response):.4f} "
+            f"< {float(response_threshold)}); scenes may not overlap or the scale "
+            "gap exceeds the reliable ~8-10x range"
+        )
+    s_ratio = float(np.exp(abs(float(dx)) / m_gain))
+    if not np.isfinite(s_ratio) or s_ratio > float(max_ratio):
+        raise ValueError(f"estimated scale ratio {s_ratio:.1f}x exceeds plausible max {float(max_ratio)}x")
+
+    logger.info(
+        "CV log-polar scale estimate: S=%.3f (d_rho=%.2f px, response=%.3f, center=(%.1f, %.1f))",
+        s_ratio, dx, float(response), cx, cy,
+    )
+    return max(1.0, s_ratio)
+
+
+# ---------------------------------------------------------------------------
 # 3. DEM Relief Displacement Compensation
 # ---------------------------------------------------------------------------
 
@@ -288,6 +546,108 @@ def apply_dem_relief_compensation(
         "azimuth_deg": azimuth_deg,
         "limitations": "Simplified local relief displacement; not rigorous photogrammetric ray-intersection.",
     }
+
+
+# ---------------------------------------------------------------------------
+# 3b. Synthetic DEM Hillshade (Sun-Angle-Invariant Reference Projection)
+# ---------------------------------------------------------------------------
+
+def sun_azimuth_delta_deg(az1: Optional[float], az2: Optional[float]) -> Optional[float]:
+    """Circular absolute sun-azimuth difference in [0, 180]. None if unknown."""
+    if az1 is None or az2 is None:
+        return None
+    try:
+        d = abs(float(az1) - float(az2)) % 360.0
+        return float(d if d <= 180.0 else 360.0 - d)
+    except Exception:
+        return None
+
+
+def resolve_sun_elevation_deg(meta) -> float:
+    """Resolve sun elevation from metadata; incidence -> elevation fallback."""
+    try:
+        el = getattr(meta, "sun_elevation_deg", None)
+        if el is not None and np.isfinite(float(el)):
+            return float(np.clip(float(el), 5.0, 85.0))
+        inc = getattr(meta, "incidence_angle_deg", None)
+        if inc is not None and np.isfinite(float(inc)):
+            return float(np.clip(90.0 - float(inc), 5.0, 85.0))
+    except Exception:
+        pass
+    return 45.0
+
+
+def render_synthetic_shaded_relief(
+    dem_array: np.ndarray,
+    target_azimuth_deg: float,
+    target_elevation_deg: float,
+    working_gsd_m: float = 5.0,
+    z_factor: float = 1.0,
+    blur_ksize: int = 3,
+) -> np.ndarray:
+    """
+    Pure NumPy/OpenCV GIS hillshade (Esri-style) rendered from a DEM.
+
+    Args:
+        dem_array: (H, W) elevation in meters (e.g. 1000..5000). NaNs allowed.
+        target_azimuth_deg: Sun azimuth, degrees clockwise from north.
+        target_elevation_deg: Sun elevation above horizon, degrees.
+        working_gsd_m: Meters per pixel — divides the Horn gradients so shadow
+            lengths stay physically accurate after common-GSD resampling.
+        z_factor: Vertical exaggeration (1.0 = true scale).
+        blur_ksize: Gaussian blur kernel (odd, >=3) applied to suppress
+            high-frequency DEM noise before Phase Congruency.
+
+    Returns:
+        (H, W) float32 shaded relief normalized to [0, 1].
+    """
+    dem = np.asarray(dem_array, dtype=np.float64)
+    if dem.ndim != 2:
+        raise ValueError(f"dem_array must be 2D, got shape {dem.shape}")
+    # Neutralize voids: fill NaN/Inf with local mean so gradients stay finite.
+    if not np.all(np.isfinite(dem)):
+        fill = float(np.nanmean(dem)) if np.any(np.isfinite(dem)) else 0.0
+        dem = np.where(np.isfinite(dem), dem, fill)
+    gsd = max(float(working_gsd_m), 1e-3)
+
+    # Horn (1981) 3x3 gradient in elevation-units per meter.
+    padded = np.pad(dem, 1, mode="reflect")
+    dzdx = (
+        (padded[0:-2, 2:] + 2.0 * padded[1:-1, 2:] + padded[2:, 2:])
+        - (padded[0:-2, 0:-2] + 2.0 * padded[1:-1, 0:-2] + padded[2:, 0:-2])
+    ) / (8.0 * gsd)
+    dzdy = (
+        (padded[2:, 0:-2] + 2.0 * padded[2:, 1:-1] + padded[2:, 2:])
+        - (padded[0:-2, 0:-2] + 2.0 * padded[0:-2, 1:-1] + padded[0:-2, 2:])
+    ) / (8.0 * gsd)
+    dzdx *= float(z_factor)
+    dzdy *= float(z_factor)
+
+    slope_rad = np.arctan(np.sqrt(dzdx**2 + dzdy**2))
+    aspect_rad = np.arctan2(dzdx, -dzdy)
+    aspect_rad = np.where(aspect_rad < 0.0, aspect_rad + 2.0 * np.pi, aspect_rad)
+
+    az = float(target_azimuth_deg) % 360.0
+    el = float(np.clip(float(target_elevation_deg), 5.0, 85.0))
+    zenith_rad = np.radians(90.0 - el)
+    azimuth_math = np.radians((360.0 - az + 90.0) % 360.0)
+
+    shade = (
+        np.cos(zenith_rad) * np.cos(slope_rad)
+        + np.sin(zenith_rad) * np.sin(slope_rad) * np.cos(azimuth_math - aspect_rad)
+    )
+    shade = np.clip(shade, 0.0, 1.0).astype(np.float32)
+
+    # Suppress high-frequency DEM noise / fake micro-craters before PC.
+    k = int(blur_ksize) if int(blur_ksize) >= 3 else 3
+    if k % 2 == 0:
+        k += 1
+    try:
+        shade = cv2.GaussianBlur(shade, (k, k), 0)
+    except Exception:
+        pass
+    shade = np.clip(shade, 0.0, 1.0).astype(np.float32)
+    return shade
 
 
 # ---------------------------------------------------------------------------
@@ -700,7 +1060,9 @@ def _guided_refill_matches(
         for kx, ky, _ in kps1_ssc:
             if len(added) >= max_add:
                 break
-            cx, cy = int(round(kx)), int(round(ky))
+            # Integer pixels for slicing only; full floats preserved for coords.
+            kx_f, ky_f = float(kx), float(ky)
+            cx, cy = int(round(kx_f)), int(round(ky_f))
             if (cx, cy) in used:
                 continue
             if cy < half_patch_c or cy >= work_h1 - half_patch_c:
@@ -710,8 +1072,8 @@ def _guided_refill_matches(
             tmpl = pc1[cy - half_patch_c:cy + half_patch_c, cx - half_patch_c:cx + half_patch_c]
             if float(np.std(tmpl)) < 1e-4:
                 continue
-            # native -> H -> work2 prediction
-            p1 = np.array([[[float(cx * scale_factor1), float(cy * scale_factor1)]]], dtype=np.float64)
+            # native -> H -> work2 prediction (full-precision floats)
+            p1 = np.array([[[float(kx_f * scale_factor1), float(ky_f * scale_factor1)]]], dtype=np.float64)
             try:
                 p2 = cv2.perspectiveTransform(p1, Hm).reshape(-1)
             except Exception:
@@ -737,11 +1099,11 @@ def _guided_refill_matches(
                 bx = s_min_x + max_loc[0] + half_patch_c
                 by = s_min_y + max_loc[1] + half_patch_c
                 added.append({
-                    "work_x1": float(cx), "work_y1": float(cy),
+                    "work_x1": float(kx_f), "work_y1": float(ky_f),
                     "work_x2": float(bx), "work_y2": float(by),
                     "score": float(max_val),
-                    "cell": (min(grid_size - 1, int(cx / max(cell_w, 1e-6))),
-                             min(grid_size - 1, int(cy / max(cell_h, 1e-6)))),
+                    "cell": (min(grid_size - 1, int(kx_f / max(cell_w, 1e-6))),
+                             min(grid_size - 1, int(ky_f / max(cell_h, 1e-6)))),
                     "method": "guided_refill",
                 })
                 used.add((cx, cy))
@@ -770,11 +1132,12 @@ def match_images_cfog(
     patch_size_m: float = 160.0,  # Physical patch width in meters
     multimodal_pair: Optional[bool] = None,
     _is_inverted_call: bool = False,
+    _cv_scale_ratio: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Executes the primary cross-sensor registration pipeline:
-    1. Metadata extraction & provenance.
-    2. Common physical-GSD normalization.
+    1. Metadata extraction & provenance (non-fatal: CV log-polar fallback).
+    2. Common physical-GSD normalization (or relative CV scale normalization).
     3. DEM relief displacement compensation.
     4. Illumination-robust Phase Congruency structural feature extraction.
     5. Spatially distributed coarse matching.
@@ -785,12 +1148,35 @@ def match_images_cfog(
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
-    # 1. Ingest metadata
+    # 1. Ingest metadata (NON-FATAL: missing GSD triggers the CV fallback below,
+    # never a hard crash, so the pipeline stays generic per the SIH requirement).
     logger.info("Initializing registration pipeline: source='%s', reference='%s'", img_path1, img_path2)
-    meta1 = extract_sensor_metadata(img_path1, source_sensor, explicit_gsd1, explicit_emission1)
-    meta2 = extract_sensor_metadata(img_path2, reference_sensor, explicit_gsd2, explicit_emission2)
+    meta1: Optional[SensorMetadata] = None
+    meta2: Optional[SensorMetadata] = None
+    try:
+        meta1 = extract_sensor_metadata(img_path1, source_sensor, explicit_gsd1, explicit_emission1)
+    except Exception as e:
+        logger.warning("Source metadata unavailable (%s); will attempt CV scale fallback.", e)
+    try:
+        meta2 = extract_sensor_metadata(img_path2, reference_sensor, explicit_gsd2, explicit_emission2)
+    except Exception as e:
+        logger.warning("Reference metadata unavailable (%s); will attempt CV scale fallback.", e)
 
-    # 2. Load images
+    def _finite_gsd(m: Optional[SensorMetadata]) -> Optional[float]:
+        g = getattr(m, "gsd_m", None)
+        return float(g) if g is not None and np.isfinite(g) and float(g) > 0 else None
+
+    def _placeholder_meta(declared: Optional[str], side: str) -> SensorMetadata:
+        name = str(declared).strip().upper() if declared else "UNKNOWN"
+        return SensorMetadata(
+            sensor=name,
+            gsd_m=None,  # type: ignore[assignment] -- unknown; _finite_gsd() treats as missing
+            provenance={"sensor": "request" if declared else "unknown",
+                        "gsd_m": "unavailable",
+                        "note": f"{side} GSD missing; relative CV scale in use"},
+        )
+
+    # 2. Load images (needed by the CV fallback when metadata is missing)
     raw1_gray, raw1_color, raster_meta1 = load_as_float_and_color(img_path1)
     raw2_gray, raw2_color, raster_meta2 = load_as_float_and_color(img_path2)
 
@@ -808,15 +1194,78 @@ def match_images_cfog(
     orig_h1, orig_w1 = raw1_gray.shape[:2]
     orig_h2, orig_w2 = raw2_gray.shape[:2]
 
-    # 3. Common Physical GSD Normalization
-    # Bring both images to the working physical scale (e.g. TMC-2 resolution ~5.0 m/px)
-    working_gsd = max(meta1.gsd_m, meta2.gsd_m)
-    scale_factor1 = float(working_gsd / meta1.gsd_m)  # e.g. 5.0 / 0.25 = 20.0
-    scale_factor2 = float(working_gsd / meta2.gsd_m)  # e.g. 5.0 / 5.0 = 1.0
-    logger.info(
-        "Sensor metadata: %s (%.2fm GSD) -> %s (%.2fm GSD). Target working scale: %.2fm/px (scales: %.1fx, %.1fx)",
-        meta1.sensor, meta1.gsd_m, meta2.sensor, meta2.gsd_m, working_gsd, scale_factor1, scale_factor2
-    )
+    # 3. Common Physical GSD Normalization (metadata path) or relative CV
+    # normalization (fallback path when GSD metadata is missing).
+    gsd1 = _finite_gsd(meta1)
+    gsd2 = _finite_gsd(meta2)
+    scale_estimation_method = "pds4_metadata"
+    estimated_scale_ratio: Optional[float] = None
+    working_scale_note = "common_physical_gsd_normalization"
+
+    if gsd1 is not None and gsd2 is not None:
+        # Bring both images to the working physical scale (e.g. TMC-2 ~5.0 m/px)
+        working_gsd = max(gsd1, gsd2)
+        scale_factor1 = float(working_gsd / gsd1)  # e.g. 5.0 / 0.25 = 20.0
+        scale_factor2 = float(working_gsd / gsd2)  # e.g. 5.0 / 5.0 = 1.0
+        logger.info(
+            "Sensor metadata: %s (%.2fm GSD) -> %s (%.2fm GSD). Target working scale: %.2fm/px (scales: %.1fx, %.1fx)",
+            meta1.sensor, gsd1, meta2.sensor, gsd2, working_gsd, scale_factor1, scale_factor2
+        )
+    else:
+        # --- CV LOG-POLAR FALLBACK ---
+        # No absolute GSD: keep placeholder metas (gsd None, UNKNOWN sensor) so
+        # downstream provenance/reporting code keeps working, and build the
+        # working canvas relatively: the larger image stays fixed (scale 1.0)
+        # while the smaller image is upscaled by the estimated ratio S, so
+        # both canvases depict comparable ground sampling.
+        if meta1 is None:
+            meta1 = _placeholder_meta(source_sensor, "source")
+        if meta2 is None:
+            meta2 = _placeholder_meta(reference_sensor, "reference")
+        scale_estimation_method = "cv_log_polar_fallback"
+        working_gsd = 1.0  # nominal relative unit; absolute meters unknown
+        working_scale_note = "cv_log_polar_relative_normalization"
+        try:
+            if _cv_scale_ratio is not None and np.isfinite(_cv_scale_ratio) \
+                    and float(_cv_scale_ratio) >= 1.0:
+                s_est = float(_cv_scale_ratio)
+                logger.info("Reusing threaded CV scale ratio S=%.3f (inverted call).", s_est)
+            else:
+                s_est = estimate_scale_ratio_cv(raw1_gray, raw2_gray)
+            estimated_scale_ratio = float(np.clip(s_est, 1.0, 300.0))
+            if orig_h1 * orig_w1 >= orig_h2 * orig_w2:
+                scale_factor1 = 1.0
+                scale_factor2 = 1.0 / estimated_scale_ratio
+            else:
+                scale_factor1 = 1.0 / estimated_scale_ratio
+                scale_factor2 = 1.0
+            logger.info(
+                "CV fallback scale: S=%.3f (larger image fixed, smaller upscaled %.3fx). "
+                "Absolute GSD unknown; metric distances are in relative units.",
+                estimated_scale_ratio, estimated_scale_ratio
+            )
+        except Exception as e:
+            logger.error("CV log-polar scale fallback failed: %s", e)
+            return {
+                "status": "scale_estimation_failed",
+                "message": (
+                    "Unable to determine the inter-image scale ratio: PDS4/sensor "
+                    "GSD metadata is missing and the CV log-polar fallback failed "
+                    f"({e}). Provide 'explicit_gsd1'/'explicit_gsd2', attach PDS4 "
+                    "XML labels, or use overlapping scenes with structural texture."
+                ),
+                "match_count": 0,
+                "inlier_count": 0,
+                "metrics": None,
+                "homography": None,
+                "metadata": {
+                    "source": meta1.to_dict(),
+                    "reference": meta2.to_dict(),
+                    "scale_estimation_method": "failed",
+                    "working_scale": {"working_gsd_m": None,
+                                      "method": working_scale_note},
+                },
+            }
 
     work_w1 = int(round(orig_w1 / scale_factor1))
     work_h1 = int(round(orig_h1 / scale_factor1))
@@ -830,7 +1279,8 @@ def match_images_cfog(
             "status": "dimension_error",
             "message": (
                 f"Normalized physical image dimensions too small for multi-scale matching "
-                f"({work_w1}x{work_h1} px for source, {work_w2}x{work_h2} px for reference at {working_gsd}m/px; "
+                f"({work_w1}x{work_h1} px for source, {work_w2}x{work_h2} px for reference "
+                f"at {working_gsd}m/px [{scale_estimation_method}]; "
                 f"minimum required footprint is {MIN_WORKING_DIM}x{MIN_WORKING_DIM} px)."
             ),
             "match_count": 0,
@@ -840,7 +1290,9 @@ def match_images_cfog(
             "metadata": {
                 "source": meta1.to_dict(),
                 "reference": meta2.to_dict(),
-                "working_scale": {"working_gsd_m": working_gsd},
+                "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                "scale_estimation_method": scale_estimation_method,
+                "estimated_scale_ratio": estimated_scale_ratio,
             },
         }
 
@@ -901,14 +1353,15 @@ def match_images_cfog(
             output_dir=inv_temp_dir or output_dir,
             source_sensor=meta2.sensor,
             reference_sensor=meta1.sensor,
-            explicit_gsd1=meta2.gsd_m,
-            explicit_gsd2=meta1.gsd_m,
+            explicit_gsd1=_finite_gsd(meta2),
+            explicit_gsd2=_finite_gsd(meta1),
             explicit_emission1=meta2.emission_angle_deg,
             explicit_emission2=meta1.emission_angle_deg,
             grid_size=grid_size,
             max_matches_per_cell=max_matches_per_cell,
             patch_size_m=patch_size_m,
             multimodal_pair=multimodal_pair,
+            _cv_scale_ratio=estimated_scale_ratio,
             _is_inverted_call=True,
         )
 
@@ -919,7 +1372,9 @@ def match_images_cfog(
             fail_meta = {
                 "source": meta1.to_dict(),
                 "reference": meta2.to_dict(),
-                "working_scale": {"working_gsd_m": working_gsd},
+                "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                "scale_estimation_method": scale_estimation_method,
+                "estimated_scale_ratio": estimated_scale_ratio,
                 "direction": "inverted_from_BA",
                 "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
             }
@@ -933,9 +1388,11 @@ def match_images_cfog(
                 "metrics": None,
                 "homography": None,
                 "metadata": fail_meta,
-                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
-                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
-                "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": _finite_gsd(meta1)},
+                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": _finite_gsd(meta2)},
+                "working_scale": {"gsd_m": working_gsd, "method": working_scale_note},
+                "scale_estimation_method": scale_estimation_method,
+                "estimated_scale_ratio": estimated_scale_ratio,
                 "matches": [],
                 "all_matches": [],
                 "outputs": {},
@@ -960,13 +1417,17 @@ def match_images_cfog(
                 "metadata": {
                     "source": meta1.to_dict(),
                     "reference": meta2.to_dict(),
-                    "working_scale": {"working_gsd_m": working_gsd},
+                    "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                    "scale_estimation_method": scale_estimation_method,
+                    "estimated_scale_ratio": estimated_scale_ratio,
                     "direction": "inverted_from_BA",
                     "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
                 },
-                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
-                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
-                "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": _finite_gsd(meta1)},
+                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": _finite_gsd(meta2)},
+                "working_scale": {"gsd_m": working_gsd, "method": working_scale_note},
+                "scale_estimation_method": scale_estimation_method,
+                "estimated_scale_ratio": estimated_scale_ratio,
                 "matches": [],
                 "all_matches": [],
                 "outputs": {},
@@ -986,13 +1447,17 @@ def match_images_cfog(
                 "metadata": {
                     "source": meta1.to_dict(),
                     "reference": meta2.to_dict(),
-                    "working_scale": {"working_gsd_m": working_gsd},
+                    "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                    "scale_estimation_method": scale_estimation_method,
+                    "estimated_scale_ratio": estimated_scale_ratio,
                     "direction": "inverted_from_BA",
                     "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
                 },
-                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
-                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
-                "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": _finite_gsd(meta1)},
+                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": _finite_gsd(meta2)},
+                "working_scale": {"gsd_m": working_gsd, "method": working_scale_note},
+                "scale_estimation_method": scale_estimation_method,
+                "estimated_scale_ratio": estimated_scale_ratio,
                 "matches": [],
                 "all_matches": [],
                 "outputs": {},
@@ -1043,13 +1508,17 @@ def match_images_cfog(
                 "metadata": {
                     "source": meta1.to_dict(),
                     "reference": meta2.to_dict(),
-                    "working_scale": {"working_gsd_m": working_gsd},
+                    "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                    "scale_estimation_method": scale_estimation_method,
+                    "estimated_scale_ratio": estimated_scale_ratio,
                     "direction": "inverted_from_BA",
                     "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
                 },
-                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
-                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
-                "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": _finite_gsd(meta1)},
+                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": _finite_gsd(meta2)},
+                "working_scale": {"gsd_m": working_gsd, "method": working_scale_note},
+                "scale_estimation_method": scale_estimation_method,
+                "estimated_scale_ratio": estimated_scale_ratio,
                 "matches": [],
                 "all_matches": inverted_all_matches,
                 "outputs": {},
@@ -1057,12 +1526,23 @@ def match_images_cfog(
 
         metrics = compute_canonical_metrics(
             pts1_arr, pts2_arr, inlier_mask_arr, H_ab, (orig_h2, orig_w2), canonical_grid_size,
-            gsd_m=working_gsd, dem_data=dem_arr
+            gsd_m=metric_gsd, dem_data=dem_arr
         )
         metrics["direction"] = "inverted_from_BA"
         metrics["measured_direction"] = f"{meta2.sensor} -> {meta1.sensor}"
         metrics["matching_grid_size"] = matching_grid_size
         metrics["canonical_grid_size"] = canonical_grid_size
+        # Propagate illumination-compensation flags from the measured BA leg
+        # so the required metrics.json keys survive homography inversion.
+        try:
+            _inner = (res_ba.get("metrics") or {})
+            metrics["synthetic_reference_used"] = bool(_inner.get("synthetic_reference_used", False))
+            metrics["illumination_compensation"] = _inner.get("illumination_compensation", "none")
+            if "illumination_detail" in _inner:
+                metrics["illumination_detail"] = _inner["illumination_detail"]
+        except Exception:
+            metrics.setdefault("synthetic_reference_used", False)
+            metrics.setdefault("illumination_compensation", "none")
 
         fit_rmse = metrics.get("fit_rmse_px")
         tx_check = verify_transformation_quality(
@@ -1081,13 +1561,17 @@ def match_images_cfog(
                 "metadata": {
                     "source": meta1.to_dict(),
                     "reference": meta2.to_dict(),
-                    "working_scale": {"working_gsd_m": working_gsd},
+                    "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                    "scale_estimation_method": scale_estimation_method,
+                    "estimated_scale_ratio": estimated_scale_ratio,
                     "direction": "inverted_from_BA",
                     "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
                 },
-                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
-                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
-                "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+                "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": _finite_gsd(meta1)},
+                "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": _finite_gsd(meta2)},
+                "working_scale": {"gsd_m": working_gsd, "method": working_scale_note},
+                "scale_estimation_method": scale_estimation_method,
+                "estimated_scale_ratio": estimated_scale_ratio,
                 "matches": [],
                 "all_matches": inverted_all_matches,
                 "outputs": {},
@@ -1116,7 +1600,7 @@ def match_images_cfog(
                 "dtype": "uint8",
                 "nodata": 0,
                 "crs": raster_meta2.get("crs") or "+proj=eqc +lat_ts=0 +lon_0=0 +a=1737400 +b=1737400 +units=m +no_defs +type=crs",
-                "transform": raster_meta2.get("transform") or from_origin(0, orig_h2, meta2.gsd_m, meta2.gsd_m),
+                "transform": raster_meta2.get("transform") or from_origin(0, orig_h2, tag_gsd, tag_gsd),
             }
             with rasterio.open(str(tif_path), "w", **profile) as dst:
                 if warped_source.ndim == 3:
@@ -1145,12 +1629,15 @@ def match_images_cfog(
         cv2.imwrite(str(checker_path), blended)
 
         matches_path = out_path / "matches.json"
-        with open(matches_path, "w") as f:
-            json.dump([m for m in inverted_all_matches if m.get("is_inlier", False)], f, indent=4)
+        dump_matches_json(
+            [m for m in inverted_all_matches if m.get("is_inlier", False)],
+            matches_path,
+            indent=2,
+        )
 
         metrics_path = out_path / "metrics.json"
         with open(metrics_path, "w") as f:
-            json.dump(metrics, f, indent=4)
+            json.dump(sanitize_for_json(metrics), f, indent=2, cls=SubpixelJSONEncoder)
 
         transform_path = out_path / "transform.json"
         transform_data = {
@@ -1161,13 +1648,15 @@ def match_images_cfog(
             "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
         }
         with open(transform_path, "w") as f:
-            json.dump(transform_data, f, indent=4)
+            json.dump(sanitize_for_json(transform_data), f, indent=2, cls=SubpixelJSONEncoder)
 
         metadata_path = out_path / "metadata.json"
         full_metadata = {
             "source": meta1.to_dict(),
             "reference": meta2.to_dict(),
-            "working_scale": {"working_gsd_m": working_gsd, "method": "common_physical_gsd_normalization"},
+            "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+            "scale_estimation_method": scale_estimation_method,
+            "estimated_scale_ratio": estimated_scale_ratio,
             "terrain_correction": {"source": None, "reference": None},
             "direction": "inverted_from_BA",
             "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
@@ -1181,15 +1670,17 @@ def match_images_cfog(
             },
         }
         with open(metadata_path, "w") as f:
-            json.dump(full_metadata, f, indent=4)
+            json.dump(sanitize_for_json(full_metadata), f, indent=2, cls=SubpixelJSONEncoder)
 
         return {
             "status": "success",
             "direction": "inverted_from_BA",
             "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
-            "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": meta1.gsd_m},
-            "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": meta2.gsd_m},
-            "working_scale": {"gsd_m": working_gsd, "method": "common_physical_gsd"},
+            "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": _finite_gsd(meta1)},
+            "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": _finite_gsd(meta2)},
+            "working_scale": {"gsd_m": working_gsd, "method": working_scale_note},
+            "scale_estimation_method": scale_estimation_method,
+            "estimated_scale_ratio": estimated_scale_ratio,
             "metrics": metrics,
             "homography": H_ab.tolist(),
             "terrain_correction": full_metadata["terrain_correction"],
@@ -1237,11 +1728,71 @@ def match_images_cfog(
         _ti["sun_azimuth_deg_not_used_for_dem"] = _meta.sun_azimuth_deg
         _ti["sun_azimuth_provenance"] = _meta.provenance.get("sun_azimuth_deg")
 
+    # 4b. Sun-Angle-Invariant Intercept (DEM hillshade projection).
+    # Quality Gate 3 correctly rejects severe sun-angle mismatches (e.g. 162deg
+    # azimuth flip inverts crater-rim shadows and breaks Phase Congruency).
+    # When delta_azimuth > 90deg, render a synthetic shaded relief from the DEM
+    # under the SOURCE sun geometry and match against its Phase Congruency
+    # instead of the raw reference image.
+    delta_azimuth = sun_azimuth_delta_deg(meta1.sun_azimuth_deg, meta2.sun_azimuth_deg)
+    synthetic_reference_used = False
+    illumination_compensation = "none"
+    illumination_detail: Dict[str, Any] = {
+        "delta_azimuth_deg": delta_azimuth,
+        "threshold_deg": 90.0,
+        "source_azimuth_deg": meta1.sun_azimuth_deg,
+        "reference_azimuth_deg": meta2.sun_azimuth_deg,
+    }
+    # Reference-domain image actually fed to PC / sub-pixel refinement.
+    # Defaults to the real reference; swapped for synthetic hillshade on trigger.
+    match_ref_gray = comp2_gray
+    if delta_azimuth is not None and delta_azimuth > 90.0:
+        illumination_detail["triggered"] = True
+        if dem_arr is not None and meta1.sun_azimuth_deg is not None:
+            try:
+                src_az = float(meta1.sun_azimuth_deg)
+                src_el = resolve_sun_elevation_deg(meta1)
+                dem_work2 = cv2.resize(
+                    np.asarray(dem_arr, dtype=np.float32),
+                    (work_w2, work_h2),
+                    interpolation=cv2.INTER_LINEAR,
+                )
+                synth_gray = render_synthetic_shaded_relief(
+                    dem_work2, src_az, src_el, working_gsd_m=working_gsd
+                )
+                match_ref_gray = np.clip(synth_gray, 0.0, 1.0).astype(np.float32)
+                synthetic_reference_used = True
+                illumination_compensation = "dem_hillshade_projection"
+                illumination_detail.update({
+                    "synthetic_azimuth_deg": src_az,
+                    "synthetic_elevation_deg": src_el,
+                    "dem_resampled_to": [work_h2, work_w2],
+                })
+                logger.info(
+                    "Illumination intercept: delta_azimuth=%.1fdeg > 90deg; "
+                    "using synthetic DEM hillshade (src az=%.1f, el=%.1f) as PC reference.",
+                    delta_azimuth, src_az, src_el,
+                )
+            except Exception as e:
+                logger.warning("Synthetic hillshade projection failed (%s); using raw reference.", e)
+                illumination_detail["synthetic_error"] = str(e)
+        else:
+            illumination_detail["skipped_reason"] = (
+                "DEM or source sun-azimuth unavailable; cannot synthesize reference"
+            )
+            logger.warning(
+                "Illumination intercept triggered (delta_azimuth=%.1fdeg) but %s.",
+                delta_azimuth, illumination_detail["skipped_reason"],
+            )
+    else:
+        illumination_detail["triggered"] = False
+
     # 5. Phase Congruency (Illumination-Robust Structural Features)
     # --- PHASE 2: MULTI-SCALE FEATURE EXTRACTION ---
-    # Compute Phase Congruency at 3 scales to handle the 16-20x OHRC/TMC gap
+    # Compute Phase Congruency at 3 scales to handle the 16-20x OHRC/TMC gap.
+    # In synthetic mode pc2 comes from the hillshade map, not the raw reference.
     pc1_pyramid = multi_scale_phase_congruency(comp1_gray, scales=3)
-    pc2_pyramid = multi_scale_phase_congruency(comp2_gray, scales=3)
+    pc2_pyramid = multi_scale_phase_congruency(match_ref_gray, scales=3)
 
     # For the rest of the pipeline, we will use the finest scale (Level 0) for now
     # to maintain compatibility with existing coarse matching logic.
@@ -1291,9 +1842,12 @@ def match_images_cfog(
     )
 
     # Correlation matching on spatially uniform pre-match SSC keypoints
+    # NOTE: kx/ky may be sub-pixel (goodFeaturesToTrack floats). Keep the
+    # full float for reported work_x1/work_y1; integers are slicing-only.
     for kx, ky, _ in kps1_ssc:
-        cx = int(round(kx))
-        cy = int(round(ky))
+        kx_f, ky_f = float(kx), float(ky)
+        cx = int(round(kx_f))
+        cy = int(round(ky_f))
 
         if (
             cy < half_patch_c
@@ -1337,11 +1891,11 @@ def match_images_cfog(
         if max_val > (0.05 if multimodal_pair else 0.35):
             best_x2 = s_min_x + max_loc[0] + half_patch_c
             best_y2 = s_min_y + max_loc[1] + half_patch_c
-            gx = min(grid_size - 1, int(cx / max(cell_w, 1e-6)))
-            gy = min(grid_size - 1, int(cy / max(cell_h, 1e-6)))
+            gx = min(grid_size - 1, int(kx_f / max(cell_w, 1e-6)))
+            gy = min(grid_size - 1, int(ky_f / max(cell_h, 1e-6)))
             coarse_matches.append({
-                "work_x1": float(cx),
-                "work_y1": float(cy),
+                "work_x1": float(kx_f),
+                "work_y1": float(ky_f),
                 "work_x2": float(best_x2),
                 "work_y2": float(best_y2),
                 "score": float(max_val),
@@ -1564,7 +2118,9 @@ def match_images_cfog(
             "metadata": {
                 "source": meta1.to_dict(),
                 "reference": meta2.to_dict(),
-                "working_scale": {"working_gsd_m": working_gsd},
+                "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                "scale_estimation_method": scale_estimation_method,
+                "estimated_scale_ratio": estimated_scale_ratio,
             },
         }
 
@@ -1579,8 +2135,13 @@ def match_images_cfog(
     refinement_records = []
 
     for m in selected_matches:
-        wx1, wy1 = int(m["work_x1"]), int(m["work_y1"])
-        wx2, wy2 = int(m["work_x2"]), int(m["work_y2"])
+        # Preserve sub-pixel precision: keep working-space coords as float
+        # for all native-space math. Integer pixels are used ONLY for array
+        # slicing, never for the reported coordinates.
+        wx1_f, wy1_f = float(m["work_x1"]), float(m["work_y1"])
+        wx2_f, wy2_f = float(m["work_x2"]), float(m["work_y2"])
+        wx1, wy1 = int(round(wx1_f)), int(round(wy1_f))
+        wx2, wy2 = int(round(wx2_f)), int(round(wy2_f))
 
         ref_dx, ref_dy = 0.0, 0.0
         refined = False
@@ -1596,36 +2157,34 @@ def match_images_cfog(
             and wx2 < work_w2 - half_p
         ):
             p1 = comp1_gray[wy1 - half_p : wy1 + half_p, wx1 - half_p : wx1 + half_p]
-            p2 = comp2_gray[wy2 - half_p : wy2 + half_p, wx2 - half_p : wx2 + half_p]
+            # In synthetic mode match_ref_gray IS the DEM hillshade rendered
+            # under the source sun angles, keeping refinement in the same
+            # domain as the coarse PC matching.
+            p2 = match_ref_gray[wy2 - half_p : wy2 + half_p, wx2 - half_p : wx2 + half_p]
 
             dx, dy, peak, valid = subpixel_phase_correlation(p1, p2)
             if valid:
-                ref_dx, ref_dy = dx, dy
+                ref_dx, ref_dy = float(dx), float(dy)
                 refined = True
 
         # Map working-scale coordinates back to NATIVE sensor pixel spaces
-        nat_x1 = float(wx1 * scale_factor1)
-        nat_y1 = float(wy1 * scale_factor1)
-        nat_x2 = float((wx2 + ref_dx) * scale_factor2)
-        nat_y2 = float((wy2 + ref_dy) * scale_factor2)
+        # using the full-precision floats (never the truncated ints).
+        nat_x1 = float(wx1_f * scale_factor1)
+        nat_y1 = float(wy1_f * scale_factor1)
+        nat_x2 = float((wx2_f + ref_dx) * scale_factor2)
+        nat_y2 = float((wy2_f + ref_dy) * scale_factor2)
 
         native_pts1.append([nat_x1, nat_y1])
         native_pts2.append([nat_x2, nat_y2])
 
-        refinement_records.append({
-            "source_x": round(nat_x1, 2),
-            "source_y": round(nat_y1, 2),
-            "target_x": round(nat_x2, 2),
-            "target_y": round(nat_y2, 2),
-            "image1_x": round(nat_x1, 2),
-            "image1_y": round(nat_y1, 2),
-            "image2_x": round(nat_x2, 2),
-            "image2_y": round(nat_y2, 2),
-            "confidence": round(m["score"], 4),
-            "refinement_dx": round(float(ref_dx), 3),
-            "refinement_dy": round(float(ref_dy), 3),
-            "is_refined": refined,
-        })
+        # Coordinates: full float() precision (no round/int). Only
+        # confidence may be rounded (2 decimals for readability).
+        refinement_records.append(make_match_record(
+            nat_x1, nat_y1, nat_x2, nat_y2, m["score"],
+            refinement_dx=float(ref_dx),
+            refinement_dy=float(ref_dy),
+            is_refined=bool(refined),
+        ))
 
     # --- PHASE 4: AI MATCH VERIFICATION ---
     # Use Supervised Machine Learning to filter out false-positive matches
@@ -1763,12 +2322,21 @@ def match_images_cfog(
                 "inlier_count": int(np.sum(inlier_mask)) if inlier_mask is not None else 0,
                 "metrics": None,
                 "homography": None,
-                "metadata": {
-                    "source": meta1.to_dict(),
-                    "reference": meta2.to_dict(),
-                    "working_scale": {"working_gsd_m": working_gsd},
-                },
-            }
+            "metadata": {
+                "source": meta1.to_dict(),
+                "reference": meta2.to_dict(),
+                "scale_estimation_method": scale_estimation_method,
+                "estimated_scale_ratio": estimated_scale_ratio,
+                "working_scale": {"working_gsd_m": working_gsd,
+                                  "method": working_scale_note},
+            },
+        }
+
+    # Effective GSD for metric reporting: None in CV-fallback mode so that
+    # absolute RMSE in meters is reported as unavailable (relative units only).
+    metric_gsd: Optional[float] = working_gsd if scale_estimation_method == "pds4_metadata" else None
+    # NaN-safe GSD for GeoTIFF geotransform tags (relative grid when unknown).
+    tag_gsd = working_gsd if np.isfinite(working_gsd) else 1.0
 
     # QUALITY GATE 3: Sanity Check Transformation Conditioning
     # Include inlier fit RMSE so excessive residuals fail here, not silently.
@@ -1792,7 +2360,9 @@ def match_images_cfog(
             "metadata": {
                 "source": meta1.to_dict(),
                 "reference": meta2.to_dict(),
-                "working_scale": {"working_gsd_m": working_gsd},
+                "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                "scale_estimation_method": scale_estimation_method,
+                "estimated_scale_ratio": estimated_scale_ratio,
             },
         }
 
@@ -1813,14 +2383,17 @@ def match_images_cfog(
             "metadata": {
                 "source": meta1.to_dict(),
                 "reference": meta2.to_dict(),
-                "working_scale": {"working_gsd_m": working_gsd},
+                "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                "scale_estimation_method": scale_estimation_method,
+                "estimated_scale_ratio": estimated_scale_ratio,
             },
         }
 
-    # Mark inliers in records
+    # Mark inliers in records (guard: AI-verifier filtering can leave the
+    # RANSAC point set shorter than the full refinement record list).
     inlier_flat = inlier_mask.ravel()
     for i, rec in enumerate(refinement_records):
-        rec["is_inlier"] = bool(inlier_flat[i] == 1)
+        rec["is_inlier"] = bool(i < len(inlier_flat) and inlier_flat[i] == 1)
     n_inliers_pre_refill = int(np.sum(inlier_mask))
 
     # --- Guided refill: H-constrained second pass over unused SSC keypoints ---
@@ -1851,23 +2424,21 @@ def match_images_cfog(
             if _g_tx.get("is_valid"):
                 for g in guided:
                     selected_matches.append(g)
-                    refinement_records.append({
-                        "source_x": round(float(g["work_x1"]) * scale_factor1, 2),
-                        "source_y": round(float(g["work_y1"]) * scale_factor1, 2),
-                        "target_x": round(float(g["work_x2"]) * scale_factor2, 2),
-                        "target_y": round(float(g["work_y2"]) * scale_factor2, 2),
-                        "image1_x": round(float(g["work_x1"]) * scale_factor1, 2),
-                        "image1_y": round(float(g["work_y1"]) * scale_factor1, 2),
-                        "image2_x": round(float(g["work_x2"]) * scale_factor2, 2),
-                        "image2_y": round(float(g["work_y2"]) * scale_factor2, 2),
-                        "confidence": round(float(g["score"]), 4),
-                        "refinement_dx": 0.0, "refinement_dy": 0.0,
-                        "is_refined": False, "method": "guided_refill",
-                    })
+                    refinement_records.append(make_match_record(
+                        float(g["work_x1"]) * scale_factor1,
+                        float(g["work_y1"]) * scale_factor1,
+                        float(g["work_x2"]) * scale_factor2,
+                        float(g["work_y2"]) * scale_factor2,
+                        float(g["score"]),
+                        refinement_dx=0.0,
+                        refinement_dy=0.0,
+                        is_refined=False,
+                        method="guided_refill",
+                    ))
                 pts1_arr, pts2_arr, H_final, inlier_mask = aug1, aug2, H_g, mask_g
                 inlier_flat = inlier_mask.ravel()
                 for i, rec in enumerate(refinement_records):
-                    rec["is_inlier"] = bool(inlier_flat[i] == 1)
+                    rec["is_inlier"] = bool(i < len(inlier_flat) and inlier_flat[i] == 1)
                 logger.info("Guided refill: inliers %d -> %d (+%d measured)",
                             n_inliers_pre_refill, int(np.sum(mask_g)), len(guided))
             else:
@@ -1879,7 +2450,7 @@ def match_images_cfog(
 
     # --- Item 3: Post-RANSAC Lucas-Kanade Sub-Pixel Refinement (OHRC↔TMC-2 only) ---
     lk_stats: Optional[Dict[str, Any]] = None
-    if not multimodal_pair and comp1_gray.shape == comp2_gray.shape and int(np.sum(inlier_mask)) >= 4:
+    if not multimodal_pair and comp1_gray.shape == match_ref_gray.shape and int(np.sum(inlier_mask)) >= 4:
         inlier_idx_lk = np.where(inlier_mask.ravel() == 1)[0]
         lk_src = pts1_arr[inlier_idx_lk]
         lk_dst = pts2_arr[inlier_idx_lk]
@@ -1953,22 +2524,27 @@ def match_images_cfog(
                     pts2_arr[refined_inlier_indices] = dst_c
 
             # Update match records with refined coordinates for downstream use
+            # Full float() precision — never round() coordinates.
             for j, idx in enumerate(inlier_idx_lk):
                 if idx < len(refinement_records):
                     if debug_pts and j < len(debug_pts) and debug_pts[j]["passed"]:
-                        refinement_records[idx]["target_x"] = round(float(refined_dst[j, 0]), 2)
-                        refinement_records[idx]["target_y"] = round(float(refined_dst[j, 1]), 2)
-                        refinement_records[idx]["image2_x"] = round(float(refined_dst[j, 0]), 2)
-                        refinement_records[idx]["image2_y"] = round(float(refined_dst[j, 1]), 2)
+                        refinement_records[idx]["target_x"] = float(refined_dst[j, 0])
+                        refinement_records[idx]["target_y"] = float(refined_dst[j, 1])
+                        refinement_records[idx]["image2_x"] = float(refined_dst[j, 0])
+                        refinement_records[idx]["image2_y"] = float(refined_dst[j, 1])
                         refinement_records[idx]["lk_refined"] = True
 
     # 9. Compute Canonical Master Metrics (fixed 10x10 reporting grid)
     metrics = compute_canonical_metrics(
         pts1_arr, pts2_arr, inlier_mask, H_final, (orig_h2, orig_w2), canonical_grid_size,
-        gsd_m=working_gsd, dem_data=dem_arr
+        gsd_m=metric_gsd, dem_data=dem_arr
     )
     metrics["matching_grid_size"] = matching_grid_size
     metrics["canonical_grid_size"] = canonical_grid_size
+    # SIH illumination-invariance audit trail (required keys).
+    metrics["synthetic_reference_used"] = bool(synthetic_reference_used)
+    metrics["illumination_compensation"] = illumination_compensation
+    metrics["illumination_detail"] = illumination_detail
     if lk_stats:
         metrics["lk_refinement"] = lk_stats
 
@@ -1988,7 +2564,9 @@ def match_images_cfog(
             "metadata": {
                 "source": meta1.to_dict(),
                 "reference": meta2.to_dict(),
-                "working_scale": {"working_gsd_m": working_gsd},
+                "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                "scale_estimation_method": scale_estimation_method,
+                "estimated_scale_ratio": estimated_scale_ratio,
             },
         }
 
@@ -2020,7 +2598,7 @@ def match_images_cfog(
             "dtype": "uint8",
             "nodata": 0,
             "crs": raster_meta2.get("crs") or "+proj=eqc +lat_ts=0 +lon_0=0 +a=1737400 +b=1737400 +units=m +no_defs +type=crs",
-            "transform": raster_meta2.get("transform") or from_origin(0, orig_h2, meta2.gsd_m, meta2.gsd_m),
+            "transform": raster_meta2.get("transform") or from_origin(0, orig_h2, tag_gsd, tag_gsd),
         }
         with rasterio.open(str(tif_path), "w", **profile) as dst:
             if warped_source.ndim == 3:
@@ -2056,15 +2634,14 @@ def match_images_cfog(
     checker_path = out_path / "registered_checkerboard.png"
     cv2.imwrite(str(checker_path), blended)
 
-    # E. Save matches JSON
+    # E. Save matches JSON (sub-pixel precision preserved, indent=2)
     matches_path = out_path / "matches.json"
-    with open(matches_path, "w") as f:
-        json.dump(refinement_records, f, indent=4)
+    dump_matches_json(refinement_records, matches_path, indent=2)
 
     # F. Save metrics JSON
     metrics_path = out_path / "metrics.json"
     with open(metrics_path, "w") as f:
-        json.dump(metrics, f, indent=4)
+        json.dump(sanitize_for_json(metrics), f, indent=2, cls=SubpixelJSONEncoder)
 
     # G. Save transform JSON
     transform_path = out_path / "transform.json"
@@ -2075,7 +2652,7 @@ def match_images_cfog(
         "direction": "native",
     }
     with open(transform_path, "w") as f:
-        json.dump(transform_data, f, indent=4)
+        json.dump(sanitize_for_json(transform_data), f, indent=2, cls=SubpixelJSONEncoder)
 
     # H. Save metadata JSON
     metadata_path = out_path / "metadata.json"
@@ -2084,12 +2661,17 @@ def match_images_cfog(
         "reference": meta2.to_dict(),
         "working_scale": {
             "working_gsd_m": working_gsd,
-            "method": "common_physical_gsd_normalization",
+            "method": working_scale_note,
         },
+        "scale_estimation_method": scale_estimation_method,
+        "estimated_scale_ratio": estimated_scale_ratio,
         "terrain_correction": {
             "source": terrain_info1,
             "reference": terrain_info2,
         },
+        "illumination_compensation": illumination_compensation,
+        "synthetic_reference_used": bool(synthetic_reference_used),
+        "illumination_detail": illumination_detail,
         "direction": "native",
         "provenance": {
             "source_path": str(img_path1),
@@ -2099,10 +2681,12 @@ def match_images_cfog(
             "spatial_attempts": spatial_attempts,
             "coarse_matcher": "mutual_information" if multimodal_pair else "normalized_correlation",
             "direction": "native",
+            "illumination_compensation": illumination_compensation,
+            "synthetic_reference_used": bool(synthetic_reference_used),
         },
     }
     with open(metadata_path, "w") as f:
-        json.dump(full_metadata, f, indent=4)
+        json.dump(sanitize_for_json(full_metadata), f, indent=2, cls=SubpixelJSONEncoder)
 
     abs_str = f"{metrics['absolute_rmse_m']:.2f} m" if metrics.get("absolute_rmse_m") is not None else "N/A"
     logger.info(
@@ -2121,20 +2705,24 @@ def match_images_cfog(
             "sensor": meta1.sensor,
             "width": orig_w1,
             "height": orig_h1,
-            "gsd_m": meta1.gsd_m,
+            "gsd_m": _finite_gsd(meta1),
         },
         "reference": {
             "sensor": meta2.sensor,
             "width": orig_w2,
             "height": orig_h2,
-            "gsd_m": meta2.gsd_m,
+            "gsd_m": _finite_gsd(meta2),
         },
         "working_scale": {
             "gsd_m": working_gsd,
-            "method": "common_physical_gsd",
+            "method": working_scale_note,
         },
+        "scale_estimation_method": scale_estimation_method,
+        "estimated_scale_ratio": estimated_scale_ratio,
         "metrics": metrics,
         "homography": H_final.tolist(),
+        "synthetic_reference_used": bool(synthetic_reference_used),
+        "illumination_compensation": illumination_compensation,
         "terrain_correction": full_metadata["terrain_correction"],
         "spatial_attempts": spatial_attempts,
         "matches": [m for m in refinement_records if m.get("is_inlier", False)],
