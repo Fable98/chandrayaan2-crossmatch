@@ -248,35 +248,67 @@ def load_as_float_and_color(path: str | Path) -> Tuple[np.ndarray, np.ndarray, D
 # 2. Phase 1: Adaptive Illumination Normalization
 # ---------------------------------------------------------------------------
 
-def adaptive_illumination_normalization(img_gray: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def adaptive_illumination_normalization(
+    img_gray: np.ndarray,
+    enable_high_pass: bool = True,
+) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Phase 1: Adaptive Illumination Normalization
-    Purpose: Mitigate extreme sun angle variations and shadow artifacts
-             before Phase Congruency feature extraction.
-    Method: CLAHE for local contrast equalization + Shadow Masking.
+    Phase 1: Adaptive Photometric Illumination Normalization
+    Purpose: Mitigate extreme sun angle variations, directional lighting ramps,
+             and shadow artifacts before Phase Congruency feature extraction.
+    Method:
+      1. High-pass division / phase-ratio normalization to eliminate macro terrain
+         tilt and slowly-varying solar illumination ramps.
+      2. CLAHE for local contrast equalization.
+      3. Shadow & saturation masking to zero out non-informative extreme pixels.
     Returns: (normalized_image, valid_mask)
     """
-    # 1. CLAHE to normalize local contrast (sun angle invariance)
+    img_f = np.clip(np.asarray(img_gray, dtype=np.float32), 0.0, 1.0)
+    h, w = img_f.shape[:2]
+
+    # 1. High-pass / phase-ratio background normalization to suppress macro solar gradients
+    if enable_high_pass and h >= 32 and w >= 32:
+        sigma_large = max(15, min(h, w) // 16)
+        if sigma_large % 2 == 0:
+            sigma_large += 1
+        background = cv2.GaussianBlur(img_f, (0, 0), sigma_large)
+        diff = img_f - background
+
+        # Local texture energy / standard deviation estimation
+        local_energy = np.sqrt(
+            cv2.GaussianBlur(diff ** 2, (0, 0), 5.0) + 1e-5
+        )
+        hp_norm = diff / (local_energy + 1e-4)
+
+        # Percentile clipping into [0, 1]
+        p_low = float(np.percentile(hp_norm, 2.0))
+        p_high = float(np.percentile(hp_norm, 98.0))
+        if p_high > p_low + 1e-5:
+            hp_norm = np.clip((hp_norm - p_low) / (p_high - p_low), 0.0, 1.0)
+        else:
+            hp_norm = img_f
+    else:
+        hp_norm = img_f
+
+    # 2. CLAHE to normalize local contrast
     clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-    img_uint8 = np.clip(img_gray * 255.0, 0, 255).astype(np.uint8)
+    img_uint8 = np.clip(hp_norm * 255.0, 0, 255).astype(np.uint8)
     clahe_img = clahe.apply(img_uint8).astype(np.float32) / 255.0
 
-    # 2. Shadow & Saturation Mask Generation
-    # Shadows typically fall in the bottom percentile of pixel intensities.
-    # We create a mask where 1.0 = valid texture, 0.0 = deep shadow or pure white saturation.
-    shadow_threshold = np.percentile(img_gray, 5.0) 
-    saturation_threshold = np.percentile(img_gray, 99.5)
+    # 3. Shadow & Saturation Mask Generation
+    shadow_threshold = float(np.percentile(img_f, 5.0))
+    saturation_threshold = float(np.percentile(img_f, 99.5))
 
-    valid_mask = ((img_gray >= shadow_threshold) & (img_gray <= saturation_threshold)).astype(np.float32)
+    valid_mask = ((img_f >= shadow_threshold) & (img_f <= saturation_threshold)).astype(np.float32)
 
-    # Apply a slight Gaussian blur to the mask to avoid harsh edge artifacts in the FFT
+    # Apply Gaussian blur to the mask to avoid harsh edge artifacts in the FFT
     valid_mask = cv2.GaussianBlur(valid_mask, (5, 5), 0)
 
-    # 3. Multiply CLAHE image by the mask so shadows become neutral (0.0)
-    # This prevents Phase Congruency from generating false edges in pitch-black shadows
+    # 4. Modulate with valid mask so deep shadows become neutral
     normalized_img = clahe_img * valid_mask
 
     return normalized_img, valid_mask
+
 
 
 # ---------------------------------------------------------------------------
@@ -673,6 +705,74 @@ def resolve_sun_elevation_deg(meta) -> float:
     return 45.0
 
 
+def compute_dem_cast_shadows(
+    dem: np.ndarray,
+    azimuth_deg: float = 0.0,
+    elevation_deg: float = 45.0,
+    working_gsd_m: float = 5.0,
+    max_dist_px: int = 150,
+    target_azimuth_deg: Optional[float] = None,
+    target_elevation_deg: Optional[float] = None,
+) -> np.ndarray:
+    """
+    Vectorized ray-marched cast shadow computation on a 2D DEM array.
+    Traces solar sightlines along azimuth and elevation angles. If intervening
+    terrain along the sun ray exceeds the ray altitude, the pixel is marked in shadow.
+
+    Returns:
+        (H, W) float32 shadow factor in [0, 1] (0 = deep cast shadow, 1 = direct sunlight).
+    """
+    h, w = dem.shape[:2]
+    az = float(target_azimuth_deg if target_azimuth_deg is not None else azimuth_deg)
+    el = float(target_elevation_deg if target_elevation_deg is not None else elevation_deg)
+    az_rad = np.radians(az % 360.0)
+    el_rad = np.radians(np.clip(el, 2.0, 88.0))
+    tan_el = np.tan(el_rad)
+
+    # Unit direction pointing towards the sun in image coordinates:
+    # 0 deg = North (-y), 90 deg = East (+x), 180 deg = South (+y), 270 deg = West (-x)
+    dx = np.sin(az_rad)
+    dy = -np.cos(az_rad)
+
+    step = 1.0 / max(abs(dx), abs(dy), 1e-4)
+    step_x = dx * step
+    step_y = dy * step
+    step_dist_m = float(np.sqrt(step_x**2 + step_y**2) * max(working_gsd_m, 1e-3))
+
+    in_shadow = np.zeros((h, w), dtype=bool)
+    n_steps = min(int(max_dist_px / step), max(h, w))
+
+    for k in range(1, n_steps + 1):
+        shift_x = int(round(k * step_x))
+        shift_y = int(round(k * step_y))
+        dist_m = k * step_dist_m
+        height_thresh_offset = dist_m * tan_el
+
+        src_y1 = max(0, shift_y)
+        src_y2 = min(h, h + shift_y)
+        dst_y1 = max(0, -shift_y)
+        dst_y2 = min(h, h - shift_y)
+
+        src_x1 = max(0, shift_x)
+        src_x2 = min(w, w + shift_x)
+        dst_x1 = max(0, -shift_x)
+        dst_x2 = min(w, w - shift_x)
+
+        if src_y2 <= src_y1 or src_x2 <= src_x1 or dst_y2 <= dst_y1 or dst_x2 <= dst_x1:
+            break
+
+        intervening_z = dem[src_y1:src_y2, src_x1:src_x2]
+        base_z = dem[dst_y1:dst_y2, dst_x1:dst_x2]
+
+        occluded = intervening_z > (base_z + height_thresh_offset)
+        in_shadow[dst_y1:dst_y2, dst_x1:dst_x2] |= occluded
+
+    shadow_factor = np.where(in_shadow, 0.0, 1.0).astype(np.float32)
+    # Smooth shadow boundary slightly to suppress sharp ringing artifacts in FFT
+    shadow_factor = cv2.GaussianBlur(shadow_factor, (3, 3), 0)
+    return shadow_factor
+
+
 def render_synthetic_shaded_relief(
     dem_array: np.ndarray,
     target_azimuth_deg: float,
@@ -680,9 +780,11 @@ def render_synthetic_shaded_relief(
     working_gsd_m: float = 5.0,
     z_factor: float = 1.0,
     blur_ksize: int = 3,
+    cast_shadows: bool = True,
 ) -> np.ndarray:
     """
-    Pure NumPy/OpenCV GIS hillshade (Esri-style) rendered from a DEM.
+    Pure NumPy/OpenCV GIS hillshade (Esri-style) rendered from a DEM with
+    physical ray-marched cast shadows.
 
     Args:
         dem_array: (H, W) elevation in meters (e.g. 1000..5000). NaNs allowed.
@@ -693,6 +795,7 @@ def render_synthetic_shaded_relief(
         z_factor: Vertical exaggeration (1.0 = true scale).
         blur_ksize: Gaussian blur kernel (odd, >=3) applied to suppress
             high-frequency DEM noise before Phase Congruency.
+        cast_shadows: When True, compute ray-marched cast shadows along the solar vector.
 
     Returns:
         (H, W) float32 shaded relief normalized to [0, 1].
@@ -733,6 +836,19 @@ def render_synthetic_shaded_relief(
         + np.sin(zenith_rad) * np.sin(slope_rad) * np.cos(azimuth_math - aspect_rad)
     )
     shade = np.clip(shade, 0.0, 1.0).astype(np.float32)
+
+    # Modulate with ray-marched cast shadows for true lunar orbital realism
+    if cast_shadows:
+        try:
+            shadow_mask = compute_dem_cast_shadows(
+                dem,
+                target_azimuth_deg=az,
+                elevation_deg=el,
+                working_gsd_m=gsd,
+            )
+            shade = shade * shadow_mask
+        except Exception as exc:
+            logger.warning("DEM cast shadow computation skipped: %s", exc)
 
     # Suppress high-frequency DEM noise / fake micro-craters before PC.
     k = int(blur_ksize) if int(blur_ksize) >= 3 else 3
@@ -875,6 +991,69 @@ def detect_blob_centroids(image: np.ndarray, min_area: int = 3) -> np.ndarray:
     return np.asarray(found, dtype=np.float32).reshape(-1, 2)
 
 
+def find_best_correspondence_unified(
+    search_region: np.ndarray,
+    tmpl: np.ndarray,
+    multimodal_pair: bool = False,
+    w_mi: float = 0.6,
+    w_ncc: float = 0.4,
+    top_k: int = 5,
+) -> Tuple[float, Tuple[int, int]]:
+    """
+    Find best match location in search_region for tmpl across a unified similarity surface.
+
+    - When multimodal_pair is True:
+        Evaluates top-K candidate peaks from normalized cross correlation on a joint surface:
+        S = w_mi * NMI(tmpl, cand) + w_ncc * max(0.0, NCC)
+        ensuring candidate peak selection is guided by both mutual information and correlation.
+    - When multimodal_pair is False:
+        Operates purely on normalized cross-correlation (cv2.matchTemplate TM_CCOEFF_NORMED).
+
+    Returns:
+        (best_score, (best_x, best_y))
+    """
+    res = cv2.matchTemplate(search_region, tmpl, cv2.TM_CCOEFF_NORMED)
+    if not multimodal_pair:
+        _, max_val, _, max_loc = cv2.minMaxLoc(res)
+        return float(max_val), max_loc
+
+    th, tw = tmpl.shape[:2]
+    flat = res.ravel()
+    k = min(top_k, flat.size)
+    if k <= 1:
+        _, max_val, _, max_loc = cv2.minMaxLoc(res)
+        cand = search_region[max_loc[1] : max_loc[1] + th, max_loc[0] : max_loc[0] + tw]
+        if cand.shape == tmpl.shape:
+            mi = mutual_information_score(tmpl, cand)
+            score = w_mi * mi + w_ncc * max(0.0, float(max_val))
+        else:
+            score = float(max_val)
+        return float(score), max_loc
+
+    top_indices = np.argpartition(-flat, k)[:k]
+    top_indices = top_indices[np.argsort(-flat[top_indices])]
+
+    best_score = -1.0
+    best_loc = (0, 0)
+    for idx in top_indices:
+        cy, cx = np.unravel_index(idx, res.shape)
+        cand = search_region[cy : cy + th, cx : cx + tw]
+        if cand.shape != tmpl.shape:
+            continue
+        ncc_val = max(0.0, float(res[cy, cx]))
+        mi_val = mutual_information_score(tmpl, cand)
+        joint_score = float(w_mi * mi_val + w_ncc * ncc_val)
+        if joint_score > best_score:
+            best_score = joint_score
+            best_loc = (int(cx), int(cy))
+
+    if best_score < 0.0:
+        _, max_val, _, max_loc = cv2.minMaxLoc(res)
+        return float(max_val), max_loc
+
+    return float(best_score), best_loc
+
+
 def apply_grid_nms(
     matches: List[Dict[str, Any]] | np.ndarray,
     image_shape: Tuple[int, int] = (512, 512),
@@ -982,6 +1161,61 @@ def verify_spatial_quality_gate(
     return True, "Spatial distribution gate passed", details
 
 
+def _continuous_float32_lk_track(
+    img1: np.ndarray,
+    img2: np.ndarray,
+    pt1: np.ndarray,
+    pt2_init: np.ndarray,
+    win_size: int = 15,
+    max_iters: int = 30,
+    eps: float = 0.01,
+) -> Tuple[bool, np.ndarray]:
+    """
+    Subpixel Gauss-Newton Lucas-Kanade optical flow on continuous float32 image patches.
+    Operates on true continuous float representations without uint8 quantization artifacts.
+    """
+    h, w = img1.shape[:2]
+    half_w = win_size / 2.0
+    x1, y1 = float(pt1[0]), float(pt1[1])
+    if x1 - half_w < 0 or x1 + half_w >= w or y1 - half_w < 0 or y1 + half_w >= h:
+        return False, np.array([x1, y1], dtype=np.float32)
+
+    T = cv2.getRectSubPix(img1, (win_size, win_size), (x1, y1))
+    Ix = cv2.Sobel(T, cv2.CV_32F, 1, 0, ksize=3) / 8.0
+    Iy = cv2.Sobel(T, cv2.CV_32F, 0, 1, ksize=3) / 8.0
+
+    gxx = float(np.sum(Ix * Ix))
+    gyy = float(np.sum(Iy * Iy))
+    gxy = float(np.sum(Ix * Iy))
+
+    det = gxx * gyy - gxy * gxy
+    tr = gxx + gyy
+    min_eig = (tr - np.sqrt(max(0.0, tr * tr - 4.0 * det))) / 2.0
+    if min_eig < 1e-4 or det < 1e-7:
+        return False, np.array(pt2_init, dtype=np.float32)
+
+    inv_det = 1.0 / det
+    h_inv = np.array([[gyy, -gxy], [-gxy, gxx]], dtype=np.float32) * inv_det
+
+    x2, y2 = float(pt2_init[0]), float(pt2_init[1])
+    h2, w2 = img2.shape[:2]
+
+    for _ in range(max_iters):
+        if x2 - half_w < 0 or x2 + half_w >= w2 or y2 - half_w < 0 or y2 + half_w >= h2:
+            return False, np.array([x2, y2], dtype=np.float32)
+        W = cv2.getRectSubPix(img2, (win_size, win_size), (x2, y2))
+        err = T - W
+        bx = float(np.sum(Ix * err))
+        by = float(np.sum(Iy * err))
+        dp = h_inv @ np.array([bx, by], dtype=np.float32)
+        x2 += float(dp[0])
+        y2 += float(dp[1])
+        if float(np.linalg.norm(dp)) < eps:
+            return True, np.array([x2, y2], dtype=np.float32)
+
+    return True, np.array([x2, y2], dtype=np.float32)
+
+
 def refine_inliers_lucas_kanade(
     work_feat1: np.ndarray,
     work_feat2: np.ndarray,
@@ -995,12 +1229,12 @@ def refine_inliers_lucas_kanade(
 ) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
     """
     Post-RANSAC Lucas-Kanade optical flow refinement for sub-pixel accuracy.
-    Refines each inlier match position via iterative LK optical flow with
-    forward-backward consistency verification on structural feature maps.
+    Refines each inlier match position via continuous float32 Gauss-Newton LK optical flow
+    with forward-backward consistency verification directly on normalized float feature maps.
 
     Args:
-        work_feat1: Working-scale source structural feature map (e.g. Phase Congruency) [0, 1].
-        work_feat2: Working-scale reference structural feature map [0, 1].
+        work_feat1: Working-scale source structural feature map [0, 1] (float32).
+        work_feat2: Working-scale reference structural feature map [0, 1] (float32).
         inlier_src: (N, 2) native-space source points.
         inlier_dst: (N, 2) native-space destination points.
         scale_factor1: Conversion from native px to working px for source.
@@ -1016,77 +1250,54 @@ def refine_inliers_lucas_kanade(
     if n == 0:
         return inlier_src.copy(), inlier_dst.copy(), {"refined_count": 0, "total": 0}
 
-    # Convert normalized structural feature representations to uint8 for OpenCV LK
-    img1_u8 = (np.clip(work_feat1, 0.0, 1.0) * 255.0).astype(np.uint8)
-    img2_u8 = (np.clip(work_feat2, 0.0, 1.0) * 255.0).astype(np.uint8)
+    # Maintain continuous float32 feature representations (no uint8 quantization)
+    img1_f32 = np.clip(work_feat1, 0.0, 1.0).astype(np.float32)
+    img2_f32 = np.clip(work_feat2, 0.0, 1.0).astype(np.float32)
 
     # Map native-space dst points into working-scale space
     work_dst = inlier_dst.copy()
     work_dst[:, 0] /= scale_factor2
     work_dst[:, 1] /= scale_factor2
-    pts_fwd = work_dst.reshape(-1, 1, 2).astype(np.float32)
 
     work_src_pts = inlier_src.copy()
     work_src_pts[:, 0] /= scale_factor1
     work_src_pts[:, 1] /= scale_factor1
-    pts_src_lk = work_src_pts.reshape(-1, 1, 2).astype(np.float32)
-
-    # CRITICAL: Preserve copies of initial target and source points before LK
-    # because cv2.calcOpticalFlowPyrLK mutates the nextPts array in place!
-    initial_target = pts_fwd.copy()
-    initial_source = pts_src_lk.copy()
-
-    lk_params = dict(
-        winSize=(win_size, win_size),
-        maxLevel=0,  # Pure native-resolution sub-pixel refinement around initial flow guess
-        criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01),
-        flags=cv2.OPTFLOW_USE_INITIAL_FLOW,  # Track starting from coarse match position
-    )
-
-    # Forward: source -> target starting from initial coarse match position
-    fwd_guess = pts_fwd.copy()
-    refined_fwd, status_fwd, _ = cv2.calcOpticalFlowPyrLK(
-        img1_u8, img2_u8, pts_src_lk, fwd_guess, **lk_params
-    )
-
-    # Backward: refined target -> source starting from initial source position
-    bwd_guess = pts_src_lk.copy()
-    refined_bwd, status_bwd, _ = cv2.calcOpticalFlowPyrLK(
-        img2_u8, img1_u8, refined_fwd, bwd_guess, **lk_params
-    )
 
     refined_dst = inlier_dst.copy()
     refined_count = 0
     debug_points: List[Dict[str, Any]] = []
 
     for i in range(n):
-        s_fwd = int(status_fwd[i, 0]) if status_fwd is not None and i < len(status_fwd) else 0
-        s_bwd = int(status_bwd[i, 0]) if status_bwd is not None and i < len(status_bwd) else 0
+        p1 = work_src_pts[i]
+        p2_init = work_dst[i]
 
-        fb_err: Optional[float] = None
-        if refined_bwd is not None and i < len(refined_bwd):
-            fb_err = float(np.linalg.norm(refined_bwd[i, 0] - initial_source[i, 0]))
+        ok_fwd, p2_fwd = _continuous_float32_lk_track(
+            img1_f32, img2_f32, p1, p2_init, win_size=win_size
+        )
+        ok_bwd, p1_bwd = (
+            _continuous_float32_lk_track(img2_f32, img1_f32, p2_fwd, p1, win_size=win_size)
+            if ok_fwd
+            else (False, p1)
+        )
 
-        shift_mag: Optional[float] = None
-        if refined_fwd is not None and i < len(refined_fwd):
-            shift = refined_fwd[i, 0] - initial_target[i, 0]
-            shift_mag = float(np.linalg.norm(shift))
+        fb_err: Optional[float] = float(np.linalg.norm(p1_bwd - p1)) if ok_bwd else None
+        shift_mag: Optional[float] = float(np.linalg.norm(p2_fwd - p2_init)) if ok_fwd else None
 
         pt_record: Dict[str, Any] = {
             "point_index": i,
             "src_pt": [float(inlier_src[i, 0]), float(inlier_src[i, 1])],
             "dst_pt": [float(inlier_dst[i, 0]), float(inlier_dst[i, 1])],
-            "status_fwd": s_fwd,
-            "status_bwd": s_bwd,
+            "status_fwd": int(ok_fwd),
+            "status_bwd": int(ok_bwd),
             "fb_err": fb_err,
             "shift_mag": shift_mag,
             "passed": False,
             "failure_gate": None,
         }
 
-        if s_fwd != 1:
+        if not ok_fwd:
             pt_record["failure_gate"] = "fwd_non_convergence"
-        elif s_bwd != 1:
+        elif not ok_bwd:
             pt_record["failure_gate"] = "bwd_non_convergence"
         elif fb_err is not None and fb_err > fb_threshold:
             pt_record["failure_gate"] = f"fb_threshold_exceeded (fb_err={fb_err:.4f} > {fb_threshold})"
@@ -1095,8 +1306,8 @@ def refine_inliers_lucas_kanade(
         else:
             pt_record["passed"] = True
             # Accept refinement — convert back to native space
-            refined_dst[i, 0] = float(refined_fwd[i, 0, 0]) * scale_factor2
-            refined_dst[i, 1] = float(refined_fwd[i, 0, 1]) * scale_factor2
+            refined_dst[i, 0] = float(p2_fwd[0]) * scale_factor2
+            refined_dst[i, 1] = float(p2_fwd[1]) * scale_factor2
             refined_count += 1
 
         debug_points.append(pt_record)
@@ -1185,13 +1396,9 @@ def _guided_refill_matches(
             search_region = pc2[s_min_y:s_max_y, s_min_x:s_max_x]
             if float(np.std(search_region)) < 1e-4:
                 continue
-            res = cv2.matchTemplate(search_region, tmpl, cv2.TM_CCOEFF_NORMED)
-            _, max_val, _, max_loc = cv2.minMaxLoc(res)
-            if multimodal_pair:
-                cand = search_region[max_loc[1]:max_loc[1] + tmpl.shape[0],
-                                     max_loc[0]:max_loc[0] + tmpl.shape[1]]
-                if cand.shape == tmpl.shape:
-                    max_val = mutual_information_score(tmpl, cand)
+            max_val, max_loc = find_best_correspondence_unified(
+                search_region, tmpl, multimodal_pair=multimodal_pair
+            )
             if max_val > thresh:
                 bx = s_min_x + max_loc[0] + half_patch_c
                 by = s_min_y + max_loc[1] + half_patch_c
@@ -2146,8 +2353,9 @@ def match_images_cfog(
                     if s_max_x - s_min_x < 2 * pw or s_max_y - s_min_y < 2 * pw:
                         continue
                     search_area = pc_t_coarse[s_min_y:s_max_y, s_min_x:s_max_x]
-                    corr = cv2.matchTemplate(search_area, tmpl, cv2.TM_CCOEFF_NORMED)
-                    _, max_val, _, max_loc = cv2.minMaxLoc(corr)
+                    max_val, max_loc = find_best_correspondence_unified(
+                        search_area, tmpl, multimodal_pair=False
+                    )
                     if max_val > TUNED_RELAXED_NCC_THRESH:
                         best_x = s_min_x + max_loc[0] + pw
                         best_y = s_min_y + max_loc[1] + pw
@@ -2328,16 +2536,9 @@ def match_images_cfog(
             ):
                 continue
 
-            res = cv2.matchTemplate(search_region, tmpl, cv2.TM_CCOEFF_NORMED)
-            _, max_val, _, max_loc = cv2.minMaxLoc(res)
-
-            if multimodal_pair:
-                candidate = search_region[
-                    max_loc[1] : max_loc[1] + tmpl.shape[0],
-                    max_loc[0] : max_loc[0] + tmpl.shape[1],
-                ]
-                if candidate.shape == tmpl.shape:
-                    max_val = mutual_information_score(tmpl, candidate)
+            max_val, max_loc = find_best_correspondence_unified(
+                search_region, tmpl, multimodal_pair=multimodal_pair
+            )
 
             if max_val > (TUNED_MI_THRESH if multimodal_pair else TUNED_NCC_THRESH):  # tuned on 2026-09-10, AUC=0.9010
                 best_x2 = s_min_x + max_loc[0] + half_patch_c
@@ -2450,17 +2651,9 @@ def match_images_cfog(
                 ):
                     continue
 
-                res = cv2.matchTemplate(search_region, tmpl, cv2.TM_CCOEFF_NORMED)
-                _, max_val, _, max_loc = cv2.minMaxLoc(res)
-
-                # 2c. For multimodal pairs, use MI as the primary ranking criterion
-                if multimodal_pair:
-                    candidate = search_region[
-                        max_loc[1] : max_loc[1] + tmpl.shape[0],
-                        max_loc[0] : max_loc[0] + tmpl.shape[1],
-                    ]
-                    if candidate.shape == tmpl.shape:
-                        max_val = mutual_information_score(tmpl, candidate)
+                max_val, max_loc = find_best_correspondence_unified(
+                    search_region, tmpl, multimodal_pair=multimodal_pair
+                )
 
                 if max_val > (TUNED_MI_THRESH if multimodal_pair else TUNED_NCC_THRESH):  # tuned on 2026-09-10, AUC=0.9010
                     best_x2 = s_min_x + max_loc[0] + half_patch_c
@@ -2521,12 +2714,9 @@ def match_images_cfog(
                 search_region = pc2[s_min_y:s_max_y, s_min_x:s_max_x]
                 if search_region.shape[0] <= tmpl.shape[0] or search_region.shape[1] <= tmpl.shape[1]:
                     continue
-                res = cv2.matchTemplate(search_region, tmpl, cv2.TM_CCOEFF_NORMED)
-                _, max_val, _, max_loc = cv2.minMaxLoc(res)
-                if multimodal_pair:
-                    candidate = search_region[max_loc[1]:max_loc[1]+tmpl.shape[0], max_loc[0]:max_loc[0]+tmpl.shape[1]]
-                    if candidate.shape == tmpl.shape:
-                        max_val = mutual_information_score(tmpl, candidate)
+                max_val, max_loc = find_best_correspondence_unified(
+                    search_region, tmpl, multimodal_pair=multimodal_pair
+                )
                 if max_val > relaxed_ncc:
                     best_x2 = s_min_x + max_loc[0] + half_patch_c
                     best_y2 = s_min_y + max_loc[1] + half_patch_c

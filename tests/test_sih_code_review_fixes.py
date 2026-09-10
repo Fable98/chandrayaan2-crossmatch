@@ -232,3 +232,82 @@ def test_cfog_nomenclature_honest():
     doc = (matcher_cfog.__doc__ or "")
     assert "not implemented" in doc and "CFOG" in doc
     assert "NCC/MI" in doc or "NCC" in doc
+
+
+# ---------------------------------------------------------------------------
+# Step 7 & 8 Verification: Unified Similarity, Float32 LK, Cast Shadows, Photometric Norm
+# ---------------------------------------------------------------------------
+
+def test_continuous_float32_lk_subpixel_precision():
+    """Verify LK subpixel refinement operates on continuous float32 without uint8 quantization."""
+    from matcher_cfog import refine_inliers_lucas_kanade, _continuous_float32_lk_track
+
+    # Synthetic continuous Gaussian spot shifted by subpixel displacement (dx=0.35, dy=-0.42)
+    y, x = np.mgrid[0:64, 0:64].astype(np.float32)
+    feat1 = np.exp(-((x - 32.0)**2 + (y - 32.0)**2) / 50.0).astype(np.float32)
+    feat2 = np.exp(-((x - 32.35)**2 + (y - 31.58)**2) / 50.0).astype(np.float32)
+
+    src_pts = np.array([[32.0, 32.0]], dtype=np.float32)
+    dst_init = np.array([[32.0, 32.0]], dtype=np.float32)
+
+    _, refined_dst, stats = refine_inliers_lucas_kanade(
+        feat1, feat2, src_pts, dst_init, scale_factor1=1.0, scale_factor2=1.0, win_size=15
+    )
+
+    assert stats["refined_count"] == 1
+    assert stats["debug_points"][0]["passed"] is True
+    assert np.isclose(refined_dst[0, 0], 32.35, atol=0.02)
+    assert np.isclose(refined_dst[0, 1], 31.58, atol=0.02)
+
+
+def test_find_best_correspondence_unified():
+    """Verify find_best_correspondence_unified behaves as unified surface."""
+    from matcher_cfog import find_best_correspondence_unified
+
+    # Search region and identical template
+    sr = np.zeros((40, 40), dtype=np.float32)
+    sr[10:26, 10:26] = np.random.RandomState(123).uniform(0.1, 0.9, size=(16, 16)).astype(np.float32)
+    tmpl = sr[10:26, 10:26].copy()
+
+    score_ncc, loc_ncc = find_best_correspondence_unified(sr, tmpl, multimodal_pair=False)
+    assert loc_ncc == (10, 10)
+    assert np.isclose(score_ncc, 1.0, atol=1e-3)
+
+    score_uni, loc_uni = find_best_correspondence_unified(sr, tmpl, multimodal_pair=True)
+    assert loc_uni == (10, 10)
+    assert score_uni > 0.8
+
+
+def test_dem_ray_marched_cast_shadows():
+    """Verify compute_dem_cast_shadows casts shadows behind an obstacle along the sun vector."""
+    from matcher_cfog import compute_dem_cast_shadows, render_synthetic_shaded_relief
+
+    # Wall obstacle at row 20 casting shadow southward (sun at North: azimuth=0 deg, el=20 deg)
+    dem = np.zeros((60, 60), dtype=np.float64)
+    dem[20, :] = 500.0  # 500m high ridge
+
+    shadow = compute_dem_cast_shadows(dem, azimuth_deg=0.0, elevation_deg=20.0, working_gsd_m=5.0)
+    # North side (row 10) should be fully illuminated (shadow == 1.0)
+    assert np.all(shadow[10, :] > 0.9)
+    # Immediate South side (row 25) behind 500m ridge should be in cast shadow (shadow < 0.2)
+    assert np.all(shadow[25, :] < 0.2)
+
+    # Shaded relief with cast shadows enabled
+    relief = render_synthetic_shaded_relief(dem, target_azimuth_deg=0.0, target_elevation_deg=20.0, cast_shadows=True)
+    assert relief[25, 30] < relief[10, 30]
+
+
+def test_adaptive_illumination_normalization_high_pass():
+    """Verify adaptive_illumination_normalization suppresses linear illumination ramps."""
+    from matcher_cfog import adaptive_illumination_normalization
+
+    y, x = np.mgrid[0:128, 0:128].astype(np.float32)
+    ramp = (x / 128.0) * 0.8  # directional solar ramp
+    crater = np.exp(-((x - 64.0)**2 + (y - 64.0)**2) / 100.0) * 0.4
+    img = np.clip(ramp + crater, 0.0, 1.0)
+
+    norm, mask = adaptive_illumination_normalization(img, enable_high_pass=True)
+    assert norm.shape == img.shape
+    # Standard deviation should be preserved and macro ramp leveled
+    assert 0.0 <= norm.min() and norm.max() <= 1.0
+

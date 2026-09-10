@@ -46,7 +46,11 @@ from scripts.register import (
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("register_lro_nac")
 
-PAIRS_DIR = REPO_ROOT / "data_preprocessing_pipeline" / "lro_nac_pairs"
+PAIRS_DIR = (
+    REPO_ROOT / "data_preprocessing_pipeline" / "lro_nac_real"
+    if (REPO_ROOT / "data_preprocessing_pipeline" / "lro_nac_real").exists()
+    else REPO_ROOT / "data_preprocessing_pipeline" / "lro_nac_pairs"
+)
 REG_OUT_DIR = REPO_ROOT / "registration_output" / "lro_nac"
 
 
