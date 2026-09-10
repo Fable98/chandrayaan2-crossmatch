@@ -9,11 +9,12 @@
     "num_raw_matches": 35,
     "inlier_ratio": 1.0,
     "fit_rmse_px": 0.2916,
+    "fit_rmse_insample_px": 0.2916,
     "validation_rmse_px": 0.4181,
     "sub_pixel_accurate": true,
     "spatial_coverage_ratio": 1.0,
     "spatial_uniformity": 0.8779,
-    "quality_tier": "HIGH_CONFIDENCE"
+    "quality_tier": "LOW_CONFIDENCE"
   },
   "registered_products": {
     "registered_source_png": "/Users/shresthkumar/chandrayaan2-crossmatch/registration_output/lro_nac/region_003/registered_source.png",

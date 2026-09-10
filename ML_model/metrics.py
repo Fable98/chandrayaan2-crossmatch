@@ -667,10 +667,11 @@ def calculate_normalized_mutual_information(
 
 def calculate_composite_quality_score(
     inlier_ratio: float,
-    fit_rmse_px: Optional[float],
-    spatial_uniformity: float,
+    fit_rmse_px: Optional[float] = None,
+    spatial_uniformity: float = 0.0,
     nmi: Optional[float] = None,
     ssim: Optional[float] = None,
+    fit_rmse_insample_px: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Computes a single unified composite quality score in [0.0, 1.0].
@@ -678,13 +679,13 @@ def calculate_composite_quality_score(
     FORMULA & WEIGHTING:
     When optical/warped image alignment metrics (NMI & SSIM) are available:
         Q = 0.25 * inlier_ratio
-          + 0.25 * exp(-fit_rmse_px / 2.0)
+          + 0.25 * exp(-fit_rmse_insample_px / 2.0)
           + 0.25 * spatial_uniformity
           + 0.25 * (0.6 * NMI + 0.4 * max(0.0, SSIM))
     
     When image rasters are unavailable (feature-only correspondence evaluation):
         Q = (1/3) * inlier_ratio
-          + (1/3) * exp(-fit_rmse_px / 2.0)
+          + (1/3) * exp(-fit_rmse_insample_px / 2.0)
           + (1/3) * spatial_uniformity
     
     PROVENANCE & INTEGRITY:
@@ -692,9 +693,10 @@ def calculate_composite_quality_score(
     directly measured photogrammetric correspondence observation. It summarizes
     multi-attribute registration fidelity into a single comparative scalar.
     """
+    effective_rmse = fit_rmse_insample_px if fit_rmse_insample_px is not None else fit_rmse_px
     inl_term = float(np.clip(inlier_ratio, 0.0, 1.0))
-    if fit_rmse_px is not None and np.isfinite(fit_rmse_px) and fit_rmse_px >= 0:
-        rmse_term = float(np.exp(-float(fit_rmse_px) / 2.0))
+    if effective_rmse is not None and np.isfinite(effective_rmse) and effective_rmse >= 0:
+        rmse_term = float(np.exp(-float(effective_rmse) / 2.0))
     else:
         rmse_term = 0.0
     unif_term = float(np.clip(spatial_uniformity, 0.0, 1.0))
@@ -769,10 +771,18 @@ def compute_canonical_metrics(
             "inlier_count": 0,
             "inlier_ratio": 0.0,
             "fit_rmse_px": None,
+            "fit_rmse_insample_px": None,
+            "fit_rmse_insample": None,
             "absolute_rmse_m": None,
             "validation_rmse_px": None,
+            "held_out_inlier_validation_rmse_px": None,
+            "held_out_validation_rmse_px": None,
+            "held_out_rmse_px": None,
             "validation_median_error_px": None,
             "validation_status": "no_inliers",
+            "quality_tier": "FAILED",
+            "confidence_tier": "FAILED",
+            "tier": "FAIL",
             "mean_reprojection_error_px": None,
             "median_reprojection_error_px": None,
             "max_reprojection_error_px": None,
@@ -780,6 +790,7 @@ def compute_canonical_metrics(
             "fraction_below_0_5px": 0.0,
             "fraction_below_0_25px": 0.0,
             "sub_pixel_accurate": False,
+            "sub_pixel_accurate_note": "Requires both in-sample fit_rmse < 1.0px and held-out validation_rmse < 1.0px; never claimed on in-sample alone.",
             "spatial_coverage": 0.0,
             "spatial_uniformity": 0.0,
             "spatial_distribution": calculate_spatial_distribution(np.zeros((0, 2)), image_shape, grid_size),
@@ -835,14 +846,17 @@ def compute_canonical_metrics(
 
     # Quality Tier Classification with explicit documented thresholds
     coverage = dist_metrics["coverage"]
-    if inlier_count < 4:
+    val_rmse = val_results.get("validation_rmse_px")
+    if inlier_count < 4 or not tx_quality.get("is_valid", True):
         quality_tier = "FAILED"
-    elif inlier_count >= 20 and coverage >= 0.20 and fit_rmse < 2.0:
+    elif inlier_count >= 15 and coverage >= 0.15 and (val_rmse is not None and val_rmse < 2.0):
         quality_tier = "HIGH_CONFIDENCE"
     elif inlier_count >= 10 and coverage >= 0.10:
         quality_tier = "ACCEPTED"
     else:
         quality_tier = "LOW_CONFIDENCE"
+
+    tier_short = "HIGH" if quality_tier == "HIGH_CONFIDENCE" else ("ACCEPTED" if quality_tier == "ACCEPTED" else ("LOW" if quality_tier == "LOW_CONFIDENCE" else "FAIL"))
 
     # Absolute RMSE in meters (DEM-corrected physical accuracy; None when no DEM/GSD)
     abs_rmse_m = None
@@ -900,21 +914,26 @@ def compute_canonical_metrics(
         "inlier_count": inlier_count,
         "inlier_ratio": round(inlier_ratio, 4),
         "fit_rmse_px": round(fit_rmse, 4),
+        "fit_rmse_insample_px": round(fit_rmse, 4),
+        "fit_rmse_insample": round(fit_rmse, 4),
         "absolute_rmse_m": abs_rmse_m,
         "validation_rmse_px": val_results["validation_rmse_px"],  # Kept for API backward compatibility
         "held_out_inlier_validation_rmse_px": val_results["validation_rmse_px"],
         "held_out_validation_rmse_px": val_results["validation_rmse_px"],
+        "held_out_rmse_px": val_results["validation_rmse_px"],
         "validation_median_error_px": val_results["validation_median_error_px"],
         "validation_status": val_results["validation_status"],
         "quality_tier": quality_tier,
         "confidence_tier": quality_tier,
+        "tier": tier_short,
         "mean_reprojection_error_px": round(mean_err, 4),
         "median_reprojection_error_px": round(median_err, 4),
         "max_reprojection_error_px": round(max_err, 4),
         "fraction_below_1px": round(frac_1, 4),
         "fraction_below_0_5px": round(frac_05, 4),
         "fraction_below_0_25px": round(frac_025, 4),
-        "sub_pixel_accurate": bool(fit_rmse < 1.0),
+        "sub_pixel_accurate": bool(fit_rmse < 1.0 and val_rmse is not None and val_rmse < 1.0),
+        "sub_pixel_accurate_note": "Requires both in-sample fit_rmse < 1.0px and held-out validation_rmse < 1.0px; never claimed on in-sample alone.",
         "fit_rmse_is_in_sample": True,
         "fit_rmse_note": "In-sample RMSE on RANSAC inliers; see held_out_validation_rmse_px for out-of-sample error.",
         "spatial_coverage": dist_metrics["coverage"],

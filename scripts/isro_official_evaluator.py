@@ -172,6 +172,30 @@ def _uniformity_of(metrics: Dict) -> Optional[float]:
 # STEP 2 + 3: Iterate engine + aggregate
 # ---------------------------------------------------------------------------
 
+def _bootstrap_ci(
+    vals: List[float],
+    n_resamples: int = 1000,
+    ci: float = 0.95,
+    seed: int = 42,
+) -> Optional[Dict[str, Any]]:
+    """Calculates bootstrap confidence interval over non-null metric values."""
+    if len(vals) < 3:
+        return None
+    rng = np.random.RandomState(seed)
+    arr = np.asarray(vals, dtype=np.float64)
+    boot_means = [float(np.mean(rng.choice(arr, size=len(arr), replace=True))) for _ in range(n_resamples)]
+    alpha = (1.0 - ci) / 2.0
+    low = float(np.percentile(boot_means, alpha * 100.0))
+    high = float(np.percentile(boot_means, (1.0 - alpha) * 100.0))
+    return {
+        "mean": round(float(np.mean(arr)), 4),
+        "ci_lower": round(low, 4),
+        "ci_upper": round(high, 4),
+        "confidence_level": ci,
+        "sample_size": len(vals),
+    }
+
+
 def evaluate_all(
     pairs: List[Dict[str, Optional[Path]]],
     output_dir: Path,
@@ -180,6 +204,7 @@ def evaluate_all(
     """Run match_images_cfog per pair; return (summary, pairwise_results)."""
     pairwise: List[Dict] = []
     fit_rmses: List[float] = []
+    held_out_rmses: List[float] = []
     abs_rmses: List[float] = []
     inlier_counts: List[float] = []
     uniformities: List[float] = []
@@ -223,6 +248,9 @@ def evaluate_all(
             logger.warning("Pair id=%s raised exception: %s\n%s", pid, exc, traceback.format_exc())
             metrics = None
 
+        fit_insample = _safe_float(metrics.get("fit_rmse_insample_px") or metrics.get("fit_rmse_px")) if (status == "success" and isinstance(metrics, dict)) else None
+        heldout = _safe_float(metrics.get("held_out_validation_rmse_px") or metrics.get("held_out_rmse_px") or metrics.get("validation_rmse_px")) if (status == "success" and isinstance(metrics, dict)) else None
+
         record = to_json_safe({
             "id": pid,
             "source": str(src),
@@ -230,15 +258,18 @@ def evaluate_all(
             "dem": str(dem) if dem is not None else None,
             "status": status,
             "message": message,
+            "fit_insample": fit_insample,
+            "heldout": heldout,
             "metrics": metrics,
         })
         pairwise.append(record)
 
         if status == "success" and isinstance(metrics, dict):
             successful += 1
-            fit = _safe_float(metrics.get("fit_rmse_px"))
-            if fit is not None:
-                fit_rmses.append(fit)
+            if fit_insample is not None:
+                fit_rmses.append(fit_insample)
+            if heldout is not None:
+                held_out_rmses.append(heldout)
             abs_rmse = _safe_float(metrics.get("absolute_rmse_m"))
             if abs_rmse is not None:
                 abs_rmses.append(abs_rmse)
@@ -257,14 +288,24 @@ def evaluate_all(
             return None
         return float(sum(vals) / len(vals))
 
+    success_rate = round(float(successful / max(1, total)), 4) if total > 0 else 0.0
+
     summary = to_json_safe({
         "total_pairs_processed": total,
         "successful_registrations": successful,
         "failed_registrations": failed,
+        "success_rate": success_rate,
+        "average_fit_rmse_insample_px": _mean(fit_rmses),
         "average_fit_rmse_px": _mean(fit_rmses),
+        "average_held_out_rmse_px": _mean(held_out_rmses),
         "average_absolute_rmse_m": _mean(abs_rmses),
         "average_inlier_count": _mean(inlier_counts),
         "average_spatial_uniformity": _mean(uniformities),
+        "bootstrap_ci_95": {
+            "fit_rmse_insample_px": _bootstrap_ci(fit_rmses),
+            "held_out_rmse_px": _bootstrap_ci(held_out_rmses),
+            "absolute_rmse_m": _bootstrap_ci(abs_rmses),
+        },
     })
     return summary, pairwise
 
@@ -283,6 +324,13 @@ def write_markdown_report(summary: Dict, output_dir: Path) -> Path:
             return f"{v:.{ndigits}f}"
         return str(v)
 
+    def _fmt_ci(ci_dict: Optional[Dict]) -> str:
+        if not ci_dict:
+            return "N/A"
+        return f"{ci_dict.get('mean', 'N/A')} [{ci_dict.get('ci_lower', 'N/A')}, {ci_dict.get('ci_upper', 'N/A')}]"
+
+    b_ci = summary.get("bootstrap_ci_95", {}) or {}
+
     lines = [
         "# ISRO Evaluation Summary — Chandrayaan-2 Cross-Sensor Registration",
         "",
@@ -290,21 +338,23 @@ def write_markdown_report(summary: Dict, output_dir: Path) -> Path:
         "",
         "## Aggregated Metrics",
         "",
-        "| Metric | Value |",
-        "|---|---|",
-        f"| Total pairs processed | {summary.get('total_pairs_processed', 0)} |",
-        f"| Successful registrations | {summary.get('successful_registrations', 0)} |",
-        f"| Failed registrations | {summary.get('failed_registrations', 0)} |",
-        f"| Average fit RMSE (px) | {_fmt(summary.get('average_fit_rmse_px'))} |",
-        f"| Average absolute RMSE (m, DEM-corrected) | {_fmt(summary.get('average_absolute_rmse_m'))} |",
-        f"| Average inlier count | {_fmt(summary.get('average_inlier_count'), 2)} |",
-        f"| Average spatial uniformity | {_fmt(summary.get('average_spatial_uniformity'))} |",
+        "| Metric | Value | 95% Bootstrap CI |",
+        "|---|---|---|",
+        f"| Total pairs processed | {summary.get('total_pairs_processed', 0)} | — |",
+        f"| Successful registrations | {summary.get('successful_registrations', 0)} | — |",
+        f"| Failed registrations | {summary.get('failed_registrations', 0)} | — |",
+        f"| Success rate | {_fmt(summary.get('success_rate', 0.0) * 100, 2)}% | — |",
+        f"| Average fit RMSE (in-sample, px) | {_fmt(summary.get('average_fit_rmse_insample_px') or summary.get('average_fit_rmse_px'))} | {_fmt_ci(b_ci.get('fit_rmse_insample_px'))} |",
+        f"| Average held-out RMSE (out-of-sample, px) | {_fmt(summary.get('average_held_out_rmse_px'))} | {_fmt_ci(b_ci.get('held_out_rmse_px'))} |",
+        f"| Average absolute RMSE (m, DEM-corrected) | {_fmt(summary.get('average_absolute_rmse_m'))} | {_fmt_ci(b_ci.get('absolute_rmse_m'))} |",
+        f"| Average inlier count | {_fmt(summary.get('average_inlier_count'), 2)} | — |",
+        f"| Average spatial uniformity | {_fmt(summary.get('average_spatial_uniformity'))} | — |",
         "",
-        "## Notes",
+        "## Integrity & Survivorship Notes",
         "",
-        "- A registration counts as successful only when the core engine returns `status == \"success\"`.",
-        "- `average_absolute_rmse_m` is averaged over successful pairs where the DEM-corrected absolute RMSE is available.",
-        "- `average_spatial_uniformity` is averaged over `uniformity_score` / `spatial_uniformity` (with fallback to `spatial_distribution.uniformity_score`).",
+        "- Failed pairs are explicitly recorded with `fit_insample = null` and `heldout = null` (never excluded to inflate averages).",
+        "- `success_rate` tracks the proportion of pairs meeting quality gates ($N \\ge 10$).",
+        "- `average_absolute_rmse_m` is averaged over successful pairs where DEM-corrected absolute RMSE is available.",
         "- Per-pair raw metrics are in `pairwise_results.json`; per-pair engine artefacts are under `per_pair/`.",
         "",
     ]

@@ -484,10 +484,16 @@ def estimate_scale_ratio_cv(
     rmax = float(np.max(np.sqrt((corners[:, 0] - cx) ** 2 + (corners[:, 1] - cy) ** 2)))
     m_gain = float(n) / float(np.log(max(rmax, 2.0)))
 
-    lp1 = cv2.logPolar(p1.astype(np.float32), (float(cx), float(cy)), m_gain,
-                       cv2.INTER_LINEAR + cv2.WARP_FILL_OUTLIERS)
-    lp2 = cv2.logPolar(p2.astype(np.float32), (float(cx), float(cy)), m_gain,
-                       cv2.INTER_LINEAR + cv2.WARP_FILL_OUTLIERS)
+    if hasattr(cv2, "warpPolar"):
+        lp1 = cv2.warpPolar(p1.astype(np.float32), (n, n), (float(cx), float(cy)), rmax,
+                            cv2.INTER_LINEAR + cv2.WARP_POLAR_LOG)
+        lp2 = cv2.warpPolar(p2.astype(np.float32), (n, n), (float(cx), float(cy)), rmax,
+                            cv2.INTER_LINEAR + cv2.WARP_POLAR_LOG)
+    else:
+        lp1 = cv2.logPolar(p1.astype(np.float32), (float(cx), float(cy)), m_gain,
+                           cv2.INTER_LINEAR + cv2.WARP_FILL_OUTLIERS)
+        lp2 = cv2.logPolar(p2.astype(np.float32), (float(cx), float(cy)), m_gain,
+                           cv2.INTER_LINEAR + cv2.WARP_FILL_OUTLIERS)
     lp1 = lp1.astype(np.float64) - float(np.mean(lp1))
     lp2 = lp2.astype(np.float64) - float(np.mean(lp2))
     window = cv2.createHanningWindow((n, n), cv2.CV_64F)
@@ -866,7 +872,7 @@ def verify_spatial_quality_gate(
     """
     total_inliers = len(inlier_cells)
     if total_inliers < 4:
-        return True, "Fewer than 4 inliers; minimum inlier threshold gate applies", {
+        return False, f"Spatial support rejected: {total_inliers} inliers (< 4 required)", {
             "distinct_cells": len(set(inlier_cells)),
             "concentration_ratio": 1.0 if inlier_cells else 0.0,
             "max_in_single_cell": len(inlier_cells),
@@ -2600,17 +2606,21 @@ def match_images_cfog(
     n_inliers_pre_refill = int(np.sum(inlier_mask))
 
     # --- Guided refill: H-constrained second pass over unused SSC keypoints ---
-    # Honest densification: same NCC/MI thresholds, re-RANSAC + gates. Adopt the
-    # refilled solution only on strict improvement (more inliers) with valid
-    # conditioning and spatial support; otherwise keep the original solution.
-    try:
-        guided = _guided_refill_matches(
-            kps1_ssc, selected_matches, pc1, pc2, H_final,
-            scale_factor1, scale_factor2, work_w1, work_h1, work_w2, work_h2,
-            half_patch_c, bool(multimodal_pair), grid_size, cell_w, cell_h,
-        )
-    except Exception:
-        guided = []
+    # Put behind experimental flag ENABLE_GUIDED_REFILL to avoid guided-refill bias.
+    enable_guided_refill = os.environ.get("ENABLE_GUIDED_REFILL", "0").lower() in ("1", "true")
+    guided = []
+    if enable_guided_refill:
+        logger.warning("Experimental guided refill active: matches are H-conditioned (h_conditioned=true)")
+        try:
+            guided = _guided_refill_matches(
+                kps1_ssc, selected_matches, pc1, pc2, H_final,
+                scale_factor1, scale_factor2, work_w1, work_h1, work_w2, work_h2,
+                half_patch_c, bool(multimodal_pair), grid_size, cell_w, cell_h,
+            )
+        except Exception:
+            guided = []
+    else:
+        logger.debug("Guided refill disabled by default (eliminates H-conditioning bias).")
     if guided:
         _g1 = [float(g["work_x1"]) * scale_factor1 for g in guided]
         _g1y = [float(g["work_y1"]) * scale_factor1 for g in guided]
@@ -2640,6 +2650,7 @@ def match_images_cfog(
                         match_id=len(refinement_records),
                     ))
                     refinement_records[-1]["cell"] = g.get("cell")
+                    refinement_records[-1]["h_conditioned"] = True
                 pts1_arr, pts2_arr, H_final, inlier_mask = aug1, aug2, H_g, mask_g
                 inlier_flat = inlier_mask.ravel()
                 # Identity-based marking (Fix P0-2): aug order == records order
