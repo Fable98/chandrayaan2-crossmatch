@@ -38,6 +38,7 @@ from scripts.register import (
     warp_source_to_reference,
     create_blend_overlay,
     create_checkerboard_qa,
+    create_displacement_quiver,
     save_geotiff,
     bounds_to_eqc_transform,
 )
@@ -52,10 +53,12 @@ REG_OUT_DIR = REPO_ROOT / "registration_output" / "lro_nac"
 def run_registration_for_region(
     region_id: str,
     output_base_dir: Optional[Path | str] = None,
-    force_non_multimodal: bool = True,
+    force_non_multimodal: bool = False,
 ) -> Dict[str, Any]:
     """
     Executes registration between OHRC (source) and LRO NAC (reference).
+    Defaults to the multimodal MI path (required on real CDRs); pass
+    force_non_multimodal=True only for synthetic-proxy NCC runs.
     """
     pair_dir = PAIRS_DIR / region_id
     if not pair_dir.exists():
@@ -114,7 +117,7 @@ def run_registration_for_region(
         reference_sensor="LRO_NAC",
         explicit_gsd1=explicit_gsd1,
         explicit_gsd2=explicit_gsd2,
-        multimodal_pair=False if force_non_multimodal else None,
+        multimodal_pair=False if force_non_multimodal else True,
     )
 
     if temp_cfog_out.exists():
@@ -160,7 +163,8 @@ def run_registration_for_region(
     # 3. Generate Registered Product Suite using scripts/register.py
     src_img = cv2.imread(str(ohrc_path))
     dst_img = cv2.imread(str(nac_path))
-    img_shape = (512, 512)
+    # Native reference shape (tiles need not be square, e.g. 317x512 west-crop).
+    img_shape = (int(dst_img.shape[1]), int(dst_img.shape[0]))
 
     registered_products: Dict[str, str] = {}
     if H_mat is not None and status == "success":
@@ -179,6 +183,23 @@ def run_registration_for_region(
         cv2.imwrite(str(reg_png_path), warped_src)
         cv2.imwrite(str(blend_path), blend)
         cv2.imwrite(str(checker_path), checkerboard)
+        quiver_lro_path = region_out / "displacement_quiver.png"
+        try:
+            _qin = np.array([[m.get("image1_x", m.get("source_x", 0)),
+                              m.get("image1_y", m.get("source_y", 0))] for m in inliers],
+                            dtype=np.float64)
+            _qout = np.array([[m.get("image2_x", m.get("target_x", 0)),
+                               m.get("image2_y", m.get("target_y", 0))] for m in inliers],
+                             dtype=np.float64)
+            if len(_qin) < 3 or H_mat is None:
+                raise ValueError("insufficient inliers for quiver")
+            if create_displacement_quiver(_qin, _qout, np.asarray(H_mat, dtype=np.float64),
+                                          (dst_img.shape[0], dst_img.shape[1]),
+                                          quiver_lro_path) is None:
+                quiver_lro_path = None
+        except Exception as exc:
+            logger.warning("Quiver QA skipped for %s: %s", region_id, exc)
+            quiver_lro_path = None
         # Georeference from pair-manifest shared-footprint bounds (lunar EQC).
         _lro_geo = bounds_to_eqc_transform(
             pair_bounds, warped_src.shape[1], warped_src.shape[0]) if pair_bounds else None
@@ -230,6 +251,7 @@ def run_registration_for_region(
             "registered_source_tif": str(geotiff_path),
             "blend_overlay": str(blend_path),
             "checkerboard_qa": str(checker_path),
+            "displacement_quiver": str(quiver_lro_path) if quiver_lro_path is not None else None,
         }
 
     # 4. Write Transform & Metrics JSON sidecars
@@ -297,11 +319,22 @@ def run_registration_for_region(
             "sub_pixel_accurate": sub_pixel,
             "spatial_coverage_ratio": cov_ratio,
             "spatial_uniformity": metrics.get("spatial_uniformity", metrics.get("uniformity_score", 0.0)),
-            "quality_tier": metrics.get("quality_tier", "HIGH_CONFIDENCE" if sub_pixel else "VERIFIED"),
+            "quality_tier": metrics.get("quality_tier",
+                                        "FAILED" if status != "success"
+                                        else ("HIGH_CONFIDENCE" if sub_pixel else "VERIFIED")),
         },
         "registered_products": registered_products,
         "transform_file": str(transform_file),
     }
+
+    # On failure the engine metrics may be None: record an explicit FAILED stub
+    # instead of writing nulls that downstream readers mistake for data.
+    if metrics is None:
+        with open(metrics_file, "w") as f:
+            json.dump({"status": status, "inlier_count": 0, "match_count": len(raw_matches),
+                       "quality_tier": "FAILED",
+                       "note": "No metrics: registration did not succeed; see transform_file status."},
+                      f, indent=2)
 
     with open(prod_manifest_file, "w") as f:
         json.dump(product_manifest, f, indent=2)
@@ -328,10 +361,14 @@ def main():
         help="Regions to register",
     )
     parser.add_argument("--output_dir", type=str, default=None, help="Output directory")
+    # Measured 2026-09-10 on real CDRs: the optical-NCC path finds 0 candidates
+    # under true ~104-132deg sun gaps; the multimodal MI path is REQUIRED
+    # (001: 32/6@0.50, 003: 27/5@0.60, 006: 24/5@0.18 with MI vs 0/NCC).
+    # MI is therefore the default; --optical-ncc restores the proxy-era path.
     parser.add_argument(
-        "--multimodal",
+        "--optical-ncc",
         action="store_true",
-        help="Force multimodal_pair=True (default is False for optical-to-optical)",
+        help="Force multimodal_pair=False (optical NCC; only works on synthetic proxies)",
     )
 
     args = parser.parse_args()
@@ -340,7 +377,7 @@ def main():
         res = run_registration_for_region(
             region_id=reg,
             output_base_dir=args.output_dir,
-            force_non_multimodal=not args.multimodal,
+            force_non_multimodal=args.optical_ncc,
         )
         summary.append(res)
 

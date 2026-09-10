@@ -32,8 +32,28 @@ from schemas_registration import (
 router = APIRouter(prefix="/api/registration", tags=["Registration"])
 logger = logging.getLogger(__name__)
 
-# Pixel size of OHRC in meters (approx) for rmse_pixels -> rmse_meters.
-OHRC_GSD_M = 0.32
+
+def _resolve_gsd_m(result: Dict[str, Any]) -> float:
+    """Single-source-of-truth pixel size in meters for display conversion.
+
+    Precedence: per-job result metadata (PDS4/manifest-derived) ->
+    ML_model SENSOR_SPECS OHRC spec (0.25) -> literal 0.25 fallback.
+    The old hardcoded 0.32 constant is gone: it silently disagreed with the
+    sensor spec and corrupted every moon-globe rmse_meters value by 28%.
+    """
+    for key in ("gsd_m", "working_gsd_m"):
+        try:
+            val = result.get(key, result.get("metadata", {}).get(key))
+            if val is not None and float(val) > 0:
+                return float(val)
+        except (TypeError, ValueError, AttributeError):
+            continue
+    try:
+        sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "ML_model"))
+        from metadata import SENSOR_SPECS
+        return float(SENSOR_SPECS["OHRC"]["gsd_m"])
+    except Exception:
+        return 0.25
 
 
 # ---------------------------------------------------------------------------
@@ -57,6 +77,7 @@ class JobManager:
                 "current_phase": "",
                 "result": None,
                 "error": None,
+                "logs": [],
             }
         logger.info("Job created: %s (type=%s)", job_id, job_type)
 
@@ -66,6 +87,37 @@ class JobManager:
                 self.jobs[job_id].update(kwargs)
         if kwargs:
             logger.info("Job %s update: %s", job_id, kwargs)
+
+    def append_log(self, job_id: str, line: str, cap: int = 200) -> None:
+        """Append a timestamped line to a job's in-memory log ring.
+
+        Same pattern as the ingest router's log_lines: bounded, per-job,
+        served via GET /logs/{job_id}. Never raises; logging must not fail jobs.
+        """
+        try:
+            from datetime import datetime, timezone
+            stamp = datetime.now(timezone.utc).strftime("%H:%M:%S")
+            with self._lock:
+                job = self.jobs.get(job_id)
+                if job is None:
+                    return
+                logs = job.setdefault("logs", [])
+                logs.append(f"[{stamp}] {line}")
+                if len(logs) > cap:
+                    del logs[: len(logs) - cap]
+        except Exception:
+            pass
+
+    def get_logs(self, job_id: str, after: int = 0) -> Optional[Dict[str, Any]]:
+        """Return log lines after index `after` plus the current total."""
+        with self._lock:
+            job = self.jobs.get(job_id)
+            if job is None:
+                return None
+            logs = list(job.get("logs", []))
+        after = max(0, int(after))
+        return {"job_id": job_id, "total": len(logs), "after": after,
+                "lines": logs[after:], "status": job.get("status")}
 
     def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
         with self._lock:
@@ -130,6 +182,7 @@ def _run_registration_pipeline(job_id: str, request: RegistrationRequest) -> Non
     """Run MasterRegistrationPipeline and optionally a PDF report."""
     try:
         job_manager.update_job(job_id, status=JobStatus.RUNNING, current_phase="Initializing")
+        job_manager.append_log(job_id, "Job started: initializing registration pipeline.")
 
         try:
             from master_pipeline import MasterRegistrationPipeline
@@ -142,12 +195,14 @@ def _run_registration_pipeline(job_id: str, request: RegistrationRequest) -> Non
         pipeline = MasterRegistrationPipeline(min_inliers_required=request.min_inliers)
 
         job_manager.update_job(job_id, progress=10.0, current_phase="Running CFOG")
+        job_manager.append_log(job_id, "Phase: CFOG matching (may take minutes on free tier).")
         logger.info("Job %s: running MasterRegistrationPipeline", job_id)
         result = pipeline.register(request.src_image_path, request.ref_image_path)
         result = dict(result) if isinstance(result, dict) else {"status": "failed"}
 
         if result.get("status") == "success":
             job_manager.update_job(job_id, progress=80.0, current_phase="Generating report")
+            job_manager.append_log(job_id, "Matching done: generating PDF report.")
 
             # Generate PDF report (best effort; failure must not fail the job).
             try:
@@ -189,8 +244,10 @@ def _run_registration_pipeline(job_id: str, request: RegistrationRequest) -> Non
                 result=clean,
             )
             logger.info("Job %s completed successfully", job_id)
+            job_manager.append_log(job_id, "Job completed successfully.")
         else:
             reason = str(result.get("reason", result.get("message", "Unknown error")))
+            job_manager.append_log(job_id, f"Job failed: {reason}")
             job_manager.update_job(
                 job_id, status=JobStatus.FAILED, current_phase="Failed", error=reason
             )
@@ -198,9 +255,11 @@ def _run_registration_pipeline(job_id: str, request: RegistrationRequest) -> Non
 
     except ImportError as exc:
         logger.error("Job %s: ML import failed: %s", job_id, exc)
+        job_manager.append_log(job_id, f"ML import failed: {exc}")
         job_manager.update_job(job_id, status=JobStatus.FAILED, error=str(exc))
     except Exception as exc:
         logger.error("Job %s: registration pipeline crashed: %s", job_id, exc)
+        job_manager.append_log(job_id, f"Pipeline crashed: {exc}")
         job_manager.update_job(job_id, status=JobStatus.FAILED, error=str(exc))
 
 
@@ -208,6 +267,7 @@ def _run_iirs_pipeline(job_id: str, request: IIRSRegistrationRequest) -> None:
     """Run IIRS_Multimodal_Registrar (hyperspectral -> OHRC)."""
     try:
         job_manager.update_job(job_id, status=JobStatus.RUNNING, current_phase="Initializing")
+        job_manager.append_log(job_id, "Job started: initializing IIRS co-registration.")
 
         try:
             from iirs_multimodal_registrar import IIRS_Multimodal_Registrar
@@ -242,8 +302,10 @@ def _run_iirs_pipeline(job_id: str, request: IIRSRegistrationRequest) -> None:
                 result=clean,
             )
             logger.info("Job %s (IIRS) completed successfully", job_id)
+            job_manager.append_log(job_id, "Job completed successfully.")
         else:
             reason = str(result.get("reason", result.get("message", "Unknown error")))
+            job_manager.append_log(job_id, f"Job failed: {reason}")
             job_manager.update_job(
                 job_id, status=JobStatus.FAILED, current_phase="Failed", error=reason
             )
@@ -251,9 +313,11 @@ def _run_iirs_pipeline(job_id: str, request: IIRSRegistrationRequest) -> None:
 
     except ImportError as exc:
         logger.error("Job %s: ML import failed: %s", job_id, exc)
+        job_manager.append_log(job_id, f"ML import failed: {exc}")
         job_manager.update_job(job_id, status=JobStatus.FAILED, error=str(exc))
     except Exception as exc:
         logger.error("Job %s: IIRS pipeline crashed: %s", job_id, exc)
+        job_manager.append_log(job_id, f"Pipeline crashed: {exc}")
         job_manager.update_job(job_id, status=JobStatus.FAILED, error=str(exc))
 
 
@@ -293,6 +357,24 @@ async def get_job_status(job_id: str) -> JobStatusResponse:
         result=job.get("result"),
         error=job.get("error"),
     )
+
+
+# ---------------------------------------------------------------------------
+# Endpoint 2b: job logs (snapshot polling; ?after=N for increments)
+# ---------------------------------------------------------------------------
+
+
+@router.get("/logs/{job_id}")
+async def get_job_logs(job_id: str, after: int = 0) -> Dict[str, Any]:
+    """Return timestamped worker log lines for a job (bounded ring, 200/job).
+
+    Poll with ?after=<total> for incremental tailing. 404 for unknown jobs.
+    Mirrors the ingest router's log_lines pattern.
+    """
+    data = job_manager.get_logs(job_id, after=after)
+    if data is None:
+        raise HTTPException(status_code=404, detail=f"Job not found: {job_id}")
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -453,7 +535,7 @@ async def get_moon_points(job_id: str) -> MoonPointsResponse:
         points=points,
         transformation_matrix=matrix,
         rmse_pixels=rmse_px,
-        rmse_meters=rmse_px * OHRC_GSD_M,
+        rmse_meters=rmse_px * _resolve_gsd_m(result),
     )
 
 

@@ -32,13 +32,14 @@
   "geometry_note": "EDR page values used (emi 32.12, phase 83.65): high off-nadir, strong relief; repo KNOWN table (emi 2.15/phase 52.4/sun 110.2) does not match page and is not used",
   "nac_crop_note": "south-up window x2620..,y19100..25700 (2443x6600, partial east overlap), padded square to preserve aspect, resized 512; north-up hypothesis failed all gates; line direction consistent with node-crossing A (region_001 node D won north-up)",
   "nac_crop_method": "edr_corner_affine_south_up_pad",
-  "matching_note": "multimodal_pair=True (MI) required; optical NCC=0 candidates; 24 raw/5 inliers, fit 0.1792px sub-pixel but 5pt/8DOF overfit risk, LOW_CONFIDENCE, 5% @10x10, no held-out",
+  "matching_note": "multimodal_pair=True (MI) via official runner; optical NCC=0; 24 raw/5 inliers, fit 0.3014px, LOW_CONFIDENCE, 5% @10x10, no held-out",
   "result": {
-    "fit_rmse_px": 0.1792,
+    "fit_rmse_px": 0.3014,
     "sub_pixel_accurate": true,
     "inlier_count": 5,
     "match_count": 24,
-    "quality_tier": "LOW_CONFIDENCE"
+    "quality_tier": "LOW_CONFIDENCE",
+    "note": "official register_lro_nac.py path (MI default, seeded RANSAC42, paraboloid refiner)"
   },
   "ohrc_source_image": "data_preprocessing_pipeline\\lro_nac_real\\region_006\\ohrc_source_512.png",
   "lro_nac_reference_image": "data_preprocessing_pipeline\\lro_nac_real\\region_006\\lro_nac_reference_512.png",

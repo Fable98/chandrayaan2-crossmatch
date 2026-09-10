@@ -32,6 +32,7 @@ type RegistrationResult = {
   reference_url?: string | null;
   matches_url?: string | null;
   raster_url?: string | null;
+  quiver_url?: string | null;
 };
 
 type MatchPoint = {
@@ -1124,6 +1125,21 @@ export default function RegistrationLauncher() {
                   </div>
                 )}
               </div>
+
+              {absoluteUrl(result.quiver_url) ? (
+                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                  <div className="mb-2 flex items-center justify-between">
+                    <h4 className="text-xs font-bold text-slate-800">Residual Displacement Vectors</h4>
+                    <span className="text-[10px] font-mono text-slate-400">Per-inlier reprojection error</span>
+                  </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={absoluteUrl(result.quiver_url)!}
+                    alt="Residual displacement vector quiver plot"
+                    className="max-h-[250px] w-full rounded-lg bg-slate-950 object-contain"
+                  />
+                </div>
+              ) : null}
             </div>
 
             {/* Telemetry Metric Cards */}

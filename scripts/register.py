@@ -9,6 +9,7 @@ image using the estimated homography matrix. Produces:
   4. registered GeoTIFF (.tif) — pixel-grid fallback georeference unless real
      CRS/transform supplied; see save_geotiff() and manifest georeferenced flag.
   5. matches.json / metrics.json / transform.json sidecars (canonical names).
+  6. displacement_quiver.png — per-inlier residual vectors (best effort).
 """
 
 from __future__ import annotations
@@ -57,8 +58,29 @@ def create_blend_overlay(
     return blend
 
 
-def create_checkerboard_qa(
-    warped_src: np.ndarray,
+def create_displacement_quiver(
+    inlier_src,
+    inlier_dst,
+    homography,
+    image_shape: tuple[int, int],
+    path: Path,
+    max_arrows: int = 100,
+) -> str | None:
+    """Per-inlier residual-vector quiver overlay (best effort, never raises).
+
+    Delegates to ML_model/quiver.py so the matcher, register, and LRO scripts
+    share one implementation. Returns str(path) or None.
+    """
+    try:
+        import sys as _sys
+        _sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ML_model"))
+        from quiver import create_displacement_quiver as _q
+        return _q(inlier_src, inlier_dst, homography, image_shape, path, max_arrows)
+    except Exception:
+        return None
+
+
+def create_checkerboard_qa(    warped_src: np.ndarray,
     dst_img: np.ndarray,
     block_size: int = 64,
 ) -> np.ndarray:
@@ -198,6 +220,11 @@ def register_region(
     cv2.imwrite(str(warped_path), warped)
     cv2.imwrite(str(blend_path), blend)
     cv2.imwrite(str(checker_path), checker)
+    quiver_path = region_out / "displacement_quiver.png"
+    if create_displacement_quiver(src_pts, dst_pts, H,
+                                  (dst_img.shape[0], dst_img.shape[1]),
+                                  quiver_path) is None:
+        quiver_path = None
     # Georeference from the region manifest shared-footprint bounds when
     # available (lunar EQC meters); otherwise pixel-grid fallback.
     _geo, _georef_method = None, "pixel_grid_fallback"
@@ -259,6 +286,7 @@ def register_region(
         "registered_geotiff": saved_tif,
         "blend_overlay": str(blend_path),
         "checkerboard_qa": str(checker_path),
+        "displacement_quiver": str(quiver_path) if quiver_path is not None else None,
         "homography_json": str(h_path),
         "transform_json": str(transform_path),
         "matches_json": str(matches_path),

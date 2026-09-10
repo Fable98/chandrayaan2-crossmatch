@@ -34,15 +34,16 @@
   "lro_nac_label": "data_preprocessing_pipeline\\lro_nac_real\\region_001\\lro_nac_reference_512.lbl",
   "nac_crop_note": "RIGOROUS north-up affine x2418..5063,y34300..38577 NATIVE aspect (317x512, no pad distortion); OHRC cropped to overlapping western ~66% and resized to same 317x512; overlap-matched aspect",
   "nac_source_file": "C:\\Users\\rohit\\Downloads\\M1417670274LC.IMG",
-  "matching_note": "multimodal_pair=True (MI); optical NCC=0; 32 raw/6 inliers, fit 0.4979px sub-pixel, LOW_CONFIDENCE, 6% @10x10, no held-out; beats padded-square 23/5 @0.8045",
+  "matching_note": "multimodal_pair=True (MI) via official runner; optical NCC=0; 32 raw/6 inliers, fit 0.6333px, LOW_CONFIDENCE, 6% @10x10, no held-out",
   "nac_crop_method": "affine_north_up_native_aspect_overlap_matched",
   "overlap_note": "partial: OHRC east edge 336.589 vs NAC east edge ~336.58; scale_ratio absorbs aspect",
   "result": {
-    "fit_rmse_px": 0.4979,
+    "fit_rmse_px": 0.6333,
     "sub_pixel_accurate": true,
     "inlier_count": 6,
     "match_count": 32,
-    "quality_tier": "LOW_CONFIDENCE"
+    "quality_tier": "LOW_CONFIDENCE",
+    "note": "official register_lro_nac.py path (MI default, seeded RANSAC42, paraboloid refiner)"
   },
   "georeferencing": {
     "method": "manifest_bounds_eqc",
