@@ -22,6 +22,10 @@ if str(REPO_ROOT) not in sys.path:
 if str(BACKEND_DIR) in sys.path:
     sys.path.remove(str(BACKEND_DIR))
 sys.path.insert(0, str(BACKEND_DIR))
+if "config" in sys.modules and not hasattr(sys.modules["config"], "settings"):
+    sys.modules.pop("config", None)
+if "data" in sys.modules and not hasattr(sys.modules["data"], "loader"):
+    sys.modules.pop("data", None)
 
 from utils.logger import setup_logging
 setup_logging()
