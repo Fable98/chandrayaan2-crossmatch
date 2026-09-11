@@ -88,6 +88,12 @@ def get_image(sensor: str, identifier: str):
 
     # LRO NAC external reference imagery
     if clean_sensor in {"lro", "lro_nac", "nac"}:
+        # Real downloaded CDRs first; the legacy synthetic-proxy dir
+        # (lro_nac_pairs, removed from tracking) stays as a last resort.
+        lro_real_dir = Path(repo_root) / "data_preprocessing_pipeline" / "lro_nac_real" / clean_id
+        candidates.append(os.path.join(lro_real_dir, "lro_nac_reference_512.png"))
+        candidates.append(os.path.join(lro_real_dir, identifier))
+        candidates.append(os.path.join(lro_real_dir, f"{identifier}.png"))
         lro_pair_dir = Path(repo_root) / "data_preprocessing_pipeline" / "lro_nac_pairs" / clean_id
         candidates.append(os.path.join(lro_pair_dir, "lro_nac_reference_512.png"))
         candidates.append(os.path.join(lro_pair_dir, identifier))

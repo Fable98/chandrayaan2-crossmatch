@@ -708,6 +708,19 @@ def test_regular_metrics_from_benchmark_summary(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
+# LRO reference imagery resolves to real CDR tiles (not 404, not OHRC)
+# ---------------------------------------------------------------------------
+
+def test_static_image_lro_real_cdr():
+    """GET /images/lro_nac/region_001 serves the real CDR reference tile."""
+    _ensure_loaded()
+    r = client.get("/images/lro_nac/region_001")
+    assert r.status_code == 200, r.text[:200]
+    assert r.headers["content-type"].startswith("image/")
+    assert len(r.content) > 10000, "tile payload suspiciously small"
+
+
+# ---------------------------------------------------------------------------
 # Step 14: ingest upload auth gate + job lifecycle + concurrency
 # ---------------------------------------------------------------------------
 

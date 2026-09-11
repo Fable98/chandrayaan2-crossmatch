@@ -384,7 +384,10 @@ def _normalize_triplet(data: dict, default_id: str | None = None, region_dir: st
 
     # Check LRO NAC (NASA Lunar Reconnaissance Orbiter Narrow Angle Camera) reference availability
     has_lro = False
-    lro_dir = os.path.join(REPO_ROOT, "data_preprocessing_pipeline", "lro_nac_pairs", triplet["id"])
+    # Real downloaded CDRs first; legacy synthetic-proxy dir kept as fallback.
+    lro_dir = os.path.join(REPO_ROOT, "data_preprocessing_pipeline", "lro_nac_real", triplet["id"])
+    if not os.path.isdir(lro_dir):
+        lro_dir = os.path.join(REPO_ROOT, "data_preprocessing_pipeline", "lro_nac_pairs", triplet["id"])
     if os.path.isdir(lro_dir) or triplet.get("lro_nac_available"):
         has_lro = True
         lro_manifest_file = os.path.join(lro_dir, "manifest.json")
