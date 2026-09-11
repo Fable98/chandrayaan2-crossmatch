@@ -23,6 +23,14 @@ os.environ.setdefault(
 )
 os.environ.setdefault("ENVIRONMENT", "test")
 
+BACKEND_DIR = str(Path(__file__).resolve().parent)
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+if "config" in sys.modules and not hasattr(sys.modules["config"], "Settings"):
+    sys.modules.pop("config", None)
+if "data" in sys.modules and not hasattr(sys.modules["data"], "loader"):
+    sys.modules.pop("data", None)
+
 from fastapi.testclient import TestClient  # noqa: E402
 
 import auth_store  # noqa: E402

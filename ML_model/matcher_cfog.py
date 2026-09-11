@@ -2023,6 +2023,9 @@ def match_images_cfog(
                 }
 
         try:
+            # Content-based overlap recovery: computes a content-derived offset
+            # (dx_px, dy_px) and applies it to shift_work_x/y, which re-centers
+            # the search region (cx2/cy2) before CFOG matching runs.
             content_overlap_info = recover_content_overlap(
                 work1_gray, work2_gray, initial_bounds=effective_bounds, gsd_m=working_gsd
             )

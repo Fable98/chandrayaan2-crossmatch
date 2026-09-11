@@ -7,6 +7,8 @@ No server needs to be running — TestClient spins the app in-process.
 
 import json
 import os
+import sys
+from pathlib import Path
 
 import pytest
 
@@ -16,6 +18,14 @@ os.environ.setdefault(
 )
 os.environ.setdefault("ENVIRONMENT", "test")
 os.environ.setdefault("AUTH_RATE_LIMIT", "1000/minute")
+
+BACKEND_DIR = str(Path(__file__).resolve().parent)
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+if "config" in sys.modules and not hasattr(sys.modules["config"], "settings"):
+    sys.modules.pop("config", None)
+if "data" in sys.modules and not hasattr(sys.modules["data"], "loader"):
+    sys.modules.pop("data", None)
 
 from fastapi.testclient import TestClient
 from main import app
