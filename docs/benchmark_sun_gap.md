@@ -6,6 +6,13 @@ Fit RMSE vs sun-azimuth gap across 10 measured pairs under unified matching arch
 
 ![Accuracy vs Delta Azimuth](accuracy_vs_delta_az.png)
 
+> **Docs-asset note:** this plot is stored as a Git-LFS pointer (182 KB). A
+> plain `git clone` without `git lfs pull` renders a broken image here —
+> that is expected and affects nothing else (no test or pipeline reads this
+> file). CI intentionally does NOT fetch LFS (see `.github/workflows/ci.yml`);
+> do not add `lfs: true` without first confirming `git lfs push --all`
+> uploaded the objects, or checkout will fail.
+
 ---
 
 ## 1. LRO Real CDR Re-benchmark: NCC-Only vs Unified MI+NCC

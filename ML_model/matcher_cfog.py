@@ -8,7 +8,8 @@ Implements scientifically defensible cross-sensor alignment:
 2. Illumination-robust (moderate) single-channel Phase Congruency structural representation.
    NOTE: multi-channel CFOG tensor F(x,y,k) is not implemented; matching uses
    normalized single-channel PC + NCC/MI. Robust to gain/bias, not to full
-   shadow-reversal (see 162deg triplet_new_2022 failure).
+   shadow-reversal (162deg triplet_new_2022 formerly failed cleanly here;
+   re-measured 2026-09-11 as fragile LOW — never invariance).
 3. Spatially distributed correspondence selection across configurable grid cells.
 4. Local patch-level Fourier Phase Correlation sub-pixel refinement at matched physical ground scales.
 5. Robust geometric estimation (RANSAC with transformation quality sanity gates).
@@ -328,7 +329,8 @@ def compute_phase_congruency(
     Phase Congruency detects structural features based on frequency-phase agreement,
     providing moderate robustness to gain/bias and mild illumination change.
     It does NOT guarantee invariance to diametric shadow reversal (e.g. ~162deg
-    sun-azimuth flip in triplet_new_2022) or to full contrast inversion.
+    sun-azimuth flip — triplet_new_2022 yields only fragile LOW fits there)
+    or to full contrast inversion.
     """
     h, w = img.shape[:2]
     img_f = img.astype(np.float32)
@@ -2553,8 +2555,9 @@ def match_images_cfog(
         _ti["sun_azimuth_provenance"] = _meta.provenance.get("sun_azimuth_deg")
 
     # 4b. Sun-Angle-Invariant Intercept (DEM hillshade projection).
-    # Quality Gate 3 correctly rejects severe sun-angle mismatches (e.g. 162deg
-    # azimuth flip inverts crater-rim shadows and breaks Phase Congruency).
+    # Quality Gate 3 bounds severe sun-angle mismatches (162deg azimuth flip
+    # inverts crater-rim shadows and breaks Phase Congruency; triplet_new_2022
+    # now passes fragilely inside those bounds rather than refusing).
     # When delta_azimuth > 90deg, render a synthetic shaded relief from the DEM
     # under the SOURCE sun geometry and match against its Phase Congruency
     # instead of the raw reference image.

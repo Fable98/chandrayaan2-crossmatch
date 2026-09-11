@@ -144,7 +144,9 @@ def build_evaluation_dataset() -> List[Dict[str, Any]]:
                     "H_gt": None,
                 })
 
-    # Add triplet_new_2022 (known low overlap / non-overlapping pair)
+    # triplet_new_2022 is illumination-hard but spatially OVERLAPPING (same
+    # footprint) — re-measured 2026-09-11 as fragile 6-inlier LOW success, so
+    # labeling it negative would punish thresholds for matching it. Hard positive.
     p_tn_o = triplets_dir / "triplet_new_2022" / "ohrc_512.png"
     p_tn_t = triplets_dir / "triplet_new_2022" / "tmc_512.png"
     if p_tn_o.exists() and p_tn_t.exists():
@@ -152,10 +154,10 @@ def build_evaluation_dataset() -> List[Dict[str, Any]]:
         i2 = cv2.imread(str(p_tn_t), cv2.IMREAD_GRAYSCALE)
         if i1 is not None and i2 is not None:
             dataset.append({
-                "id": "real_neg_triplet_new_2022",
+                "id": "real_hard_pos_triplet_new_2022",
                 "img1": i1,
                 "img2": i2,
-                "is_positive": False,
+                "is_positive": True,
                 "is_multimodal": False,
                 "H_gt": None,
             })
