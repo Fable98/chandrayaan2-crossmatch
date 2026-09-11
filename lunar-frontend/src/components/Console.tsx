@@ -785,6 +785,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                         tripletId={detail.id}
                         points={matches}
                         referenceMode={referenceMode}
+                        notice={metrics?.metric_notes?.matches ?? null}
                       />
                     </div>
                   )}
