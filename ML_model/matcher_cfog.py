@@ -1672,7 +1672,7 @@ def refine_inliers_lucas_kanade(
 
 
 def _guided_refill_matches(
-    kps1_ssc,
+    kps_candidates,
     selected_matches,
     pc1,
     pc2,
@@ -1689,48 +1689,55 @@ def _guided_refill_matches(
     cell_w: float,
     cell_h: float,
     max_add: int = 80,
-    radius: int = 14,
+    radius: int = 12,
+    max_residual: float = 2.5,
 ):
     """H-guided second-pass matching (honest densification, no synthesis).
 
-    Projects unused pre-match SSC keypoints through the RANSAC homography
+    Projects unused pre-match salient keypoints through the RANSAC homography
     (native scale) and correlates a tight local window around the prediction
-    with the SAME NCC/MI thresholds as coarse matching. Every returned point
-    is a measured correlation, re-verified by a second RANSAC + quality gates
-    by the caller. Returns [] when H is None/degenerate.
+    with relaxed NCC/MI thresholds. Includes Fourier sub-pixel refinement and
+    reprojection residual filtering. Every returned point is a real measured
+    correlation, re-verified by RANSAC + quality gates.
+    Returns [] when H is None/degenerate.
     """
     try:
         Hm = np.asarray(H_native, dtype=np.float64)
         if Hm.shape != (3, 3) or not np.all(np.isfinite(Hm)):
             return []
-        used = set()
+        used_coords = []
         for m in selected_matches:
             try:
-                ux = int(round(float(m["work_x1"])))
-                uy = int(round(float(m["work_y1"])))
-                used.add((ux, uy))
+                ux = float(m.get("work_x1", m.get("source_x", 0.0)))
+                uy = float(m.get("work_y1", m.get("source_y", 0.0)))
+                used_coords.append((ux, uy))
             except Exception:
                 continue
         added = []
-        thresh = TUNED_MI_THRESH if multimodal_pair else TUNED_NCC_THRESH  # tuned on 2026-09-10, AUC=0.9010
-        for kx, ky, _ in kps1_ssc:
-
+        thresh = TUNED_RELAXED_MI_THRESH if multimodal_pair else TUNED_RELAXED_NCC_THRESH
+        for item in kps_candidates:
             if len(added) >= max_add:
                 break
-            # Integer pixels for slicing only; full floats preserved for coords.
-            kx_f, ky_f = float(kx), float(ky)
-            cx, cy = int(round(kx_f)), int(round(ky_f))
-            if (cx, cy) in used:
-                continue
+            kx = float(item[0])
+            ky = float(item[1])
+            cx, cy = int(round(kx)), int(round(ky))
             if cy < half_patch_c or cy >= work_h1 - half_patch_c:
                 continue
             if cx < half_patch_c or cx >= work_w1 - half_patch_c:
                 continue
+
+            # Minimum spatial distance from existing matches
+            if used_coords:
+                min_d = min(math.hypot(kx - ux, ky - uy) for ux, uy in used_coords)
+                if min_d < 6.0:
+                    continue
+
             tmpl = pc1[cy - half_patch_c:cy + half_patch_c, cx - half_patch_c:cx + half_patch_c]
             if float(np.std(tmpl)) < 1e-4:
                 continue
+
             # native -> H -> work2 prediction (full-precision floats)
-            p1 = np.array([[[float(kx_f * scale_factor1), float(ky_f * scale_factor1)]]], dtype=np.float64)
+            p1 = np.array([[[float(kx * scale_factor1), float(ky * scale_factor1)]]], dtype=np.float64)
             try:
                 p2 = cv2.perspectiveTransform(p1, Hm).reshape(-1)
             except Exception:
@@ -1749,19 +1756,46 @@ def _guided_refill_matches(
                 search_region, tmpl, multimodal_pair=multimodal_pair
             )
             if max_val > thresh:
-                bx = s_min_x + max_loc[0] + half_patch_c
-                by = s_min_y + max_loc[1] + half_patch_c
-                added.append({
-                    "work_x1": float(kx_f), "work_y1": float(ky_f),
-                    "work_x2": float(bx), "work_y2": float(by),
-                    "score": float(max_val),
-                    "cell": (min(grid_size - 1, int(kx_f / max(cell_w, 1e-6))),
-                             min(grid_size - 1, int(ky_f / max(cell_h, 1e-6)))),
-                    "method": "guided_refill",
-                })
-                used.add((cx, cy))
+                bx = float(s_min_x + max_loc[0] + half_patch_c)
+                by = float(s_min_y + max_loc[1] + half_patch_c)
+
+                # Sub-pixel Fourier phase correlation refinement
+                ibx, iby = int(round(bx)), int(round(by))
+                ref_dx, ref_dy = 0.0, 0.0
+                refined = False
+                if (
+                    iby >= half_patch_c
+                    and iby + half_patch_c <= work_h2
+                    and ibx >= half_patch_c
+                    and ibx + half_patch_c <= work_w2
+                ):
+                    p_ref = pc2[iby - half_patch_c:iby + half_patch_c, ibx - half_patch_c:ibx + half_patch_c]
+                    if p_ref.shape == tmpl.shape:
+                        dx, dy, peak, valid = subpixel_phase_correlation(tmpl, p_ref)
+                        if valid and abs(dx) < 2.0 and abs(dy) < 2.0:
+                            ref_dx, ref_dy = float(dx), float(dy)
+                            bx += ref_dx
+                            by += ref_dy
+                            refined = True
+
+                # Reprojection residual check against coarse homography prediction
+                res_dist = math.hypot(bx - px, by - py)
+                if res_dist <= max_residual:
+                    added.append({
+                        "work_x1": float(kx), "work_y1": float(ky),
+                        "work_x2": float(bx), "work_y2": float(by),
+                        "score": float(max_val),
+                        "cell": (min(grid_size - 1, int(kx / max(cell_w, 1e-6))),
+                                 min(grid_size - 1, int(ky / max(cell_h, 1e-6)))),
+                        "method": "guided_refill",
+                        "refinement_dx": float(ref_dx),
+                        "refinement_dy": float(ref_dy),
+                        "is_refined": bool(refined),
+                    })
+                    used_coords.append((kx, ky))
         return added
-    except Exception:
+    except Exception as exc:
+        logger.debug("Guided refill encountered error: %s", exc)
         return []
 
 
@@ -1793,6 +1827,7 @@ def match_images_cfog(
     allow_synthetic_reference: bool = False,
     look_azimuth_deg: Optional[float] = None,
     dem_array: Optional[np.ndarray] = None,
+    enable_guided_densification: bool = True,
 ) -> Dict[str, Any]:
     """
     Executes the primary cross-sensor registration pipeline:
@@ -2887,10 +2922,14 @@ def match_images_cfog(
         kps2_ssc = suppression_via_square_covering(
             kps2_raw, num_ret_points=target_ssc, tolerance=0.15, cols=work_w2, rows=work_h2
         )
+        # Broader pool for Phase 6b Guided Densification
+        kps1_guided_pool = suppression_via_square_covering(
+            kps1_raw, num_ret_points=max(160, grid_size * grid_size * 3), tolerance=0.08, cols=work_w1, rows=work_h1
+        )
 
         logger.info(
-            "Pre-match SSC keypoint selection: Image 1: %d -> %d; Image 2: %d -> %d",
-            len(kps1_raw), len(kps1_ssc), len(kps2_raw), len(kps2_ssc),
+            "Pre-match SSC keypoint selection: Image 1: %d -> %d (guided pool: %d); Image 2: %d -> %d",
+            len(kps1_raw), len(kps1_ssc), len(kps1_guided_pool), len(kps2_raw), len(kps2_ssc),
         )
 
         # Correlation matching on spatially uniform pre-match SSC keypoints
@@ -3517,22 +3556,27 @@ def match_images_cfog(
             verified_matches[_j]["is_inlier"] = True
     n_inliers_pre_refill = int(np.sum(inlier_mask))
 
-    # --- Guided refill: H-constrained second pass over unused SSC keypoints ---
-    # Put behind experimental flag ENABLE_GUIDED_REFILL to avoid guided-refill bias.
-    enable_guided_refill = os.environ.get("ENABLE_GUIDED_REFILL", "0").lower() in ("1", "true")
+    # --- Phase 6b: Guided Densification (H-constrained second pass across unrepresented terrain) ---
+    enable_guided_refill = enable_guided_densification
+    if os.environ.get("ENABLE_GUIDED_DENSIFICATION") is not None:
+        enable_guided_refill = os.environ.get("ENABLE_GUIDED_DENSIFICATION", "1").lower() in ("1", "true")
+    elif os.environ.get("ENABLE_GUIDED_REFILL") is not None:
+        enable_guided_refill = os.environ.get("ENABLE_GUIDED_REFILL", "0").lower() in ("1", "true")
+
     guided = []
-    if enable_guided_refill:
-        logger.warning("Experimental guided refill active: matches are H-conditioned (h_conditioned=true)")
+    if enable_guided_refill and H_final is not None and inlier_mask is not None and int(np.sum(inlier_mask)) >= 4:
+        logger.info("Guided Densification active: measuring second-pass correspondences constrained by anchor H.")
         try:
+            pool = kps1_guided_pool if ('kps1_guided_pool' in locals() and kps1_guided_pool) else kps1_ssc
             guided = _guided_refill_matches(
-                kps1_ssc, selected_matches, pc1, pc2, H_final,
+                pool, selected_matches, pc1, pc2, H_final,
                 scale_factor1, scale_factor2, work_w1, work_h1, work_w2, work_h2,
                 half_patch_c, bool(multimodal_pair), grid_size, cell_w, cell_h,
+                max_add=60, radius=12, max_residual=2.5,
             )
-        except Exception:
+        except Exception as exc:
+            logger.warning("Guided densification failed (%s); keeping anchor matches.", exc)
             guided = []
-    else:
-        logger.debug("Guided refill disabled by default (eliminates H-conditioning bias).")
     if guided:
         _g1 = [float(g["work_x1"]) * scale_factor1 for g in guided]
         _g1y = [float(g["work_y1"]) * scale_factor1 for g in guided]
@@ -3555,9 +3599,9 @@ def match_images_cfog(
                         float(g["work_x2"]) * scale_factor2,
                         float(g["work_y2"]) * scale_factor2,
                         float(g["score"]),
-                        refinement_dx=0.0,
-                        refinement_dy=0.0,
-                        is_refined=False,
+                        refinement_dx=float(g.get("refinement_dx", 0.0)),
+                        refinement_dy=float(g.get("refinement_dy", 0.0)),
+                        is_refined=bool(g.get("is_refined", False)),
                         method="guided_refill",
                         match_id=len(refinement_records),
                     ))
@@ -3569,13 +3613,13 @@ def match_images_cfog(
                 # here (appended consistently), lengths match by construction.
                 for i, rec in enumerate(refinement_records):
                     rec["is_inlier"] = bool(i < len(inlier_flat) and inlier_flat[i] == 1)
-                logger.info("Guided refill: inliers %d -> %d (+%d measured)",
+                logger.info("Guided densification: inliers %d -> %d (+%d measured)",
                             n_inliers_pre_refill, int(np.sum(mask_g)), len(guided))
             else:
-                logger.info("Guided refill rejected by quality gate (%s); keeping original solution.",
+                logger.info("Guided densification rejected by quality gate (%s); keeping original solution.",
                             _g_tx.get("reason"))
         else:
-            logger.info("Guided refill: no strict inlier gain (%d candidates); keeping original solution.",
+            logger.info("Guided densification: no strict inlier gain (%d candidates); keeping original solution.",
                         len(guided))
 
     # --- Item 3: Post-RANSAC Lucas-Kanade Sub-Pixel Refinement (OHRC↔TMC-2 only) ---
