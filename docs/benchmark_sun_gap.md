@@ -31,24 +31,24 @@ Empirical re-evaluation conducted on real NASA LRO NAC Calibrated Data Record (C
 | 103.6 | region_006 OHRC→NAC (real CDR) | 24 / 5 | 0.3014 | success, LOW (sub-pixel) |
 | 131.8 | region_001 OHRC→NAC (real CDR) | 32 / 6 | 0.6333 | success, LOW (sub-pixel) |
 | 131.8 | region_003 OHRC→NAC (real CDR) | 27 / 5 | 1.2860 | success, LOW |
-| 160.8 | region_001 OHRC→TMC | 41 / 7 | 1.2715 | success, LOW |
-| 160.8 | region_002 OHRC→TMC | 43 / 6 | 1.7868 | success, LOW |
-| 160.8 | region_003 OHRC→TMC | 44 / 6 | 0.9941 | success, LOW |
-| 160.8 | region_004 OHRC→TMC | 39 / 6 | 1.8329 | success, LOW |
-| 162.3 | region_005 OHRC→TMC | 26 / 6 | 1.7699 | success, LOW |
-| 162.3 | region_006 OHRC→TMC | 37 / 6 | 1.2960 | success, LOW |
-| 162.3 | triplet_new_2022 | 49 cand / 0 | FAILED (Gate3 pathological distortion) | clean fail |
+| 160.8 | region_001 OHRC→TMC | 49 / 6 | 1.2726 | success, LOW |
+| 160.8 | region_002 OHRC→TMC | 49 / 6 | 1.7222 | success, LOW |
+| 160.8 | region_003 OHRC→TMC | 50 / 6 | 1.5451 | success, LOW |
+| 160.8 | region_004 OHRC→TMC | 48 / 6 | 1.4784 | success, LOW |
+| 162.3 | region_005 OHRC→TMC | 46 / 6 | 1.4652 | success, LOW |
+| 162.3 | region_006 OHRC→TMC | 50 / 6 | 1.0601 | success, LOW |
+| 162.3 | triplet_new_2022 OHRC→TMC | 50 / 6 | 1.2140 | success, LOW (ex-honest-fail; see §3.4) |
 
 ---
 
 ## 3. Readout & Physical Fail-Angle Curve
 
-1. **Monotonic degradation, ~+0.1px per 10° past 100°.** 0.30 → 0.63–1.29 → 1.0–1.8px. This replaces synthetic-brightness stress tests as genuine illumination-robustness evidence: moderate physical robustness, not unphysical invariance.
+1. **Monotonic degradation, ~+0.1px per 10° past 100°.** 0.30 → 0.63–1.29 → 1.1–1.7px. This replaces synthetic-brightness stress tests as genuine illumination-robustness evidence: moderate physical robustness, not unphysical invariance. (Re-benchmarked 2026-09-11 on current tree; seeded runs reproduce exactly.)
 2. **Fail-Angle Curve (expect fail > 90° for unimodal NCC)**:
    - For unimodal linear correlation (NCC), performance collapses completely at $\Delta\text{az} > 90^\circ$ due to shadow-slope reversal.
-   - For multimodal MI+NCC with Phase Congruency and high-pass photometric normalization, valid correspondences survive up to ~162°, where severe geometric distortion triggers Quality Gate 3 safety rejections rather than producing hallucinated registrations.
-3. **Inlier count is gap-independent (5–7 everywhere).** Density is texture-limited, not illumination-limited.
-4. **Gap alone does not predict failure.** `triplet_new_2022` fails at 162.3° while `region_005/006` succeed at the same gap — local texture and distortion conditioning (Gate3) decide. The gate correctly refuses instead of forcing a fit.
+   - For multimodal MI+NCC with Phase Congruency and high-pass photometric normalization, valid correspondences survive up to ~162°; remaining failures refuse cleanly through Quality Gates rather than producing hallucinated registrations.
+3. **Inlier count is gap-independent (4–7 everywhere).** Density is texture-limited, not illumination-limited.
+4. **`triplet_new_2022`: ex-honest-fail, now 50/6 @1.21 LOW success.** Previously refused by Gate 3 (pathological distortion) under the biased refiner; the validated paraboloid yields a well-conditioned H (det 4.6, cond 11k, scale-ratio 2.5, projectivity 0.0035 — all inside gate bounds) over a decent spread. Kept as the hardest-case regression test: same 162.3° gap, both outcomes documented with mechanism. Removal was considered and rejected — deleting the hardest case would read as cherry-picking.
 
 ---
 
@@ -56,4 +56,4 @@ Empirical re-evaluation conducted on real NASA LRO NAC Calibrated Data Record (C
 
 - LRO gaps mix conventions (OHRC PDS4 sun azimuth vs LROC sub-solar azimuth); treat as approximate.
 - TMC manifests cluster at two gap values (160.78 / 162.26 across regions — values appear reused at generation); per-region sun metadata should be re-derived from PDS4 labels before citing precisely.
-- `triplet_01_ch2_ohr_ncp_202` (45/7 @1.55px) lacks a manifest mismatch value and is excluded from the sorted curve.
+- `triplet_01_ch2_ohr_ncp_202` (47/7 @1.69px) lacks a manifest mismatch value and is excluded from the sorted curve.

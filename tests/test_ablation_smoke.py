@@ -42,7 +42,9 @@ def test_ablation_pipeline_smoke_test(tmp_path):
     assert "method" in loftr_res
     assert "status" in loftr_res
     if not LOFTR_AVAILABLE:
-        assert "NCC Fallback" in loftr_res["method"]
+        # Fallback indication must name both the fallback and its method,
+        # in either order ("NCC Fallback" or "Pure LoFTR (Fallback: NCC)").
+        assert "NCC" in loftr_res["method"] and "allback" in loftr_res["method"]
 
     # 3. Test full run_ablation_study orchestration
     ablation_out = tmp_path / "ablation_out"

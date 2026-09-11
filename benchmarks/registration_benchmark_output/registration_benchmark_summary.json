@@ -1,23 +1,23 @@
 {
     "benchmark_name": "Chandrayaan-2 Primary Multi-Sensor OHRC <-> TMC-2 <-> IIRS Benchmark",
     "total_regions_tested": 8,
-    "successful_registrations": 7,
-    "average_runtime_seconds": 6.57,
+    "successful_registrations": 8,
+    "average_runtime_seconds": 6.01,
     "regions": [
         {
             "region_id": "region_001",
             "status": "success",
             "quality_tier": "LOW_CONFIDENCE",
             "failure_reason": null,
-            "elapsed_seconds": 7.64,
-            "match_count": 41,
-            "inlier_count": 7,
-            "inlier_ratio": 0.1707,
-            "fit_rmse_px": 1.2715,
+            "elapsed_seconds": 6.13,
+            "match_count": 49,
+            "inlier_count": 6,
+            "inlier_ratio": 0.1224,
+            "fit_rmse_px": 1.2726,
             "validation_rmse_px": null,
             "validation_status": "insufficient_points_for_holdout",
-            "spatial_coverage": 0.4375,
-            "spatial_uniformity": 0.3113,
+            "spatial_coverage": 0.06,
+            "spatial_uniformity": 0.0183,
             "pairs": {
                 "ohrc_tmc": {
                     "status": "success",
@@ -25,27 +25,35 @@
                     "direction": "native",
                     "measured_direction": null,
                     "quality_tier": "LOW_CONFIDENCE",
-                    "match_count": 41,
-                    "inlier_count": 7,
-                    "inlier_ratio": 0.1707,
-                    "fit_rmse_px": 1.2715,
-                    "spatial_coverage": 0.4375,
-                    "spatial_uniformity": 0.3113
+                    "match_count": 49,
+                    "inlier_count": 6,
+                    "inlier_ratio": 0.1224,
+                    "fit_rmse_px": 1.2726,
+                    "fit_rmse_is_in_sample": true,
+                    "sub_pixel_accurate": false,
+                    "fraction_below_1px": 0.5,
+                    "validation_rmse_px": null,
+                    "validation_status": "insufficient_points_for_holdout",
+                    "spatial_coverage": 0.06,
+                    "spatial_uniformity": 0.0183,
+                    "canonical_grid_size": 10,
+                    "matching_grid_size": 4
                 },
                 "ohrc_iirs": {
                     "status": "composed",
                     "inlier_count": 0,
-                    "fit_rmse_px": 0.0,
+                    "fit_rmse_px": null,
                     "forward_ohrc_to_iirs": {
                         "status": "composed",
                         "message": null,
                         "quality_tier": "COMPOSED_CHAIN",
                         "match_count": 0,
                         "inlier_count": 0,
-                        "inlier_ratio": 1.0,
-                        "fit_rmse_px": 0.0,
-                        "spatial_coverage": 1.0,
-                        "spatial_uniformity": 1.0
+                        "inlier_ratio": 0.0,
+                        "fit_rmse_px": null,
+                        "fit_rmse_note": "derived chain has no measured fit; loop-closure RMSE was None px (diagnostic only)",
+                        "spatial_coverage": 0.0,
+                        "spatial_uniformity": 0.0
                     },
                     "reverse_iirs_to_ohrc": null,
                     "bidirectional_agreement": true,
@@ -54,25 +62,127 @@
                         "source": "A -> B -> C",
                         "homography": [
                             [
-                                -1.1688799168098072,
-                                -0.767617191288967,
-                                501.9382405556856
+                                1.285149813689644,
+                                0.2583675920010742,
+                                -100.04286925634759
                             ],
                             [
-                                -0.5432478052979041,
-                                -0.622802709012029,
-                                282.62164373310543
+                                0.15550894155711179,
+                                1.1912871436861487,
+                                -64.31726035330148
                             ],
                             [
-                                -0.0023117776209215014,
-                                -0.0017870675470659707,
+                                0.00037968311447167006,
+                                0.00019382000676084626,
                                 1.0
                             ]
                         ],
-                        "transform": "benchmarks/registration_benchmark_output/region_001/triplet_cycle/composed_ohrc_to_iirs_transform.json",
-                        "registered_raster": "benchmarks/registration_benchmark_output/region_001/triplet_cycle/composed_registered_ohrc_to_iirs.png",
-                        "registered_geotiff": "benchmarks/registration_benchmark_output/region_001/triplet_cycle/composed_registered_ohrc_to_iirs.tif",
-                        "checkerboard_qa": "benchmarks/registration_benchmark_output/region_001/triplet_cycle/composed_checkerboard_qa.png"
+                        "Sigma_AC": [
+                            [
+                                302.4468439881004,
+                                -52.87376297235324,
+                                11386.993134284668,
+                                185.0830496600176,
+                                -90.24022706326366,
+                                19995.820495385055,
+                                0.7839142078187775,
+                                -0.06547479345358008,
+                                0.0
+                            ],
+                            [
+                                -52.87376297235324,
+                                524.2488792016984,
+                                -238017.53550354898,
+                                -329.9171958480685,
+                                51.20753391137711,
+                                34419.71378247241,
+                                -1.0125648588183858,
+                                0.2431875641660919,
+                                0.0
+                            ],
+                            [
+                                11386.993134284668,
+                                -238017.53550354898,
+                                120819056.95898913,
+                                147557.69221503526,
+                                8694.91052571035,
+                                -19343543.14253674,
+                                431.5707589946902,
+                                -15.887298381661795,
+                                0.0
+                            ],
+                            [
+                                185.0830496600176,
+                                -329.9171958480685,
+                                147557.69221503526,
+                                309.2335199593079,
+                                -93.05477148131668,
+                                -6360.508359325728,
+                                1.0729882631010705,
+                                -0.1971185917204893,
+                                0.0
+                            ],
+                            [
+                                -90.24022706326366,
+                                51.20753391137711,
+                                8694.91052571035,
+                                -93.05477148131668,
+                                288.2793736554764,
+                                -51818.9542023097,
+                                -0.5084776460244471,
+                                0.48987285538498504,
+                                0.0
+                            ],
+                            [
+                                19995.820495385055,
+                                34419.71378247241,
+                                -19343543.14253674,
+                                -6360.508359325728,
+                                -51818.9542023097,
+                                14174875.296382114,
+                                29.679366404560085,
+                                -57.607529187200214,
+                                0.0
+                            ],
+                            [
+                                0.7839142078187775,
+                                -1.0125648588183858,
+                                431.5707589946902,
+                                1.0729882631010705,
+                                -0.5084776460244471,
+                                29.679366404560085,
+                                0.003952576931600261,
+                                -0.0009002926101796434,
+                                0.0
+                            ],
+                            [
+                                -0.06547479345358008,
+                                0.2431875641660919,
+                                -15.887298381661795,
+                                -0.1971185917204893,
+                                0.48987285538498504,
+                                -57.607529187200214,
+                                -0.0009002926101796434,
+                                0.0011567652088324391,
+                                0.0
+                            ],
+                            [
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0
+                            ]
+                        ],
+                        "uncertainty_m": 883327.6366,
+                        "transform": "benchmarks\\registration_benchmark_output\\region_001\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
+                        "registered_raster": "benchmarks\\registration_benchmark_output\\region_001\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
+                        "registered_geotiff": "benchmarks\\registration_benchmark_output\\region_001\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
+                        "checkerboard_qa": "benchmarks\\registration_benchmark_output\\region_001\\triplet_cycle\\composed_checkerboard_qa.png"
                     }
                 },
                 "tmc_iirs": {
@@ -89,32 +199,46 @@
                         "inlier_count": 0,
                         "inlier_ratio": 0.0,
                         "fit_rmse_px": null,
+                        "fit_rmse_is_in_sample": true,
+                        "sub_pixel_accurate": false,
+                        "fraction_below_1px": 0.0,
+                        "validation_rmse_px": null,
+                        "validation_status": null,
                         "spatial_coverage": 0.0,
-                        "spatial_uniformity": 0.0
+                        "spatial_uniformity": 0.0,
+                        "canonical_grid_size": 10,
+                        "matching_grid_size": null
                     },
                     "reverse_iirs_to_tmc": {
-                        "status": "success",
-                        "message": null,
+                        "status": "insufficient_correspondences",
+                        "message": "Insufficient verified correspondences for geometric registration (found 2, minimum required is 4).",
                         "direction": "native",
                         "measured_direction": null,
-                        "quality_tier": "LOW_CONFIDENCE",
-                        "match_count": 74,
-                        "inlier_count": 6,
-                        "inlier_ratio": 0.0811,
-                        "fit_rmse_px": 1.3444,
-                        "spatial_coverage": 0.25,
-                        "spatial_uniformity": 0.1339
+                        "quality_tier": "FAILED",
+                        "match_count": 2,
+                        "inlier_count": 0,
+                        "inlier_ratio": 0.0,
+                        "fit_rmse_px": null,
+                        "fit_rmse_is_in_sample": true,
+                        "sub_pixel_accurate": false,
+                        "fraction_below_1px": 0.0,
+                        "validation_rmse_px": null,
+                        "validation_status": null,
+                        "spatial_coverage": 0.0,
+                        "spatial_uniformity": 0.0,
+                        "canonical_grid_size": 10,
+                        "matching_grid_size": null
                     },
-                    "bidirectional_agreement": true,
-                    "directional_note": null
+                    "bidirectional_agreement": false,
+                    "directional_note": "Forward (TMC->IIRS) produced 'success' while Reverse (IIRS->TMC) produced 'insufficient_correspondences'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
                 }
             },
             "triplet_consistency": {
                 "status": "evaluated_composed",
                 "reason": null,
-                "cycle_rmse_px": 0.0,
-                "cycle_mean_px": 0.0,
-                "cycle_closed_successfully": true,
+                "cycle_rmse_px": null,
+                "cycle_mean_px": null,
+                "cycle_closed_successfully": false,
                 "failed_legs": []
             }
         },
@@ -123,15 +247,15 @@
             "status": "success",
             "quality_tier": "LOW_CONFIDENCE",
             "failure_reason": null,
-            "elapsed_seconds": 7.34,
-            "match_count": 43,
+            "elapsed_seconds": 6.51,
+            "match_count": 49,
             "inlier_count": 6,
-            "inlier_ratio": 0.1395,
-            "fit_rmse_px": 1.7868,
+            "inlier_ratio": 0.1224,
+            "fit_rmse_px": 1.7222,
             "validation_rmse_px": null,
             "validation_status": "insufficient_points_for_holdout",
-            "spatial_coverage": 0.3125,
-            "spatial_uniformity": 0.1935,
+            "spatial_coverage": 0.06,
+            "spatial_uniformity": 0.0183,
             "pairs": {
                 "ohrc_tmc": {
                     "status": "success",
@@ -139,12 +263,19 @@
                     "direction": "native",
                     "measured_direction": null,
                     "quality_tier": "LOW_CONFIDENCE",
-                    "match_count": 43,
+                    "match_count": 49,
                     "inlier_count": 6,
-                    "inlier_ratio": 0.1395,
-                    "fit_rmse_px": 1.7868,
-                    "spatial_coverage": 0.3125,
-                    "spatial_uniformity": 0.1935
+                    "inlier_ratio": 0.1224,
+                    "fit_rmse_px": 1.7222,
+                    "fit_rmse_is_in_sample": true,
+                    "sub_pixel_accurate": false,
+                    "fraction_below_1px": 0.1667,
+                    "validation_rmse_px": null,
+                    "validation_status": "insufficient_points_for_holdout",
+                    "spatial_coverage": 0.06,
+                    "spatial_uniformity": 0.0183,
+                    "canonical_grid_size": 10,
+                    "matching_grid_size": 4
                 },
                 "ohrc_iirs": {
                     "status": "composition_not_computable",
@@ -152,64 +283,201 @@
                     "fit_rmse_px": null,
                     "forward_ohrc_to_iirs": {
                         "status": "composition_not_computable",
-                        "message": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+                        "message": null,
                         "quality_tier": "FAILED",
                         "match_count": 0,
                         "inlier_count": 0,
                         "inlier_ratio": 0.0,
                         "fit_rmse_px": null,
+                        "fit_rmse_note": null,
                         "spatial_coverage": 0.0,
                         "spatial_uniformity": 0.0
                     },
                     "reverse_iirs_to_ohrc": null,
                     "bidirectional_agreement": false,
                     "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
-                    "composition": null
+                    "composition": {
+                        "source": "A -> B -> C",
+                        "homography": [
+                            [
+                                0.6724591148366943,
+                                -0.41238787943313915,
+                                143.6477837856356
+                            ],
+                            [
+                                -0.3038013566074887,
+                                0.32751307835975807,
+                                166.84728541291784
+                            ],
+                            [
+                                5.03803343208138e-05,
+                                -0.0010411454492268235,
+                                1.0
+                            ]
+                        ],
+                        "Sigma_AC": [
+                            [
+                                909.3605284104366,
+                                1315.5482677885261,
+                                -672959.5238258429,
+                                -1547.7207354629036,
+                                816.2027554635158,
+                                510682.2531705669,
+                                -1.3568865162601942,
+                                2.6127639330768395,
+                                0.0
+                            ],
+                            [
+                                1315.5482677885261,
+                                2531.4882142158613,
+                                -1246853.510951763,
+                                -3033.6394858840154,
+                                1401.0727515032258,
+                                1003663.0815426246,
+                                -3.411338527939765,
+                                5.14924146978467,
+                                0.0
+                            ],
+                            [
+                                -672959.5238258429,
+                                -1246853.510951763,
+                                619938099.4355326,
+                                1487956.8833597093,
+                                -676700.1695907405,
+                                -498029084.5273786,
+                                1627.8201866182378,
+                                -2502.6871665054864,
+                                0.0
+                            ],
+                            [
+                                -1547.7207354629036,
+                                -3033.6394858840154,
+                                1487956.8833597093,
+                                3750.820382641714,
+                                -1750.0190525578362,
+                                -1217214.0104680911,
+                                4.256920468652575,
+                                -6.276926290407432,
+                                0.0
+                            ],
+                            [
+                                816.2027554635158,
+                                1401.0727515032258,
+                                -676700.1695907405,
+                                -1750.0190525578362,
+                                1052.280988170489,
+                                518237.4798132716,
+                                -1.8459070933697832,
+                                3.1002629731524363,
+                                0.0
+                            ],
+                            [
+                                510682.2531705669,
+                                1003663.0815426246,
+                                -498029084.5273786,
+                                -1217214.0104680911,
+                                518237.4798132716,
+                                410326645.46906745,
+                                -1377.5155639520044,
+                                2008.2255795106244,
+                                0.0
+                            ],
+                            [
+                                -1.3568865162601942,
+                                -3.411338527939765,
+                                1627.8201866182378,
+                                4.256920468652575,
+                                -1.8459070933697832,
+                                -1377.5155639520044,
+                                0.0055011765766697085,
+                                -0.0072000121997781085,
+                                0.0
+                            ],
+                            [
+                                2.6127639330768395,
+                                5.14924146978467,
+                                -2502.6871665054864,
+                                -6.276926290407432,
+                                3.1002629731524363,
+                                2008.2255795106244,
+                                -0.0072000121997781085,
+                                0.010816111531774409,
+                                0.0
+                            ],
+                            [
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0
+                            ]
+                        ],
+                        "uncertainty_m": 1062329.6589,
+                        "transform": "benchmarks\\registration_benchmark_output\\region_002\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
+                        "registered_raster": "benchmarks\\registration_benchmark_output\\region_002\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
+                        "registered_geotiff": "benchmarks\\registration_benchmark_output\\region_002\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
+                        "checkerboard_qa": "benchmarks\\registration_benchmark_output\\region_002\\triplet_cycle\\composed_checkerboard_qa.png"
+                    }
                 },
                 "tmc_iirs": {
-                    "status": "failed",
-                    "inlier_count": 0,
-                    "fit_rmse_px": null,
+                    "status": "success",
+                    "inlier_count": 4,
+                    "fit_rmse_px": 0.0,
                     "forward_tmc_to_iirs": {
-                        "status": "failed",
+                        "status": "success",
                         "message": null,
                         "direction": "native",
                         "measured_direction": null,
-                        "quality_tier": "FAILED",
-                        "match_count": 0,
-                        "inlier_count": 0,
-                        "inlier_ratio": 0.0,
-                        "fit_rmse_px": null,
-                        "spatial_coverage": 0.0,
-                        "spatial_uniformity": 0.0
+                        "quality_tier": "LOW_CONFIDENCE",
+                        "match_count": 5,
+                        "inlier_count": 4,
+                        "inlier_ratio": 0.8,
+                        "fit_rmse_px": 0.0,
+                        "fit_rmse_is_in_sample": true,
+                        "sub_pixel_accurate": false,
+                        "fraction_below_1px": 1.0,
+                        "validation_rmse_px": null,
+                        "validation_status": "insufficient_points_for_holdout",
+                        "spatial_coverage": 0.04,
+                        "spatial_uniformity": 0.0092,
+                        "canonical_grid_size": 10,
+                        "matching_grid_size": 4
                     },
                     "reverse_iirs_to_tmc": {
-                        "status": "geometric_verification_failed",
-                        "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                        "status": "success",
+                        "message": null,
                         "direction": "native",
                         "measured_direction": null,
-                        "quality_tier": "FAILED",
-                        "match_count": 81,
+                        "quality_tier": "LOW_CONFIDENCE",
+                        "match_count": 5,
                         "inlier_count": 4,
-                        "inlier_ratio": 0.0,
-                        "fit_rmse_px": null,
-                        "spatial_coverage": 0.0,
-                        "spatial_uniformity": 0.0
+                        "inlier_ratio": 0.8,
+                        "fit_rmse_px": 0.0,
+                        "fit_rmse_is_in_sample": true,
+                        "sub_pixel_accurate": false,
+                        "fraction_below_1px": 1.0,
+                        "validation_rmse_px": null,
+                        "validation_status": "insufficient_points_for_holdout",
+                        "spatial_coverage": 0.04,
+                        "spatial_uniformity": 0.0092,
+                        "canonical_grid_size": 10,
+                        "matching_grid_size": 4
                     },
-                    "bidirectional_agreement": false,
-                    "directional_note": "Forward (TMC->IIRS) produced 'failed' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
+                    "bidirectional_agreement": true,
+                    "directional_note": null
                 }
             },
             "triplet_consistency": {
-                "status": "cycle_not_computable",
-                "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
-                "cycle_rmse_px": null,
-                "cycle_mean_px": null,
+                "status": "evaluated",
+                "reason": null,
+                "cycle_rmse_px": 103.3727,
+                "cycle_mean_px": 95.9247,
                 "cycle_closed_successfully": false,
-                "failed_legs": [
-                    "BC (B -> C)",
-                    "CA (C -> A)"
-                ]
+                "failed_legs": []
             }
         },
         {
@@ -217,15 +485,15 @@
             "status": "success",
             "quality_tier": "LOW_CONFIDENCE",
             "failure_reason": null,
-            "elapsed_seconds": 7.12,
-            "match_count": 44,
+            "elapsed_seconds": 5.07,
+            "match_count": 50,
             "inlier_count": 6,
-            "inlier_ratio": 0.1364,
-            "fit_rmse_px": 0.9941,
+            "inlier_ratio": 0.12,
+            "fit_rmse_px": 1.5451,
             "validation_rmse_px": null,
             "validation_status": "insufficient_points_for_holdout",
-            "spatial_coverage": 0.375,
-            "spatial_uniformity": 0.2546,
+            "spatial_coverage": 0.06,
+            "spatial_uniformity": 0.0183,
             "pairs": {
                 "ohrc_tmc": {
                     "status": "success",
@@ -233,12 +501,19 @@
                     "direction": "native",
                     "measured_direction": null,
                     "quality_tier": "LOW_CONFIDENCE",
-                    "match_count": 44,
+                    "match_count": 50,
                     "inlier_count": 6,
-                    "inlier_ratio": 0.1364,
-                    "fit_rmse_px": 0.9941,
-                    "spatial_coverage": 0.375,
-                    "spatial_uniformity": 0.2546
+                    "inlier_ratio": 0.12,
+                    "fit_rmse_px": 1.5451,
+                    "fit_rmse_is_in_sample": true,
+                    "sub_pixel_accurate": false,
+                    "fraction_below_1px": 0.3333,
+                    "validation_rmse_px": null,
+                    "validation_status": "insufficient_points_for_holdout",
+                    "spatial_coverage": 0.06,
+                    "spatial_uniformity": 0.0183,
+                    "canonical_grid_size": 10,
+                    "matching_grid_size": 4
                 },
                 "ohrc_iirs": {
                     "status": "composition_not_computable",
@@ -252,6 +527,7 @@
                         "inlier_count": 0,
                         "inlier_ratio": 0.0,
                         "fit_rmse_px": null,
+                        "fit_rmse_note": null,
                         "spatial_coverage": 0.0,
                         "spatial_uniformity": 0.0
                     },
@@ -274,24 +550,38 @@
                         "inlier_count": 0,
                         "inlier_ratio": 0.0,
                         "fit_rmse_px": null,
+                        "fit_rmse_is_in_sample": true,
+                        "sub_pixel_accurate": false,
+                        "fraction_below_1px": 0.0,
+                        "validation_rmse_px": null,
+                        "validation_status": null,
                         "spatial_coverage": 0.0,
-                        "spatial_uniformity": 0.0
+                        "spatial_uniformity": 0.0,
+                        "canonical_grid_size": 10,
+                        "matching_grid_size": null
                     },
                     "reverse_iirs_to_tmc": {
-                        "status": "geometric_verification_failed",
-                        "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                        "status": "insufficient_correspondences",
+                        "message": "Insufficient verified correspondences for geometric registration (found 3, minimum required is 4).",
                         "direction": "native",
                         "measured_direction": null,
                         "quality_tier": "FAILED",
-                        "match_count": 79,
-                        "inlier_count": 4,
+                        "match_count": 3,
+                        "inlier_count": 0,
                         "inlier_ratio": 0.0,
                         "fit_rmse_px": null,
+                        "fit_rmse_is_in_sample": true,
+                        "sub_pixel_accurate": false,
+                        "fraction_below_1px": 0.0,
+                        "validation_rmse_px": null,
+                        "validation_status": null,
                         "spatial_coverage": 0.0,
-                        "spatial_uniformity": 0.0
+                        "spatial_uniformity": 0.0,
+                        "canonical_grid_size": 10,
+                        "matching_grid_size": null
                     },
                     "bidirectional_agreement": false,
-                    "directional_note": "Forward (TMC->IIRS) produced 'failed' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
+                    "directional_note": "Forward (TMC->IIRS) produced 'failed' while Reverse (IIRS->TMC) produced 'insufficient_correspondences'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
                 }
             },
             "triplet_consistency": {
@@ -311,15 +601,15 @@
             "status": "success",
             "quality_tier": "LOW_CONFIDENCE",
             "failure_reason": null,
-            "elapsed_seconds": 7.87,
-            "match_count": 39,
+            "elapsed_seconds": 5.07,
+            "match_count": 48,
             "inlier_count": 6,
-            "inlier_ratio": 0.1538,
-            "fit_rmse_px": 1.8329,
+            "inlier_ratio": 0.125,
+            "fit_rmse_px": 1.4784,
             "validation_rmse_px": null,
             "validation_status": "insufficient_points_for_holdout",
-            "spatial_coverage": 0.3125,
-            "spatial_uniformity": 0.1935,
+            "spatial_coverage": 0.06,
+            "spatial_uniformity": 0.0183,
             "pairs": {
                 "ohrc_tmc": {
                     "status": "success",
@@ -327,97 +617,99 @@
                     "direction": "native",
                     "measured_direction": null,
                     "quality_tier": "LOW_CONFIDENCE",
-                    "match_count": 39,
+                    "match_count": 48,
                     "inlier_count": 6,
-                    "inlier_ratio": 0.1538,
-                    "fit_rmse_px": 1.8329,
-                    "spatial_coverage": 0.3125,
-                    "spatial_uniformity": 0.1935
+                    "inlier_ratio": 0.125,
+                    "fit_rmse_px": 1.4784,
+                    "fit_rmse_is_in_sample": true,
+                    "sub_pixel_accurate": false,
+                    "fraction_below_1px": 0.5,
+                    "validation_rmse_px": null,
+                    "validation_status": "insufficient_points_for_holdout",
+                    "spatial_coverage": 0.06,
+                    "spatial_uniformity": 0.0183,
+                    "canonical_grid_size": 10,
+                    "matching_grid_size": 4
                 },
                 "ohrc_iirs": {
-                    "status": "composed",
+                    "status": "composition_not_computable",
                     "inlier_count": 0,
-                    "fit_rmse_px": 0.0,
+                    "fit_rmse_px": null,
                     "forward_ohrc_to_iirs": {
-                        "status": "composed",
-                        "message": null,
-                        "quality_tier": "COMPOSED_CHAIN",
+                        "status": "composition_not_computable",
+                        "message": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+                        "quality_tier": "FAILED",
                         "match_count": 0,
                         "inlier_count": 0,
-                        "inlier_ratio": 1.0,
-                        "fit_rmse_px": 0.0,
-                        "spatial_coverage": 1.0,
-                        "spatial_uniformity": 1.0
+                        "inlier_ratio": 0.0,
+                        "fit_rmse_px": null,
+                        "fit_rmse_note": null,
+                        "spatial_coverage": 0.0,
+                        "spatial_uniformity": 0.0
                     },
                     "reverse_iirs_to_ohrc": null,
-                    "bidirectional_agreement": true,
+                    "bidirectional_agreement": false,
                     "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
-                    "composition": {
-                        "source": "A -> B -> C",
-                        "homography": [
-                            [
-                                0.9328724507764455,
-                                -0.10068805902310597,
-                                45.685747618752075
-                            ],
-                            [
-                                0.00012725508945843946,
-                                1.0513045669953356,
-                                -20.424490979005675
-                            ],
-                            [
-                                -0.00014499984756267186,
-                                -5.187728855649676e-05,
-                                1.0
-                            ]
-                        ],
-                        "transform": "benchmarks/registration_benchmark_output/region_004/triplet_cycle/composed_ohrc_to_iirs_transform.json",
-                        "registered_raster": "benchmarks/registration_benchmark_output/region_004/triplet_cycle/composed_registered_ohrc_to_iirs.png",
-                        "registered_geotiff": "benchmarks/registration_benchmark_output/region_004/triplet_cycle/composed_registered_ohrc_to_iirs.tif",
-                        "checkerboard_qa": "benchmarks/registration_benchmark_output/region_004/triplet_cycle/composed_checkerboard_qa.png"
-                    }
+                    "composition": null
                 },
                 "tmc_iirs": {
-                    "status": "success",
+                    "status": "failed",
                     "inlier_count": 0,
                     "fit_rmse_px": null,
                     "forward_tmc_to_iirs": {
-                        "status": "success",
+                        "status": "failed",
                         "message": null,
                         "direction": "native",
                         "measured_direction": null,
-                        "quality_tier": "LOW_CONFIDENCE",
+                        "quality_tier": "FAILED",
                         "match_count": 0,
                         "inlier_count": 0,
                         "inlier_ratio": 0.0,
                         "fit_rmse_px": null,
+                        "fit_rmse_is_in_sample": true,
+                        "sub_pixel_accurate": false,
+                        "fraction_below_1px": 0.0,
+                        "validation_rmse_px": null,
+                        "validation_status": null,
                         "spatial_coverage": 0.0,
-                        "spatial_uniformity": 0.0
+                        "spatial_uniformity": 0.0,
+                        "canonical_grid_size": 10,
+                        "matching_grid_size": null
                     },
                     "reverse_iirs_to_tmc": {
-                        "status": "geometric_verification_failed",
-                        "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                        "status": "insufficient_correspondences",
+                        "message": "Insufficient verified correspondences for geometric registration (found 0, minimum required is 4).",
                         "direction": "native",
                         "measured_direction": null,
                         "quality_tier": "FAILED",
-                        "match_count": 76,
-                        "inlier_count": 6,
+                        "match_count": 0,
+                        "inlier_count": 0,
                         "inlier_ratio": 0.0,
                         "fit_rmse_px": null,
+                        "fit_rmse_is_in_sample": true,
+                        "sub_pixel_accurate": false,
+                        "fraction_below_1px": 0.0,
+                        "validation_rmse_px": null,
+                        "validation_status": null,
                         "spatial_coverage": 0.0,
-                        "spatial_uniformity": 0.0
+                        "spatial_uniformity": 0.0,
+                        "canonical_grid_size": 10,
+                        "matching_grid_size": null
                     },
                     "bidirectional_agreement": false,
-                    "directional_note": "Forward (TMC->IIRS) produced 'success' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
+                    "directional_note": "Forward (TMC->IIRS) produced 'failed' while Reverse (IIRS->TMC) produced 'insufficient_correspondences'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
                 }
             },
             "triplet_consistency": {
-                "status": "evaluated_composed",
-                "reason": null,
-                "cycle_rmse_px": 0.0,
-                "cycle_mean_px": 0.0,
-                "cycle_closed_successfully": true,
-                "failed_legs": []
+                "status": "cycle_not_computable",
+                "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
+                "cycle_rmse_px": null,
+                "cycle_mean_px": null,
+                "cycle_closed_successfully": false,
+                "failed_legs": [
+                    "BC (B -> C)",
+                    "CA (C -> A)"
+                ]
             }
         },
         {
@@ -425,15 +717,15 @@
             "status": "success",
             "quality_tier": "LOW_CONFIDENCE",
             "failure_reason": null,
-            "elapsed_seconds": 6.43,
-            "match_count": 26,
+            "elapsed_seconds": 6.14,
+            "match_count": 46,
             "inlier_count": 6,
-            "inlier_ratio": 0.2308,
-            "fit_rmse_px": 1.7699,
+            "inlier_ratio": 0.1304,
+            "fit_rmse_px": 1.4652,
             "validation_rmse_px": null,
             "validation_status": "insufficient_points_for_holdout",
-            "spatial_coverage": 0.3125,
-            "spatial_uniformity": 0.1935,
+            "spatial_coverage": 0.06,
+            "spatial_uniformity": 0.0183,
             "pairs": {
                 "ohrc_tmc": {
                     "status": "success",
@@ -441,12 +733,19 @@
                     "direction": "native",
                     "measured_direction": null,
                     "quality_tier": "LOW_CONFIDENCE",
-                    "match_count": 26,
+                    "match_count": 46,
                     "inlier_count": 6,
-                    "inlier_ratio": 0.2308,
-                    "fit_rmse_px": 1.7699,
-                    "spatial_coverage": 0.3125,
-                    "spatial_uniformity": 0.1935
+                    "inlier_ratio": 0.1304,
+                    "fit_rmse_px": 1.4652,
+                    "fit_rmse_is_in_sample": true,
+                    "sub_pixel_accurate": false,
+                    "fraction_below_1px": 0.5,
+                    "validation_rmse_px": null,
+                    "validation_status": "insufficient_points_for_holdout",
+                    "spatial_coverage": 0.06,
+                    "spatial_uniformity": 0.0183,
+                    "canonical_grid_size": 10,
+                    "matching_grid_size": 4
                 },
                 "ohrc_iirs": {
                     "status": "composition_not_computable",
@@ -454,200 +753,13 @@
                     "fit_rmse_px": null,
                     "forward_ohrc_to_iirs": {
                         "status": "composition_not_computable",
-                        "message": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
-                        "quality_tier": "FAILED",
-                        "match_count": 0,
-                        "inlier_count": 0,
-                        "inlier_ratio": 0.0,
-                        "fit_rmse_px": null,
-                        "spatial_coverage": 0.0,
-                        "spatial_uniformity": 0.0
-                    },
-                    "reverse_iirs_to_ohrc": null,
-                    "bidirectional_agreement": false,
-                    "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
-                    "composition": null
-                },
-                "tmc_iirs": {
-                    "status": "failed",
-                    "inlier_count": 0,
-                    "fit_rmse_px": null,
-                    "forward_tmc_to_iirs": {
-                        "status": "failed",
-                        "message": null,
-                        "direction": "native",
-                        "measured_direction": null,
-                        "quality_tier": "FAILED",
-                        "match_count": 0,
-                        "inlier_count": 0,
-                        "inlier_ratio": 0.0,
-                        "fit_rmse_px": null,
-                        "spatial_coverage": 0.0,
-                        "spatial_uniformity": 0.0
-                    },
-                    "reverse_iirs_to_tmc": {
-                        "status": "geometric_verification_failed",
-                        "message": "Robust geometric verification failed to estimate a valid transformation from verified correspondences.",
-                        "direction": "native",
-                        "measured_direction": null,
-                        "quality_tier": "FAILED",
-                        "match_count": 64,
-                        "inlier_count": 3,
-                        "inlier_ratio": 0.0,
-                        "fit_rmse_px": null,
-                        "spatial_coverage": 0.0,
-                        "spatial_uniformity": 0.0
-                    },
-                    "bidirectional_agreement": false,
-                    "directional_note": "Forward (TMC->IIRS) produced 'failed' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
-                }
-            },
-            "triplet_consistency": {
-                "status": "cycle_not_computable",
-                "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
-                "cycle_rmse_px": null,
-                "cycle_mean_px": null,
-                "cycle_closed_successfully": false,
-                "failed_legs": [
-                    "BC (B -> C)",
-                    "CA (C -> A)"
-                ]
-            }
-        },
-        {
-            "region_id": "region_006",
-            "status": "success",
-            "quality_tier": "LOW_CONFIDENCE",
-            "failure_reason": null,
-            "elapsed_seconds": 6.75,
-            "match_count": 37,
-            "inlier_count": 6,
-            "inlier_ratio": 0.1622,
-            "fit_rmse_px": 1.296,
-            "validation_rmse_px": null,
-            "validation_status": "insufficient_points_for_holdout",
-            "spatial_coverage": 0.375,
-            "spatial_uniformity": 0.2546,
-            "pairs": {
-                "ohrc_tmc": {
-                    "status": "success",
-                    "message": null,
-                    "direction": "native",
-                    "measured_direction": null,
-                    "quality_tier": "LOW_CONFIDENCE",
-                    "match_count": 37,
-                    "inlier_count": 6,
-                    "inlier_ratio": 0.1622,
-                    "fit_rmse_px": 1.296,
-                    "spatial_coverage": 0.375,
-                    "spatial_uniformity": 0.2546
-                },
-                "ohrc_iirs": {
-                    "status": "composition_not_computable",
-                    "inlier_count": 0,
-                    "fit_rmse_px": null,
-                    "forward_ohrc_to_iirs": {
-                        "status": "composition_not_computable",
-                        "message": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
-                        "quality_tier": "FAILED",
-                        "match_count": 0,
-                        "inlier_count": 0,
-                        "inlier_ratio": 0.0,
-                        "fit_rmse_px": null,
-                        "spatial_coverage": 0.0,
-                        "spatial_uniformity": 0.0
-                    },
-                    "reverse_iirs_to_ohrc": null,
-                    "bidirectional_agreement": false,
-                    "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
-                    "composition": null
-                },
-                "tmc_iirs": {
-                    "status": "failed",
-                    "inlier_count": 0,
-                    "fit_rmse_px": null,
-                    "forward_tmc_to_iirs": {
-                        "status": "failed",
-                        "message": null,
-                        "direction": "native",
-                        "measured_direction": null,
-                        "quality_tier": "FAILED",
-                        "match_count": 0,
-                        "inlier_count": 0,
-                        "inlier_ratio": 0.0,
-                        "fit_rmse_px": null,
-                        "spatial_coverage": 0.0,
-                        "spatial_uniformity": 0.0
-                    },
-                    "reverse_iirs_to_tmc": {
-                        "status": "geometric_verification_failed",
-                        "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
-                        "direction": "native",
-                        "measured_direction": null,
-                        "quality_tier": "FAILED",
-                        "match_count": 72,
-                        "inlier_count": 4,
-                        "inlier_ratio": 0.0,
-                        "fit_rmse_px": null,
-                        "spatial_coverage": 0.0,
-                        "spatial_uniformity": 0.0
-                    },
-                    "bidirectional_agreement": false,
-                    "directional_note": "Forward (TMC->IIRS) produced 'failed' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
-                }
-            },
-            "triplet_consistency": {
-                "status": "cycle_not_computable",
-                "reason": "Missing verified homography for leg(s): BC (B -> C), CA (C -> A)",
-                "cycle_rmse_px": null,
-                "cycle_mean_px": null,
-                "cycle_closed_successfully": false,
-                "failed_legs": [
-                    "BC (B -> C)",
-                    "CA (C -> A)"
-                ]
-            }
-        },
-        {
-            "region_id": "triplet_01_ch2_ohr_ncp_202",
-            "status": "success",
-            "quality_tier": "LOW_CONFIDENCE",
-            "failure_reason": null,
-            "elapsed_seconds": 5.69,
-            "match_count": 45,
-            "inlier_count": 7,
-            "inlier_ratio": 0.1556,
-            "fit_rmse_px": 1.5468,
-            "validation_rmse_px": null,
-            "validation_status": "insufficient_points_for_holdout",
-            "spatial_coverage": 0.4375,
-            "spatial_uniformity": 0.3113,
-            "pairs": {
-                "ohrc_tmc": {
-                    "status": "success",
-                    "message": null,
-                    "direction": "native",
-                    "measured_direction": null,
-                    "quality_tier": "LOW_CONFIDENCE",
-                    "match_count": 45,
-                    "inlier_count": 7,
-                    "inlier_ratio": 0.1556,
-                    "fit_rmse_px": 1.5468,
-                    "spatial_coverage": 0.4375,
-                    "spatial_uniformity": 0.3113
-                },
-                "ohrc_iirs": {
-                    "status": "composition_not_computable",
-                    "inlier_count": 0,
-                    "fit_rmse_px": 137.7112,
-                    "forward_ohrc_to_iirs": {
-                        "status": "composition_not_computable",
                         "message": null,
                         "quality_tier": "FAILED",
                         "match_count": 0,
                         "inlier_count": 0,
                         "inlier_ratio": 0.0,
-                        "fit_rmse_px": 137.7112,
+                        "fit_rmse_px": null,
+                        "fit_rmse_note": null,
                         "spatial_coverage": 0.0,
                         "spatial_uniformity": 0.0
                     },
@@ -658,43 +770,152 @@
                         "source": "A -> B -> C",
                         "homography": [
                             [
-                                1.560005208370546,
-                                -0.4670415478199706,
-                                188.10179818254034
+                                0.37736269876213535,
+                                0.3557126573839149,
+                                -28.725631114185017
                             ],
                             [
-                                0.8280401162366585,
-                                0.9343487288469035,
-                                -217.61125394607896
+                                -0.44396591072611946,
+                                0.8756217866254102,
+                                107.17654349826964
                             ],
                             [
-                                0.0026604635472497443,
-                                -0.0014315853183681593,
+                                -0.0023433421029815634,
+                                0.001663281807746392,
                                 1.0
                             ]
                         ],
-                        "transform": "benchmarks/registration_benchmark_output/triplet_01_ch2_ohr_ncp_202/triplet_cycle/composed_ohrc_to_iirs_transform.json",
-                        "registered_raster": "benchmarks/registration_benchmark_output/triplet_01_ch2_ohr_ncp_202/triplet_cycle/composed_registered_ohrc_to_iirs.png",
-                        "registered_geotiff": "benchmarks/registration_benchmark_output/triplet_01_ch2_ohr_ncp_202/triplet_cycle/composed_registered_ohrc_to_iirs.tif",
-                        "checkerboard_qa": "benchmarks/registration_benchmark_output/triplet_01_ch2_ohr_ncp_202/triplet_cycle/composed_checkerboard_qa.png"
+                        "Sigma_AC": [
+                            [
+                                2.6363655790132725,
+                                -0.031325318737443014,
+                                -328.7920852329338,
+                                2.2103784384439056,
+                                -1.5415965128903701,
+                                -105.76600860634828,
+                                0.010186011581440495,
+                                -0.007418020944623897,
+                                0.0
+                            ],
+                            [
+                                -0.031325318737443014,
+                                1.9411480061732416,
+                                -124.22193859677948,
+                                -0.7499673269267845,
+                                2.566035095531469,
+                                -30.050119300035774,
+                                -0.003089573614704844,
+                                0.01079907915458846,
+                                0.0
+                            ],
+                            [
+                                -328.7920852329338,
+                                -124.22193859677948,
+                                52928.73969275411,
+                                -218.2450032379144,
+                                18.441694123029805,
+                                17060.613259450496,
+                                -1.0021497406178397,
+                                0.2251803862931405,
+                                0.0
+                            ],
+                            [
+                                2.2103784384439056,
+                                -0.7499673269267845,
+                                -218.2450032379144,
+                                2.3136399729316945,
+                                -2.315971728147485,
+                                -93.69455316442064,
+                                0.010268323002210587,
+                                -0.010492302428929717,
+                                0.0
+                            ],
+                            [
+                                -1.5415965128903701,
+                                2.566035095531469,
+                                18.441694123029805,
+                                -2.315971728147485,
+                                5.187522141999043,
+                                -43.094318171545666,
+                                -0.011491099943567543,
+                                0.021051233432226805,
+                                0.0
+                            ],
+                            [
+                                -105.76600860634828,
+                                -30.050119300035774,
+                                17060.613259450496,
+                                -93.69455316442064,
+                                -43.094318171545666,
+                                14268.980016805355,
+                                -0.2710427595852396,
+                                -0.014937792385477868,
+                                0.0
+                            ],
+                            [
+                                0.010186011581440495,
+                                -0.003089573614704844,
+                                -1.0021497406178397,
+                                0.010268323002210587,
+                                -0.011491099943567543,
+                                -0.2710427595852396,
+                                5.09816453907078e-05,
+                                -5.229575095556033e-05,
+                                0.0
+                            ],
+                            [
+                                -0.007418020944623897,
+                                0.01079907915458846,
+                                0.2251803862931405,
+                                -0.010492302428929717,
+                                0.021051233432226805,
+                                -0.014937792385477868,
+                                -5.229575095556033e-05,
+                                9.364088692468562e-05,
+                                0.0
+                            ],
+                            [
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0
+                            ]
+                        ],
+                        "uncertainty_m": 1454674.2307,
+                        "transform": "benchmarks\\registration_benchmark_output\\region_005\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
+                        "registered_raster": "benchmarks\\registration_benchmark_output\\region_005\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
+                        "registered_geotiff": "benchmarks\\registration_benchmark_output\\region_005\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
+                        "checkerboard_qa": "benchmarks\\registration_benchmark_output\\region_005\\triplet_cycle\\composed_checkerboard_qa.png"
                     }
                 },
                 "tmc_iirs": {
                     "status": "success",
-                    "inlier_count": 6,
-                    "fit_rmse_px": 1.2354,
+                    "inlier_count": 7,
+                    "fit_rmse_px": 1.3842,
                     "forward_tmc_to_iirs": {
                         "status": "success",
                         "message": null,
                         "direction": "native",
                         "measured_direction": null,
                         "quality_tier": "LOW_CONFIDENCE",
-                        "match_count": 82,
-                        "inlier_count": 6,
-                        "inlier_ratio": 0.0732,
-                        "fit_rmse_px": 1.2354,
-                        "spatial_coverage": 0.3125,
-                        "spatial_uniformity": 0.1935
+                        "match_count": 23,
+                        "inlier_count": 7,
+                        "inlier_ratio": 0.3043,
+                        "fit_rmse_px": 1.3842,
+                        "fit_rmse_is_in_sample": true,
+                        "sub_pixel_accurate": false,
+                        "fraction_below_1px": 0.4286,
+                        "validation_rmse_px": null,
+                        "validation_status": "insufficient_points_for_holdout",
+                        "spatial_coverage": 0.06,
+                        "spatial_uniformity": 0.0172,
+                        "canonical_grid_size": 10,
+                        "matching_grid_size": 4
                     },
                     "reverse_iirs_to_tmc": {
                         "status": "success",
@@ -702,12 +923,19 @@
                         "direction": "native",
                         "measured_direction": null,
                         "quality_tier": "LOW_CONFIDENCE",
-                        "match_count": 82,
-                        "inlier_count": 6,
-                        "inlier_ratio": 0.0732,
-                        "fit_rmse_px": 1.1893,
-                        "spatial_coverage": 0.3125,
-                        "spatial_uniformity": 0.1935
+                        "match_count": 23,
+                        "inlier_count": 7,
+                        "inlier_ratio": 0.3043,
+                        "fit_rmse_px": 1.5229,
+                        "fit_rmse_is_in_sample": true,
+                        "sub_pixel_accurate": false,
+                        "fraction_below_1px": 0.4286,
+                        "validation_rmse_px": null,
+                        "validation_status": "insufficient_points_for_holdout",
+                        "spatial_coverage": 0.07,
+                        "spatial_uniformity": 0.0235,
+                        "canonical_grid_size": 10,
+                        "matching_grid_size": 4
                     },
                     "bidirectional_agreement": true,
                     "directional_note": null
@@ -716,39 +944,46 @@
             "triplet_consistency": {
                 "status": "evaluated",
                 "reason": null,
-                "cycle_rmse_px": 137.7112,
-                "cycle_mean_px": 127.6425,
+                "cycle_rmse_px": 186.6006,
+                "cycle_mean_px": 109.6105,
                 "cycle_closed_successfully": false,
                 "failed_legs": []
             }
         },
         {
-            "region_id": "triplet_new_2022",
-            "status": "geometric_verification_failed",
-            "quality_tier": "FAILED",
-            "failure_reason": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
-            "elapsed_seconds": 3.72,
-            "match_count": 0,
-            "inlier_count": 0,
-            "inlier_ratio": 0.0,
-            "fit_rmse_px": null,
+            "region_id": "region_006",
+            "status": "success",
+            "quality_tier": "LOW_CONFIDENCE",
+            "failure_reason": null,
+            "elapsed_seconds": 6.49,
+            "match_count": 50,
+            "inlier_count": 6,
+            "inlier_ratio": 0.12,
+            "fit_rmse_px": 1.0601,
             "validation_rmse_px": null,
-            "validation_status": null,
-            "spatial_coverage": 0.0,
-            "spatial_uniformity": 0.0,
+            "validation_status": "insufficient_points_for_holdout",
+            "spatial_coverage": 0.06,
+            "spatial_uniformity": 0.0183,
             "pairs": {
                 "ohrc_tmc": {
-                    "status": "geometric_verification_failed",
-                    "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                    "status": "success",
+                    "message": null,
                     "direction": "native",
                     "measured_direction": null,
-                    "quality_tier": "FAILED",
-                    "match_count": 49,
+                    "quality_tier": "LOW_CONFIDENCE",
+                    "match_count": 50,
                     "inlier_count": 6,
-                    "inlier_ratio": 0.0,
-                    "fit_rmse_px": null,
-                    "spatial_coverage": 0.0,
-                    "spatial_uniformity": 0.0
+                    "inlier_ratio": 0.12,
+                    "fit_rmse_px": 1.0601,
+                    "fit_rmse_is_in_sample": true,
+                    "sub_pixel_accurate": false,
+                    "fraction_below_1px": 0.6667,
+                    "validation_rmse_px": null,
+                    "validation_status": "insufficient_points_for_holdout",
+                    "spatial_coverage": 0.06,
+                    "spatial_uniformity": 0.0183,
+                    "canonical_grid_size": 10,
+                    "matching_grid_size": 4
                 },
                 "ohrc_iirs": {
                     "status": "composition_not_computable",
@@ -756,65 +991,677 @@
                     "fit_rmse_px": null,
                     "forward_ohrc_to_iirs": {
                         "status": "composition_not_computable",
-                        "message": "Missing verified homography for leg(s): AB (A -> B), BC (B -> C), CA (C -> A)",
+                        "message": null,
                         "quality_tier": "FAILED",
                         "match_count": 0,
                         "inlier_count": 0,
                         "inlier_ratio": 0.0,
                         "fit_rmse_px": null,
+                        "fit_rmse_note": null,
                         "spatial_coverage": 0.0,
                         "spatial_uniformity": 0.0
                     },
                     "reverse_iirs_to_ohrc": null,
                     "bidirectional_agreement": false,
                     "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
-                    "composition": null
+                    "composition": {
+                        "source": "A -> B -> C",
+                        "homography": [
+                            [
+                                0.9397010728544154,
+                                -0.25845469823324024,
+                                88.22690768792869
+                            ],
+                            [
+                                0.03664421121136106,
+                                1.2191359835835138,
+                                -126.0742599881945
+                            ],
+                            [
+                                0.00015248193553185703,
+                                -0.00013949160631914696,
+                                1.0
+                            ]
+                        ],
+                        "Sigma_AC": [
+                            [
+                                1333.8294027510308,
+                                1012.8361276965478,
+                                -230339.87883231064,
+                                857.396880706645,
+                                2803.174046370363,
+                                -633117.5716434155,
+                                1.8343029248378873,
+                                3.3863965155432467,
+                                0.0
+                            ],
+                            [
+                                1012.8361276965478,
+                                1279.1933446663627,
+                                -222230.2144756545,
+                                283.813902707232,
+                                3020.0475635672788,
+                                -551809.1774932701,
+                                0.6660739749302552,
+                                4.364607626688608,
+                                0.0
+                            ],
+                            [
+                                -230339.87883231064,
+                                -222230.2144756545,
+                                44284603.09018407,
+                                -113559.8899252718,
+                                -565835.3499113679,
+                                115634374.1053552,
+                                -248.7377047135493,
+                                -749.8454403652656,
+                                0.0
+                            ],
+                            [
+                                857.396880706645,
+                                283.813902707232,
+                                -113559.8899252718,
+                                891.4917589805477,
+                                1146.4277542896307,
+                                -366954.3623351717,
+                                1.7810466630464432,
+                                0.8362841111440613,
+                                0.0
+                            ],
+                            [
+                                2803.174046370363,
+                                3020.0475635672788,
+                                -565835.3499113679,
+                                1146.4277542896307,
+                                7471.058039839534,
+                                -1457529.0462808541,
+                                2.56092639405602,
+                                10.283134708187838,
+                                0.0
+                            ],
+                            [
+                                -633117.5716434155,
+                                -551809.1774932701,
+                                115634374.1053552,
+                                -366954.3623351717,
+                                -1457529.0462808541,
+                                313298398.6192394,
+                                -777.8511263774336,
+                                -1855.761653411997,
+                                0.0
+                            ],
+                            [
+                                1.8343029248378873,
+                                0.6660739749302552,
+                                -248.7377047135493,
+                                1.7810466630464432,
+                                2.56092639405602,
+                                -777.8511263774336,
+                                0.0036645195155447278,
+                                0.0020329520971253357,
+                                0.0
+                            ],
+                            [
+                                3.3863965155432467,
+                                4.364607626688608,
+                                -749.8454403652656,
+                                0.8362841111440613,
+                                10.283134708187838,
+                                -1855.761653411997,
+                                0.0020329520971253357,
+                                0.014983025868874853,
+                                0.0
+                            ],
+                            [
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0
+                            ]
+                        ],
+                        "uncertainty_m": 662937.3547,
+                        "transform": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
+                        "registered_raster": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
+                        "registered_geotiff": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
+                        "checkerboard_qa": "benchmarks\\registration_benchmark_output\\region_006\\triplet_cycle\\composed_checkerboard_qa.png"
+                    }
                 },
                 "tmc_iirs": {
-                    "status": "failed",
-                    "inlier_count": 0,
-                    "fit_rmse_px": null,
+                    "status": "success",
+                    "inlier_count": 7,
+                    "fit_rmse_px": 1.8201,
                     "forward_tmc_to_iirs": {
-                        "status": "failed",
+                        "status": "success",
                         "message": null,
                         "direction": "native",
                         "measured_direction": null,
+                        "quality_tier": "LOW_CONFIDENCE",
+                        "match_count": 20,
+                        "inlier_count": 7,
+                        "inlier_ratio": 0.35,
+                        "fit_rmse_px": 1.8201,
+                        "fit_rmse_is_in_sample": true,
+                        "sub_pixel_accurate": false,
+                        "fraction_below_1px": 0.2857,
+                        "validation_rmse_px": null,
+                        "validation_status": "insufficient_points_for_holdout",
+                        "spatial_coverage": 0.06,
+                        "spatial_uniformity": 0.0172,
+                        "canonical_grid_size": 10,
+                        "matching_grid_size": 4
+                    },
+                    "reverse_iirs_to_tmc": {
+                        "status": "success",
+                        "message": null,
+                        "direction": "native",
+                        "measured_direction": null,
+                        "quality_tier": "LOW_CONFIDENCE",
+                        "match_count": 20,
+                        "inlier_count": 7,
+                        "inlier_ratio": 0.35,
+                        "fit_rmse_px": 1.7973,
+                        "fit_rmse_is_in_sample": true,
+                        "sub_pixel_accurate": false,
+                        "fraction_below_1px": 0.4286,
+                        "validation_rmse_px": null,
+                        "validation_status": "insufficient_points_for_holdout",
+                        "spatial_coverage": 0.07,
+                        "spatial_uniformity": 0.0235,
+                        "canonical_grid_size": 10,
+                        "matching_grid_size": 4
+                    },
+                    "bidirectional_agreement": true,
+                    "directional_note": null
+                }
+            },
+            "triplet_consistency": {
+                "status": "evaluated",
+                "reason": null,
+                "cycle_rmse_px": 148.5246,
+                "cycle_mean_px": 127.2431,
+                "cycle_closed_successfully": false,
+                "failed_legs": []
+            }
+        },
+        {
+            "region_id": "triplet_01_ch2_ohr_ncp_202",
+            "status": "success",
+            "quality_tier": "LOW_CONFIDENCE",
+            "failure_reason": null,
+            "elapsed_seconds": 6.22,
+            "match_count": 47,
+            "inlier_count": 7,
+            "inlier_ratio": 0.1489,
+            "fit_rmse_px": 1.6875,
+            "validation_rmse_px": null,
+            "validation_status": "insufficient_points_for_holdout",
+            "spatial_coverage": 0.07,
+            "spatial_uniformity": 0.0235,
+            "pairs": {
+                "ohrc_tmc": {
+                    "status": "success",
+                    "message": null,
+                    "direction": "native",
+                    "measured_direction": null,
+                    "quality_tier": "LOW_CONFIDENCE",
+                    "match_count": 47,
+                    "inlier_count": 7,
+                    "inlier_ratio": 0.1489,
+                    "fit_rmse_px": 1.6875,
+                    "fit_rmse_is_in_sample": true,
+                    "sub_pixel_accurate": false,
+                    "fraction_below_1px": 0.4286,
+                    "validation_rmse_px": null,
+                    "validation_status": "insufficient_points_for_holdout",
+                    "spatial_coverage": 0.07,
+                    "spatial_uniformity": 0.0235,
+                    "canonical_grid_size": 10,
+                    "matching_grid_size": 4
+                },
+                "ohrc_iirs": {
+                    "status": "composition_not_computable",
+                    "inlier_count": 0,
+                    "fit_rmse_px": null,
+                    "forward_ohrc_to_iirs": {
+                        "status": "composition_not_computable",
+                        "message": null,
                         "quality_tier": "FAILED",
                         "match_count": 0,
                         "inlier_count": 0,
                         "inlier_ratio": 0.0,
                         "fit_rmse_px": null,
+                        "fit_rmse_note": null,
                         "spatial_coverage": 0.0,
                         "spatial_uniformity": 0.0
                     },
-                    "reverse_iirs_to_tmc": {
-                        "status": "geometric_verification_failed",
-                        "message": "Estimated transformation rejected by quality gate: Pathological projective distortion or ill-conditioned matrix",
+                    "reverse_iirs_to_ohrc": null,
+                    "bidirectional_agreement": false,
+                    "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
+                    "composition": {
+                        "source": "A -> B -> C",
+                        "homography": [
+                            [
+                                1.700828525829387,
+                                0.11315651152528536,
+                                12.136100298081953
+                            ],
+                            [
+                                1.2317157420430862,
+                                1.342244821118833,
+                                -88.52571563117114
+                            ],
+                            [
+                                0.002551532737730462,
+                                3.6076476019066434e-05,
+                                1.0
+                            ]
+                        ],
+                        "Sigma_AC": [
+                            [
+                                2.293931069293817,
+                                0.13988634900409683,
+                                -135.27429959087186,
+                                2.585391935233219,
+                                1.2786366516970176,
+                                -350.5530394227694,
+                                0.007036925828388602,
+                                0.0002967229001767493,
+                                0.0
+                            ],
+                            [
+                                0.13988634900409683,
+                                0.19458704424303072,
+                                -28.473440371514773,
+                                0.11823206230180691,
+                                0.4241122073542258,
+                                -62.90508465007009,
+                                3.503112829482041e-05,
+                                0.0007287810893991452,
+                                0.0
+                            ],
+                            [
+                                -135.27429959087186,
+                                -28.473440371514773,
+                                11747.513359631379,
+                                -138.39569934435963,
+                                -111.48272656386087,
+                                25807.05285920491,
+                                -0.3337576571031405,
+                                -0.09282393668951099,
+                                0.0
+                            ],
+                            [
+                                2.585391935233219,
+                                0.11823206230180691,
+                                -138.39569934435963,
+                                3.425375602005832,
+                                1.3369179196998113,
+                                -421.4809864311971,
+                                0.008676909140099172,
+                                0.00011229169191566485,
+                                0.0
+                            ],
+                            [
+                                1.2786366516970176,
+                                0.4241122073542258,
+                                -111.48272656386087,
+                                1.3369179196998113,
+                                1.4145419196489002,
+                                -282.30122866162753,
+                                0.003114645438294726,
+                                0.0015303084615013005,
+                                0.0
+                            ],
+                            [
+                                -350.5530394227694,
+                                -62.90508465007009,
+                                25807.05285920491,
+                                -421.4809864311971,
+                                -282.30122866162753,
+                                72775.3675151429,
+                                -0.9729017669484499,
+                                -0.20156114620146925,
+                                0.0
+                            ],
+                            [
+                                0.007036925828388602,
+                                3.503112829482041e-05,
+                                -0.3337576571031405,
+                                0.008676909140099172,
+                                0.003114645438294726,
+                                -0.9729017669484499,
+                                2.4104974431052786e-05,
+                                -7.016199286872595e-07,
+                                0.0
+                            ],
+                            [
+                                0.0002967229001767493,
+                                0.0007287810893991452,
+                                -0.09282393668951099,
+                                0.00011229169191566485,
+                                0.0015303084615013005,
+                                -0.20156114620146925,
+                                -7.016199286872595e-07,
+                                2.866546652003912e-06,
+                                0.0
+                            ],
+                            [
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0
+                            ]
+                        ],
+                        "uncertainty_m": 648371.6465,
+                        "transform": "benchmarks\\registration_benchmark_output\\triplet_01_ch2_ohr_ncp_202\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
+                        "registered_raster": "benchmarks\\registration_benchmark_output\\triplet_01_ch2_ohr_ncp_202\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
+                        "registered_geotiff": "benchmarks\\registration_benchmark_output\\triplet_01_ch2_ohr_ncp_202\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
+                        "checkerboard_qa": "benchmarks\\registration_benchmark_output\\triplet_01_ch2_ohr_ncp_202\\triplet_cycle\\composed_checkerboard_qa.png"
+                    }
+                },
+                "tmc_iirs": {
+                    "status": "success",
+                    "inlier_count": 8,
+                    "fit_rmse_px": 1.4874,
+                    "forward_tmc_to_iirs": {
+                        "status": "success",
+                        "message": null,
                         "direction": "native",
                         "measured_direction": null,
-                        "quality_tier": "FAILED",
-                        "match_count": 67,
-                        "inlier_count": 5,
-                        "inlier_ratio": 0.0,
-                        "fit_rmse_px": null,
-                        "spatial_coverage": 0.0,
-                        "spatial_uniformity": 0.0
+                        "quality_tier": "LOW_CONFIDENCE",
+                        "match_count": 24,
+                        "inlier_count": 8,
+                        "inlier_ratio": 0.3333,
+                        "fit_rmse_px": 1.4874,
+                        "fit_rmse_is_in_sample": true,
+                        "sub_pixel_accurate": false,
+                        "fraction_below_1px": 0.25,
+                        "validation_rmse_px": 5.4931,
+                        "validation_status": "evaluated",
+                        "spatial_coverage": 0.08,
+                        "spatial_uniformity": 0.0289,
+                        "canonical_grid_size": 10,
+                        "matching_grid_size": 4
                     },
-                    "bidirectional_agreement": false,
-                    "directional_note": "Forward (TMC->IIRS) produced 'failed' while Reverse (IIRS->TMC) produced 'geometric_verification_failed'. Caused by grid sizing and search window asymmetries under ~13x physical scale disparity."
+                    "reverse_iirs_to_tmc": {
+                        "status": "success",
+                        "message": null,
+                        "direction": "native",
+                        "measured_direction": null,
+                        "quality_tier": "LOW_CONFIDENCE",
+                        "match_count": 24,
+                        "inlier_count": 8,
+                        "inlier_ratio": 0.3333,
+                        "fit_rmse_px": 1.5096,
+                        "fit_rmse_is_in_sample": true,
+                        "sub_pixel_accurate": false,
+                        "fraction_below_1px": 0.25,
+                        "validation_rmse_px": 6.5318,
+                        "validation_status": "evaluated",
+                        "spatial_coverage": 0.08,
+                        "spatial_uniformity": 0.0289,
+                        "canonical_grid_size": 10,
+                        "matching_grid_size": 4
+                    },
+                    "bidirectional_agreement": true,
+                    "directional_note": null
                 }
             },
             "triplet_consistency": {
-                "status": "cycle_not_computable",
-                "reason": "Missing verified homography for leg(s): AB (A -> B), BC (B -> C), CA (C -> A)",
-                "cycle_rmse_px": null,
-                "cycle_mean_px": null,
+                "status": "evaluated",
+                "reason": null,
+                "cycle_rmse_px": 152.9886,
+                "cycle_mean_px": 149.7235,
                 "cycle_closed_successfully": false,
-                "failed_legs": [
-                    "AB (A -> B)",
-                    "BC (B -> C)",
-                    "CA (C -> A)"
-                ]
+                "failed_legs": []
+            }
+        },
+        {
+            "region_id": "triplet_new_2022",
+            "status": "success",
+            "quality_tier": "LOW_CONFIDENCE",
+            "failure_reason": null,
+            "elapsed_seconds": 6.44,
+            "match_count": 50,
+            "inlier_count": 6,
+            "inlier_ratio": 0.12,
+            "fit_rmse_px": 1.214,
+            "validation_rmse_px": null,
+            "validation_status": "insufficient_points_for_holdout",
+            "spatial_coverage": 0.06,
+            "spatial_uniformity": 0.0183,
+            "pairs": {
+                "ohrc_tmc": {
+                    "status": "success",
+                    "message": null,
+                    "direction": "native",
+                    "measured_direction": null,
+                    "quality_tier": "LOW_CONFIDENCE",
+                    "match_count": 50,
+                    "inlier_count": 6,
+                    "inlier_ratio": 0.12,
+                    "fit_rmse_px": 1.214,
+                    "fit_rmse_is_in_sample": true,
+                    "sub_pixel_accurate": false,
+                    "fraction_below_1px": 0.5,
+                    "validation_rmse_px": null,
+                    "validation_status": "insufficient_points_for_holdout",
+                    "spatial_coverage": 0.06,
+                    "spatial_uniformity": 0.0183,
+                    "canonical_grid_size": 10,
+                    "matching_grid_size": 4
+                },
+                "ohrc_iirs": {
+                    "status": "composition_not_computable",
+                    "inlier_count": 0,
+                    "fit_rmse_px": null,
+                    "forward_ohrc_to_iirs": {
+                        "status": "composition_not_computable",
+                        "message": null,
+                        "quality_tier": "FAILED",
+                        "match_count": 0,
+                        "inlier_count": 0,
+                        "inlier_ratio": 0.0,
+                        "fit_rmse_px": null,
+                        "fit_rmse_note": null,
+                        "spatial_coverage": 0.0,
+                        "spatial_uniformity": 0.0
+                    },
+                    "reverse_iirs_to_ohrc": null,
+                    "bidirectional_agreement": false,
+                    "directional_note": "OHRC -> IIRS is composed as H(TMC -> IIRS) \u00b7 H(OHRC -> TMC); direct matching is intentionally not attempted.",
+                    "composition": {
+                        "source": "A -> B -> C",
+                        "homography": [
+                            [
+                                3.3992802533851254,
+                                0.3386078587621177,
+                                -206.1129671380912
+                            ],
+                            [
+                                1.763358159041292,
+                                2.184855644779511,
+                                -285.62815695431976
+                            ],
+                            [
+                                0.004896428499616402,
+                                0.0009712937348124365,
+                                1.0
+                            ]
+                        ],
+                        "Sigma_AC": [
+                            [
+                                202010.21000816327,
+                                -248224.1453901477,
+                                29864020.84550207,
+                                210995.73204975025,
+                                -232355.36262754846,
+                                16674779.585973749,
+                                1108.9246469088062,
+                                -859.3274574473231,
+                                0.0
+                            ],
+                            [
+                                -248224.1453901477,
+                                318360.6422209514,
+                                -39087366.68311074,
+                                -260317.26238919244,
+                                301436.1936037041,
+                                -22606050.558573183,
+                                -1356.0932393497562,
+                                1083.4347584184197,
+                                0.0
+                            ],
+                            [
+                                29864020.84550207,
+                                -39087366.68311074,
+                                4857575310.426779,
+                                31145581.405818053,
+                                -37082774.52559113,
+                                2861806792.444452,
+                                161737.4343360385,
+                                -131275.1256126838,
+                                0.0
+                            ],
+                            [
+                                210995.73204975025,
+                                -260317.26238919244,
+                                31145581.405818053,
+                                226210.320496272,
+                                -246560.64601114608,
+                                17238496.90814483,
+                                1183.1730315549034,
+                                -915.8764424591093,
+                                0.0
+                            ],
+                            [
+                                -232355.36262754846,
+                                301436.1936037041,
+                                -37082774.52559113,
+                                -246560.64601114608,
+                                287834.0735499869,
+                                -21572315.182311147,
+                                -1282.5540296034985,
+                                1030.7230034406139,
+                                0.0
+                            ],
+                            [
+                                16674779.585973749,
+                                -22606050.558573183,
+                                2861806792.444452,
+                                17238496.90814483,
+                                -21572315.182311147,
+                                1739365316.5422752,
+                                89141.94861699754,
+                                -74407.96006856316,
+                                0.0
+                            ],
+                            [
+                                1108.9246469088062,
+                                -1356.0932393497562,
+                                161737.4343360385,
+                                1183.1730315549034,
+                                -1282.5540296034985,
+                                89141.94861699754,
+                                6.309230184302767,
+                                -4.837836583527618,
+                                0.0
+                            ],
+                            [
+                                -859.3274574473231,
+                                1083.4347584184197,
+                                -131275.1256126838,
+                                -915.8764424591093,
+                                1030.7230034406139,
+                                -74407.96006856316,
+                                -4.837836583527618,
+                                3.795155686953352,
+                                0.0
+                            ],
+                            [
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0,
+                                0.0
+                            ]
+                        ],
+                        "uncertainty_m": 2240807.6547,
+                        "transform": "benchmarks\\registration_benchmark_output\\triplet_new_2022\\triplet_cycle\\composed_ohrc_to_iirs_transform.json",
+                        "registered_raster": "benchmarks\\registration_benchmark_output\\triplet_new_2022\\triplet_cycle\\composed_registered_ohrc_to_iirs.png",
+                        "registered_geotiff": "benchmarks\\registration_benchmark_output\\triplet_new_2022\\triplet_cycle\\composed_registered_ohrc_to_iirs.tif",
+                        "checkerboard_qa": "benchmarks\\registration_benchmark_output\\triplet_new_2022\\triplet_cycle\\composed_checkerboard_qa.png"
+                    }
+                },
+                "tmc_iirs": {
+                    "status": "success",
+                    "inlier_count": 8,
+                    "fit_rmse_px": 1.9565,
+                    "forward_tmc_to_iirs": {
+                        "status": "success",
+                        "message": null,
+                        "direction": "native",
+                        "measured_direction": null,
+                        "quality_tier": "LOW_CONFIDENCE",
+                        "match_count": 29,
+                        "inlier_count": 8,
+                        "inlier_ratio": 0.2759,
+                        "fit_rmse_px": 1.9565,
+                        "fit_rmse_is_in_sample": true,
+                        "sub_pixel_accurate": false,
+                        "fraction_below_1px": 0.25,
+                        "validation_rmse_px": 4.4093,
+                        "validation_status": "evaluated",
+                        "spatial_coverage": 0.08,
+                        "spatial_uniformity": 0.0289,
+                        "canonical_grid_size": 10,
+                        "matching_grid_size": 4
+                    },
+                    "reverse_iirs_to_tmc": {
+                        "status": "success",
+                        "message": null,
+                        "direction": "native",
+                        "measured_direction": null,
+                        "quality_tier": "LOW_CONFIDENCE",
+                        "match_count": 29,
+                        "inlier_count": 8,
+                        "inlier_ratio": 0.2759,
+                        "fit_rmse_px": 1.8396,
+                        "fit_rmse_is_in_sample": true,
+                        "sub_pixel_accurate": false,
+                        "fraction_below_1px": 0.25,
+                        "validation_rmse_px": 4.1683,
+                        "validation_status": "evaluated",
+                        "spatial_coverage": 0.08,
+                        "spatial_uniformity": 0.0289,
+                        "canonical_grid_size": 10,
+                        "matching_grid_size": 4
+                    },
+                    "bidirectional_agreement": true,
+                    "directional_note": null
+                }
+            },
+            "triplet_consistency": {
+                "status": "evaluated",
+                "reason": null,
+                "cycle_rmse_px": 68.312,
+                "cycle_mean_px": 64.5318,
+                "cycle_closed_successfully": false,
+                "failed_legs": []
             }
         }
     ]

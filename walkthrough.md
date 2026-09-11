@@ -44,6 +44,7 @@ To satisfy the problem statement requirement of **maintaining uniform distributi
    - `region_003` achieved a 44% error reduction down to true sub-pixel fit RMSE (**0.9941 px**); `triplet_01` improved from 2.20 px down to 1.55 px (-29.5%); and `region_006` improved from 1.65 px to 1.30 px (-21.2%).
 4. **Honest Reporting on `triplet_new_2022`**:
    - Features an extreme $162.25^\circ$ sun-azimuth disparity (diametric illumination reversal). The surviving inliers clustered in a localized band along the bottom edge, correctly triggering Quality Gate 3 (*Pathological projective distortion*). Per the project's zero-synthetic-fallback principle, failure is reported cleanly without fabricating identity transforms.
+   - **Update 2026-09-11**: the Gate-3 refusal was measured under the biased refiner. With the validated paraboloid the same pair yields a well-conditioned H (det 4.6, cond 11k, scale-ratio 2.5, projectivity 0.0035): **50 raw / 6 inliers @1.21px, LOW**. Deletion considered and rejected as cherry-picking; both outcomes on record with mechanism. The frozen Before→After table above documents the spatial-suppression change specifically.
 
 ---
 

@@ -35,6 +35,13 @@ def _summarize_pair_result(reg_result: Optional[Dict[str, Any]]) -> Optional[Dic
     status = reg_result.get("status")
     metrics = reg_result.get("metrics") or {}
     fit_rmse = metrics.get("fit_rmse_px")
+    # Use the canonical module flag (fit<1 AND held-out<1) — never recompute
+    # fit-only here; a second definition silently contradicted metrics.py.
+    sub_px = metrics.get("sub_pixel_accurate")
+    if sub_px is None:
+        val = metrics.get("held_out_validation_rmse_px", metrics.get("validation_rmse_px"))
+        sub_px = bool(fit_rmse is not None and fit_rmse < 1.0
+                      and val is not None and val < 1.0)
     return {
         "status": status,
         "message": reg_result.get("message") if status != "success" else None,
@@ -46,7 +53,7 @@ def _summarize_pair_result(reg_result: Optional[Dict[str, Any]]) -> Optional[Dic
         "inlier_ratio": metrics.get("inlier_ratio", 0.0),
         "fit_rmse_px": fit_rmse,
         "fit_rmse_is_in_sample": True,
-        "sub_pixel_accurate": bool(fit_rmse is not None and fit_rmse < 1.0),
+        "sub_pixel_accurate": bool(sub_px),
         "fraction_below_1px": metrics.get("fraction_below_1px", 0.0),
         "validation_rmse_px": metrics.get("held_out_validation_rmse_px", metrics.get("validation_rmse_px")),
         "validation_status": metrics.get("validation_status"),
@@ -182,24 +189,32 @@ def run_full_registration_benchmark(
                 with open(p, "w") as f:
                     json.dump(cycle_report, f, indent=4)
 
-            # Build composed OHRC->IIRS summary
-            is_composed = (cycle_report.get("status") == "evaluated_composed") or cycle_report.get("cycle_closed_successfully", False)
-            composed_rmse = cycle_report.get("triplet_cycle_rmse_px")
+            # Build composed OHRC->IIRS summary. A composed chain is NEVER
+            # measured: inliers 0, fit None. Cycle numbers (when present) describe
+            # loop closure, not leg accuracy — never relabel them as fit_rmse.
+            # (Fixed 2026-09-11: old code reported cycle_rmse as fit_rmse_px and
+            # 1.0 coverage/uniformity for 0-inlier chains, incl. tautological
+            # 0.0px "fits", and misread closed all-measured loops as composed.)
+            is_composed = (cycle_report.get("status") == "evaluated_composed")
+            cycle_rmse_for_note = cycle_report.get("triplet_cycle_rmse_px")
             sum_oi_fwd = {
                 "status": "composed" if is_composed else "composition_not_computable",
                 "message": None if is_composed else cycle_report.get("reason"),
                 "quality_tier": "COMPOSED_CHAIN" if is_composed else "FAILED",
                 "match_count": 0,
                 "inlier_count": 0,
-                "inlier_ratio": 1.0 if is_composed else 0.0,
-                "fit_rmse_px": composed_rmse,
-                "spatial_coverage": 1.0 if is_composed else 0.0,
-                "spatial_uniformity": 1.0 if is_composed else 0.0,
+                "inlier_ratio": 0.0,
+                "fit_rmse_px": None,
+                "fit_rmse_note": ("derived chain has no measured fit; loop-closure "
+                                  f"RMSE was {cycle_rmse_for_note} px (diagnostic only)"
+                                  if is_composed else None),
+                "spatial_coverage": 0.0,
+                "spatial_uniformity": 0.0,
             }
             pair_oi = {
                 "status": "composed" if is_composed else "composition_not_computable",
                 "inlier_count": 0,
-                "fit_rmse_px": composed_rmse,
+                "fit_rmse_px": None,
                 "forward_ohrc_to_iirs": sum_oi_fwd,
                 "reverse_iirs_to_ohrc": None,
                 "bidirectional_agreement": True if is_composed else False,

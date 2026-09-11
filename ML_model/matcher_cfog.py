@@ -1790,6 +1790,7 @@ def match_images_cfog(
     _is_inverted_call: bool = False,
     _cv_scale_ratio: Optional[float] = None,
     experimental_stack: bool = False,
+    allow_synthetic_reference: bool = False,
     look_azimuth_deg: Optional[float] = None,
     dem_array: Optional[np.ndarray] = None,
 ) -> Dict[str, Any]:
@@ -2153,6 +2154,7 @@ def match_images_cfog(
             _cv_scale_ratio=estimated_scale_ratio,
             _is_inverted_call=True,
             experimental_stack=experimental_stack,
+            allow_synthetic_reference=allow_synthetic_reference,
         )
 
         if inv_temp_dir and inv_temp_dir.exists():
@@ -2566,11 +2568,16 @@ def match_images_cfog(
         "reference_azimuth_deg": meta2.sun_azimuth_deg,
     }
     # Reference-domain image actually fed to PC / sub-pixel refinement.
-    # Defaults to the real reference; swapped for synthetic hillshade on trigger.
+    # Defaults to the real reference; swapped for synthetic hillshade ONLY on
+    # explicit opt-in (allow_synthetic_reference=True). Rationale, measured
+    # 2026-09-11: silent swapping made benchmark outcomes uninterpretable
+    # (002/004 success->fail, triplet_new_2022 fail->success) by matching
+    # OHRC against a FABRICATED reference while metrics read as if real.
+    # Synthetic-data matching is a legitimate experiment, never a default.
     match_ref_gray = comp2_gray
     if delta_azimuth is not None and delta_azimuth > 90.0:
         illumination_detail["triggered"] = True
-        if dem_arr is not None and meta1.sun_azimuth_deg is not None:
+        if allow_synthetic_reference and dem_arr is not None and meta1.sun_azimuth_deg is not None:
             try:
                 src_az = float(meta1.sun_azimuth_deg)
                 src_el = resolve_sun_elevation_deg(meta1)
