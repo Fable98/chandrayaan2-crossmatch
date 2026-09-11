@@ -50,7 +50,8 @@ Raw Candidate Matches
      • Scale ratio S_max / S_min >= 20.0 (anisotropic stretch/collapse)
      • Projectivity magnitude sqrt(h31^2 + h32^2) >= 0.05
      • Fit RMSE > 5.0 px
-     Clean failure reported transparently (e.g., on triplet_new_2022).
+     Clean failure reported transparently when transforms are ill-conditioned
+     (historically e.g. on triplet_new_2022 under the biased refiner; resolved §6.4).
         │
         ▼
 [ QUALITY GATE 4: Spatial Support & Concentration Check ]
@@ -149,7 +150,10 @@ Empirical evaluation across all 8 multi-sensor Chandrayaan-2 test regions, bench
 > 1. **Active Redundancy Pruning**: Raw candidate match counts decreased by ~45–55% across all regions (e.g. 77 → 41 in `region_001`, 97 → 45 in `triplet_01`). This directly reflects active spatial suppression: redundant, co-located candidate clusters on single crater rims are eliminated in favor of a homogeneous spatial spread.
 > 2. **$4\times$ to $6\times$ Spatial Coverage Expansion**: Despite fewer raw candidates, surviving geometric inliers span 31.25% to 43.75% of the $10 \times 10$ image grid (up from only 6.0%–7.0% previously). This eliminates localized clustering and distributes geometric constraints across the full lunar terrain canvas.
 > 3. **Sub-Pixel Precision & Error Reduction**: `region_003` achieved a 44% error reduction down to true sub-pixel fit RMSE (**0.9941 px**); `triplet_01` improved from 2.20 px down to 1.55 px (-29.5%); and `region_006` improved from 1.65 px to 1.30 px (-21.2%).
-> 4. ***Honest Reporting on `triplet_new_2022`**: Features an extreme $162.25^\circ$ sun-azimuth disparity (diametric illumination reversal). While 49 candidate correspondences were detected, the surviving inliers fell into a single localized band along the bottom edge, correctly triggering Quality Gate 3 (*Pathological projective distortion*). Per the project's zero-synthetic-fallback principle, failure is reported cleanly without fabricating identity transforms.
+> 4. ***`triplet_new_2022` resolved (update 2026-09-11)**: the Gate-3 refusal above was measured under the biased refiner. The validated paraboloid yields a well-conditioned H (det 4.6, cond 11k, scale-ratio 2.5, projectivity 0.0035 — all inside gate bounds) over a decent spread: **50 raw / 6 inliers @1.21px, LOW**. Deletion was considered and rejected as cherry-picking; both outcomes stay on record with mechanism. See `docs/benchmark_sun_gap.md §3.4`.
+
+> [!NOTE]
+> **Re-benchmarked 2026-09-11 on current tree** (seeded RANSAC42, paraboloid refiner, synthetic-reference gated off; reproduces exactly). OHRC→TMC today: `region_001` 49/6 @1.27px, `region_002` 49/6 @1.72px, `region_003` 50/6 @1.55px, `region_004` 48/6 @1.48px, `region_005` 46/6 @1.47px, `region_006` 50/6 @1.06px, `triplet_01` 47/7 @1.69px, `triplet_new_2022` 50/6 @1.21px — all LOW, 5–7% canonical coverage. The frozen Before→After table above documents the spatial-suppression change specifically and is kept for history.
 
 ---
 
@@ -320,9 +324,9 @@ Run the frontend from within the `lunar-frontend/` directory. The backend expose
 1. **Planar Projective Approximation**: The homography model operates as a local projective approximation. On steep lunar crater walls (>30° slope), non-planar relief displacement can induce localized residual errors.
 2. **DEM Relief Compensation**: Simplified local vertical-offset shift, not rigorous orbital ray-trace. Sensor LOS azimuth unavailable; DEM often disabled at nadir. `geometry.dem_ray_intersection` is closed-form, not iterative.
 3. **IIRS Resolution Boundary**: IIRS GSD (~70–80 m) physically limits direct optical tie-point extraction. Hyperspectral information is integrated through composed co-registration (0 measured inliers) and derived overlay grids, not sub-meter correspondence.
-4. **Illumination / Sun-Angle**: Moderate gain/bias robustness only. Diametric ~162° azimuth reversal (`triplet_new_2022`) correctly fails closed; contrast-reversal invariance not proven. Synthetic brightness tests are diagnostic proxies, not orbital proof.
+4. **Illumination / Sun-Angle**: Moderate gain/bias robustness only (~+0.1px per 10° past 100° sun gap; see `docs/benchmark_sun_gap.md`). Contrast-reversal invariance not proven. Synthetic brightness tests are diagnostic proxies, not orbital proof.
 5. **Scale**: ~20× handled by downsampling OHRC to TMC grid (detail loss); ~275× IIRS never directly matched. No scale-invariant descriptor.
-6. **Density / Uniformity**: Primary pairs yield 6–7 inliers at 6–7% canonical 10×10 coverage (LOW_CONFIDENCE); held-out validation not computable (<8 pts). Sub-pixel scene fit achieved only for LRO proxies (1–4× optical) and one borderline TMC case.
+6. **Density / Uniformity**: Primary pairs yield 4–7 inliers at 5–7% canonical 10×10 coverage (LOW_CONFIDENCE); held-out validation not computable (<8 pts). Sub-pixel scene fit on 2/3 real-CDR LRO pairs and one TMC case; fragile by construction.
 7. **Georeferencing**: GeoTIFFs use reference CRS/transform when present, else pixel-grid EQC fallback (`georeferenced=False`). Moon-globe lat/lon uses manifest bounds when available, else demo-patch approximation.
 8. **TMC Stereo**: Single NCF view only; Fore/Nadir/Aft joint stereo not implemented.
 

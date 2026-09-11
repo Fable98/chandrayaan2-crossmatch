@@ -103,7 +103,9 @@ def test_register_rejects_bad_extension_without_writing():
             data={"source_sensor": "OHRC", "reference_sensor": "TMC", "method": "cfog"},
         )
         assert resp_anon.status_code == 401, f"expected 401, got {resp_anon.status_code}"
-        assert set(os.listdir(dyn)) == before
+        # TTL purge may legitimately REMOVE expired runs; what must never
+        # happen is an ADD from our rejected upload.
+        assert set(os.listdir(dyn)) - before == set()
 
         reg = client.post(
             "/auth/register",
@@ -123,7 +125,10 @@ def test_register_rejects_bad_extension_without_writing():
         )
     # Contract: unsupported media type; the key assertion is NOTHING was written.
     assert resp.status_code == 415, f"expected 415, got {resp.status_code}: {resp.text[:200]}"
-    assert set(os.listdir(dyn)) == before, "rejected upload must not create run dirs/files"
+    assert set(os.listdir(dyn)) - before == set(), \
+        "rejected upload must not create run dirs/files"
+    assert [p for p in Path(dyn).rglob("*") if p.suffix.lower() == ".php"] == [], \
+        "no .php payload may exist under dynamic_runs"
 
 
 # ---------------------------------------------------------------------------

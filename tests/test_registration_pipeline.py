@@ -686,10 +686,22 @@ def test_evaluation_summary_contains_iirs_and_triplet_consistency():
             assert "reason" in tc and tc["reason"] is not None
             assert len(failed_legs) > 0, f"Expected failed legs list for uncomputable cycle in {ds_id}"
         elif tc["status"] in ("evaluated", "evaluated_composed", "evaluated_measured"):
-            # Evaluated requires all underlying legs to have succeeded with real homographies
-            assert isinstance(tc["cycle_rmse_px"], (int, float)), (
-                f"Evaluated cycle must have numeric cycle_rmse_px in {ds_id}"
-            )
+            # Evaluated requires all underlying legs to have succeeded with real homographies.
+            # EXCEPTION (derived-leg rule): a cycle closed WITH a derived leg is
+            # tautological (~0.0px validates nothing), so cycle_rmse_px MUST be
+            # null there — a numeric value in that case is the gaming this
+            # suite exists to catch, not evidence.
+            _report = entry.get("triplet_consistency_report") or {}
+            _legs = _report.get("leg_derivations") or {}
+            _has_derived = any(v == "composed" for v in _legs.values())
+            if tc["status"] == "evaluated_composed" or _has_derived:
+                assert tc["cycle_rmse_px"] is None, (
+                    f"Derived-leg cycle must be null (tautology), got {tc['cycle_rmse_px']} in {ds_id}"
+                )
+            else:
+                assert isinstance(tc["cycle_rmse_px"], (int, float)), (
+                    f"Evaluated cycle must have numeric cycle_rmse_px in {ds_id}"
+                )
             assert len(failed_legs) == 0, f"Evaluated cycle cannot have failed legs in {ds_id}: {failed_legs}"
             assert pairs.get("ohrc_tmc", {}).get("status") == "success"
 

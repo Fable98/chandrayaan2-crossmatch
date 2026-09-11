@@ -478,21 +478,41 @@ def evaluate_triplet_consistency(
                 "transform_json": str(composition_path),
             },
             "cycle_metrics": {
-                "cycle_rmse_px": round(float(cycle_rmse), 4),
-                "cycle_mean_px": round(float(cycle_mean), 4),
-                "cycle_closed": bool(cycle_rmse < 5.0),
+                # A derived leg voids closure validation (tautological ~0.0).
+                "cycle_rmse_px": (round(float(cycle_rmse), 4)
+                                  if not any(v == "composed" for v in derivations.values()) else None),
+                "cycle_mean_px": (round(float(cycle_mean), 4)
+                                  if not any(v == "composed" for v in derivations.values()) else None),
+                "cycle_closed": (bool(cycle_rmse < 5.0)
+                                 if not any(v == "composed" for v in derivations.values()) else False),
+                "cycle_validation": ("measured_loop"
+                                      if not any(v == "composed" for v in derivations.values())
+                                      else "not_applicable_derived_leg"),
             },
         }
         with open(manifest_path, "w") as f:
             json.dump(manifest, f, indent=4)
 
         has_composed_leg = any(v == "composed" for v in derivations.values())
+        # A closure error measured WITH a derived leg is tautological (the leg
+        # was built from the other two, so ~0.0px "closure" validates nothing).
+        # Report numbers only for fully-measured loops; otherwise null + reason.
+        if has_composed_leg:
+            cycle_rmse_out, cycle_mean_out, closed_out = None, None, False
+            cycle_note = ("cycle_validation_not_applicable: a derived leg voids "
+                          "closure; H_AC product + covariance above remain usable")
+        else:
+            cycle_rmse_out = round(float(cycle_rmse), 4)
+            cycle_mean_out = round(float(cycle_mean), 4)
+            closed_out = bool(cycle_rmse < 5.0)
+            cycle_note = None
         evaluation_report = {
             "status": "evaluated_composed" if has_composed_leg else "evaluated",
             "reason": None,
-            "triplet_cycle_rmse_px": round(float(cycle_rmse), 4),
-            "triplet_mean_cycle_error_px": round(float(cycle_mean), 4),
-            "cycle_closed_successfully": bool(cycle_rmse < 5.0),
+            "triplet_cycle_rmse_px": cycle_rmse_out,
+            "triplet_mean_cycle_error_px": cycle_mean_out,
+            "cycle_closed_successfully": closed_out,
+            "cycle_validation_note": cycle_note,
             "failed_legs": [],
             "leg_derivations": derivations,
             "legs": {

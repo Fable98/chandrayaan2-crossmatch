@@ -509,11 +509,14 @@ def load_all() -> None:
                     except Exception:
                         pass
 
-    # Source 2: ML_model/matches.json — mapped to region_001
+    # Source 2 (fallback only): ML_model/matches.json — legacy seed mapped to
+    # region_001. Must NEVER overwrite the fresh DATA_DIR seed above: a stale
+    # 7-entry legacy file once shadowed the current 6-entry seed and broke the
+    # num_inliers == num_matches contract. Fill only missing ids.
     ml_matches_path = os.path.join(ML_OUTPUT_DIR, "matches.json")
     if os.path.isfile(ml_matches_path):
         raw = _load_match_file(ml_matches_path)
-        if raw:
+        if raw and "region_001" not in _matches:
             _matches["region_001"] = raw
     ml_transform_path = os.path.join(ML_OUTPUT_DIR, "transform.json")
     if os.path.isfile(ml_transform_path):
