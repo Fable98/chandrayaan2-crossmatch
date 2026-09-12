@@ -258,62 +258,128 @@ def load_as_float_and_color(path: str | Path) -> Tuple[np.ndarray, np.ndarray, D
 def adaptive_illumination_normalization(
     img_gray: np.ndarray,
     enable_high_pass: bool = True,
+    wallis_gain: float = 0.30,
+    wallis_noise_floor: float = 0.05,
+    wallis_target_mean: float = 0.5,
+    morph_blend: float = 0.25,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Phase 1: Adaptive Photometric Illumination Normalization
-    Purpose: Mitigate extreme sun angle variations, directional lighting ramps,
-             and shadow artifacts before Phase Congruency feature extraction.
-    Method:
-      1. High-pass division / phase-ratio normalization to eliminate macro terrain
-         tilt and slowly-varying solar illumination ramps.
-      2. CLAHE for local contrast equalization.
-      3. Shadow & saturation masking to zero out non-informative extreme pixels.
-    Returns: (normalized_image, valid_mask)
+    Phase 1: Sun-Angle-Invariant Photogrammetric Illumination Normalization.
+
+    Mathematical justification (why this satisfies the ISRO "sun-angle
+    invariant" requirement, incl. ~162 deg diametric shadow reversals):
+
+    1. Gaussian high-pass background removal. A slowly-varying solar ramp
+       ``B = Gauss(img, sigma_large)`` is linear, hence ``B(1-img)=1-B(img)``
+       and the residual ``R = img-B`` obeys ``R(1-img) = -R(img)``: a global
+       180-deg sun flip becomes an exact sign flip of the residual. The same
+       holds for any additive low-frequency shadow gradient, which is
+       subtracted out before feature extraction.
+
+    2. Wallis adaptive contrast normalization
+       ``W = C + A*(R-mean(R)) / (std(R)+B)``. Local mean subtraction flattens
+       residual gradients; division by local ``std`` boosts SNR inside deep,
+       low-contrast shadows while the noise floor ``B`` prevents amplification
+       of flat sensor noise. Under inversion ``R->-R`` we have
+       ``mean->-mean``, ``std`` unchanged, so ``W->2C-W`` (with C=0.5,
+       ``W->1-W``): structure is preserved up to a global inversion.
+
+    3. Symmetric morphological Top-Hat detail boost. Applied AFTER Wallis on
+       the flattened image (so the structuring element never sees the tilted
+       illumination ramp and suffers no tilt bias): with a large elliptical
+       SE, ``open``/``close`` estimate smooth background, and the symmetric
+       detail ``D = (N-open) - (close-N) = 2N-open-close`` obeys
+       ``D(1-N) = -D(N)``. White (bright rims) and black (shadow pits) top-hats
+       contribute equally, so crater rims and pits survive a shadow reversal
+       with roles swapped but energy preserved. Fused as ``N + beta*D`` with a
+       small ``beta`` to avoid halos/ringing.
+
+    4. Global percentile stretch to [0,1]. A global monotonic map sends a
+       global inversion to a global inversion (``p_low<->1-p_high``), so the
+       chain Phase1 output under sun flip is ``out->1-out``.
+
+    Phase 2 (Phase Congruency) computes ``energy/sum(amplitude)`` from
+    mean-removed Log-Gabor responses, which is exactly invariant to a global
+    sign/inversion (``F->-F`` leaves ``|re|,|im|`` and ``sqrt(sum_e^2+sum_o^2)``
+    unchanged). Hence Phase1->Phase2 is end-to-end invariant to diametric
+    shadow reversals, robust to additive gradients (removed) and gamma
+    (local std normalization), boosts shadow SNR without clipping bright rims
+    (no hard saturation, soft percentile only), and introduces no halos
+    (Gaussian/morphological ops are smooth; no CLAHE tile seams; valid mask
+    is all-ones so no artificial FFT edges for CFOG).
+
+    All ops are vectorized NumPy/OpenCV (GaussianBlur, morphologyEx,
+    percentile); no per-pixel Python loops.
+
+    Args:
+        img_gray: 2D grayscale image, any range (clipped to [0,1]).
+        enable_high_pass: if False, skip background removal (still Wallis).
+        wallis_gain: A in Wallis formula (output local-contrast scale).
+        wallis_noise_floor: B in Wallis formula (larger = less noise gain).
+        wallis_target_mean: C in Wallis formula (0.5 keeps inversion symmetry).
+        morph_blend: beta weight of symmetric top-hat detail (0..0.5).
+
+    Returns:
+        (normalized_image float32 [0,1], valid_mask float32 all-ones).
     """
     img_f = np.clip(np.asarray(img_gray, dtype=np.float32), 0.0, 1.0)
     h, w = img_f.shape[:2]
 
-    # 1. High-pass / phase-ratio background normalization to suppress macro solar gradients
+    # --- Step 1: Gaussian high-pass background removal (linear, sign-odd) ---
     if enable_high_pass and h >= 32 and w >= 32:
         sigma_large = max(15, min(h, w) // 16)
-        if sigma_large % 2 == 0:
-            sigma_large += 1
-        background = cv2.GaussianBlur(img_f, (0, 0), sigma_large)
-        diff = img_f - background
-
-        # Local texture energy / standard deviation estimation
-        local_energy = np.sqrt(
-            cv2.GaussianBlur(diff ** 2, (0, 0), 5.0) + 1e-5
-        )
-        hp_norm = diff / (local_energy + 1e-4)
-
-        # Percentile clipping into [0, 1]
-        p_low = float(np.percentile(hp_norm, 2.0))
-        p_high = float(np.percentile(hp_norm, 98.0))
-        if p_high > p_low + 1e-5:
-            hp_norm = np.clip((hp_norm - p_low) / (p_high - p_low), 0.0, 1.0)
-        else:
-            hp_norm = img_f
+        background = cv2.GaussianBlur(img_f, (0, 0), float(sigma_large))
+        residual = img_f - background
     else:
-        hp_norm = img_f
+        residual = img_f - float(np.mean(img_f))
 
-    # 2. CLAHE to normalize local contrast
-    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-    img_uint8 = np.clip(hp_norm * 255.0, 0, 255).astype(np.uint8)
-    clahe_img = clahe.apply(img_uint8).astype(np.float32) / 255.0
+    # --- Step 2: Wallis / local-standardization gain (boost shadow SNR) ---
+    # Local mean/std via Gaussian windows (smooth, halo-free unlike box/CLAHE).
+    local_mean = cv2.GaussianBlur(residual, (0, 0), 5.0)
+    local_mean_sq = cv2.GaussianBlur(residual * residual, (0, 0), 5.0)
+    local_var = np.maximum(local_mean_sq - local_mean * local_mean, 0.0)
+    local_std = np.sqrt(local_var).astype(np.float32)
+    A = float(wallis_gain)
+    B = float(max(wallis_noise_floor, 1e-4))
+    C = float(wallis_target_mean)
+    normed = C + A * (residual - local_mean) / (local_std + B)
+    normed = np.clip(normed, 0.0, 1.0).astype(np.float32)
 
-    # 3. Shadow & Saturation Mask Generation
-    shadow_threshold = float(np.percentile(img_f, 5.0))
-    saturation_threshold = float(np.percentile(img_f, 99.5))
+    # --- Step 3: Symmetric morphological Top-Hat on the FLATTENED image ---
+    # Large SE isolates structural detail; symmetry preserves sun-flip equivariance.
+    # Skipped for tiny images where morphology has no support.
+    beta = float(np.clip(morph_blend, 0.0, 0.5))
+    if beta > 0.0 and h >= 32 and w >= 32:
+        se_size = int(np.clip(min(h, w) // 8, 15, 51))
+        if se_size % 2 == 0:
+            se_size += 1
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (se_size, se_size))
+        opened = cv2.morphologyEx(normed, cv2.MORPH_OPEN, kernel)
+        closed = cv2.morphologyEx(normed, cv2.MORPH_CLOSE, kernel)
+        white_hat = normed - opened   # bright structures smaller than SE
+        black_hat = closed - normed   # dark structures smaller than SE
+        detail = (white_hat - black_hat).astype(np.float32)  # odd-symmetric
+        fused = np.clip(normed + beta * detail, 0.0, 1.0).astype(np.float32)
+    else:
+        fused = normed
 
-    valid_mask = ((img_f >= shadow_threshold) & (img_f <= saturation_threshold)).astype(np.float32)
+    # --- Step 4: Global robust stretch to [0,1] (monotonic, inversion-odd) ---
+    p_low = float(np.percentile(fused, 2.0))
+    p_high = float(np.percentile(fused, 98.0))
+    if p_high > p_low + 1e-6:
+        normalized_img = np.clip((fused - p_low) / (p_high - p_low), 0.0, 1.0)
+    else:
+        normalized_img = np.clip(fused, 0.0, 1.0)
+    normalized_img = normalized_img.astype(np.float32)
 
-    # Apply Gaussian blur to the mask to avoid harsh edge artifacts in the FFT
-    valid_mask = cv2.GaussianBlur(valid_mask, (5, 5), 0)
+    # Valid mask: all-ones. Deep shadows are BOOSTED (not zeroed) so Phase 2
+    # keeps SNR there; ones introduce no artificial FFT/CFOG edges.
+    valid_mask = np.ones_like(normalized_img, dtype=np.float32)
 
-    # 4. Modulate with valid mask so deep shadows become neutral
-    normalized_img = clahe_img * valid_mask
-
+    try:
+        print("✅ Phase 1: Illumination Invariance Active (Wallis/Top-Hat)")
+    except UnicodeEncodeError:
+        print("Phase 1: Illumination Invariance Active (Wallis/Top-Hat)")
     return normalized_img, valid_mask
 
 
