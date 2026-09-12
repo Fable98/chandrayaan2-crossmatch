@@ -294,7 +294,7 @@ def prepare_pair_for_region(
     return pair_manifest
 
 
-def main():
+def main(argv: Optional[list[str]] = None):
     parser = argparse.ArgumentParser(description="Prepare OHRC + LRO NAC matched pairs")
     parser.add_argument(
         "--regions",
@@ -305,15 +305,57 @@ def main():
     parser.add_argument("--raw_nac_img", type=str, default=None, help="Path to raw/downloaded LRO NAC image")
     parser.add_argument("--raw_nac_lbl", type=str, default=None, help="Path to raw/downloaded LRO NAC PDS3 label")
     parser.add_argument("--output_dir", type=str, default=None, help="Output directory")
+    parser.add_argument(
+        "--auto-discover",
+        action="store_true",
+        default=False,
+        help="Query ODE REST API to automatically discover, download, and stage overlapping LRO NAC frames",
+    )
+    parser.add_argument(
+        "--refresh-cache",
+        action="store_true",
+        default=False,
+        help="Bypass on-disk ODE query cache during auto-discovery",
+    )
 
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     for reg in args.regions:
-        prepare_pair_for_region(
-            region_id=reg,
-            raw_nac_image=args.raw_nac_img,
-            raw_nac_label=args.raw_nac_lbl,
-            output_dir=Path(args.output_dir) / reg if args.output_dir else None,
-        )
+        if args.auto_discover:
+            reg_dir = PROCESSED_TRIPLETS_DIR / reg
+            manifest_file = reg_dir / "manifest.json"
+            if not manifest_file.exists():
+                logger.error("Cannot auto-discover for %s: manifest missing at %s", reg, manifest_file)
+                continue
+            with open(manifest_file, "r", encoding="utf-8") as f:
+                reg_manifest = json.load(f)
+
+            bounds = reg_manifest.get("bounds_optical", reg_manifest.get("bounds"))
+            inc_angle = reg_manifest.get("ohrc_incidence_angle_deg") or reg_manifest.get("incidence_angle_deg")
+            out_dest = (
+                Path(args.output_dir) / reg
+                if args.output_dir
+                else (REPO_ROOT / "data_preprocessing_pipeline" / "lro_nac_real" / reg)
+            )
+
+            try:
+                from lro_ode_client import fetch_and_prepare_lro_nac
+            except ImportError:
+                from ML_model.lro_ode_client import fetch_and_prepare_lro_nac
+
+            fetch_and_prepare_lro_nac(
+                region_bounds=bounds,
+                region_id=reg,
+                output_dir=out_dest,
+                incidence_angle=inc_angle,
+                refresh_cache=args.refresh_cache,
+            )
+        else:
+            prepare_pair_for_region(
+                region_id=reg,
+                raw_nac_image=args.raw_nac_img,
+                raw_nac_label=args.raw_nac_lbl,
+                output_dir=Path(args.output_dir) / reg if args.output_dir else None,
+            )
 
 
 if __name__ == "__main__":

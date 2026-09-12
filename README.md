@@ -184,6 +184,35 @@ Consequently, this pairing does not require the heavy multi-spectral dimensional
 
 ---
 
+### 7.1 Automated LRO NAC Frame Discovery via Washington University ODE REST API
+
+To scale beyond manually curated LRO NAC frame IDs (`M1417670274LC` and `M1413636095LC` hardcoded for `region_001`, `region_003`, and `region_006`), the pipeline includes automated frame discovery via Washington University's Orbital Data Explorer (ODE) REST API ([`ML_model/lro_ode_client.py`](ML_model/lro_ode_client.py)).
+
+#### Architectural Rationale: Why ODE REST?
+- **Direct Spatial Bounding Box Queries**: Washington University ODE REST provides structured query parameters (`minlat`, `maxlat`, `westernlon`, `easternlon`, `target=moon`, `ihid=lro`, `iid=lroc`, `pt=EDRNAC`), returning product footprints and direct USGS/PDS image and label download URLs in structured JSON.
+- **Superior to Moon Trek / PDS4 Registry for Raw Rasters**: NASA Moon Trek is designed primarily for tiled map visualization (WMTS/WMS) rather than direct programmatic retrieval of raw unprojected EDR/CDR rasters. The PDS4 registry indexes newer missions but lacks uniform direct bounding-box spatial intersection endpoints for historical PDS3 LROC collections compared to ODE REST.
+- **Lightweight & Dependency-Free**: Implemented entirely with Python standard library `urllib.request` and `urllib.parse`—introducing zero new third-party dependencies.
+
+#### Usage: `--auto-discover`
+To discover and stage overlapping LRO NAC frames automatically:
+```bash
+python data_preprocessing_pipeline/scripts/prepare_lro_nac_pair.py --regions region_001 --auto-discover
+```
+Options:
+- `--auto-discover`: Queries ODE REST for candidate NAC products overlapping the region's bounding box, ranks candidates by footprint overlap and incidence angle similarity, streams the top candidate's `.LBL` and `.IMG`, decodes the binary raster, and stages the verified pair.
+- `--refresh-cache`: Bypasses the 24-hour on-disk query cache (`.cache/lro_ode/`).
+- `--output_dir <path>`: Specifies custom output destination (defaults to `data_preprocessing_pipeline/lro_nac_real/<region_id>/`).
+
+#### Prerequisite Requirement
+`fetch_and_prepare_lro_nac()` strictly requires that the target region has already been ingested into `data_preprocessing_pipeline/processed_triplets/<region_id>/` (containing `manifest.json` and `ohrc_512.png`). If the region is not yet ingested, the discovery pipeline aborts immediately with a clear prerequisite failure log.
+
+#### Defensive Implementation & Live Validation Status
+> [!IMPORTANT]
+> - **ODE Field Names & PDS3 Decoding Assumptions**: Because offline evaluation and CI environments lack external network access, ODE JSON parsing and PDS3 binary raster decoding (`LINES`, `LINE_SAMPLES`, `SAMPLE_BITS`, `SAMPLE_TYPE`, endianness) are implemented defensively per published PDS3/ODE specifications and verified via mocked test suites (`tests/test_lro_ode_client.py`, `tests/test_lro_candidate_ranking.py`, `tests/test_pds3_image_decoder.py`, `tests/test_lro_fetch_and_prepare.py`, and `tests/test_lro_auto_discover_cli.py`). Their live network response field names and binary payload shapes remain unverified against real ODE servers until executed with outbound network access (`tests/test_lro_ode_live_integration.py`, enabled via `LRO_ODE_LIVE_TEST=1`).
+> - **Benchmarked vs. Auto-Discovered Regions**: `region_001`, `region_003`, and `region_006` remain the primary ground-truth benchmarked set with human-verified registration quality. Any newly auto-discovered regions are considered unverified until visual inspection and quality gates confirm registration fidelity.
+
+---
+
 ## 7.5. Capability Status
 
 The following audit matrix documents the exact operational status of each algorithmic capability in this repository. In accordance with strict photogrammetric integrity, capabilities are marked **✅ Verified** only if supported by passing regression tests or published empirical benchmark outputs in this repository. Capabilities that are implemented in code but lack flight data, end-to-end ground truth validation, or rigorous benchmark verification are transparently tagged **⚠️ Implemented, not verified here**.
@@ -199,6 +228,7 @@ The following audit matrix documents the exact operational status of each algori
 | **Content-Based Overlap Recovery (1D Profiles + 2D Phase Correlation)** | ✅ Verified | Passing tests in [`tests/test_overlap_recovery.py`](tests/test_overlap_recovery.py) proving non-divergent recovery (<0.05° delta) across synthetic translations and real Chandrayaan-2 sample scenes. |
 | **LRO NAC PDS3 Metadata Parser & Header Ingestion** | ✅ Verified | Passing tests in [`tests/test_lro_pds3_parser.py`](tests/test_lro_pds3_parser.py) (4 tests) validating detached `.lbl` labels and attached image headers. |
 | **LRO NAC Real-CDR Cross-Registration (NASA Basemap Reference)** | ✅ Verified | Benchmarked across 3 real orbital CDR footprints in §7 (`region_001`, `region_003`, `region_006`) with 5–6 verified inliers, 0.18–0.60 px fit RMSE (LOW_CONFIDENCE tier). |
+| **Automated LRO NAC Discovery (ODE REST Client & PDS3 Decoder)** | ✅ Verified (Offline Tests) | Discovers and stages candidate frames via [`ML_model/lro_ode_client.py`](ML_model/lro_ode_client.py) and [`ML_model/pds3_image_decoder.py`](ML_model/pds3_image_decoder.py). Comprehensive unit tests in `tests/test_lro_ode_client.py`, `tests/test_lro_candidate_ranking.py`, `tests/test_pds3_image_decoder.py`, `tests/test_lro_fetch_and_prepare.py`, and `tests/test_lro_auto_discover_cli.py`. Live network query integration test gated behind `LRO_ODE_LIVE_TEST=1`. |
 | **IIRS Hyperspectral PCA-PC1 Co-Registration Overlay** | ✅ Verified | Passing tests in [`tests/test_iirs.py`](tests/test_iirs.py) and [`tests/test_registration_pipeline.py::test_iirs_hyperspectral_co_registration_integration`](tests/test_registration_pipeline.py). Co-registration operates via TMC-2 chained bridge ($H_{TI} \cdot H_{OT}$). |
 | **Direct Sub-Meter OHRC ↔ IIRS Point Matching** | ⚠️ Suppressed by design | Intentionally null (0 direct inliers). Direct matching across ~275–320× scale disparity (0.25 m vs 80 m) is physically ungrounded and suppressed to prevent spatial aliasing. |
 | **DEM Relief Displacement Compensation** | ✅ Verified | Geometric formulas implemented in [`ML_model/geometry.py`](ML_model/geometry.py) (passing tests `test_geometry.py::test_dem_ray_intersection_math` and `test_geometry.py::test_dem_aware_ransac_residual_filtering`). Non-planar relief strain detection in `test_geometry.py::test_topographic_relief_strain_detection`. |

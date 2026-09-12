@@ -105,6 +105,9 @@ def test_bundled_production_model_loads_and_is_trained():
     prod_path = REPO_ROOT / "ML_model/ai_verifier_model.pkl"
     if not prod_path.exists():
         pytest.skip("Production model ai_verifier_model.pkl not found.")
+    with open(prod_path, "rb") as _f:
+        if _f.read(30).startswith(b"version https://git-lfs"):
+            pytest.skip("Production model ai_verifier_model.pkl is an unpulled Git LFS pointer.")
     verifier = AIMatchVerifier(model_path=prod_path)
     assert verifier.is_trained is True
     assert verifier.model is not None

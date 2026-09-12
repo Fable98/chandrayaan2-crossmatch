@@ -270,6 +270,8 @@ evaluation_output/
 registration_output/
 reports/
 processed_user/
+.cache/
+.cache/lro_ode/
 data_preprocessing_pipeline/processed_triplets/
 */matches/
 data_preprocessing_pipeline/lro_nac_pairs/
