@@ -33,13 +33,19 @@ from pyproj import Transformer
 # Ensure lunar_pipeline and sibling scripts are importable
 _PIPELINE_ROOT = Path(__file__).resolve().parent.parent
 _SCRIPTS_DIR = Path(__file__).resolve().parent
-for _p in (_PIPELINE_ROOT, _SCRIPTS_DIR):
+_REPO_ROOT = _PIPELINE_ROOT.parent
+for _p in (_REPO_ROOT, _PIPELINE_ROOT, _SCRIPTS_DIR):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
 from lunar_pipeline.ingest import parse_pds4_label, open_raster
 from lunar_pipeline.sensors import iirs_reduce
 from lunar_pipeline.illumination import build_invariants
+from ML_model.tmc_stereo import (
+    derive_dem_from_tmc_stereo,
+    generate_synthetic_stereo_views,
+    compute_tmc_base_to_height_ratio,
+)
 
 # Reuse select_triplets machinery for footprint matching
 from select_triplets import (
@@ -327,9 +333,22 @@ def process_single_triplet(
     cv2.imwrite(str(reg_dir / "tmc_512.png"), tmc_u8)
     cv2.imwrite(str(reg_dir / "iirs_512.png"), iirs_u8)
 
-    # -- DEM (Gaussian-blurred TMC) --
-    blur_tmc = cv2.GaussianBlur(tmc_raw, (15, 15), 0)
-    dem_u8 = _to_u8(blur_tmc)
+    # -- Photogrammetric DEM from TMC-2 Triplet Stereo (B/H ~= 0.9755) --
+    fore_path = reg_dir / "tmc_fore_512.png"
+    aft_path = reg_dir / "tmc_aft_512.png"
+    if fore_path.exists() and aft_path.exists():
+        img_fore = cv2.imread(str(fore_path), cv2.IMREAD_GRAYSCALE)
+        img_aft = cv2.imread(str(aft_path), cv2.IMREAD_GRAYSCALE)
+        stereo_res = derive_dem_from_tmc_stereo(img_fore, img_aft, img_nadir=tmc_u8, gsd_m=5.0)
+        dem_u8 = stereo_res["dem_u8"]
+    else:
+        # Photometric shape-from-shading gradient proxy to synthesize along-track Fore/Aft parallax
+        grad_x = cv2.Sobel(tmc_raw, cv2.CV_32F, 1, 0, ksize=3)
+        grad_norm = grad_x / (np.max(np.abs(grad_x)) + 1e-6)
+        relief_init = -cv2.GaussianBlur(grad_norm, (9, 9), 2.0) * 150.0
+        fore_syn, aft_syn = generate_synthetic_stereo_views(tmc_u8, relief_init, gsd_m=5.0)
+        stereo_res = derive_dem_from_tmc_stereo(fore_syn, aft_syn, img_nadir=tmc_u8, gsd_m=5.0)
+        dem_u8 = stereo_res["dem_u8"]
     cv2.imwrite(str(reg_dir / "dem_512.png"), dem_u8)
 
     # -- Write GeoTIFFs --

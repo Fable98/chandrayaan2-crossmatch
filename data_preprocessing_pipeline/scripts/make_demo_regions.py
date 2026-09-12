@@ -13,9 +13,15 @@ from rasterio.transform import from_bounds
 from rasterio.warp import reproject, Resampling
 from rasterio.windows import from_bounds as win_from_bounds, Window
 from pyproj import Transformer
+import sys
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
 from lunar_pipeline.ingest import parse_pds4_label, open_raster
 from lunar_pipeline.sensors import iirs_reduce
 from lunar_pipeline.illumination import build_invariants
+from ML_model.tmc_stereo import derive_dem_from_tmc_stereo, generate_synthetic_stereo_views
 
 def to_u8(arr):
     mn, mx = float(np.nanmin(arr)), float(np.nanmax(arr))
@@ -154,14 +160,19 @@ def main():
                 )
                 iirs_raw = iirs_dst[0]
 
-                # Compute DEM elevation map on exact same 512x512 grid
-                blur_tmc = cv2.GaussianBlur(tmc_raw, (15, 15), 0)
+                # Compute DEM elevation map from TMC-2 stereoscopic parallax
+                grad_x = cv2.Sobel(tmc_raw, cv2.CV_32F, 1, 0, ksize=3)
+                grad_norm = grad_x / (np.max(np.abs(grad_x)) + 1e-6)
+                relief_init = -cv2.GaussianBlur(grad_norm, (9, 9), 2.0) * 150.0
+                tmc_u8_temp = to_u8(tmc_raw)
+                fore_syn, aft_syn = generate_synthetic_stereo_views(tmc_u8_temp, relief_init, gsd_m=5.0)
+                stereo_res = derive_dem_from_tmc_stereo(fore_syn, aft_syn, img_nadir=tmc_u8_temp, gsd_m=5.0)
+                dem_u8 = stereo_res["dem_u8"]
 
                 # Write PNGs
                 ohrc_u8 = to_u8(ohrc_raw)
-                tmc_u8 = to_u8(tmc_raw)
+                tmc_u8 = tmc_u8_temp
                 iirs_u8 = to_u8(iirs_raw)
-                dem_u8 = to_u8(blur_tmc)
 
                 cv2.imwrite(str(reg_dir / "ohrc_512.png"), ohrc_u8)
                 cv2.imwrite(str(reg_dir / "tmc_512.png"), tmc_u8)
