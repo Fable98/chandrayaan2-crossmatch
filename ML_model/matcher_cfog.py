@@ -33,7 +33,13 @@ import cv2
 
 from metadata import extract_sensor_metadata, SensorMetadata
 from metrics import compute_canonical_metrics, verify_transformation_quality, calculate_reprojection_errors
-from geometry import warp_piecewise_affine, warp_thin_plate_splines, dem_ray_intersection, ransac_dem_aware_fit
+from geometry import (
+    warp_piecewise_affine,
+    warp_thin_plate_splines,
+    dem_ray_intersection,
+    ransac_dem_aware_fit,
+    estimate_topographic_relief_strain,
+)
 from spectral import enhance_iirs_structural_features, quantify_iirs_residuals
 from spatial_suppression import (
     detect_salient_keypoints,
@@ -3583,6 +3589,29 @@ def match_images_cfog(
                 pts1_arr, pts2_arr, estimator_method, ransacReprojThreshold=5.0  # tuned on 2026-09-10, AUC=0.9010
             )
 
+    # 7b. DEM-Aware Topographic Relief RANSAC
+    # If DEM is present and sensor has non-zero emission, check if DEM-aware RANSAC
+    # preserves crater-wall and relief correspondences that planar RANSAC rejected.
+    dem_ransac_applied = False
+    if dem_arr is not None and len(pts1_arr) >= 4:
+        try:
+            _em = float(meta1.emission_angle_deg) if (meta1 and meta1.emission_angle_deg is not None) else 0.0
+            _az = float(look_azimuth_deg) if look_azimuth_deg is not None else (float(meta1.sensor_los_azimuth_deg) if (meta1 and meta1.sensor_los_azimuth_deg is not None) else 45.0)
+            if abs(_em) > 1e-2:
+                H_dem, mask_dem, dem_fit_info = ransac_dem_aware_fit(
+                    pts1_arr, pts2_arr, dem=dem_arr, emission_deg=_em, azimuth_deg=_az, gsd_m=working_gsd
+                )
+                count_dem = int(np.sum(mask_dem)) if mask_dem is not None else 0
+                count_curr = int(np.sum(inlier_mask)) if inlier_mask is not None else 0
+                if count_dem >= 4 and (H_final is None or count_dem > count_curr):
+                    tx_check_dem = verify_transformation_quality(H_dem, (orig_h2, orig_w2))
+                    if tx_check_dem.get("is_valid"):
+                        H_final, inlier_mask = H_dem, mask_dem.reshape(-1, 1).astype(np.uint8)
+                        dem_ransac_applied = True
+                        logger.info("DEM-aware RANSAC adopted (%d inliers vs %d planar).", count_dem, count_curr)
+        except Exception as exc:
+            logger.warning("DEM-aware RANSAC check failed (%s); retaining standard solution.", exc)
+
     if H_final is not None and inlier_mask is not None and np.sum(inlier_mask) >= 4:
         try:
             det = float(np.linalg.det(H_final))
@@ -3954,6 +3983,7 @@ def match_images_cfog(
     # Slope-residual correlation on inliers; TPS fallback when terrain relief
     # deformation exceeds planar limits.
     slope_residual_correlation: Optional[float] = None
+    relief_strain_info: Dict[str, Any] = {"strain_detected": False, "strain_ratio": 1.0}
     dem_model: str = "homography"
     try:
         if dem_arr is not None and len(_inl_idx) >= 4:
@@ -3965,11 +3995,29 @@ def match_images_cfog(
             slope_residual_correlation = None
     except Exception:
         slope_residual_correlation = None
-    if slope_residual_correlation is not None and slope_residual_correlation > 0.40:
+
+    # Estimate differential topographic relief strain across inliers
+    try:
+        if len(_inl_idx) >= 6:
+            relief_strain_info = estimate_topographic_relief_strain(
+                pts1_arr[_inl_idx], pts2_arr[_inl_idx], H_final
+            )
+    except Exception as exc:
+        logger.warning("Relief strain estimation failed (%s).", exc)
+
+    max_ray_shift_px = float(dem_ray_shift.get("max_shift_px", 0.0)) if isinstance(dem_ray_shift, dict) else 0.0
+
+    if (slope_residual_correlation is not None and slope_residual_correlation > 0.40) or max_ray_shift_px > 3.0:
         dem_model = "tps_fallback"
         logger.info(
-            "Slope-residual correlation %.3f exceeds planar limit; TPS fallback engaged.",
-            slope_residual_correlation,
+            "Topographic relief exceeds planar limits (slope_corr=%.3f, max_ray_shift=%.2fpx); TPS fallback engaged.",
+            slope_residual_correlation if slope_residual_correlation is not None else 0.0, max_ray_shift_px,
+        )
+    elif relief_strain_info.get("strain_detected", False):
+        dem_model = "tps_fallback"
+        logger.info(
+            "Topographic relief strain ratio %.3f exceeds planar threshold; non-rigid TPS fallback engaged.",
+            relief_strain_info.get("strain_ratio", 1.0),
         )
     else:
         dem_model = "homography"
@@ -3982,6 +4030,14 @@ def match_images_cfog(
     metrics["dem_ray_shift"] = dem_ray_shift
     metrics["slope_residual_correlation"] = slope_residual_correlation
     metrics["dem_model"] = dem_model
+    metrics["topographic_relief"] = {
+        "model": dem_model,
+        "dem_available": bool(dem_arr is not None),
+        "dem_ransac_applied": bool(dem_ransac_applied),
+        "slope_residual_correlation": slope_residual_correlation,
+        "relief_strain_detected": bool(relief_strain_info.get("strain_detected", False)),
+        "relief_strain_ratio": float(relief_strain_info.get("strain_ratio", 1.0)),
+    }
     try:
         _unc = (bootstrap_info or {}).get("absolute_rmse_uncertainty_m")
     except Exception:
@@ -4041,7 +4097,7 @@ def match_images_cfog(
             try:
                 warped_source = warp_thin_plate_splines(
                     raw1_color, pts1_arr[curr_inliers], pts2_arr[curr_inliers],
-                    (orig_h2, orig_w2),
+                    (orig_h2, orig_w2), global_H=H_final
                 )
             except Exception:
                 warped_source = warp_piecewise_affine(
