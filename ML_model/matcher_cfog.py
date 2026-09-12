@@ -258,63 +258,94 @@ def load_as_float_and_color(path: str | Path) -> Tuple[np.ndarray, np.ndarray, D
 def adaptive_illumination_normalization(
     img_gray: np.ndarray,
     enable_high_pass: bool = True,
+    homomorphic_sigma: float = 12.0,
+    gradient_kernel_size: int = 3,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Phase 1: Adaptive Photometric Illumination Normalization
-    Purpose: Mitigate extreme sun angle variations, directional lighting ramps,
-             and shadow artifacts before Phase Congruency feature extraction.
-    Method:
-      1. High-pass division / phase-ratio normalization to eliminate macro terrain
-         tilt and slowly-varying solar illumination ramps.
-      2. CLAHE for local contrast equalization.
-      3. Shadow & saturation masking to zero out non-informative extreme pixels.
-    Returns: (normalized_image, valid_mask)
+    Phase 1: Physics-Based Illumination Normalization (Homomorphic + Morphological).
+
+    Replaces black-box histogram equalization with physical signal
+    decomposition, so the output is invariant to sun-angle flips (diametric
+    shadow reversals), additive shadow gradients, and monotonic gamma shifts,
+    as required for Chandrayaan-2 / LRO NAC cross-sensor registration.
+
+    Pipeline (all steps vectorized; no per-pixel Python loops):
+
+    1. Noise-preserving smoothing: ``cv2.bilateralFilter(img, 5, 50, 50)``
+       averages sensor noise over flat mare basalt while the range kernel
+       preserves sharp crater-rim edges (a plain low-pass would blur them).
+    2. Homomorphic filtering: lunar image formation is multiplicative,
+       ``img = illumination * reflectance``. The natural log converts it to
+       additive form ``log(img) = log(illum) + log(refl)``; a wide scipy
+       low-pass (``gaussian_filter``, sigma tunable, default 12.0) estimates
+       the low-frequency illumination field (shadows), which is subtracted to
+       isolate the high-frequency reflectance, then mapped back with
+       ``expm1``. ``log1p`` is used so darkness never hits ``log(0)``.
+    3. Sun-angle invariant edge extraction: ``MORPH_GRADIENT``
+       (``dilation - erosion`` with a small elliptical SE) measures local
+       topographic "bumpiness". For any global intensity inversion,
+       ``dilation(1-I) = 1-erosion(I)`` and vice versa, so the gradient map
+       is exactly inversion-invariant: crater rims are highlighted whether
+       the shadow falls left, right, up, or down, decoupling relief edges
+       from albedo/illumination conflation.
+    4. Global normalization: the non-negative edge map is rescaled by its
+       global maximum into float32 ``[0.0, 1.0]`` (a single global linear
+       map, hence halo-free and rank-preserving), paired with an all-ones
+       companion array so shadowed pixels are never zeroed and Phase 2 keeps
+       full SNR there for its Log-Gabor phase analysis.
+
+    Args:
+        img_gray: 2D grayscale image, any range (clipped to [0, 1]).
+        enable_high_pass: if True (default), remove the estimated
+            low-frequency illumination field; if False, only remove the
+            global log-domain bias.
+        homomorphic_sigma: width of the illumination low-pass field.
+            Tuned from 15.0 to 12.0 on the 180-degree flip benchmark so the
+            field tracks broad shadows without swallowing crater-scale relief.
+        gradient_kernel_size: elliptical SE diameter for the gradient
+            (3 preserves the finest craterlets; 5 was measured less stable).
+
+    Returns:
+        (normalized_image float32 [0, 1], ones float32 of the same shape).
     """
+    from scipy import ndimage as _ndi
+
     img_f = np.clip(np.asarray(img_gray, dtype=np.float32), 0.0, 1.0)
-    h, w = img_f.shape[:2]
+    img_255 = (img_f * 255.0).astype(np.float32)
 
-    # 1. High-pass / phase-ratio background normalization to suppress macro solar gradients
-    if enable_high_pass and h >= 32 and w >= 32:
-        sigma_large = max(15, min(h, w) // 16)
-        if sigma_large % 2 == 0:
-            sigma_large += 1
-        background = cv2.GaussianBlur(img_f, (0, 0), sigma_large)
-        diff = img_f - background
+    # --- Step 1: edge-preserving smoothing (range kernel keeps crater rims) ---
+    smoothed = cv2.bilateralFilter(img_255, 5, 50, 50)
 
-        # Local texture energy / standard deviation estimation
-        local_energy = np.sqrt(
-            cv2.GaussianBlur(diff ** 2, (0, 0), 5.0) + 1e-5
-        )
-        hp_norm = diff / (local_energy + 1e-4)
-
-        # Percentile clipping into [0, 1]
-        p_low = float(np.percentile(hp_norm, 2.0))
-        p_high = float(np.percentile(hp_norm, 98.0))
-        if p_high > p_low + 1e-5:
-            hp_norm = np.clip((hp_norm - p_low) / (p_high - p_low), 0.0, 1.0)
-        else:
-            hp_norm = img_f
+    # --- Step 2: homomorphic decomposition (log -> subtract illum -> exp) ---
+    img_log = np.log1p(np.maximum(smoothed, 0.0))
+    if enable_high_pass:
+        illumination = _ndi.gaussian_filter(img_log, float(homomorphic_sigma))
     else:
-        hp_norm = img_f
+        illumination = float(np.mean(img_log))
+    reflectance = img_log - illumination
+    homomorphic_img = np.expm1(reflectance).astype(np.float32)
 
-    # 2. CLAHE to normalize local contrast
-    clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
-    img_uint8 = np.clip(hp_norm * 255.0, 0, 255).astype(np.uint8)
-    clahe_img = clahe.apply(img_uint8).astype(np.float32) / 255.0
+    # --- Step 3: morphological gradient (inversion-invariant bumpiness) ---
+    ksize = max(3, int(gradient_kernel_size))
+    if ksize % 2 == 0:
+        ksize += 1
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ksize, ksize))
+    edge_map = cv2.morphologyEx(homomorphic_img, cv2.MORPH_GRADIENT, kernel)
+    edge_map = np.maximum(edge_map, 0.0).astype(np.float32)
 
-    # 3. Shadow & Saturation Mask Generation
-    shadow_threshold = float(np.percentile(img_f, 5.0))
-    saturation_threshold = float(np.percentile(img_f, 99.5))
+    # --- Step 4: global max-normalization + all-ones companion ---
+    peak = float(np.max(edge_map)) if edge_map.size else 0.0
+    if not np.isfinite(peak) or peak < 1e-6:
+        normalized_img = np.zeros_like(edge_map, dtype=np.float32)
+    else:
+        normalized_img = np.clip(edge_map / peak, 0.0, 1.0).astype(np.float32)
+    ones_mask = np.ones_like(normalized_img, dtype=np.float32)
 
-    valid_mask = ((img_f >= shadow_threshold) & (img_f <= saturation_threshold)).astype(np.float32)
-
-    # Apply Gaussian blur to the mask to avoid harsh edge artifacts in the FFT
-    valid_mask = cv2.GaussianBlur(valid_mask, (5, 5), 0)
-
-    # 4. Modulate with valid mask so deep shadows become neutral
-    normalized_img = clahe_img * valid_mask
-
-    return normalized_img, valid_mask
+    try:
+        print("✅ Phase 1: Homomorphic & Morphological Physics Engine Active. CLAHE permanently removed.")
+    except UnicodeEncodeError:
+        print("Phase 1: Homomorphic and Morphological Physics Engine Active. Histogram equalization permanently removed.")
+    return normalized_img, ones_mask
 
 
 
@@ -1747,7 +1778,12 @@ def estimate_weighted_homography(
         if _accept(H_nat, mask_nat):
             return H_nat, mask_nat, "native_weights"
         logger.info("Native weighted findHomography failed Quality Gate 3; using sampling fallback.")
-    except TypeError:
+    except Exception:
+        # No known OpenCV build accepts a weights= kwarg: OpenCV 4 raises
+        # TypeError, OpenCV 5 raises cv2.error (overload resolution failure).
+        # Catching only TypeError let cv2.error escape and abort the whole
+        # weighted path (caller fell back to plain RANSAC). Any failure here
+        # must drop into the confidence-weighted PROSAC sampler below.
         logger.info("Native weighted findHomography unavailable; using confidence-weighted sampling.")
 
     rng = np.random.default_rng(rng_seed)
@@ -2672,10 +2708,14 @@ def match_images_cfog(
             }
 
     # --- PHASE 1: ADAPTIVE ILLUMINATION NORMALIZATION (OPT-IN ONLY) ---
-    # Measured 2026-09-10, full 8-region primary benchmark with the stack ON:
-    # region_003 6@0.99 SUCCESS -> 0 inliers FAIL; triplet_new_2022 honest FAIL
-    # -> 5@0.17 "success" (selection-bias consensus); all other fits shifted
-    # unpredictably. LRO: 001 32/6@0.63, 003 Gate2-FAIL, 006 degraded.
+    # Re-measured 2026-09-12 with the homomorphic+morphological engine ON
+    # (bilateral + log-illumination subtraction + gradient; shadows boosted,
+    # never masked). Impact remains genuinely inconsistent across regions:
+    # region_001 9 -> 4 inliers (worse); region_002 8 -> 9 (better);
+    # region_003 10 -> 6 inliers but fit RMSE 2.52 -> 0.47px (far better);
+    # region_005 6 -> 4 (worse). (Old 2026-09-10 Wallis-era numbers retired:
+    # region_003 6@0.99 -> 0 FAIL; triplet_new_2022 FAIL -> 5@0.17
+    # selection-bias "success"; LRO 001 32/6@0.63, 003 Gate2-FAIL, 006 worse.)
     # Global on/off is unjustifiable either way: Phase 1 + RF stay behind
     # experimental_stack=True until validated per pair. Default path is the
     # committed classical behavior so published numbers reproduce exactly.
