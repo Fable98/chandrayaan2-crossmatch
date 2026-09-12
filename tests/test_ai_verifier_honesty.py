@@ -26,6 +26,16 @@ sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from train_ai_verifier import main as train_main
 from ai_verifier import AIMatchVerifier
+from ai_verifier import FEATURE_NAMES as VERIFIER_FEATURES
+from train_ai_verifier import FEATURE_NAMES as TRAIN_FEATURES
+
+
+def test_feature_contract_stays_in_sync():
+    assert TRAIN_FEATURES == VERIFIER_FEATURES
+    assert TRAIN_FEATURES == [
+        "confidence", "refinement_dx", "refinement_dy", "spatial_quality_score",
+        "cfog_distance", "pc_energy_src", "pc_energy_tgt", "nn_ratio", "scale_diff",
+    ]
 
 
 def _write_matches(path: Path, records: list[dict]) -> Path:
@@ -38,6 +48,10 @@ def _record(conf: float, dx: float = 0.0, **labels) -> dict:
         "confidence": conf, "refinement_dx": dx, "refinement_dy": 0.0,
         "spatial_quality_score": 0.8, "source_x": 1.0, "source_y": 2.0,
         "target_x": 3.0, "target_y": 4.0,
+        "cfog_distance": 0.15 if conf >= 0.5 else 1.2,
+        "pc_energy_src": 0.7, "pc_energy_tgt": 0.65,
+        "nn_ratio": 0.35 if conf >= 0.5 else 0.92,
+        "scale_diff": 0.2 if conf >= 0.5 else 2.5,
     }
     rec.update(labels)
     return rec
@@ -169,7 +183,7 @@ def test_train_skips_rows_missing_live_features(tmp_path):
     except KeyError:
         pass
     row = extract_feature_row(complete, require_live_features=True)
-    assert len(row) == 4
+    assert len(row) == 9
 
     mixed = []
     for i in range(8):
@@ -208,6 +222,8 @@ def test_gt_generator_emits_live_features_and_cross_sensor_domain(tmp_path):
     for r in recs:
         assert "spatial_quality_score" in r
         assert "refinement_dx" in r and "refinement_dy" in r
+        for k in ("cfog_distance", "pc_energy_src", "pc_energy_tgt", "nn_ratio", "scale_diff"):
+            assert k in r, r.keys()
         assert r["label_source"] == "hand"
         assert r["domain"] in ("same_sensor", "cross_sensor")
     assert any(r["human_label"] for r in recs)
@@ -252,4 +268,26 @@ def test_live_matcher_records_populate_spatial_quality_and_refinement(tmp_path):
         assert "refinement_dx" in r and "refinement_dy" in r
         assert 0.0 <= float(r["spatial_quality_score"]) <= 1.0
         assert "ai_inlier_prob" in r
+        for k in ("cfog_distance", "pc_energy_src", "pc_energy_tgt", "nn_ratio", "scale_diff"):
+            assert k in r, r.keys()
+
+
+def test_hard_pre_ransac_veto_stays_experimental():
+    """Default path must weight RANSAC, not hard-filter, unless experimental_stack."""
+    src = (REPO_ROOT / "ML_model/matcher_cfog.py").read_text(encoding="utf-8")
+    assert "if experimental_stack and verifier.is_trained:" in src
+    assert "verifier.filter_matches(refinement_records, threshold=0.5)" in src
+    assert "weighting RANSAC with" in src
+
+
+def test_descriptor_features_are_finite_measurements():
+    from matcher_cfog import compute_descriptor_match_features, DESCRIPTOR_FEATURE_KEYS
+
+    img = np.zeros((64, 64), dtype=np.float32)
+    img[20:40, 20:40] = 1.0
+    img[8:16, 8:16] = 0.4
+    feats = compute_descriptor_match_features(img, img, 30.0, 30.0, 12.0, 12.0)
+    assert tuple(feats) == DESCRIPTOR_FEATURE_KEYS
+    for v in feats.values():
+        assert np.isfinite(v)
 

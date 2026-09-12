@@ -1521,6 +1521,162 @@ def compute_spatial_quality_score(
     return float(np.clip(0.50 * uniq + 0.35 * refine + 0.15 * border, 0.05, 1.0))
 
 
+# Descriptor-level AI-verifier features (must stay in sync with FEATURE_NAMES
+# in ai_verifier.py / train_ai_verifier.py). Computed at candidate-match time,
+# before Phase 7 RANSAC. These are measurements, not RANSAC labels.
+CFOG_N_ORIENT = 8
+CFOG_DESC_DIM = CFOG_N_ORIENT * 4  # 2x2 spatial cells
+DESCRIPTOR_FEATURE_KEYS = (
+    "cfog_distance",
+    "pc_energy_src",
+    "pc_energy_tgt",
+    "nn_ratio",
+    "scale_diff",
+)
+
+
+def _clip_xy(x: float, y: float, w: int, h: int) -> Tuple[int, int]:
+    return int(min(w - 1, max(0, int(round(x))))), int(min(h - 1, max(0, int(round(y)))))
+
+
+def sample_pc_energy(pc: np.ndarray, x: float, y: float, radius: int = 2) -> float:
+    """Max Phase Congruency energy in a small window around (x, y)."""
+    if pc is None or getattr(pc, "size", 0) == 0:
+        return 0.0
+    h, w = pc.shape[:2]
+    ix, iy = _clip_xy(x, y, w, h)
+    y0, y1 = max(0, iy - radius), min(h, iy + radius + 1)
+    x0, x1 = max(0, ix - radius), min(w, ix + radius + 1)
+    patch = pc[y0:y1, x0:x1]
+    if patch.size == 0:
+        return 0.0
+    return float(np.max(patch))
+
+
+def estimate_blob_scale(feat: np.ndarray, x: float, y: float,
+                        sigmas: Tuple[float, ...] = (1.0, 1.6, 2.5, 4.0, 6.4)) -> float:
+    """Characteristic scale (px) via scale-normalized LoG peak at the point."""
+    if feat is None or getattr(feat, "size", 0) == 0:
+        return float(sigmas[0])
+    img = np.asarray(feat, dtype=np.float32)
+    h, w = img.shape[:2]
+    ix, iy = _clip_xy(x, y, w, h)
+    best_s, best_r = float(sigmas[0]), -1.0
+    for s in sigmas:
+        ksize = int(6 * s + 1) | 1
+        if ksize < 3:
+            continue
+        blur = cv2.GaussianBlur(img, (ksize, ksize), float(s))
+        lap = cv2.Laplacian(blur, cv2.CV_32F)
+        resp = abs(float(lap[iy, ix])) * (float(s) ** 2)
+        if resp > best_r:
+            best_r, best_s = resp, float(s)
+    return best_s
+
+
+def extract_cfog_descriptor(
+    feat: np.ndarray,
+    x: float,
+    y: float,
+    half: int = 8,
+    n_orient: int = CFOG_N_ORIENT,
+) -> np.ndarray:
+    """Local CFOG-style descriptor: oriented-gradient histograms on a 2x2 grid.
+
+    Built from the structural map actually used for matching (Phase Congruency),
+    not a separate unimplemented multi-channel CFOG tensor.
+    """
+    dim = n_orient * 4
+    empty = np.zeros(dim, dtype=np.float32)
+    if feat is None or getattr(feat, "size", 0) == 0:
+        return empty
+    img = np.asarray(feat, dtype=np.float32)
+    h, w = img.shape[:2]
+    ix, iy = int(round(x)), int(round(y))
+    y0, y1 = max(0, iy - half), min(h, iy + half)
+    x0, x1 = max(0, ix - half), min(w, ix + half)
+    patch = img[y0:y1, x0:x1]
+    if patch.size < 9:
+        return empty
+    gx = cv2.Sobel(patch, cv2.CV_32F, 1, 0, ksize=3)
+    gy = cv2.Sobel(patch, cv2.CV_32F, 0, 1, ksize=3)
+    mag = np.sqrt(gx * gx + gy * gy)
+    ang = np.arctan2(gy, gx) + np.pi  # [0, 2pi]
+    ph, pw = patch.shape[:2]
+    hy, hx = max(1, ph // 2), max(1, pw // 2)
+    cells = []
+    for cy in (0, hy):
+        for cx in (0, hx):
+            cell_m = mag[cy:cy + hy, cx:cx + hx]
+            cell_a = ang[cy:cy + hy, cx:cx + hx]
+            hist = np.zeros(n_orient, dtype=np.float32)
+            if cell_m.size:
+                bins = np.clip((cell_a / (2.0 * np.pi) * n_orient).astype(np.int32), 0, n_orient - 1)
+                np.add.at(hist, bins.ravel(), cell_m.ravel())
+            cells.append(hist)
+    desc = np.concatenate(cells).astype(np.float32)
+    nrm = float(np.linalg.norm(desc))
+    if nrm > 1e-8:
+        desc /= nrm
+    return desc
+
+
+def build_cfog_descriptor_gallery(
+    feat: np.ndarray,
+    keypoints,
+    max_n: int = 200,
+) -> np.ndarray:
+    """Stack CFOG descriptors at keypoint locations (x, y, ...)."""
+    descs = []
+    if not keypoints:
+        return np.zeros((0, CFOG_DESC_DIM), dtype=np.float32)
+    for item in list(keypoints)[:max_n]:
+        descs.append(extract_cfog_descriptor(feat, float(item[0]), float(item[1])))
+    return np.stack(descs, axis=0) if descs else np.zeros((0, CFOG_DESC_DIM), dtype=np.float32)
+
+
+def _lowe_nn_ratio(
+    src_desc: np.ndarray,
+    tgt_desc: np.ndarray,
+    tgt_gallery: Optional[np.ndarray],
+) -> float:
+    """Lowe ratio: dist(src, matched tgt) / dist(src, 2nd NN in gallery)."""
+    d1 = float(np.linalg.norm(src_desc - tgt_desc))
+    others: List[float] = []
+    if tgt_gallery is not None and len(tgt_gallery) > 0:
+        gd = np.linalg.norm(tgt_gallery - src_desc[None, :], axis=1)
+        # Drop near-duplicates of the matched target descriptor.
+        for v in gd:
+            fv = float(v)
+            if abs(fv - d1) > 1e-6:
+                others.append(fv)
+    if not others:
+        return 1.0 if d1 > 1e-8 else 0.0
+    d2 = min(others)
+    return float(np.clip(d1 / max(d2, 1e-12), 0.0, 1.0))
+
+
+def compute_descriptor_match_features(
+    pc1: np.ndarray,
+    pc2: np.ndarray,
+    x1: float,
+    y1: float,
+    x2: float,
+    y2: float,
+    tgt_gallery: Optional[np.ndarray] = None,
+) -> Dict[str, float]:
+    """Five descriptor-level features for one candidate correspondence."""
+    src_desc = extract_cfog_descriptor(pc1, x1, y1)
+    tgt_desc = extract_cfog_descriptor(pc2, x2, y2)
+    return {
+        "cfog_distance": float(np.linalg.norm(src_desc - tgt_desc)),
+        "pc_energy_src": sample_pc_energy(pc1, x1, y1),
+        "pc_energy_tgt": sample_pc_energy(pc2, x2, y2),
+        "nn_ratio": _lowe_nn_ratio(src_desc, tgt_desc, tgt_gallery),
+        "scale_diff": abs(estimate_blob_scale(pc1, x1, y1) - estimate_blob_scale(pc2, x2, y2)),
+    }
+
+
 def _homography_sample_degenerate(src4: np.ndarray, dst4: np.ndarray, min_span_px: float = 2.0) -> bool:
     """True if a 4-point sample is collinear / collapsed (ill-conditioned DLT)."""
     def _collapsed(pts: np.ndarray) -> bool:
@@ -2142,6 +2298,14 @@ def _guided_refill_matches(
                 continue
         added = []
         thresh = TUNED_RELAXED_MI_THRESH if multimodal_pair else TUNED_RELAXED_NCC_THRESH
+        tgt_pts = []
+        for m in selected_matches:
+            try:
+                tgt_pts.append((float(m.get("work_x2", m.get("target_x", 0.0))),
+                                float(m.get("work_y2", m.get("target_y", 0.0)))))
+            except Exception:
+                continue
+        tgt_gallery = build_cfog_descriptor_gallery(pc2, tgt_pts)
         for item in kps_candidates:
             if len(added) >= max_add:
                 break
@@ -2209,7 +2373,7 @@ def _guided_refill_matches(
                 # Reprojection residual check against coarse homography prediction
                 res_dist = math.hypot(bx - px, by - py)
                 if res_dist <= max_residual:
-                    added.append({
+                    rec = {
                         "work_x1": float(kx), "work_y1": float(ky),
                         "work_x2": float(bx), "work_y2": float(by),
                         "score": float(max_val),
@@ -2227,7 +2391,11 @@ def _guided_refill_matches(
                             is_refined=refined,
                             x=kx, y=ky, width=work_w1, height=work_h1,
                         ),
-                    })
+                    }
+                    rec.update(compute_descriptor_match_features(
+                        pc1, pc2, kx, ky, bx, by, tgt_gallery=tgt_gallery,
+                    ))
+                    added.append(rec)
                     used_coords.append((kx, ky))
         return added
     except Exception as exc:
@@ -3288,6 +3456,8 @@ def match_images_cfog(
                 kps_ssc = suppression_via_square_covering(
                     kps_raw, num_ret_points=36, tolerance=0.15, cols=t_high.shape[1], rows=t_high.shape[0]
                 )
+                kps_coarse = detect_salient_keypoints(pc_t_coarse, max_corners=100, quality_level=0.01)
+                tile_gallery = build_cfog_descriptor_gallery(pc_t_coarse, kps_coarse)
                 pw = 16
                 for kx, ky, _ in kps_ssc:
                     kx_i, ky_i = int(round(kx)), int(round(ky))
@@ -3340,6 +3510,11 @@ def match_images_cfog(
                         work_y2 = nat_y2 / scale_factor2
 
                         fine_cell = (int(work_x1 / max(1.0, cell_w)), int(work_y1 / max(1.0, cell_h)))
+                        _desc = compute_descriptor_match_features(
+                            pc_t_high, pc_t_coarse, kx, ky,
+                            float(best_x) + sub_dx, float(best_y) + sub_dy,
+                            tgt_gallery=tile_gallery,
+                        )
                         selected_matches.append({
                             "work_x1": work_x1,
                             "work_y1": work_y1,
@@ -3349,6 +3524,7 @@ def match_images_cfog(
                             "cell": fine_cell,
                             "method": "native_tiling",
                             "peak_uniqueness": float(peak_uniq),
+                            **_desc,
                         })
                         native_pts1.append([nat_x1, nat_y1])
                         native_pts2.append([nat_x2, nat_y2])
@@ -3364,6 +3540,7 @@ def match_images_cfog(
                                 is_refined=bool(valid),
                                 x=nat_x1, y=nat_y1, width=orig_w1, height=orig_h1,
                             ),
+                            **_desc,
                         ))
 
         # Spatial Uniformity via Grid NMS
@@ -3464,6 +3641,7 @@ def match_images_cfog(
             "Pre-match SSC keypoint selection: Image 1: %d -> %d (guided pool: %d); Image 2: %d -> %d",
             len(kps1_raw), len(kps1_ssc), len(kps1_guided_pool), len(kps2_raw), len(kps2_ssc),
         )
+        tgt_cfog_gallery = build_cfog_descriptor_gallery(pc2, kps2_ssc)
 
         # Seed Level 0 keypoints with Level 1 matched anchors (hierarchical correspondence propagation)
         kps1_search_list = []
@@ -3540,6 +3718,10 @@ def match_images_cfog(
                     "cell": (gx, gy),
                     "method": "ssc_patch",
                     "peak_uniqueness": float(peak_uniq),
+                    **compute_descriptor_match_features(
+                        pc1, pc2, kx_f, ky_f, float(best_x2), float(best_y2),
+                        tgt_gallery=tgt_cfog_gallery,
+                    ),
                 })
 
         # --- 2b. For multimodal pairs, run centroid matching (with SSC on centroids) ---
@@ -3596,6 +3778,10 @@ def match_images_cfog(
                             "score": float(mi_score),
                             "cell": cell,
                             "method": "centroid",
+                            **compute_descriptor_match_features(
+                                pc1, pc2, float(x1), float(y1), float(x2), float(y2),
+                                tgt_gallery=tgt_cfog_gallery,
+                            ),
                         })
                         used_c2.add(int(nearest))
                         break
@@ -3654,6 +3840,10 @@ def match_images_cfog(
                         "cell": (gx, gy),
                         "method": "patch",
                         "peak_uniqueness": float(peak_uniq),
+                        **compute_descriptor_match_features(
+                            pc1, pc2, float(cx), float(cy), float(best_x2), float(best_y2),
+                            tgt_gallery=tgt_cfog_gallery,
+                        ),
                     })
 
         # --- Step 2: Post-match Grid Density Budgeting (NxN grid, 10x10) ---
@@ -3717,6 +3907,10 @@ def match_images_cfog(
                         "cell": fine_cell,
                         "method": "mandatory_fill",
                         "peak_uniqueness": float(peak_uniq),
+                        **compute_descriptor_match_features(
+                            pc1, pc2, float(cx), float(cy), float(best_x2), float(best_y2),
+                            tgt_gallery=tgt_cfog_gallery,
+                        ),
                     })
                     occupied_macro.add((mc_x, mc_y))
                     mandatory_fill_count += 1
@@ -3819,6 +4013,12 @@ def match_images_cfog(
 
             # Coordinates: full float() precision (no round/int). Only
             # confidence may be rounded (2 decimals for readability).
+            _desc = {k: m[k] for k in DESCRIPTOR_FEATURE_KEYS if k in m}
+            if len(_desc) < len(DESCRIPTOR_FEATURE_KEYS):
+                _desc = compute_descriptor_match_features(
+                    pc1, pc2, wx1_f, wy1_f, wx2_f + ref_dx, wy2_f + ref_dy,
+                    tgt_gallery=tgt_cfog_gallery if "tgt_cfog_gallery" in locals() else None,
+                )
             refinement_records.append(make_match_record(
                 nat_x1, nat_y1, nat_x2, nat_y2, m["score"],
                 refinement_dx=float(ref_dx),
@@ -3831,6 +4031,7 @@ def match_images_cfog(
                     is_refined=refined,
                     x=nat_x1, y=nat_y1, width=orig_w1, height=orig_h1,
                 ),
+                **_desc,
             ))
     t_l0 = time.perf_counter() - t_start_l0
     coarse_to_fine_timing = {"L2_s": round(t_l2, 4), "L1_s": round(t_l1, 4), "L0_s": round(t_l0, 4)}
@@ -4153,6 +4354,7 @@ def match_images_cfog(
                         )),
                         method="guided_refill",
                         match_id=len(refinement_records),
+                        **{k: g[k] for k in DESCRIPTOR_FEATURE_KEYS if k in g},
                     ))
                     refinement_records[-1]["cell"] = g.get("cell")
                     refinement_records[-1]["h_conditioned"] = True

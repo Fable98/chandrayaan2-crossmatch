@@ -9,12 +9,17 @@ record must carry a human verdict under ``human_label`` (aliases
 ``hand_label``, ``manual_label``, ``verified_label``; 1/True = true
 correspondence, 0/False = false).
 
-Features (per match, all read with ``.get()`` defaults so missing keys are safe):
+Features (per match; live matcher fields are required so defaulted dumps cannot
+poison the classifier). Order is the load-time contract with ``ai_verifier.py``:
     1. ``confidence``               (falls back to ``score``)
-    2. ``refinement_dx``            (sub-pixel shift X, default 0.0)
-    3. ``refinement_dy``            (sub-pixel shift Y, default 0.0)
-    4. ``spatial_quality_score``    (required; rows missing this or refinement_dx/dy
-       are skipped so defaulted dumps cannot poison the classifier)
+    2. ``refinement_dx``            (sub-pixel shift X)
+    3. ``refinement_dy``            (sub-pixel shift Y)
+    4. ``spatial_quality_score``
+    5. ``cfog_distance``            (Euclidean CFOG descriptor distance)
+    6. ``pc_energy_src``            (max Phase Congruency energy at source)
+    7. ``pc_energy_tgt``            (max Phase Congruency energy at target)
+    8. ``nn_ratio``                 (Lowe 1st/2nd NN descriptor distance ratio)
+    9. ``scale_diff``               (abs blob-scale difference)
 
 Model:
     ``RandomForestClassifier(n_estimators=100, class_weight='balanced')`` —
@@ -54,7 +59,17 @@ except ImportError:
 logger = logging.getLogger("ML_model.train_ai_verifier")
 
 # Feature order is the contract with ai_verifier.AIMatchVerifier.extract_features.
-FEATURE_NAMES = ["confidence", "refinement_dx", "refinement_dy", "spatial_quality_score"]
+FEATURE_NAMES = [
+    "confidence",
+    "refinement_dx",
+    "refinement_dy",
+    "spatial_quality_score",
+    "cfog_distance",
+    "pc_energy_src",
+    "pc_energy_tgt",
+    "nn_ratio",
+    "scale_diff",
+]
 
 # Directories searched (recursively) for *matches.json when no explicit input is given.
 # NOTE: data_preprocessing_pipeline/processed_triplets currently holds manifests + PNGs,
@@ -124,17 +139,21 @@ def extract_label(match: dict, allow_ransac: bool = False,
 def extract_feature_row(match: dict, require_live_features: bool = True) -> list[float]:
     """Build one feature row.
 
-    Live production records always carry ``refinement_dx/dy`` and
-    ``spatial_quality_score``. Older dumps that omit them are *skipped* at
-    train time (see build_dataset): defaulting those fields made a genuine
-    RANSAC-confirmed real match look identical to a failed correspondence
-    and taught the RF to reject true OHRC↔TMC pairs.
+    Live production records always carry ``refinement_dx/dy``,
+    ``spatial_quality_score``, and the five descriptor-level fields.
+    Older dumps that omit them are *skipped* at train time (see build_dataset):
+    defaulting those fields made a genuine RANSAC-confirmed real match look
+    identical to a failed correspondence and taught the RF to reject true
+    OHRC↔TMC pairs.
     """
     if require_live_features:
         has_dx = "refinement_dx" in match or "ref_dx" in match
         has_dy = "refinement_dy" in match or "ref_dy" in match
         has_sp = "spatial_quality_score" in match or "spatial_score" in match
-        if not (has_dx and has_dy and has_sp):
+        has_desc = all(k in match for k in (
+            "cfog_distance", "pc_energy_src", "pc_energy_tgt", "nn_ratio", "scale_diff",
+        ))
+        if not (has_dx and has_dy and has_sp and has_desc):
             raise KeyError("missing live matcher features")
     conf = float(match.get("confidence", match.get("score", 0.0) or 0.0))
     dx = float(match.get("refinement_dx", match.get("ref_dx", 0.0) or 0.0))
@@ -143,7 +162,12 @@ def extract_feature_row(match: dict, require_live_features: bool = True) -> list
     if spatial_raw is None:
         raise KeyError("spatial_quality_score")
     spatial = float(spatial_raw)
-    return [conf, dx, dy, spatial]
+    cfog_d = float(match.get("cfog_distance", 0.0) or 0.0)
+    pc_src = float(match.get("pc_energy_src", 0.0) or 0.0)
+    pc_tgt = float(match.get("pc_energy_tgt", 0.0) or 0.0)
+    nn_ratio = float(match["nn_ratio"]) if "nn_ratio" in match else 1.0
+    scale_diff = float(match.get("scale_diff", 0.0) or 0.0)
+    return [conf, dx, dy, spatial, cfog_d, pc_src, pc_tgt, nn_ratio, scale_diff]
 
 
 def iter_match_files(search_roots: list[Path]) -> list[Path]:
@@ -219,7 +243,7 @@ def build_dataset(search_roots: list[Path], allow_ransac: bool = False,
             else:
                 stats["n_ransac"] += 1
             dedup_key = (
-                round(row[0], 6), round(row[1], 6), round(row[2], 6), round(row[3], 6),
+                tuple(round(float(v), 6) for v in row),
                 label,
                 round(float(m.get("source_x", m.get("image1_x", 0.0)) or 0.0), 4),
                 round(float(m.get("source_y", m.get("image1_y", 0.0)) or 0.0), 4),
