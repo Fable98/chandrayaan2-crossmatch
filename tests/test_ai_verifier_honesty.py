@@ -98,3 +98,25 @@ def test_default_verifier_is_untrained_baseline(tmp_path):
     # Baseline keeps the top ~75% by construction; it must not nuke everything.
     assert len(kept) >= 4
     assert len(kept) + len(rejected) == len(recs)
+
+
+def test_bundled_production_model_loads_and_is_trained():
+    """Verify that the bundled ai_verifier_model.pkl loads successfully as a trained model."""
+    prod_path = REPO_ROOT / "ML_model/ai_verifier_model.pkl"
+    if not prod_path.exists():
+        pytest.skip("Production model ai_verifier_model.pkl not found.")
+    verifier = AIMatchVerifier(model_path=prod_path)
+    assert verifier.is_trained is True
+    assert verifier.model is not None
+    assert hasattr(verifier.model, "predict_proba")
+
+    # Verify predictions on sample matches
+    sample_matches = [
+        _record(0.85, dx=0.1, dy=0.1),
+        _record(0.12, dx=4.5, dy=3.8),
+    ]
+    confidences = verifier.predict_confidence(sample_matches)
+    assert len(confidences) == 2
+    # High-confidence, small-residual match should have higher probability than low-conf, large-residual match
+    assert confidences[0] > confidences[1]
+

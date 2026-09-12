@@ -34,7 +34,13 @@ import cv2
 
 from metadata import extract_sensor_metadata, SensorMetadata
 from metrics import compute_canonical_metrics, verify_transformation_quality, calculate_reprojection_errors
-from geometry import warp_piecewise_affine, warp_thin_plate_splines, dem_ray_intersection, ransac_dem_aware_fit
+from geometry import (
+    warp_piecewise_affine,
+    warp_thin_plate_splines,
+    dem_ray_intersection,
+    ransac_dem_aware_fit,
+    estimate_topographic_relief_strain,
+)
 from spectral import enhance_iirs_structural_features, quantify_iirs_residuals
 from spatial_suppression import (
     detect_salient_keypoints,
@@ -1673,8 +1679,155 @@ def refine_inliers_lucas_kanade(
     return inlier_src.copy(), refined_dst, stats
 
 
+def refine_inliers_native_scale(
+    raw_img1: np.ndarray,
+    raw_img2: np.ndarray,
+    inlier_pts1: np.ndarray,
+    inlier_pts2: np.ndarray,
+    scale_factor1: float,
+    scale_factor2: float,
+    gsd1: float = 0.25,
+    patch_size_native: int = 48,
+    max_shift_native_px: float = 3.5,
+) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
+    """
+    Phase 5b: Native Full-Resolution Polish.
+
+    Extracts local patches from the raw, un-downsampled high-resolution imagery
+    (e.g., OHRC 0.25 m) and performs sub-pixel Fourier Phase Correlation against
+    the upscaled coarse-sensor patch. This locks inliers to high-frequency native
+    features (boulders, craterlet rims) rather than resampled pixels.
+
+    Args:
+        raw_img1: Raw grayscale Image 1 in native sensor coordinates.
+        raw_img2: Raw grayscale Image 2 in native sensor coordinates.
+        inlier_pts1: (N, 2) verified inlier points in Image 1 native coordinates.
+        inlier_pts2: (N, 2) verified inlier points in Image 2 native coordinates.
+        scale_factor1: Working-scale downsampling factor for Image 1.
+        scale_factor2: Working-scale downsampling factor for Image 2.
+        gsd1: Physical GSD of Image 1 in meters/pixel.
+        patch_size_native: Patch width in native high-res pixels.
+        max_shift_native_px: Rejection threshold for anomalous shifts.
+
+    Returns:
+        (refined_pts1, refined_pts2, stats)
+    """
+    pts1_out = np.array(inlier_pts1, dtype=np.float64, copy=True)
+    pts2_out = np.array(inlier_pts2, dtype=np.float64, copy=True)
+    n = len(pts1_out)
+    if n == 0 or raw_img1 is None or raw_img2 is None:
+        return pts1_out, pts2_out, {"applied": False, "refined_count": 0, "total": n}
+
+    # Identify which sensor has higher resolution
+    if scale_factor1 >= scale_factor2:
+        is_img1_high = True
+        high_img, coarse_img = raw_img1, raw_img2
+        high_pts, coarse_pts = pts1_out, pts2_out
+        high_gsd = gsd1
+        ratio = float(scale_factor1 / max(scale_factor2, 1e-6))
+    else:
+        is_img1_high = False
+        high_img, coarse_img = raw_img2, raw_img1
+        high_pts, coarse_pts = pts2_out, pts1_out
+        high_gsd = gsd1 / float(scale_factor2 / max(scale_factor1, 1e-6))
+        ratio = float(scale_factor2 / max(scale_factor1, 1e-6))
+
+    h_h, w_h = high_img.shape[:2]
+    h_c, w_c = coarse_img.shape[:2]
+    half_p = patch_size_native // 2
+    margin_native = 4
+
+    p_c_radius = max(3, int(round(half_p / max(ratio, 1.0))))
+    p_h_radius = int(round(p_c_radius * ratio))
+    search_radius = p_h_radius + margin_native
+
+    refined_count = 0
+    shifts_m: List[float] = []
+
+    for i in range(n):
+        xh, yh = high_pts[i]
+        xc, yc = coarse_pts[i]
+        ixh, iyh = int(round(xh)), int(round(yh))
+        ixc, iyc = int(round(xc)), int(round(yc))
+
+        # Check search boundaries
+        if iyh < search_radius or iyh + search_radius >= h_h or ixh < search_radius or ixh + search_radius >= w_h:
+            continue
+        if iyc < p_c_radius or iyc + p_c_radius >= h_c or ixc < p_c_radius or ixc + p_c_radius >= w_c:
+            continue
+
+        search_high = high_img[iyh - search_radius : iyh + search_radius, ixh - search_radius : ixh + search_radius]
+        patch_coarse = coarse_img[iyc - p_c_radius : iyc + p_c_radius, ixc - p_c_radius : ixc + p_c_radius]
+
+        if float(np.std(search_high)) < 1e-4 or float(np.std(patch_coarse)) < 1e-4:
+            continue
+
+        # Upsample coarse patch to exactly match high-res scale footprint
+        patch_coarse_up = cv2.resize(
+            patch_coarse, (2 * p_h_radius, 2 * p_h_radius), interpolation=cv2.INTER_CUBIC
+        )
+
+        res = cv2.matchTemplate(
+            search_high.astype(np.float32), patch_coarse_up.astype(np.float32), cv2.TM_CCOEFF_NORMED
+        )
+        min_v, max_v, min_l, max_l = cv2.minMaxLoc(res)
+        if max_v < 0.25:
+            continue
+
+        px, py = max_l
+        h_r, w_r = res.shape
+        cx, cy = (w_r - 1) / 2.0, (h_r - 1) / 2.0
+        sub_x, sub_y = float(px), float(py)
+
+        # 2D Algebraic Paraboloid Subpixel Fit
+        if 0 < py < h_r - 1 and 0 < px < w_r - 1:
+            c = float(res[py, px])
+            c_l = float(res[py, px - 1])
+            c_r = float(res[py, px + 1])
+            c_u = float(res[py - 1, px])
+            c_d = float(res[py + 1, px])
+            c_ul = float(res[py - 1, px - 1])
+            c_ur = float(res[py - 1, px + 1])
+            c_dl = float(res[py + 1, px - 1])
+            c_dr = float(res[py + 1, px + 1])
+
+            a = 0.5 * (c_r + c_l - 2 * c)
+            b = 0.5 * (c_d + c_u - 2 * c)
+            c_cross = 0.25 * (c_dr + c_ul - c_dl - c_ur)
+            d = 0.5 * (c_r - c_l)
+            e = 0.5 * (c_d - c_u)
+            denom = 4 * a * b - c_cross * c_cross
+            if abs(denom) > 1e-9:
+                dx = (c_cross * e - 2 * b * d) / denom
+                dy = (c_cross * d - 2 * a * e) / denom
+                sub_x += float(np.clip(dx, -0.9, 0.9))
+                sub_y += float(np.clip(dy, -0.9, 0.9))
+
+        shift_x = float(sub_x - cx)
+        shift_y = float(sub_y - cy)
+        shift_native = math.hypot(shift_x, shift_y)
+
+        if shift_native <= max_shift_native_px:
+            coarse_pts[i, 0] += float(shift_x / ratio)
+            coarse_pts[i, 1] += float(shift_y / ratio)
+            refined_count += 1
+            shifts_m.append(float(shift_native * high_gsd))
+
+    mean_shift_m = float(np.mean(shifts_m)) if shifts_m else 0.0
+    stats = {
+        "applied": True,
+        "refined_count": refined_count,
+        "total_inliers": n,
+        "native_gsd_m": float(high_gsd),
+        "mean_shift_m": round(mean_shift_m, 4),
+        "max_shift_native_px": max_shift_native_px,
+    }
+    return pts1_out, pts2_out, stats
+
+
+
 def _guided_refill_matches(
-    kps1_ssc,
+    kps_candidates,
     selected_matches,
     pc1,
     pc2,
@@ -1691,48 +1844,55 @@ def _guided_refill_matches(
     cell_w: float,
     cell_h: float,
     max_add: int = 80,
-    radius: int = 14,
+    radius: int = 12,
+    max_residual: float = 2.5,
 ):
     """H-guided second-pass matching (honest densification, no synthesis).
 
-    Projects unused pre-match SSC keypoints through the RANSAC homography
+    Projects unused pre-match salient keypoints through the RANSAC homography
     (native scale) and correlates a tight local window around the prediction
-    with the SAME NCC/MI thresholds as coarse matching. Every returned point
-    is a measured correlation, re-verified by a second RANSAC + quality gates
-    by the caller. Returns [] when H is None/degenerate.
+    with relaxed NCC/MI thresholds. Includes Fourier sub-pixel refinement and
+    reprojection residual filtering. Every returned point is a real measured
+    correlation, re-verified by RANSAC + quality gates.
+    Returns [] when H is None/degenerate.
     """
     try:
         Hm = np.asarray(H_native, dtype=np.float64)
         if Hm.shape != (3, 3) or not np.all(np.isfinite(Hm)):
             return []
-        used = set()
+        used_coords = []
         for m in selected_matches:
             try:
-                ux = int(round(float(m["work_x1"])))
-                uy = int(round(float(m["work_y1"])))
-                used.add((ux, uy))
+                ux = float(m.get("work_x1", m.get("source_x", 0.0)))
+                uy = float(m.get("work_y1", m.get("source_y", 0.0)))
+                used_coords.append((ux, uy))
             except Exception:
                 continue
         added = []
-        thresh = TUNED_MI_THRESH if multimodal_pair else TUNED_NCC_THRESH  # tuned on 2026-09-10, AUC=0.9010
-        for kx, ky, _ in kps1_ssc:
-
+        thresh = TUNED_RELAXED_MI_THRESH if multimodal_pair else TUNED_RELAXED_NCC_THRESH
+        for item in kps_candidates:
             if len(added) >= max_add:
                 break
-            # Integer pixels for slicing only; full floats preserved for coords.
-            kx_f, ky_f = float(kx), float(ky)
-            cx, cy = int(round(kx_f)), int(round(ky_f))
-            if (cx, cy) in used:
-                continue
+            kx = float(item[0])
+            ky = float(item[1])
+            cx, cy = int(round(kx)), int(round(ky))
             if cy < half_patch_c or cy >= work_h1 - half_patch_c:
                 continue
             if cx < half_patch_c or cx >= work_w1 - half_patch_c:
                 continue
+
+            # Minimum spatial distance from existing matches
+            if used_coords:
+                min_d = min(math.hypot(kx - ux, ky - uy) for ux, uy in used_coords)
+                if min_d < 6.0:
+                    continue
+
             tmpl = pc1[cy - half_patch_c:cy + half_patch_c, cx - half_patch_c:cx + half_patch_c]
             if float(np.std(tmpl)) < 1e-4:
                 continue
+
             # native -> H -> work2 prediction (full-precision floats)
-            p1 = np.array([[[float(kx_f * scale_factor1), float(ky_f * scale_factor1)]]], dtype=np.float64)
+            p1 = np.array([[[float(kx * scale_factor1), float(ky * scale_factor1)]]], dtype=np.float64)
             try:
                 p2 = cv2.perspectiveTransform(p1, Hm).reshape(-1)
             except Exception:
@@ -1751,19 +1911,46 @@ def _guided_refill_matches(
                 search_region, tmpl, multimodal_pair=multimodal_pair
             )
             if max_val > thresh:
-                bx = s_min_x + max_loc[0] + half_patch_c
-                by = s_min_y + max_loc[1] + half_patch_c
-                added.append({
-                    "work_x1": float(kx_f), "work_y1": float(ky_f),
-                    "work_x2": float(bx), "work_y2": float(by),
-                    "score": float(max_val),
-                    "cell": (min(grid_size - 1, int(kx_f / max(cell_w, 1e-6))),
-                             min(grid_size - 1, int(ky_f / max(cell_h, 1e-6)))),
-                    "method": "guided_refill",
-                })
-                used.add((cx, cy))
+                bx = float(s_min_x + max_loc[0] + half_patch_c)
+                by = float(s_min_y + max_loc[1] + half_patch_c)
+
+                # Sub-pixel Fourier phase correlation refinement
+                ibx, iby = int(round(bx)), int(round(by))
+                ref_dx, ref_dy = 0.0, 0.0
+                refined = False
+                if (
+                    iby >= half_patch_c
+                    and iby + half_patch_c <= work_h2
+                    and ibx >= half_patch_c
+                    and ibx + half_patch_c <= work_w2
+                ):
+                    p_ref = pc2[iby - half_patch_c:iby + half_patch_c, ibx - half_patch_c:ibx + half_patch_c]
+                    if p_ref.shape == tmpl.shape:
+                        dx, dy, peak, valid = subpixel_phase_correlation(tmpl, p_ref)
+                        if valid and abs(dx) < 2.0 and abs(dy) < 2.0:
+                            ref_dx, ref_dy = float(dx), float(dy)
+                            bx += ref_dx
+                            by += ref_dy
+                            refined = True
+
+                # Reprojection residual check against coarse homography prediction
+                res_dist = math.hypot(bx - px, by - py)
+                if res_dist <= max_residual:
+                    added.append({
+                        "work_x1": float(kx), "work_y1": float(ky),
+                        "work_x2": float(bx), "work_y2": float(by),
+                        "score": float(max_val),
+                        "cell": (min(grid_size - 1, int(kx / max(cell_w, 1e-6))),
+                                 min(grid_size - 1, int(ky / max(cell_h, 1e-6)))),
+                        "method": "guided_refill",
+                        "refinement_dx": float(ref_dx),
+                        "refinement_dy": float(ref_dy),
+                        "is_refined": bool(refined),
+                    })
+                    used_coords.append((kx, ky))
         return added
-    except Exception:
+    except Exception as exc:
+        logger.debug("Guided refill encountered error: %s", exc)
         return []
 
 
@@ -1795,6 +1982,8 @@ def match_images_cfog(
     allow_synthetic_reference: bool = False,
     look_azimuth_deg: Optional[float] = None,
     dem_array: Optional[np.ndarray] = None,
+    enable_guided_densification: bool = True,
+    enable_native_polish: bool = True,
 ) -> Dict[str, Any]:
     """
     Executes the primary cross-sensor registration pipeline:
@@ -2624,6 +2813,20 @@ def match_images_cfog(
 
     # 5. Real 3-Level Coarse-to-Fine Multi-Scale Phase Congruency
     # L2 ECC/phase for large shift -> L1 candidate -> L0 refine.
+    sensors = {str(source_sensor).upper(), str(reference_sensor).upper()}
+    if multimodal_pair is None:
+        multimodal_pair = "IIRS" in sensors
+    # Key half-patch size to preserve Phase Congruency Log-Gabor support
+    half_patch_c = max(4 if multimodal_pair else 8, int(round((patch_size_m / working_gsd) / 4.0)))
+
+    # Search window in image 2 — wider for multimodal to compensate for IIRS's coarse resolution
+    if multimodal_pair:
+        search_half_w = max(16, work_w2 // 3)
+        search_half_h = max(16, work_h2 // 3)
+    else:
+        search_half_w = max(16, work_w2 // 6)
+        search_half_h = max(16, work_h2 // 6)
+
     import time
     t_start_l2 = time.perf_counter()
     pyr1 = multi_scale_phase_congruency(comp1_gray, scales=3)
@@ -2671,7 +2874,7 @@ def match_images_cfog(
             logger.info("Level 2 global displacement captured: dx=%.2f, dy=%.2f px (resp=%.3f)", l2_shift_x, l2_shift_y, float(l2_resp))
     t_l2 = time.perf_counter() - t_start_l2
 
-    # --- Level 1 (1/2 scale): Candidate Feature Selection ---
+    # --- Level 1 (1/2 scale): Candidate Feature Matching & Intermediate Homography ---
     t_start_l1 = time.perf_counter()
     kps1_l1_raw = detect_salient_keypoints(pc1_l1, max_corners=300, quality_level=0.01)
     kps2_l1_raw = detect_salient_keypoints(pc2_l1, max_corners=300, quality_level=0.01)
@@ -2679,12 +2882,80 @@ def match_images_cfog(
         kps1_l1_raw, num_ret_points=max(36, grid_size * grid_size * 2),
         tolerance=0.15, cols=pc1_l1.shape[1], rows=pc1_l1.shape[0],
     )
+
+    h1_l1, w1_l1 = pc1_l1.shape[:2]
+    h2_l1, w2_l1 = pc2_l1.shape[:2]
+    half_patch_l1 = max(4, half_patch_c // 2)
+    search_half_l1_w = max(12, search_half_w // 2)
+    search_half_l1_h = max(12, search_half_h // 2)
+
+    l1_matches = []
+    l1_pts1 = []
+    l1_pts2 = []
+    shift_l1_x = shift_work_x * 0.5
+    shift_l1_y = shift_work_y * 0.5
+
+    for kx, ky, _ in kps1_l1:
+        cx1 = int(round(kx))
+        cy1 = int(round(ky))
+        if (
+            cy1 < half_patch_l1
+            or cy1 >= h1_l1 - half_patch_l1
+            or cx1 < half_patch_l1
+            or cx1 >= w1_l1 - half_patch_l1
+        ):
+            continue
+        tmpl_l1 = pc1_l1[cy1 - half_patch_l1 : cy1 + half_patch_l1, cx1 - half_patch_l1 : cx1 + half_patch_l1]
+        if float(np.std(tmpl_l1)) < 1e-4:
+            continue
+
+        cx2_l1 = int(round(cx1 * (w2_l1 / float(w1_l1)) + shift_l1_x))
+        cy2_l1 = int(round(cy1 * (h2_l1 / float(h1_l1)) + shift_l1_y))
+        s_min_x = max(0, cx2_l1 - search_half_l1_w)
+        s_max_x = min(w2_l1, cx2_l1 + search_half_l1_w)
+        s_min_y = max(0, cy2_l1 - search_half_l1_h)
+        s_max_y = min(h2_l1, cy2_l1 + search_half_l1_h)
+        if s_max_x - s_min_x <= tmpl_l1.shape[1] or s_max_y - s_min_y <= tmpl_l1.shape[0]:
+            continue
+        search_l1 = pc2_l1[s_min_y:s_max_y, s_min_x:s_max_x]
+        if float(np.std(search_l1)) < 1e-4:
+            continue
+
+        val, loc = find_best_correspondence_unified(search_l1, tmpl_l1, multimodal_pair=bool(multimodal_pair))
+        if val >= 0.25:
+            mx = s_min_x + loc[0] + half_patch_l1
+            my = s_min_y + loc[1] + half_patch_l1
+            l1_pts1.append([float(kx), float(ky)])
+            l1_pts2.append([float(mx), float(my)])
+            l1_matches.append({
+                "work_x1": float(kx), "work_y1": float(ky),
+                "work_x2": float(mx), "work_y2": float(my),
+                "score": float(val),
+            })
+
+    H_l1 = None
+    H_l0_prior = None
+    l1_inlier_count = 0
+    if len(l1_pts1) >= 4:
+        p1_arr_l1 = np.array(l1_pts1, dtype=np.float32)
+        p2_arr_l1 = np.array(l1_pts2, dtype=np.float32)
+        H_cand_l1, mask_l1 = cv2.findHomography(p1_arr_l1, p2_arr_l1, cv2.RANSAC, 4.0)
+        if H_cand_l1 is not None and abs(np.linalg.det(H_cand_l1)) > 1e-4:
+            l1_inlier_count = int(np.sum(mask_l1)) if mask_l1 is not None else 0
+            if l1_inlier_count >= 4:
+                H_l1 = H_cand_l1
+                S_half = np.diag([0.5, 0.5, 1.0])
+                S_two = np.diag([2.0, 2.0, 1.0])
+                H_l0_prior = S_two @ H_l1 @ S_half
+                logger.info("Level 1 coarse homography estimated: %d/%d inliers.", l1_inlier_count, len(l1_pts1))
+
     t_l1 = time.perf_counter() - t_start_l1
 
     # --- Level 0 (1x Scale): Full Resolution Matching & Sub-Pixel Refinement ---
     t_start_l0 = time.perf_counter()
     pc1 = pc1_l0
     pc2 = pc2_l0
+
 
 
     # 6. Spatially Distributed Coarse Matching (Symmetric Scale-Aware Sizing)
@@ -2890,16 +3161,28 @@ def match_images_cfog(
         kps2_ssc = suppression_via_square_covering(
             kps2_raw, num_ret_points=target_ssc, tolerance=0.15, cols=work_w2, rows=work_h2
         )
+        # Broader pool for Phase 6b Guided Densification
+        kps1_guided_pool = suppression_via_square_covering(
+            kps1_raw, num_ret_points=max(160, grid_size * grid_size * 3), tolerance=0.08, cols=work_w1, rows=work_h1
+        )
 
         logger.info(
-            "Pre-match SSC keypoint selection: Image 1: %d -> %d; Image 2: %d -> %d",
-            len(kps1_raw), len(kps1_ssc), len(kps2_raw), len(kps2_ssc),
+            "Pre-match SSC keypoint selection: Image 1: %d -> %d (guided pool: %d); Image 2: %d -> %d",
+            len(kps1_raw), len(kps1_ssc), len(kps1_guided_pool), len(kps2_raw), len(kps2_ssc),
         )
+
+        # Seed Level 0 keypoints with Level 1 matched anchors (hierarchical correspondence propagation)
+        kps1_search_list = []
+        if l1_matches:
+            for m in l1_matches:
+                kps1_search_list.append((float(m["work_x1"]) * 2.0, float(m["work_y1"]) * 2.0, float(m["score"])))
+        for kp in kps1_ssc:
+            kps1_search_list.append(kp)
 
         # Correlation matching on spatially uniform pre-match SSC keypoints
         # NOTE: kx/ky may be sub-pixel (goodFeaturesToTrack floats). Keep the
         # full float for reported work_x1/work_y1; integers are slicing-only.
-        for kx, ky, _ in kps1_ssc:
+        for kx, ky, _ in kps1_search_list:
             kx_f, ky_f = float(kx), float(ky)
             cx = int(round(kx_f))
             cy = int(round(ky_f))
@@ -2916,13 +3199,22 @@ def match_images_cfog(
             if float(np.std(tmpl)) < 1e-4:
                 continue
 
-            cx2 = int(round(cx * (work_w2 / float(work_w1)) + shift_work_x))
-            cy2 = int(round(cy * (work_h2 / float(work_h1)) + shift_work_y))
+            if H_l0_prior is not None:
+                p_proj = cv2.perspectiveTransform(np.array([[[kx_f, ky_f]]], dtype=np.float64), H_l0_prior)[0, 0]
+                cx2 = int(round(p_proj[0]))
+                cy2 = int(round(p_proj[1]))
+                win_w = max(16, search_half_w // 2)
+                win_h = max(16, search_half_h // 2)
+            else:
+                cx2 = int(round(cx * (work_w2 / float(work_w1)) + shift_work_x))
+                cy2 = int(round(cy * (work_h2 / float(work_h1)) + shift_work_y))
+                win_w = search_half_w
+                win_h = search_half_h
 
-            s_min_x = max(0, cx2 - search_half_w)
-            s_max_x = min(work_w2, cx2 + search_half_w)
-            s_min_y = max(0, cy2 - search_half_h)
-            s_max_y = min(work_h2, cy2 + search_half_h)
+            s_min_x = max(0, cx2 - win_w)
+            s_max_x = min(work_w2, cx2 + win_w)
+            s_min_y = max(0, cy2 - win_h)
+            s_max_y = min(work_h2, cy2 + win_h)
             if s_max_x <= s_min_x or s_max_y <= s_min_y:
                 continue
 
@@ -3399,6 +3691,29 @@ def match_images_cfog(
                 pts1_arr, pts2_arr, estimator_method, ransacReprojThreshold=5.0  # tuned on 2026-09-10, AUC=0.9010
             )
 
+    # 7b. DEM-Aware Topographic Relief RANSAC
+    # If DEM is present and sensor has non-zero emission, check if DEM-aware RANSAC
+    # preserves crater-wall and relief correspondences that planar RANSAC rejected.
+    dem_ransac_applied = False
+    if dem_arr is not None and len(pts1_arr) >= 4:
+        try:
+            _em = float(meta1.emission_angle_deg) if (meta1 and meta1.emission_angle_deg is not None) else 0.0
+            _az = float(look_azimuth_deg) if look_azimuth_deg is not None else (float(meta1.sensor_los_azimuth_deg) if (meta1 and meta1.sensor_los_azimuth_deg is not None) else 45.0)
+            if abs(_em) > 1e-2:
+                H_dem, mask_dem, dem_fit_info = ransac_dem_aware_fit(
+                    pts1_arr, pts2_arr, dem=dem_arr, emission_deg=_em, azimuth_deg=_az, gsd_m=working_gsd
+                )
+                count_dem = int(np.sum(mask_dem)) if mask_dem is not None else 0
+                count_curr = int(np.sum(inlier_mask)) if inlier_mask is not None else 0
+                if count_dem >= 4 and (H_final is None or count_dem > count_curr):
+                    tx_check_dem = verify_transformation_quality(H_dem, (orig_h2, orig_w2))
+                    if tx_check_dem.get("is_valid"):
+                        H_final, inlier_mask = H_dem, mask_dem.reshape(-1, 1).astype(np.uint8)
+                        dem_ransac_applied = True
+                        logger.info("DEM-aware RANSAC adopted (%d inliers vs %d planar).", count_dem, count_curr)
+        except Exception as exc:
+            logger.warning("DEM-aware RANSAC check failed (%s); retaining standard solution.", exc)
+
     if H_final is not None and inlier_mask is not None and np.sum(inlier_mask) >= 4:
         try:
             det = float(np.linalg.det(H_final))
@@ -3520,22 +3835,27 @@ def match_images_cfog(
             verified_matches[_j]["is_inlier"] = True
     n_inliers_pre_refill = int(np.sum(inlier_mask))
 
-    # --- Guided refill: H-constrained second pass over unused SSC keypoints ---
-    # Put behind experimental flag ENABLE_GUIDED_REFILL to avoid guided-refill bias.
-    enable_guided_refill = os.environ.get("ENABLE_GUIDED_REFILL", "0").lower() in ("1", "true")
+    # --- Phase 6b: Guided Densification (H-constrained second pass across unrepresented terrain) ---
+    enable_guided_refill = enable_guided_densification
+    if os.environ.get("ENABLE_GUIDED_DENSIFICATION") is not None:
+        enable_guided_refill = os.environ.get("ENABLE_GUIDED_DENSIFICATION", "1").lower() in ("1", "true")
+    elif os.environ.get("ENABLE_GUIDED_REFILL") is not None:
+        enable_guided_refill = os.environ.get("ENABLE_GUIDED_REFILL", "0").lower() in ("1", "true")
+
     guided = []
-    if enable_guided_refill:
-        logger.warning("Experimental guided refill active: matches are H-conditioned (h_conditioned=true)")
+    if enable_guided_refill and H_final is not None and inlier_mask is not None and int(np.sum(inlier_mask)) >= 4:
+        logger.info("Guided Densification active: measuring second-pass correspondences constrained by anchor H.")
         try:
+            pool = kps1_guided_pool if ('kps1_guided_pool' in locals() and kps1_guided_pool) else kps1_ssc
             guided = _guided_refill_matches(
-                kps1_ssc, selected_matches, pc1, pc2, H_final,
+                pool, selected_matches, pc1, pc2, H_final,
                 scale_factor1, scale_factor2, work_w1, work_h1, work_w2, work_h2,
                 half_patch_c, bool(multimodal_pair), grid_size, cell_w, cell_h,
+                max_add=60, radius=12, max_residual=2.5,
             )
-        except Exception:
+        except Exception as exc:
+            logger.warning("Guided densification failed (%s); keeping anchor matches.", exc)
             guided = []
-    else:
-        logger.debug("Guided refill disabled by default (eliminates H-conditioning bias).")
     if guided:
         _g1 = [float(g["work_x1"]) * scale_factor1 for g in guided]
         _g1y = [float(g["work_y1"]) * scale_factor1 for g in guided]
@@ -3558,9 +3878,9 @@ def match_images_cfog(
                         float(g["work_x2"]) * scale_factor2,
                         float(g["work_y2"]) * scale_factor2,
                         float(g["score"]),
-                        refinement_dx=0.0,
-                        refinement_dy=0.0,
-                        is_refined=False,
+                        refinement_dx=float(g.get("refinement_dx", 0.0)),
+                        refinement_dy=float(g.get("refinement_dy", 0.0)),
+                        is_refined=bool(g.get("is_refined", False)),
                         method="guided_refill",
                         match_id=len(refinement_records),
                     ))
@@ -3572,13 +3892,13 @@ def match_images_cfog(
                 # here (appended consistently), lengths match by construction.
                 for i, rec in enumerate(refinement_records):
                     rec["is_inlier"] = bool(i < len(inlier_flat) and inlier_flat[i] == 1)
-                logger.info("Guided refill: inliers %d -> %d (+%d measured)",
+                logger.info("Guided densification: inliers %d -> %d (+%d measured)",
                             n_inliers_pre_refill, int(np.sum(mask_g)), len(guided))
             else:
-                logger.info("Guided refill rejected by quality gate (%s); keeping original solution.",
+                logger.info("Guided densification rejected by quality gate (%s); keeping original solution.",
                             _g_tx.get("reason"))
         else:
-            logger.info("Guided refill: no strict inlier gain (%d candidates); keeping original solution.",
+            logger.info("Guided densification: no strict inlier gain (%d candidates); keeping original solution.",
                         len(guided))
 
     # --- Item 3: Post-RANSAC Lucas-Kanade Sub-Pixel Refinement (OHRC↔TMC-2 only) ---
@@ -3664,6 +3984,70 @@ def match_images_cfog(
                         refinement_records[idx]["image2_y"] = float(refined_dst[j, 1])
                         refinement_records[idx]["lk_refined"] = True
 
+    # --- Item 4: Native Full-Resolution Polish (Phase 5b) ---
+    native_polish_stats: Dict[str, Any] = {"applied": False, "reason": "not_triggered"}
+    scale_disparity = max(scale_factor1, scale_factor2) / max(min(scale_factor1, scale_factor2), 1e-6)
+    if enable_native_polish and scale_disparity >= 1.5 and inlier_mask is not None and int(np.sum(inlier_mask)) >= 4:
+        try:
+            inlier_indices = np.where(inlier_mask.ravel() == 1)[0]
+            inl_pts1 = pts1_arr[inlier_indices]
+            inl_pts2 = pts2_arr[inlier_indices]
+            native_gsd1 = float(gsd1) if gsd1 is not None else float(working_gsd / max(scale_factor1, 1e-6))
+
+            ref_pts1, ref_pts2, np_stats = refine_inliers_native_scale(
+                raw_img1=raw1_gray,
+                raw_img2=raw2_gray,
+                inlier_pts1=inl_pts1,
+                inlier_pts2=inl_pts2,
+                scale_factor1=scale_factor1,
+                scale_factor2=scale_factor2,
+                gsd1=native_gsd1,
+                patch_size_native=48,
+                max_shift_native_px=3.5,
+            )
+            native_polish_stats = np_stats
+
+            if np_stats.get("applied") and np_stats.get("refined_count", 0) >= 4:
+                # Re-fit homography candidate with quality gate check
+                H_np, mask_np = cv2.findHomography(ref_pts1, ref_pts2, estimator_method, ransacReprojThreshold=5.0)
+                if H_np is None:
+                    H_np, mask_np = cv2.findHomography(ref_pts1, ref_pts2, 0)
+
+                if H_np is not None:
+                    err_np = calculate_reprojection_errors(ref_pts1, ref_pts2, H_np)
+                    rmse_np = float(np.sqrt(np.mean(err_np**2))) if len(err_np) else None
+                    tx_check_np = verify_transformation_quality(H_np, (orig_h2, orig_w2), fit_rmse_px=rmse_np)
+
+                    # Compute baseline RMSE for comparison
+                    err_prev = calculate_reprojection_errors(inl_pts1, inl_pts2, H_final)
+                    rmse_prev = float(np.sqrt(np.mean(err_prev**2))) if len(err_prev) else 999.0
+
+                    # Accept if valid and not degrading geometry
+                    if tx_check_np.get("is_valid") and (rmse_np is not None and rmse_np <= rmse_prev * 1.15):
+                        pts1_arr[inlier_indices] = ref_pts1
+                        pts2_arr[inlier_indices] = ref_pts2
+                        H_final = H_np
+                        native_polish_stats["re_fit_accepted"] = True
+                        native_polish_stats["rmse_before"] = round(rmse_prev, 4)
+                        native_polish_stats["rmse_after"] = round(rmse_np, 4)
+
+                        # Update match records with polished native coordinates
+                        for k, idx in enumerate(inlier_indices):
+                            if idx < len(refinement_records):
+                                refinement_records[idx]["image1_x"] = float(ref_pts1[k, 0])
+                                refinement_records[idx]["image1_y"] = float(ref_pts1[k, 1])
+                                refinement_records[idx]["target_x"] = float(ref_pts2[k, 0])
+                                refinement_records[idx]["target_y"] = float(ref_pts2[k, 1])
+                                refinement_records[idx]["image2_x"] = float(ref_pts2[k, 0])
+                                refinement_records[idx]["image2_y"] = float(ref_pts2[k, 1])
+                                refinement_records[idx]["native_polished"] = True
+                    else:
+                        native_polish_stats["re_fit_accepted"] = False
+                        native_polish_stats["rejection_reason"] = tx_check_np.get("reason", "rmse_degraded")
+        except Exception as exc:
+            logger.warning("Native scale polish encountered error (%s); retaining existing solution.", exc)
+            native_polish_stats = {"applied": False, "reason": str(exc)}
+
     # 8b. DEM-aware geometry: LOS ray-shift honesty, bootstrap covariance,
     # slope-correlated TPS fallback (Step 9).
     try:
@@ -3701,6 +4085,7 @@ def match_images_cfog(
     # Slope-residual correlation on inliers; TPS fallback when terrain relief
     # deformation exceeds planar limits.
     slope_residual_correlation: Optional[float] = None
+    relief_strain_info: Dict[str, Any] = {"strain_detected": False, "strain_ratio": 1.0}
     dem_model: str = "homography"
     try:
         if dem_arr is not None and len(_inl_idx) >= 4:
@@ -3712,11 +4097,29 @@ def match_images_cfog(
             slope_residual_correlation = None
     except Exception:
         slope_residual_correlation = None
-    if slope_residual_correlation is not None and slope_residual_correlation > 0.40:
+
+    # Estimate differential topographic relief strain across inliers
+    try:
+        if len(_inl_idx) >= 6:
+            relief_strain_info = estimate_topographic_relief_strain(
+                pts1_arr[_inl_idx], pts2_arr[_inl_idx], H_final
+            )
+    except Exception as exc:
+        logger.warning("Relief strain estimation failed (%s).", exc)
+
+    max_ray_shift_px = float(dem_ray_shift.get("max_shift_px", 0.0)) if isinstance(dem_ray_shift, dict) else 0.0
+
+    if (slope_residual_correlation is not None and slope_residual_correlation > 0.40) or max_ray_shift_px > 3.0:
         dem_model = "tps_fallback"
         logger.info(
-            "Slope-residual correlation %.3f exceeds planar limit; TPS fallback engaged.",
-            slope_residual_correlation,
+            "Topographic relief exceeds planar limits (slope_corr=%.3f, max_ray_shift=%.2fpx); TPS fallback engaged.",
+            slope_residual_correlation if slope_residual_correlation is not None else 0.0, max_ray_shift_px,
+        )
+    elif relief_strain_info.get("strain_detected", False):
+        dem_model = "tps_fallback"
+        logger.info(
+            "Topographic relief strain ratio %.3f exceeds planar threshold; non-rigid TPS fallback engaged.",
+            relief_strain_info.get("strain_ratio", 1.0),
         )
     else:
         dem_model = "homography"
@@ -3729,6 +4132,14 @@ def match_images_cfog(
     metrics["dem_ray_shift"] = dem_ray_shift
     metrics["slope_residual_correlation"] = slope_residual_correlation
     metrics["dem_model"] = dem_model
+    metrics["topographic_relief"] = {
+        "model": dem_model,
+        "dem_available": bool(dem_arr is not None),
+        "dem_ransac_applied": bool(dem_ransac_applied),
+        "slope_residual_correlation": slope_residual_correlation,
+        "relief_strain_detected": bool(relief_strain_info.get("strain_detected", False)),
+        "relief_strain_ratio": float(relief_strain_info.get("strain_ratio", 1.0)),
+    }
     try:
         _unc = (bootstrap_info or {}).get("absolute_rmse_uncertainty_m")
     except Exception:
@@ -3755,6 +4166,18 @@ def match_images_cfog(
     metrics["illumination_detail"] = illumination_detail
     if lk_stats:
         metrics["lk_refinement"] = lk_stats
+    metrics["native_polish"] = native_polish_stats
+    metrics["native_polish_applied"] = bool(native_polish_stats.get("applied", False))
+    t_l0 = time.perf_counter() - t_start_l0
+    metrics["pyramid_matching"] = {
+        "levels_executed": [2, 1, 0],
+        "l2_global_shift_px": [round(float(shift_work_x), 2), round(float(shift_work_y), 2)],
+        "l1_matches_found": len(l1_matches),
+        "l1_inliers": l1_inlier_count,
+        "l1_homography_valid": bool(H_l0_prior is not None),
+        "coarse_to_fine_applied": bool(H_l0_prior is not None or len(l1_matches) > 0),
+        "timing_s": {"L2": round(float(t_l2), 4), "L1": round(float(t_l1), 4), "L0": round(float(t_l0), 4)},
+    }
 
     fit_rmse = metrics.get("fit_rmse_px")
     tx_check = verify_transformation_quality(
@@ -3786,7 +4209,7 @@ def match_images_cfog(
             try:
                 warped_source = warp_thin_plate_splines(
                     raw1_color, pts1_arr[curr_inliers], pts2_arr[curr_inliers],
-                    (orig_h2, orig_w2),
+                    (orig_h2, orig_w2), global_H=H_final
                 )
             except Exception:
                 warped_source = warp_piecewise_affine(

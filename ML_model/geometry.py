@@ -294,6 +294,7 @@ def warp_thin_plate_splines(
     dst_pts: np.ndarray,
     out_shape: Tuple[int, int],
     num_ctrl_points: int = 64,
+    global_H: Optional[np.ndarray] = None,
 ) -> np.ndarray:
     """
     Warps source image to destination space using Thin Plate Splines (TPS).
@@ -304,7 +305,8 @@ def warp_thin_plate_splines(
     dst_arr = np.asarray(dst_pts, dtype=np.float32)
 
     if len(src_arr) < 4:
-        # Fallback to simple identity or homography
+        if global_H is not None:
+            return cv2.warpPerspective(image, global_H, (out_w, out_h), flags=cv2.INTER_LINEAR)
         return cv2.resize(image, (out_w, out_h))
 
     # Subsample control points if too dense (for efficiency)
@@ -316,10 +318,41 @@ def warp_thin_plate_splines(
         ctrl_src = src_arr
         ctrl_dst = dst_arr
 
-    # Add 4 image corner points to pin boundaries
+    # Add 4 image corner points to pin boundaries accurately in destination space
     ih, iw = image.shape[:2]
     corners_src = np.array([[0, 0], [iw - 1, 0], [0, ih - 1], [iw - 1, ih - 1]], dtype=np.float32)
-    corners_dst = np.array([[0, 0], [out_w - 1, 0], [0, out_h - 1], [out_w - 1, out_h - 1]], dtype=np.float32)
+
+    # Project corners using global_H or robust fitted transformation
+    corners_dst = None
+    if global_H is not None:
+        try:
+            c_proj = cv2.perspectiveTransform(corners_src.reshape(1, -1, 2), global_H.astype(np.float64))
+            if c_proj is not None and np.all(np.isfinite(c_proj)):
+                corners_dst = c_proj.reshape(-1, 2).astype(np.float32)
+        except Exception:
+            corners_dst = None
+
+    if corners_dst is None:
+        try:
+            H_est, _ = cv2.findHomography(src_arr, dst_arr, 0)
+            if H_est is not None:
+                c_proj = cv2.perspectiveTransform(corners_src.reshape(1, -1, 2), H_est.astype(np.float64))
+                if c_proj is not None and np.all(np.isfinite(c_proj)):
+                    corners_dst = c_proj.reshape(-1, 2).astype(np.float32)
+        except Exception:
+            corners_dst = None
+
+    if corners_dst is None:
+        try:
+            M_aff, _ = cv2.estimateAffine2D(src_arr, dst_arr)
+            if M_aff is not None:
+                c_h = np.hstack([corners_src, np.ones((4, 1), dtype=np.float32)])
+                corners_dst = (c_h @ M_aff.T).astype(np.float32)
+        except Exception:
+            corners_dst = None
+
+    if corners_dst is None:
+        corners_dst = np.array([[0, 0], [out_w - 1, 0], [0, out_h - 1], [out_w - 1, out_h - 1]], dtype=np.float32)
 
     all_src = np.vstack([ctrl_src, corners_src])
     all_dst = np.vstack([ctrl_dst, corners_dst])
@@ -337,11 +370,14 @@ def warp_thin_plate_splines(
             warped = cv2.resize(warped, (out_w, out_h))
         return warped
     except Exception:
-        # Fallback to affine
+        # Fallback to perspective or affine
+        if global_H is not None:
+            return cv2.warpPerspective(image, global_H, (out_w, out_h), flags=cv2.INTER_LINEAR)
         M, _ = cv2.estimateAffine2D(src_arr, dst_arr)
         if M is not None:
             return cv2.warpAffine(image, M, (out_w, out_h))
         return cv2.resize(image, (out_w, out_h))
+
 
 
 # ---------------------------------------------------------------------------
@@ -450,3 +486,54 @@ def ransac_dem_aware_fit(
         "total_points": n,
         "dem_compensated": bool(dem is not None and abs(emission_deg) > 1e-2),
     }
+
+
+def estimate_topographic_relief_strain(
+    pts1: np.ndarray,
+    pts2: np.ndarray,
+    H_global: Optional[np.ndarray],
+) -> Dict[str, Any]:
+    """
+    Estimates non-planar topographic relief strain from correspondence residuals.
+    Compares global homography residual variance against local piecewise affine residuals.
+    A high strain ratio indicates that elevation relief violates the single-plane homography.
+    """
+    p1 = np.asarray(pts1, dtype=np.float64)
+    p2 = np.asarray(pts2, dtype=np.float64)
+    n = len(p1)
+    if n < 6 or H_global is None:
+        return {"strain_detected": False, "strain_ratio": 1.0, "reason": "insufficient_points"}
+
+    # 1. Global homography reprojection error
+    p1_h = np.hstack([p1, np.ones((n, 1))])
+    proj = (H_global.astype(np.float64) @ p1_h.T).T
+    z = np.where(np.abs(proj[:, 2:3]) < 1e-12, 1e-12, proj[:, 2:3])
+    global_err = np.linalg.norm(proj[:, :2] / z - p2, axis=1)
+    rmse_global = float(np.sqrt(np.mean(global_err ** 2)))
+
+    # 2. Local piecewise affine / k-NN error
+    local_errs = []
+    for i in range(n):
+        dists = np.linalg.norm(p1 - p1[i], axis=1)
+        k_indices = np.argsort(dists)[:max(4, min(6, n))]
+        M, _ = cv2.estimateAffine2D(p1[k_indices], p2[k_indices])
+        if M is not None:
+            pt_proj = M @ np.array([p1[i, 0], p1[i, 1], 1.0])
+            local_errs.append(float(np.linalg.norm(pt_proj - p2[i])))
+        else:
+            local_errs.append(float(global_err[i]))
+
+    rmse_local = float(np.sqrt(np.mean(np.array(local_errs) ** 2))) if local_errs else rmse_global
+    strain_ratio = float(rmse_global / max(rmse_local, 0.05))
+
+    # If global error is elevated and local models significantly reduce error (> 1.35x),
+    # physical relief displacement is present across the terrain.
+    strain_detected = bool(rmse_global >= 1.2 and strain_ratio >= 1.35)
+
+    return {
+        "strain_detected": strain_detected,
+        "rmse_global_px": round(rmse_global, 4),
+        "rmse_local_px": round(rmse_local, 4),
+        "strain_ratio": round(strain_ratio, 4),
+    }
+
