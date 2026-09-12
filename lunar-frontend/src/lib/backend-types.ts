@@ -266,5 +266,6 @@ export const BACKEND_API_PATHS = [
   "/triplets/{triplet_id}" /* GET */,
   "/triplets/{triplet_id}/footprint" /* GET */,
   "/triplets/{triplet_id}/iirs-overlay" /* GET */,
+  "/triplets/{triplet_id}/lro-candidates" /* GET */,
   "/triplets/{triplet_id}/matches" /* GET */,
 ] as const;

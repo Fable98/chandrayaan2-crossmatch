@@ -44,6 +44,8 @@ sys.path.insert(0, str(REPO_ROOT / "ML_model"))
 
 from config import SEED
 from matcher_cfog import (
+    build_cfog_descriptor_gallery,
+    compute_descriptor_match_features,
     compute_phase_congruency,
     compute_spatial_quality_score,
     detect_salient_keypoints,
@@ -139,8 +141,14 @@ def generate_matches_for_image(
     image_path: Path,
     rng: np.random.Generator,
     domains: Tuple[str, ...] = ("same_sensor", "cross_sensor"),
+    scene_sink: List[Dict[str, Any]] | None = None,
 ) -> List[Dict[str, Any]]:
-    """Process an image under known transforms in one or more photometric domains."""
+    """Process an image under known transforms in one or more photometric domains.
+
+    If ``scene_sink`` is provided, each (pc1, pc2, gallery, domain) transform is
+    appended so a backfill can measure descriptor features at stored coordinates
+    without relabelling.
+    """
     img_gray = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
     if img_gray is None:
         return []
@@ -172,13 +180,19 @@ def generate_matches_for_image(
                 warped = apply_photometric_perturbation(warped, rng)
 
             pc2 = compute_phase_congruency(warped, num_orientations=4, num_scales=3)
+            kps2_raw = detect_salient_keypoints(pc2, max_corners=200, quality_level=0.01)
+            tgt_gallery = build_cfog_descriptor_gallery(pc2, kps2_raw)
+            if scene_sink is not None:
+                scene_sink.append({
+                    "domain": domain, "pc1": pc1, "pc2": pc2, "gallery": tgt_gallery,
+                })
             search_rad = int(spec["search_rad"])
             jitter = float(spec["jitter"])
 
             for item in kps_ssc:
                 rec = _match_one_keypoint(
                     kx=float(item[0]), ky=float(item[1]),
-                    pc1=pc1, pc2=pc2, H_gt=H_gt, w=w, h=h,
+                    pc1=pc1, pc2=pc2, tgt_gallery=tgt_gallery, H_gt=H_gt, w=w, h=h,
                     half_p=half_p, search_rad=search_rad, jitter=jitter,
                     multimodal=multimodal, rng=rng, domain=domain,
                     true_px=float(spec["true_px"]), false_px=float(spec["false_px"]),
@@ -192,7 +206,7 @@ def generate_matches_for_image(
             for item in list(kps_ssc)[:n_false]:
                 rec = _random_false_match(
                     kx=float(item[0]), ky=float(item[1]),
-                    pc1=pc1, pc2=pc2, H_gt=H_gt, w=w, h=h,
+                    pc1=pc1, pc2=pc2, tgt_gallery=tgt_gallery, H_gt=H_gt, w=w, h=h,
                     half_p=half_p, multimodal=multimodal, rng=rng, domain=domain,
                     true_px=float(spec["true_px"]), false_px=float(spec["false_px"]),
                 )
@@ -204,7 +218,7 @@ def generate_matches_for_image(
 
 def _match_one_keypoint(
     *,
-    kx: float, ky: float, pc1, pc2, H_gt, w, h, half_p, search_rad, jitter,
+    kx: float, ky: float, pc1, pc2, tgt_gallery, H_gt, w, h, half_p, search_rad, jitter,
     multimodal: bool, rng: np.random.Generator, domain: str,
     true_px: float, false_px: float,
 ) -> Dict[str, Any] | None:
@@ -232,7 +246,7 @@ def _match_one_keypoint(
     found_x = float(s_min_x + loc[0] + half_p)
     found_y = float(s_min_y + loc[1] + half_p)
     return _finalize_record(
-        kx, ky, found_x, found_y, tmpl, pc2, w, h, half_p,
+        kx, ky, found_x, found_y, tmpl, pc1, pc2, tgt_gallery, w, h, half_p,
         gt_x, gt_y, score, peak_uniq, domain, multimodal,
         true_px=true_px, false_px=false_px,
     )
@@ -240,7 +254,7 @@ def _match_one_keypoint(
 
 def _random_false_match(
     *,
-    kx: float, ky: float, pc1, pc2, H_gt, w, h, half_p,
+    kx: float, ky: float, pc1, pc2, tgt_gallery, H_gt, w, h, half_p,
     multimodal: bool, rng: np.random.Generator, domain: str,
     true_px: float, false_px: float,
 ) -> Dict[str, Any] | None:
@@ -270,7 +284,7 @@ def _random_false_match(
     found_x = float(s_min_x + loc[0] + half_p)
     found_y = float(s_min_y + loc[1] + half_p)
     rec = _finalize_record(
-        kx, ky, found_x, found_y, tmpl, pc2, w, h, half_p,
+        kx, ky, found_x, found_y, tmpl, pc1, pc2, tgt_gallery, w, h, half_p,
         gt_x, gt_y, score, peak_uniq, domain, multimodal,
         true_px=true_px, false_px=false_px,
     )
@@ -281,7 +295,7 @@ def _random_false_match(
 
 
 def _finalize_record(
-    kx, ky, found_x, found_y, tmpl, pc2, w, h, half_p,
+    kx, ky, found_x, found_y, tmpl, pc1, pc2, tgt_gallery, w, h, half_p,
     gt_x, gt_y, score, peak_uniq, domain, multimodal,
     true_px: float = 2.0, false_px: float = 5.0,
 ) -> Dict[str, Any] | None:
@@ -310,6 +324,10 @@ def _finalize_record(
         is_refined=refined,
         x=kx, y=ky, width=w, height=h,
     )
+    desc = compute_descriptor_match_features(
+        pc1, pc2, float(kx), float(ky), float(found_x), float(found_y),
+        tgt_gallery=tgt_gallery,
+    )
     return {
         "source_x": float(kx),
         "source_y": float(ky),
@@ -325,6 +343,7 @@ def _finalize_record(
         "label_source": "hand",
         "domain": domain,
         "multimodal_pair": bool(multimodal),
+        **desc,
     }
 
 

@@ -6,7 +6,17 @@ import logging
 logger = logging.getLogger("ML_model.ai_verifier")
 
 # Must match train_ai_verifier.FEATURE_NAMES and the saved bundle's feature order.
-FEATURE_NAMES = ["confidence", "refinement_dx", "refinement_dy", "spatial_quality_score"]
+FEATURE_NAMES = [
+    "confidence",
+    "refinement_dx",
+    "refinement_dy",
+    "spatial_quality_score",
+    "cfog_distance",
+    "pc_energy_src",
+    "pc_energy_tgt",
+    "nn_ratio",
+    "scale_diff",
+]
 DEFAULT_MODEL_PATH = Path(__file__).resolve().parent / "ai_verifier_model.pkl"
 
 
@@ -68,7 +78,15 @@ class AIMatchVerifier:
             return False
 
     def extract_features(self, matches: List[Dict[str, Any]]) -> np.ndarray:
-        """Extract features for the AI model (order matches FEATURE_NAMES)."""
+        """Extract features for the AI model (order matches FEATURE_NAMES).
+
+        Always materializes the 9-feature contract. If an older bundle was
+        loaded (``self.feature_names`` is a prefix of FEATURE_NAMES), columns
+        are selected to match ``n_features_in_`` so predict does not fail.
+        """
+        names = [n for n in list(self.feature_names or FEATURE_NAMES) if n in FEATURE_NAMES]
+        if not names:
+            names = list(FEATURE_NAMES)
         features = []
         for m in matches:
             conf = float(m.get("confidence", m.get("score", 0.0)))
@@ -82,7 +100,18 @@ class AIMatchVerifier:
                     spatial = float(spatial_raw)
                 except (TypeError, ValueError):
                     spatial = 0.5
-            features.append([conf, dx, dy, spatial])
+            vec = {
+                "confidence": conf,
+                "refinement_dx": dx,
+                "refinement_dy": dy,
+                "spatial_quality_score": spatial,
+                "cfog_distance": float(m.get("cfog_distance", 0.0) or 0.0),
+                "pc_energy_src": float(m.get("pc_energy_src", 0.0) or 0.0),
+                "pc_energy_tgt": float(m.get("pc_energy_tgt", 0.0) or 0.0),
+                "nn_ratio": float(m.get("nn_ratio", 1.0) if m.get("nn_ratio") is not None else 1.0),
+                "scale_diff": float(m.get("scale_diff", 0.0) or 0.0),
+            }
+            features.append([vec[n] for n in names])
         return np.array(features, dtype=np.float64)
 
     def predict_confidence(self, matches: List[Dict[str, Any]]) -> np.ndarray:
