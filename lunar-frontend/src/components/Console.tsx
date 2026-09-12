@@ -764,7 +764,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                           <div className="flex items-center gap-2">
                             <span className="h-2 w-2 rounded-full bg-amber-500" />
                             <span className="font-semibold">NASA LRO NAC External Reference Mode Active</span>
-                            <span className="text-[11px] text-amber-700">· Orbit GSD ~0.91m ({detail.lro_nac_product_id ?? "M1417670274LC"})</span>
+                            <span className="text-[11px] text-amber-700">· Orbit GSD ~0.91m ({detail.lro_nac_product_id ?? "Unknown product"})</span>
                           </div>
                           <span className="font-mono text-[11px] font-bold text-amber-900">
                             Fit RMSE: {metrics?.fit_rmse_px?.toFixed(3) ?? metrics?.rmse_px?.toFixed(3) ?? "—"} px
