@@ -876,4 +876,37 @@ def test_job_manager_thread_safety_all_backends(tmp_path):
             assert len(job["logs"]) == 5
 
 
+def test_get_triplet_lro_candidates_endpoint(monkeypatch):
+    """GET /triplets/{id}/lro-candidates returns candidate list."""
+    candidates_sample = [
+        {
+            "product_id": "M1417670274LC",
+            "label_url": "https://example.com/test.lbl",
+            "download_urls": ["https://example.com/test.img"],
+            "footprint_bounds": {"west_lon": 336.3, "east_lon": 336.7, "south_lat": -3.6, "north_lat": -3.2},
+            "incidence_angle_deg": 5.82,
+            "overlap_score": 0.95,
+            "ranking_score": 0.95,
+        }
+    ]
+    monkeypatch.setattr(
+        "data.loader.get_triplet",
+        lambda tid: {
+            "id": tid,
+            "bounds": {"west_lon": 336.48, "east_lon": 336.58, "south_lat": -3.51, "north_lat": -3.42},
+            "ohrc_incidence_angle_deg": 5.82,
+        },
+    )
+    monkeypatch.setattr("lro_ode_client.search_lro_nac_overlap", lambda bounds, **kw: candidates_sample)
+    monkeypatch.setattr("lro_ode_client.rank_candidates", lambda c, b, **kw: candidates_sample)
+
+    r = client.get("/triplets/region_001/lro-candidates")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["triplet_id"] == "region_001"
+    assert len(body["candidates"]) == 1
+    assert body["candidates"][0]["product_id"] == "M1417670274LC"
+
+
+
 

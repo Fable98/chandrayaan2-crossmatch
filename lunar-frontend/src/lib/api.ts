@@ -99,4 +99,22 @@ export const api = {
     getJson<MatchesResponse>(`/triplets/${id}/matches`),
   getIirsOverlay: (id: string): Promise<IIRSOverlay> =>
     getJson<IIRSOverlay>(`/triplets/${id}/iirs-overlay`),
+  getLroCandidates: (id: string) =>
+    getJson<{
+      triplet_id: string;
+      candidates: Array<{
+        product_id: string;
+        label_url?: string | null;
+        download_urls: string[];
+        footprint_bounds?: {
+          west_lon: number;
+          east_lon: number;
+          south_lat: number;
+          north_lat: number;
+        } | null;
+        incidence_angle_deg?: number | null;
+        overlap_score?: number;
+        ranking_score?: number;
+      }>;
+    }>(`/triplets/${id}/lro-candidates`),
 };

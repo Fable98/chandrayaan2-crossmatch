@@ -101,8 +101,8 @@ export default function AboutPage({ onBackToHero, onOpenConsole }: Props) {
             (SIFT, SURF, ORB) and photometric matchers completely ineffective.
           </p>
 
-          {/* 3 Payload Cards */}
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
+          {/* 4 Payload Cards */}
+          <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {/* Card 1: OHRC */}
             <div className="rounded-2xl border border-[#23211d] bg-[#121217] p-6 shadow-xl transition-all duration-300 hover:border-teal/40">
               <div className="flex items-center justify-between">
@@ -167,6 +167,28 @@ export default function AboutPage({ onBackToHero, onOpenConsole }: Props) {
               </p>
               <div className="mt-4 border-t border-[#23211d] pt-3 font-mono text-2xs text-ink-faint">
                 Role: Mineralogical Spectral Overlay
+              </div>
+            </div>
+
+            {/* Card 4: NASA LRO NAC */}
+            <div className="rounded-2xl border border-[#23211d] bg-[#121217] p-6 shadow-xl transition-all duration-300 hover:border-emerald-400/40">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs font-bold uppercase tracking-wider text-emerald-400">
+                  LRO NAC
+                </span>
+                <span className="rounded bg-emerald-500/10 px-2 py-0.5 font-mono text-2xs text-emerald-400 font-semibold">
+                  ~0.9–1.1 m/px
+                </span>
+              </div>
+              <h3 className="mt-3 text-base font-semibold text-white">
+                NASA LRO Narrow Angle Camera
+              </h3>
+              <p className="mt-2 text-xs leading-relaxed text-[#9a958e]">
+                NASA LRO optical basemap serving as external reference (~3.6–4.5× scale ratio).
+                Benchmarked on real orbital CDRs and auto-discoverable via Washington University ODE REST API.
+              </p>
+              <div className="mt-4 border-t border-[#23211d] pt-3 font-mono text-2xs text-ink-faint">
+                Role: External Lunar Reference (PS 26166)
               </div>
             </div>
           </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { imageUrl } from "@/lib/api";
+import { API_BASE, imageUrl } from "@/lib/api";
 import { footprintSizeKm } from "@/lib/geo";
 import type { TripletSummary } from "@/lib/types";
 
@@ -211,9 +211,24 @@ export default function VaultModal({
 
                   {/* Actions */}
                   <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-[10px] font-medium text-slate-500">
-                      {t.dem_available ? "DEM available" : "Mono"}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-medium text-slate-500">
+                        {t.dem_available ? "DEM available" : "Mono"}
+                      </span>
+                      <a
+                        href={`${API_BASE}/api/registration/report/${t.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition-all"
+                        title="Download ISRO Verification Report (PDF)"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <svg className="h-2.5 w-2.5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span>PDF</span>
+                      </a>
+                    </div>
                     <button
                       onClick={() => {
                         onClose();

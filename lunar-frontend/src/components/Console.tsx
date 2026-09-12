@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef } from "react";
 import { useSearchParams } from "next/navigation";
-import { api, ApiError, imageUrl } from "@/lib/api";
+import { api, ApiError, imageUrl, API_BASE } from "@/lib/api";
 import { footprintSizeKm } from "@/lib/geo";
 import type { TripletSummary, MatchPoint, IIRSOverlay, MatchMetrics } from "@/lib/types";
 import MapPanel from "./DynamicMapPanel";
@@ -657,11 +657,25 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                         {currentFootprint.widthKm.toFixed(1)} × {currentFootprint.heightKm.toFixed(1)} km
                       </span>
                     )}
+                    {detail && (
+                      <a
+                        href={`${API_BASE}/api/registration/report/${detail.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 bg-rose-50/80 px-2.5 py-1 text-xs font-semibold text-rose-700 shadow-sm transition-all hover:bg-rose-100 hover:border-rose-300"
+                        title="Download official ISRO Verification Report PDF for this region"
+                      >
+                        <svg className="h-3.5 w-3.5 text-rose-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <span>ISRO Report (PDF)</span>
+                      </a>
+                    )}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
                     {/* Reference Mode Switcher */}
-                    {detail?.lro_nac_available && (
+                    {detail?.lro_nac_available ? (
                       <div className="flex items-center bg-slate-100 p-1 rounded-xl gap-1">
                         <span className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Ref:</span>
                         <button
@@ -689,6 +703,19 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                             Ext Ref
                           </span>
                         </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center bg-slate-100/70 p-1 rounded-xl gap-1">
+                        <span className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Ref:</span>
+                        <span className="rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-slate-900 shadow-sm">
+                          TMC-2 (Mono)
+                        </span>
+                        <span
+                          className="rounded-lg px-2 py-1 text-[10px] font-medium text-slate-400 cursor-help"
+                          title="NASA LRO NAC reference discoverable via ODE REST API (--auto-discover)"
+                        >
+                          LRO: ODE Discovery
+                        </span>
                       </div>
                     )}
 
