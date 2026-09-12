@@ -126,8 +126,8 @@ class SubPixelRefiner:
         if float(np.std(ref_patch.astype(np.float32))) < self.min_patch_std:
             return float(src_pt[0]), float(src_pt[1]), 0.0
 
-        # --- NCC correlation surface (template vs. search window). ---
-        corr = cv2.matchTemplate(search_win, ref_patch, cv2.TM_CCORR_NORMED)
+        # --- Zero-Mean NCC correlation surface (template vs. search window). ---
+        corr = cv2.matchTemplate(search_win, ref_patch, cv2.TM_CCOEFF_NORMED)
         corr = np.asarray(corr, dtype=np.float32)
         py, px = np.unravel_index(int(np.argmax(corr)), corr.shape)
         peak = float(corr[py, px])
