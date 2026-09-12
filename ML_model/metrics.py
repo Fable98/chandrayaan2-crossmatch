@@ -751,6 +751,7 @@ def compute_canonical_metrics(
     source_img: Optional[np.ndarray] = None,
     ref_img: Optional[np.ndarray] = None,
     warped_source: Optional[np.ndarray] = None,
+    anchor_inlier_indices: Optional[List[int] | np.ndarray] = None,
 ) -> Dict[str, Any]:
     """
     Single canonical entry point to compute all registration metrics across the repository.
@@ -821,7 +822,16 @@ def compute_canonical_metrics(
     frac_025 = float(np.mean(fit_errors < 0.25)) if len(fit_errors) > 0 else 0.0
 
     # Held-Out Inlier Correspondence Validation
-    val_results = evaluate_held_out_validation(inliers_src, inliers_dst)
+    # To eliminate H-conditioning circularity, evaluate strictly on independent anchor inliers if >= 8 points
+    held_out_is_h_conditioned = False
+    if anchor_inlier_indices is not None and len(anchor_inlier_indices) >= 8:
+        val_results = evaluate_held_out_validation(src_pts_raw[anchor_inlier_indices], dst_pts_raw[anchor_inlier_indices])
+        held_out_is_h_conditioned = False
+    else:
+        val_results = evaluate_held_out_validation(inliers_src, inliers_dst)
+        held_out_is_h_conditioned = bool(
+            anchor_inlier_indices is not None and inlier_count > len(anchor_inlier_indices)
+        )
 
     # Spatial Distribution (Fixed Grid, default 10x10)
     dist_metrics = calculate_spatial_distribution(inliers_src, image_shape, grid_size)
@@ -924,6 +934,9 @@ def compute_canonical_metrics(
         "held_out_rmse_px": val_results["validation_rmse_px"],
         "validation_median_error_px": val_results["validation_median_error_px"],
         "validation_status": val_results["validation_status"],
+        "held_out_is_h_conditioned": held_out_is_h_conditioned,
+        "anchor_inliers_count": len(anchor_inlier_indices) if anchor_inlier_indices is not None else inlier_count,
+        "guided_inliers_count": inlier_count - (len(anchor_inlier_indices) if anchor_inlier_indices is not None else inlier_count),
         "quality_tier": quality_tier,
         "confidence_tier": quality_tier,
         "tier": tier_short,

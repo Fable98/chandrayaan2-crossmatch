@@ -1982,7 +1982,7 @@ def match_images_cfog(
     allow_synthetic_reference: bool = False,
     look_azimuth_deg: Optional[float] = None,
     dem_array: Optional[np.ndarray] = None,
-    enable_guided_densification: bool = True,
+    enable_guided_densification: bool = False,
     enable_native_polish: bool = True,
 ) -> Dict[str, Any]:
     """
@@ -3830,15 +3830,18 @@ def match_images_cfog(
     # the wrong records whenever the verifier drops candidates.
     for _rec in refinement_records:
         _rec["is_inlier"] = False
+        _rec["provenance"] = "anchor"
+        _rec["h_conditioned"] = False
     for _j in np.where(inlier_mask.ravel() == 1)[0].tolist():
         if 0 <= _j < len(verified_matches):
             verified_matches[_j]["is_inlier"] = True
+    n_anchor_points = len(pts1_arr)
     n_inliers_pre_refill = int(np.sum(inlier_mask))
 
     # --- Phase 6b: Guided Densification (H-constrained second pass across unrepresented terrain) ---
     enable_guided_refill = enable_guided_densification
     if os.environ.get("ENABLE_GUIDED_DENSIFICATION") is not None:
-        enable_guided_refill = os.environ.get("ENABLE_GUIDED_DENSIFICATION", "1").lower() in ("1", "true")
+        enable_guided_refill = os.environ.get("ENABLE_GUIDED_DENSIFICATION", "0").lower() in ("1", "true")
     elif os.environ.get("ENABLE_GUIDED_REFILL") is not None:
         enable_guided_refill = os.environ.get("ENABLE_GUIDED_REFILL", "0").lower() in ("1", "true")
 
@@ -3886,6 +3889,7 @@ def match_images_cfog(
                     ))
                     refinement_records[-1]["cell"] = g.get("cell")
                     refinement_records[-1]["h_conditioned"] = True
+                    refinement_records[-1]["provenance"] = "guided_refill"
                 pts1_arr, pts2_arr, H_final, inlier_mask = aug1, aug2, H_g, mask_g
                 inlier_flat = inlier_mask.ravel()
                 # Identity-based marking (Fix P0-2): aug order == records order
@@ -3900,6 +3904,10 @@ def match_images_cfog(
         else:
             logger.info("Guided densification: no strict inlier gain (%d candidates); keeping original solution.",
                         len(guided))
+
+    final_inlier_indices = np.where(inlier_mask.ravel() == 1)[0] if inlier_mask is not None else np.array([], dtype=int)
+    final_anchor_inliers = [int(i) for i in final_inlier_indices if i < n_anchor_points]
+    final_guided_inliers = [int(i) for i in final_inlier_indices if i >= n_anchor_points]
 
     # --- Item 3: Post-RANSAC Lucas-Kanade Sub-Pixel Refinement (OHRC↔TMC-2 only) ---
     lk_stats: Optional[Dict[str, Any]] = None
@@ -4128,7 +4136,15 @@ def match_images_cfog(
     metrics = compute_canonical_metrics(
         pts1_arr, pts2_arr, inlier_mask, H_final, (orig_h2, orig_w2), canonical_grid_size,
         gsd_m=metric_gsd, dem_data=dem_arr, source_img=raw1_gray, ref_img=raw2_gray,
+        anchor_inlier_indices=final_anchor_inliers,
     )
+    metrics["guided_densification"] = {
+        "enabled": bool(enable_guided_refill),
+        "anchor_inliers_count": len(final_anchor_inliers),
+        "guided_inliers_count": len(final_guided_inliers),
+        "h_conditioned": bool(len(final_guided_inliers) > 0),
+        "held_out_is_h_conditioned": bool(metrics.get("held_out_is_h_conditioned", False)),
+    }
     metrics["dem_ray_shift"] = dem_ray_shift
     metrics["slope_residual_correlation"] = slope_residual_correlation
     metrics["dem_model"] = dem_model
