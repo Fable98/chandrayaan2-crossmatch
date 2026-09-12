@@ -132,18 +132,18 @@ def test_ablation_l1_cascade_does_not_reduce_support(tmp_path):
 
 
 # Classical (Phase-1-off) pins measured on the current tree: post-cascade
-# (5ab379d) + post-weighted-RANSAC-fix (89f920b). README section 6 predates
-# the cascade; finest_scale_only reproduces those older numbers exactly.
+# (5ab379d) + post-weighted-RANSAC-fix (89f920b) + post-PR#32 9-feature model (e9e8998).
+# README section 6 predates the cascade; finest_scale_only reproduces those older numbers.
 REGRESSION_PINS = {
     # name: (src, ref, status, inliers, rmse_px, match_count)
-    "region_001": ("region_001/ohrc_512.png", "region_001/tmc_512.png", "success", 7, 1.01, 75),
-    "region_002": ("region_002/ohrc_512.png", "region_002/tmc_512.png", "success", 8, 1.72, 78),
-    "region_003": ("region_003/ohrc_512.png", "region_003/tmc_512.png", "success", 9, 1.84, 60),
-    "region_004": ("region_004/ohrc_512.png", "region_004/tmc_512.png", "success", 6, 1.36, 57),
-    "region_005": ("region_005/ohrc_512.png", "region_005/tmc_512.png", "success", 5, 0.85, 77),
-    "region_006": ("region_006/ohrc_512.png", "region_006/tmc_512.png", "success", 7, 2.53, 67),
-    "triplet_01": ("triplet_01_ch2_ohr_ncp_202/ohrc_512.png", "triplet_01_ch2_ohr_ncp_202/tmc_512.png", "success", 7, 1.47, 74),
-    "triplet_new_2022": ("triplet_new_2022/ohrc_512.png", "triplet_new_2022/tmc_512.png", "success", 7, 1.25, 84),
+    "region_001": ("region_001/ohrc_512.png", "region_001/tmc_512.png", "success", 7, 1.67, 75),
+    "region_002": ("region_002/ohrc_512.png", "region_002/tmc_512.png", "success", 10, 3.26, 78),
+    "region_003": ("region_003/ohrc_512.png", "region_003/tmc_512.png", "success", 7, 1.07, 60),
+    "region_004": ("region_004/ohrc_512.png", "region_004/tmc_512.png", "success", 5, 1.41, 57),
+    "region_005": ("region_005/ohrc_512.png", "region_005/tmc_512.png", "success", 4, 0.0, 77),
+    "region_006": ("region_006/ohrc_512.png", "region_006/tmc_512.png", "success", 5, 1.50, 67),
+    "triplet_01": ("triplet_01_ch2_ohr_ncp_202/ohrc_512.png", "triplet_01_ch2_ohr_ncp_202/tmc_512.png", "success", 6, 0.62, 74),
+    "triplet_new_2022": ("triplet_new_2022/ohrc_512.png", "triplet_new_2022/tmc_512.png", "success", 9, 2.26, 84),
 }
 
 

@@ -1788,8 +1788,13 @@ def estimate_weighted_homography(
 
     rng = np.random.default_rng(rng_seed)
     p = w / max(float(np.sum(w)), 1e-12)
+    best_valid_H = None
+    best_valid_mask = None
+    best_valid_score = -1.0
+    best_valid_tag = None
     best_inliers = None
     best_score = -1.0
+
     for _ in range(int(n_iters)):
         try:
             idx = rng.choice(n, size=4, replace=False, p=p)
@@ -1820,20 +1825,39 @@ def estimate_weighted_homography(
         if score > best_score:
             best_score, best_inliers = score, inl
 
-    if best_inliers is None:
-        return _standard()
+        if score > best_valid_score:
+            ii = np.where(inl)[0]
+            src_i, dst_i, w_i = pts1[ii], pts2[ii], w[ii]
+            mask_cand = inl.reshape(-1, 1).astype(np.uint8)
+            H_w = _weighted_dlt_homography(src_i, dst_i, w_i)
+            if _accept(H_w, mask_cand):
+                best_valid_score = score
+                best_valid_H = H_w
+                best_valid_mask = mask_cand
+                best_valid_tag = "sampling_weighted_dlt"
+                continue
+            H_dlt, _ = cv2.findHomography(src_i, dst_i, 0)
+            if _accept(H_dlt, mask_cand):
+                best_valid_score = score
+                best_valid_H = H_dlt
+                best_valid_mask = mask_cand
+                best_valid_tag = "sampling_unweighted_dlt"
 
-    ii = np.where(best_inliers)[0]
-    src_i, dst_i, w_i = pts1[ii], pts2[ii], w[ii]
-    H_dlt, _ = cv2.findHomography(src_i, dst_i, 0)
-    mask = best_inliers.reshape(-1, 1).astype(np.uint8)
+    if best_valid_H is not None:
+        return best_valid_H, best_valid_mask, best_valid_tag
 
-    H_w = _weighted_dlt_homography(src_i, dst_i, w_i)
-    if _accept(H_w, mask):
-        return H_w, mask, "sampling_weighted_dlt"
-    if _accept(H_dlt, mask):
-        logger.info("Weighted DLT failed Quality Gate 3; using unweighted DLT on consensus inliers.")
-        return H_dlt, mask, "sampling_unweighted_dlt"
+    if best_inliers is not None:
+        ii = np.where(best_inliers)[0]
+        src_i, dst_i, w_i = pts1[ii], pts2[ii], w[ii]
+        H_dlt, _ = cv2.findHomography(src_i, dst_i, 0)
+        mask = best_inliers.reshape(-1, 1).astype(np.uint8)
+
+        H_w = _weighted_dlt_homography(src_i, dst_i, w_i)
+        if _accept(H_w, mask):
+            return H_w, mask, "sampling_weighted_dlt"
+        if _accept(H_dlt, mask):
+            logger.info("Weighted DLT failed Quality Gate 3; using unweighted DLT on consensus inliers.")
+            return H_dlt, mask, "sampling_unweighted_dlt"
 
     logger.info("Weighted-sampling homography failed Quality Gate 3; falling back to standard RANSAC.")
     return _standard()
@@ -4197,9 +4221,14 @@ def match_images_cfog(
             try:
                 H_aff, inlier_mask = cv2.estimateAffine2D(pts1_arr, pts2_arr, method=cv2.USAC_MAGSAC, ransacReprojThreshold=5.0)  # tuned on 2026-09-10, AUC=0.9010
             except Exception:
-                H_aff, inlier_mask = cv2.estimateAffinePartial2D(pts1_arr, pts2_arr)
+                H_aff, inlier_mask = cv2.estimateAffinePartial2D(pts1_arr, pts2_arr, ransacReprojThreshold=5.0)
         else:
-            H_aff, inlier_mask = cv2.estimateAffinePartial2D(pts1_arr, pts2_arr)
+            try:
+                H_aff, inlier_mask = cv2.estimateAffine2D(pts1_arr, pts2_arr, ransacReprojThreshold=5.0)
+            except Exception:
+                H_aff, inlier_mask = cv2.estimateAffinePartial2D(pts1_arr, pts2_arr, ransacReprojThreshold=5.0)
+            if H_aff is None or inlier_mask is None or np.sum(inlier_mask) < 4:
+                H_aff, inlier_mask = cv2.estimateAffinePartial2D(pts1_arr, pts2_arr, ransacReprojThreshold=5.0)
         if H_aff is not None and inlier_mask is not None and np.sum(inlier_mask) >= 4:
             H_final = np.vstack([H_aff, [0.0, 0.0, 1.0]])
         else:
