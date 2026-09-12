@@ -103,6 +103,29 @@ def test_default_verifier_is_untrained_baseline(tmp_path):
     assert len(kept) + len(rejected) == len(recs)
 
 
+def test_unpulled_lfs_pointer_is_detected_not_cryptic(tmp_path, caplog):
+    """An unpulled Git LFS pointer must be refused with an actionable message.
+
+    Regression: joblib fails on pointer text with a bare ``KeyError: 118``,
+    which used to surface as a cryptic warning while silently disabling the
+    trained verifier.
+    """
+    from ai_verifier import looks_like_git_lfs_pointer
+
+    stub = tmp_path / "stub.pkl"
+    stub.write_bytes(
+        b"version https://git-lfs.github.com/spec/v1\n"
+        b"oid sha256:7543962117de4d46e343ff4646c83df9c2d8f95ae93873ffc3d33\n"
+        b"size 3222749\n"
+    )
+    assert looks_like_git_lfs_pointer(stub) is True
+    assert looks_like_git_lfs_pointer(REPO_ROOT / "ML_model" / "ai_verifier.py") is False
+    with caplog.at_level("WARNING", logger="ML_model.ai_verifier"):
+        verifier = AIMatchVerifier(model_path=stub)
+    assert verifier.is_trained is False
+    assert "Git LFS" in caplog.text and "git lfs pull" in caplog.text
+
+
 def test_bundled_production_model_loads_and_is_trained():
     """Verify that the bundled ai_verifier_model.pkl loads successfully as a trained model."""
     prod_path = REPO_ROOT / "ML_model/ai_verifier_model.pkl"

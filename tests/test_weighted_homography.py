@@ -69,3 +69,41 @@ def test_weighted_sampling_does_not_return_ill_conditioned_h(monkeypatch):
     # Translation should stay near the true warp, not a collapsed 4-point DLT.
     assert abs(float(H[0, 2]) - 12.0) < 6.0
     assert abs(float(H[1, 2]) + 8.0) < 6.0
+
+
+def test_native_weights_cv2_error_still_uses_sampling_fallback(monkeypatch):
+    """OpenCV 5 raises cv2.error (not TypeError) for the weights= kwarg.
+
+    The native attempt must absorb ANY exception into the confidence-weighted
+    PROSAC sampler — never let it escape and force plain-RANSAC fallback.
+    """
+    rng = np.random.default_rng(7)
+    H_true = np.array([[1.0, 0.0, 12.0], [0.0, 1.0, -8.0], [0.0, 0.0, 1.0]], dtype=np.float64)
+
+    xs, ys = np.meshgrid(np.linspace(40, 470, 8), np.linspace(40, 470, 8))
+    src = np.column_stack([xs.ravel(), ys.ravel()]).astype(np.float32)
+    dst_h = cv2.perspectiveTransform(src.reshape(-1, 1, 2), H_true).reshape(-1, 2)
+    dst = dst_h + rng.normal(0.0, 0.15, dst_h.shape).astype(np.float32)
+    weights = np.full(len(src), 0.8, dtype=np.float64)
+
+    real_fh = cv2.findHomography
+
+    def _opencv5_no_weights(*args, **kwargs):
+        if "weights" in kwargs:
+            raise cv2.error("OpenCV(5.0.0) :-1: error: (-5:Bad argument) in function 'findHomography'")
+        return real_fh(*args, **kwargs)
+
+    monkeypatch.setattr(cv2, "findHomography", _opencv5_no_weights)
+
+    H, mask, tag = estimate_weighted_homography(
+        src, dst, weights,
+        estimator_method=cv2.RANSAC,
+        ransac_reproj_threshold=5.0,
+        image_shape=(512, 512),
+        rng_seed=7,
+        n_iters=400,
+    )
+    assert H is not None and mask is not None
+    assert tag in {"sampling_weighted_dlt", "sampling_unweighted_dlt", "standard_ransac"}
+    check = verify_transformation_quality(H, (512, 512))
+    assert check["is_valid"], f"Gate 3 rejected fallback H ({check['reason']}, tag={tag})"

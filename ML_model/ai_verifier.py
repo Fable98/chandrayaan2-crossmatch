@@ -9,6 +9,23 @@ logger = logging.getLogger("ML_model.ai_verifier")
 FEATURE_NAMES = ["confidence", "refinement_dx", "refinement_dy", "spatial_quality_score"]
 DEFAULT_MODEL_PATH = Path(__file__).resolve().parent / "ai_verifier_model.pkl"
 
+_GIT_LFS_PREAMBLE = b"version https://git-lfs"
+
+
+def looks_like_git_lfs_pointer(path: Path) -> bool:
+    """True if *path* is an unpulled Git LFS pointer, not the real asset.
+
+    joblib chokes on pointer text with a cryptic ``KeyError: 118``; sniffing
+    the preamble lets the loader emit an actionable message instead.
+    """
+    try:
+        if path.stat().st_size >= 4096:
+            return False
+        with open(path, "rb") as handle:
+            return handle.read(len(_GIT_LFS_PREAMBLE) + 8).startswith(_GIT_LFS_PREAMBLE)
+    except OSError:
+        return False
+
 
 class AIMatchVerifier:
     """
@@ -35,6 +52,15 @@ class AIMatchVerifier:
         try:
             if not path.exists():
                 logger.info(f"No trained model at {path}; using non-ML baseline (no model ships).")
+                return False
+            if looks_like_git_lfs_pointer(path):
+                logger.warning(
+                    "AI verifier model at %s is an unpulled Git LFS pointer "
+                    "(joblib would fail with KeyError: 118). Run `git lfs pull "
+                    "--include \"%s\"` (or re-clone with LFS) to materialize it. "
+                    "Using non-ML baseline.",
+                    path, path.name,
+                )
                 return False
             import joblib
             loaded = joblib.load(path)

@@ -10,3 +10,8 @@
 *.pth filter=lfs diff=lfs merge=lfs -text
 *.cub filter=lfs diff=lfs merge=lfs -text
 *.qub filter=lfs diff=lfs merge=lfs -text
+# Production AI verifier bundle ships RAW in git (not LFS) so every clone can
+# load it without `git lfs pull`. An unpulled LFS pointer fails joblib with a
+# cryptic KeyError: 118 and silently disables the trained verifier. Later
+# lines win in gitattributes, so this exempts exactly this path.
+ML_model/ai_verifier_model.pkl binary -filter

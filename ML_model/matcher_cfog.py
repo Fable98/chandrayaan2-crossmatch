@@ -1622,7 +1622,12 @@ def estimate_weighted_homography(
         if _accept(H_nat, mask_nat):
             return H_nat, mask_nat, "native_weights"
         logger.info("Native weighted findHomography failed Quality Gate 3; using sampling fallback.")
-    except TypeError:
+    except Exception:
+        # No known OpenCV build accepts a weights= kwarg: OpenCV 4 raises
+        # TypeError, OpenCV 5 raises cv2.error (overload resolution failure).
+        # Catching only TypeError let cv2.error escape and abort the whole
+        # weighted path (caller fell back to plain RANSAC). Any failure here
+        # must drop into the confidence-weighted PROSAC sampler below.
         logger.info("Native weighted findHomography unavailable; using confidence-weighted sampling.")
 
     rng = np.random.default_rng(rng_seed)
@@ -2535,10 +2540,14 @@ def match_images_cfog(
             }
 
     # --- PHASE 1: ADAPTIVE ILLUMINATION NORMALIZATION (OPT-IN ONLY) ---
-    # Measured 2026-09-10, full 8-region primary benchmark with the stack ON:
-    # region_003 6@0.99 SUCCESS -> 0 inliers FAIL; triplet_new_2022 honest FAIL
-    # -> 5@0.17 "success" (selection-bias consensus); all other fits shifted
-    # unpredictably. LRO: 001 32/6@0.63, 003 Gate2-FAIL, 006 degraded.
+    # Re-measured 2026-09-12 with the homomorphic+morphological engine ON
+    # (bilateral + log-illumination subtraction + gradient; shadows boosted,
+    # never masked). Impact remains genuinely inconsistent across regions:
+    # region_001 9 -> 4 inliers (worse); region_002 8 -> 9 (better);
+    # region_003 10 -> 6 inliers but fit RMSE 2.52 -> 0.47px (far better);
+    # region_005 6 -> 4 (worse). (Old 2026-09-10 Wallis-era numbers retired:
+    # region_003 6@0.99 -> 0 FAIL; triplet_new_2022 FAIL -> 5@0.17
+    # selection-bias "success"; LRO 001 32/6@0.63, 003 Gate2-FAIL, 006 worse.)
     # Global on/off is unjustifiable either way: Phase 1 + RF stay behind
     # experimental_stack=True until validated per pair. Default path is the
     # committed classical behavior so published numbers reproduce exactly.
