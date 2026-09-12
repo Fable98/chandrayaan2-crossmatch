@@ -13,8 +13,8 @@ Features (per match, all read with ``.get()`` defaults so missing keys are safe)
     1. ``confidence``               (falls back to ``score``)
     2. ``refinement_dx``            (sub-pixel shift X, default 0.0)
     3. ``refinement_dy``            (sub-pixel shift Y, default 0.0)
-    4. ``spatial_quality_score``    (default 0.5; falls back to ``spatial_score``,
-       else 1.0 if ``is_refined`` else 0.5 so legacy files still carry signal)
+    4. ``spatial_quality_score``    (required; rows missing this or refinement_dx/dy
+       are skipped so defaulted dumps cannot poison the classifier)
 
 Model:
     ``RandomForestClassifier(n_estimators=100, class_weight='balanced')`` —
@@ -121,23 +121,28 @@ def extract_label(match: dict, allow_ransac: bool = False,
     return None, "none"
 
 
-def extract_feature_row(match: dict) -> list[float]:
-    """Build one feature row; every key uses .get() with a safe default."""
+def extract_feature_row(match: dict, require_live_features: bool = True) -> list[float]:
+    """Build one feature row.
+
+    Live production records always carry ``refinement_dx/dy`` and
+    ``spatial_quality_score``. Older dumps that omit them are *skipped* at
+    train time (see build_dataset): defaulting those fields made a genuine
+    RANSAC-confirmed real match look identical to a failed correspondence
+    and taught the RF to reject true OHRC↔TMC pairs.
+    """
+    if require_live_features:
+        has_dx = "refinement_dx" in match or "ref_dx" in match
+        has_dy = "refinement_dy" in match or "ref_dy" in match
+        has_sp = "spatial_quality_score" in match or "spatial_score" in match
+        if not (has_dx and has_dy and has_sp):
+            raise KeyError("missing live matcher features")
     conf = float(match.get("confidence", match.get("score", 0.0) or 0.0))
     dx = float(match.get("refinement_dx", match.get("ref_dx", 0.0) or 0.0))
     dy = float(match.get("refinement_dy", match.get("ref_dy", 0.0) or 0.0))
     spatial_raw = match.get("spatial_quality_score", match.get("spatial_score", None))
     if spatial_raw is None:
-        # Legacy files predate spatial_quality_score: derive a neutral prior
-        # from whether sub-pixel refinement succeeded.
-        spatial = 1.0 if match.get("is_refined", False) else 0.5
-    else:
-        try:
-            spatial = float(spatial_raw)
-        except (TypeError, ValueError):
-            spatial = 0.5
-    mag_guard = match.get("refinement_mag", None)  # optional extra, folded into dx/dy only
-    _ = mag_guard  # documented: kept for forward-compat, not a separate feature
+        raise KeyError("spatial_quality_score")
+    spatial = float(spatial_raw)
     return [conf, dx, dy, spatial]
 
 
@@ -193,25 +198,26 @@ def build_dataset(search_roots: list[Path], allow_ransac: bool = False,
     # train/test split.
     seen_rows: set[tuple] = set()
     n_duplicates = 0
-    stats = {"files": len(files), "parsed": 0, "skipped_no_label": 0, "per_file": [],
+    stats = {"files": len(files), "parsed": 0, "skipped_no_label": 0, "skipped_missing_features": 0,
+             "per_file": [],
              "n_hand": 0, "n_ransac": 0, "allow_ransac": bool(allow_ransac)}
     for f in files:
         records = load_matches_from_file(f)
-        n_in, n_out, n_skip = 0, 0, 0
+        n_in, n_out, n_skip, n_feat = 0, 0, 0, 0
         for m in records:
             label, source = extract_label(m, allow_ransac=allow_ransac, hand_keys=hand_keys)
             if label is None:
                 n_skip += 1
                 continue
+            try:
+                row = extract_feature_row(m, require_live_features=True)
+            except Exception:
+                n_feat += 1
+                continue
             if source == "hand":
                 stats["n_hand"] += 1
             else:
                 stats["n_ransac"] += 1
-            try:
-                row = extract_feature_row(m)
-            except Exception:
-                n_skip += 1
-                continue
             dedup_key = (
                 round(row[0], 6), round(row[1], 6), round(row[2], 6), round(row[3], 6),
                 label,
@@ -232,8 +238,16 @@ def build_dataset(search_roots: list[Path], allow_ransac: bool = False,
                 n_out += 1
         stats["parsed"] += n_in + n_out
         stats["skipped_no_label"] += n_skip
-        stats["per_file"].append({"file": str(f), "inliers": n_in, "outliers": n_out, "skipped": n_skip})
-        logger.info("  %s: %d unique inliers, %d unique outliers, %d skipped (no label)", f, n_in, n_out, n_skip)
+        stats["skipped_missing_features"] += n_feat
+        stats["per_file"].append({
+            "file": str(f), "inliers": n_in, "outliers": n_out,
+            "skipped": n_skip, "skipped_missing_features": n_feat,
+        })
+        logger.info(
+            "  %s: %d unique inliers, %d unique outliers, %d skipped (no label), "
+            "%d skipped (missing live features)",
+            f, n_in, n_out, n_skip, n_feat,
+        )
     stats["duplicates_removed"] = n_duplicates
     if n_duplicates:
         logger.info("Removed %d exact-duplicate row(s) shared across output dirs.", n_duplicates)
