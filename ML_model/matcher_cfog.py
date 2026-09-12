@@ -2433,6 +2433,7 @@ def match_images_cfog(
     dem_array: Optional[np.ndarray] = None,
     enable_guided_densification: bool = False,
     enable_native_polish: bool = True,
+    finest_scale_only: bool = False,
 ) -> Dict[str, Any]:
     """
     Executes the primary cross-sensor registration pipeline:
@@ -2444,6 +2445,11 @@ def match_images_cfog(
     6. Physically scaled local Fourier Phase Correlation sub-pixel refinement.
     7. RANSAC verification with transformation quality gates.
     8. Complete output raster and metadata package.
+
+    Set finest_scale_only=True to disable the L1 coarse cascade (L2 shift
+    capture + L1 seeds/prior) so L0 matches finest-scale-only with full
+    search windows. Explicit ablation hook for Phase-2 pyramid studies;
+    default False. PC maps themselves are computed identically either way.
     """
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
@@ -3321,7 +3327,7 @@ def match_images_cfog(
     if np.isfinite(l2_dx) and np.isfinite(l2_dy) and float(l2_resp) >= 0.03:
         l2_shift_x = float(l2_dx * l2_mult)
         l2_shift_y = float(l2_dy * l2_mult)
-        if (shift_work_x == 0.0 and shift_work_y == 0.0) and (recover_overlap_from_content or native_tiling_applied):
+        if (shift_work_x == 0.0 and shift_work_y == 0.0) and (recover_overlap_from_content or native_tiling_applied) and not finest_scale_only:
             shift_work_x = l2_shift_x
             shift_work_y = l2_shift_y
             logger.info("Level 2 global displacement captured: dx=%.2f, dy=%.2f px (resp=%.3f)", l2_shift_x, l2_shift_y, float(l2_resp))
@@ -3345,62 +3351,66 @@ def match_images_cfog(
     l1_matches = []
     l1_pts1 = []
     l1_pts2 = []
-    shift_l1_x = shift_work_x * 0.5
-    shift_l1_y = shift_work_y * 0.5
-
-    for kx, ky, _ in kps1_l1:
-        cx1 = int(round(kx))
-        cy1 = int(round(ky))
-        if (
-            cy1 < half_patch_l1
-            or cy1 >= h1_l1 - half_patch_l1
-            or cx1 < half_patch_l1
-            or cx1 >= w1_l1 - half_patch_l1
-        ):
-            continue
-        tmpl_l1 = pc1_l1[cy1 - half_patch_l1 : cy1 + half_patch_l1, cx1 - half_patch_l1 : cx1 + half_patch_l1]
-        if float(np.std(tmpl_l1)) < 1e-4:
-            continue
-
-        cx2_l1 = int(round(cx1 * (w2_l1 / float(w1_l1)) + shift_l1_x))
-        cy2_l1 = int(round(cy1 * (h2_l1 / float(h1_l1)) + shift_l1_y))
-        s_min_x = max(0, cx2_l1 - search_half_l1_w)
-        s_max_x = min(w2_l1, cx2_l1 + search_half_l1_w)
-        s_min_y = max(0, cy2_l1 - search_half_l1_h)
-        s_max_y = min(h2_l1, cy2_l1 + search_half_l1_h)
-        if s_max_x - s_min_x <= tmpl_l1.shape[1] or s_max_y - s_min_y <= tmpl_l1.shape[0]:
-            continue
-        search_l1 = pc2_l1[s_min_y:s_max_y, s_min_x:s_max_x]
-        if float(np.std(search_l1)) < 1e-4:
-            continue
-
-        val, loc = find_best_correspondence_unified(search_l1, tmpl_l1, multimodal_pair=bool(multimodal_pair))
-        if val >= 0.25:
-            mx = s_min_x + loc[0] + half_patch_l1
-            my = s_min_y + loc[1] + half_patch_l1
-            l1_pts1.append([float(kx), float(ky)])
-            l1_pts2.append([float(mx), float(my)])
-            l1_matches.append({
-                "work_x1": float(kx), "work_y1": float(ky),
-                "work_x2": float(mx), "work_y2": float(my),
-                "score": float(val),
-            })
-
     H_l1 = None
     H_l0_prior = None
     l1_inlier_count = 0
-    if len(l1_pts1) >= 4:
-        p1_arr_l1 = np.array(l1_pts1, dtype=np.float32)
-        p2_arr_l1 = np.array(l1_pts2, dtype=np.float32)
-        H_cand_l1, mask_l1 = cv2.findHomography(p1_arr_l1, p2_arr_l1, cv2.RANSAC, 4.0)
-        if H_cand_l1 is not None and abs(np.linalg.det(H_cand_l1)) > 1e-4:
-            l1_inlier_count = int(np.sum(mask_l1)) if mask_l1 is not None else 0
-            if l1_inlier_count >= 4:
-                H_l1 = H_cand_l1
-                S_half = np.diag([0.5, 0.5, 1.0])
-                S_two = np.diag([2.0, 2.0, 1.0])
-                H_l0_prior = S_two @ H_l1 @ S_half
-                logger.info("Level 1 coarse homography estimated: %d/%d inliers.", l1_inlier_count, len(l1_pts1))
+    shift_l1_x = shift_work_x * 0.5
+    shift_l1_y = shift_work_y * 0.5
+
+    # Ablation hook: with finest_scale_only=True the L1 cascade is skipped
+    # entirely, so L0 matches on finest-scale evidence alone with full search
+    # windows (no L1 seeds, no H_l0_prior centering).
+    if not finest_scale_only:
+        for kx, ky, _ in kps1_l1:
+            cx1 = int(round(kx))
+            cy1 = int(round(ky))
+            if (
+                cy1 < half_patch_l1
+                or cy1 >= h1_l1 - half_patch_l1
+                or cx1 < half_patch_l1
+                or cx1 >= w1_l1 - half_patch_l1
+            ):
+                continue
+            tmpl_l1 = pc1_l1[cy1 - half_patch_l1 : cy1 + half_patch_l1, cx1 - half_patch_l1 : cx1 + half_patch_l1]
+            if float(np.std(tmpl_l1)) < 1e-4:
+                continue
+
+            cx2_l1 = int(round(cx1 * (w2_l1 / float(w1_l1)) + shift_l1_x))
+            cy2_l1 = int(round(cy1 * (h2_l1 / float(h1_l1)) + shift_l1_y))
+            s_min_x = max(0, cx2_l1 - search_half_l1_w)
+            s_max_x = min(w2_l1, cx2_l1 + search_half_l1_w)
+            s_min_y = max(0, cy2_l1 - search_half_l1_h)
+            s_max_y = min(w2_l1, cy2_l1 + search_half_l1_h)
+            if s_max_x - s_min_x <= tmpl_l1.shape[1] or s_max_y - s_min_y <= tmpl_l1.shape[0]:
+                continue
+            search_l1 = pc2_l1[s_min_y:s_max_y, s_min_x:s_max_x]
+            if float(np.std(search_l1)) < 1e-4:
+                continue
+
+            val, loc = find_best_correspondence_unified(search_l1, tmpl_l1, multimodal_pair=bool(multimodal_pair))
+            if val >= 0.25:
+                mx = s_min_x + loc[0] + half_patch_l1
+                my = s_min_y + loc[1] + half_patch_l1
+                l1_pts1.append([float(kx), float(ky)])
+                l1_pts2.append([float(mx), float(my)])
+                l1_matches.append({
+                    "work_x1": float(kx), "work_y1": float(ky),
+                    "work_x2": float(mx), "work_y2": float(my),
+                    "score": float(val),
+                })
+
+        if len(l1_pts1) >= 4:
+            p1_arr_l1 = np.array(l1_pts1, dtype=np.float32)
+            p2_arr_l1 = np.array(l1_pts2, dtype=np.float32)
+            H_cand_l1, mask_l1 = cv2.findHomography(p1_arr_l1, p2_arr_l1, cv2.RANSAC, 4.0)
+            if H_cand_l1 is not None and abs(np.linalg.det(H_cand_l1)) > 1e-4:
+                l1_inlier_count = int(np.sum(mask_l1)) if mask_l1 is not None else 0
+                if l1_inlier_count >= 4:
+                    H_l1 = H_cand_l1
+                    S_half = np.diag([0.5, 0.5, 1.0])
+                    S_two = np.diag([2.0, 2.0, 1.0])
+                    H_l0_prior = S_two @ H_l1 @ S_half
+                    logger.info("Level 1 coarse homography estimated: %d/%d inliers.", l1_inlier_count, len(l1_pts1))
 
     t_l1 = time.perf_counter() - t_start_l1
 
@@ -4661,6 +4671,7 @@ def match_images_cfog(
         "l1_inliers": l1_inlier_count,
         "l1_homography_valid": bool(H_l0_prior is not None),
         "coarse_to_fine_applied": bool(H_l0_prior is not None or len(l1_matches) > 0),
+        "finest_scale_only": bool(finest_scale_only),
         "timing_s": {"L2": round(float(t_l2), 4), "L1": round(float(t_l1), 4), "L0": round(float(t_l0), 4)},
     }
 
