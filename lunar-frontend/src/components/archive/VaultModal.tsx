@@ -22,6 +22,10 @@ export default function VaultModal({
 }: Props) {
   const [filter, setFilter] = useState<PayloadFilter>(initialFilter);
   const [search, setSearch] = useState("");
+  // Tiles that failed to load, keyed by resolved URL. LRO tiles NEVER fall
+  // back to OHRC pixels (that mislabels one sensor as another); they render
+  // an explicit unavailable placeholder instead (Step 13 honesty rule).
+  const [failedThumbs, setFailedThumbs] = useState<Set<string>>(new Set());
 
   const filteredTriplets = triplets.filter((t) => {
     const matchesSearch = t.id.toLowerCase().includes(search.toLowerCase());
@@ -162,17 +166,33 @@ export default function VaultModal({
                       </span>
                     </div>
 
-                    {/* Image Preview */}
+                    {/* Image Preview: contain-fit so non-square tiles (e.g. LRO
+                        reference swaths) are never edge-cropped. */}
                     <div className="relative aspect-square overflow-hidden rounded-xl border border-slate-100 bg-black">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={thumbUrl}
-                        alt={t.id}
-                        className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
-                        onError={(e) => {
-                          (e.currentTarget as HTMLImageElement).src = imageUrl(filter === "iirs" ? "/images/iirs/iirs_overlay.png" : `/images/ohrc/${t.id}`);
-                        }}
-                      />
+                      {filter === "lro" && failedThumbs.has(thumbUrl) ? (
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 p-4 text-center">
+                          <span className="rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700">
+                            LRO reference unavailable
+                          </span>
+                          <span className="text-[10px] leading-relaxed text-slate-400">
+                            Real CDR tile missing for {t.id} — no proxy substituted
+                          </span>
+                        </div>
+                      ) : (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img
+                          src={thumbUrl}
+                          alt={t.id}
+                          className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
+                          onError={(e) => {
+                            if (filter === "lro") {
+                              setFailedThumbs((prev) => new Set(prev).add(thumbUrl));
+                            } else {
+                              (e.currentTarget as HTMLImageElement).src = imageUrl(filter === "iirs" ? "/images/iirs/iirs_overlay.png" : `/images/ohrc/${t.id}`);
+                            }
+                          }}
+                        />
+                      )}
                     </div>
 
                     {/* Region Metadata */}

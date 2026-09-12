@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import { isAuthenticated } from '@/lib/auth';
 import DropZone from './DropZone';
 import ProcessingProgress from './ProcessingProgress';
 import ResultsTable from './ResultsTable';
@@ -254,6 +255,31 @@ export default function IngestPage() {
 
   const totalSize = files.reduce((s, f) => s + f.size, 0);
   const isProcessing = phase === 'processing' || phase === 'queued';
+
+  // Uploads require a Bearer token (backend enforces auth); explain instead
+  // of showing a form that can only 401.
+  if (!isAuthenticated()) {
+    return (
+      <div style={styles.page}>
+        <div style={{ ...styles.configPanel, textAlign: 'center' as const, padding: '48px 24px' }}>
+          <div style={{ fontSize: '2rem', marginBottom: '12px' }}>🔐</div>
+          <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
+            Sign in required
+          </h1>
+          <p style={{ ...styles.heroSub, marginTop: '8px' }}>
+            The ingest pipeline writes to disk and launches processing jobs, so
+            uploads require an operator session. Please sign in from the home
+            page, then return here.
+          </p>
+          <div style={{ marginTop: '20px' }}>
+            <Link href="/" className="btn btn-primary">
+              Go to Sign In
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.page}>

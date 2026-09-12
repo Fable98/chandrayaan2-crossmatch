@@ -365,11 +365,13 @@ def _normalize_triplet(data: dict, default_id: str | None = None, region_dir: st
 
     triplet["dem_available"] = has_dem
     if has_dem:
-        reg_dem_filename = f"{triplet['id']}_dem_512.png"
-        if os.path.isfile(os.path.join(DATA_DIR, "images", "dem", reg_dem_filename)):
-            triplet["dem_url"] = f"/images/dem/{reg_dem_filename}"
-        else:
-            triplet["dem_url"] = "/images/dem/dem_512.png"
+        # Per-region DEM URL (resolves to processed_triplets/<id>/dem_512.png
+        # via the backend router and public/images/dem/<id>.png via Next.js).
+        # The old generic /images/dem/dem_512.png served whichever region's
+        # DEM happened to match first (region_001's) for EVERY region — the
+        # same mislabeling class as the LRO-tile incident — so it is no
+        # longer advertised here.
+        triplet["dem_url"] = f"/images/dem/{triplet['id']}"
     else:
         triplet["dem_url"] = None
 
@@ -384,7 +386,10 @@ def _normalize_triplet(data: dict, default_id: str | None = None, region_dir: st
 
     # Check LRO NAC (NASA Lunar Reconnaissance Orbiter Narrow Angle Camera) reference availability
     has_lro = False
-    lro_dir = os.path.join(REPO_ROOT, "data_preprocessing_pipeline", "lro_nac_pairs", triplet["id"])
+    # Real downloaded CDRs first; legacy synthetic-proxy dir kept as fallback.
+    lro_dir = os.path.join(REPO_ROOT, "data_preprocessing_pipeline", "lro_nac_real", triplet["id"])
+    if not os.path.isdir(lro_dir):
+        lro_dir = os.path.join(REPO_ROOT, "data_preprocessing_pipeline", "lro_nac_pairs", triplet["id"])
     if os.path.isdir(lro_dir) or triplet.get("lro_nac_available"):
         has_lro = True
         lro_manifest_file = os.path.join(lro_dir, "manifest.json")

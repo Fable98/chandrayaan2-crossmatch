@@ -17,6 +17,9 @@ interface Props {
   tripletId: string;
   points: MatchPoint[];
   referenceMode?: "tmc" | "lro_nac";
+  // Optional provenance notice (e.g. why zero dots are shown despite
+  // reported inliers). Rendered as an honest banner, never silently empty.
+  notice?: string | null;
 }
 
 interface Selection {
@@ -52,7 +55,7 @@ function findNearestMatch(
   return { match: best, index: bestIdx, distance: bestDist };
 }
 
-export default function LinkedCursorPanel({ tripletId, points, referenceMode = "tmc" }: Props) {
+export default function LinkedCursorPanel({ tripletId, points, referenceMode = "tmc", notice = null }: Props) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [clickNotice, setClickNotice] = useState<string | null>(null);
@@ -122,6 +125,13 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
           Stage 4: LK Refinement
         </span>
       </div>
+
+      {notice && points.length === 0 && (
+        <div className="mx-5 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 font-mono text-[11px] leading-relaxed text-amber-800">
+          <span className="font-black uppercase tracking-wider">No correspondence dots: </span>
+          {notice}
+        </div>
+      )}
 
       {/* Dual Canvas Arena */}
       <div className="grid flex-1 grid-cols-1 md:grid-cols-[1fr_auto_1fr] items-center gap-4 p-5">

@@ -4,7 +4,7 @@
 
 1. **The Problem:** Chandrayaan-2 images have sun-angle variation, ~20× OHRC↔TMC scale gap (~275× to IIRS overlay-only), and 3D topographic relief. Pretrained deep matchers break here because brightness constancy is violated by shadows.
 
-2. **Our Solution:** Deterministic structural pipeline (single-channel Phase Congruency + Fourier phase correlation + Lucas-Kanade) with moderate gain/bias tolerance — explicitly NOT claimed sun-angle invariant (162° diametric reversal correctly fails closed). LoFTR baseline retained for comparison (`ML_model/matcher.py`).
+2. **Our Solution:** Deterministic structural pipeline (single-channel Phase Congruency + Fourier phase correlation + Lucas-Kanade) with moderate gain/bias tolerance — explicitly NOT claimed sun-angle invariant (162° diametric reversal yields only fragile LOW fits, never invariance). LoFTR baseline retained for comparison (`ML_model/matcher.py`).
 
 3. **The 8-Phase Pipeline:** Walk through README §8-Phase table. Emphasize honest status: Phase 1 CLAHE+mask done; Phase 2 pyramid built but matching uses Level 0; Phase 3 ~20× via common-GSD resampling (not invariant descriptor); Phase 4 RandomForest is an untrained scaffold/pass-through; Phase 5 per-point sub-pixel true, full-scene fit 0.99–1.83 px; Phase 6 Grid NMS + macro-cell + SSC done but density low (6–7 inliers, 6–7% @10×10); Phase 7 weighted-RANSAC mechanism present but effectively standard RANSAC until Phase 4 trained; Phase 8 80/20 held-out implemented (not computable at <8 inliers).
 
@@ -26,4 +26,4 @@ A: Two places: (1) Supervised RandomForest outlier gate — interface implemente
 A: Forward-backward consistency (0.08–0.31 px per-point tracking), RANSAC 5.0 px gate, conditioning/distortion gates, spatial-support gate, and 80/20 held-out validation when ≥8 inliers (currently N/A on primary pairs — reported, not hidden). Canonical fixed 10×10 coverage + entropy uniformity via `metrics.py`.
 
 **Q: What happens on failure?**
-A: Clean failure with status codes (`insufficient_correspondences`, `geometric_verification_failed`, distortion rejection, `cycle_not_computable`). Demo: `triplet_new_2022` 162° sun-flip fails closed. No identity fallback.
+A: Clean failure with status codes (`insufficient_correspondences`, `geometric_verification_failed`, distortion rejection, `cycle_not_computable`). Demo: `triplet_new_2022` 162° hardest case (fragile LOW success, null held-out — formerly a clean Gate-3 refusal; both outcomes on record). No identity fallback.
