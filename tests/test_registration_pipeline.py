@@ -381,6 +381,137 @@ def test_real_20x_scale_disparity_registration():
 
 
 # ---------------------------------------------------------------------------
+# Test 9b: STRESSED 20x native-tiling — illumination mismatch + rotation/shear
+# ---------------------------------------------------------------------------
+def test_stressed_20x_scale_disparity_illumination_and_shear():
+    """
+    Stressed sibling of test_real_20x_scale_disparity_registration.
+
+    Same 20x OHRC (0.25 m/px, 1024px) -> TMC-2 (5.0 m/px, 51px) bridge and the
+    same ground-truth accounting, but the pair is degraded the way real
+    two-acquisition pairs actually differ, stressing what native tiling is
+    FOR (full-res detail preservation under adversity):
+
+    (i)  Photometric mismatch: OHRC gets a multiplicative diagonal ramp
+         (0.65 + 0.70 * ramp); TMC-2 gets gamma 1.35, a reversed ramp and a
+         +8 bias — simulating different sun angles / sensor gains.
+    (ii) Geometry beyond translation: 1.5-degree rotation about the frame
+         centre plus 0.01 shear, on top of the (+40, -20) px OHRC shift.
+         Expected TMC translation is therefore 0.05 * M[0:2, 2] of the exact
+         warp matrix used (centre-rotation offset included, computed below —
+         not hand-derived), asserted within +-0.75 px.
+    (iii) Heterogeneous terrain: two-octave smooth base, dense crater cluster
+         on the left half, sparse feature-poor mare on the right half, plus
+         linear ridges — so some native tiles are texture-starved.
+
+    Asserts native_tiling_applied still fires with a sane tile count
+    (1024px frame / 512px tiles / 384px stride -> exactly 2x2 = 4 tiles),
+    scale recovers 0.05 on both axes, and the full output package is written.
+
+    Explicit scope: SYNTHETIC terrain and SYNTHETIC degradations. This is not
+    real-imagery validation of the tiling path (no native-resolution orbital
+    pair exists in this repo — see STEP 1 audit); confidence stays at
+    "mechanism stressed", never "validated on real data".
+    """
+    np.random.seed(7)
+    h_ohrc, w_ohrc = 1024, 1024
+    yy, xx = np.mgrid[0:h_ohrc, 0:w_ohrc]
+
+    # Heterogeneous terrain: smooth two-octave base ...
+    master = np.random.uniform(60, 170, size=(h_ohrc, w_ohrc)).astype(np.float32)
+    master = 0.6 * cv2.GaussianBlur(master, (21, 21), 5.0) + 0.4 * cv2.GaussianBlur(master, (5, 5), 1.0)
+    # ... dense crater cluster on the left (feature-rich) ...
+    for _ in range(70):
+        cx, cy = np.random.randint(60, 500), np.random.randint(60, 964)
+        rad = np.random.randint(12, 50)
+        val = np.random.uniform(120, 255)
+        cv2.circle(master, (cx, cy), rad, val, -1)
+        cv2.circle(master, (cx, cy), max(3, rad - 7), val * 0.45, -1)
+    # ... sparse mare on the right (feature-poor) ...
+    for _ in range(12):
+        cx, cy = np.random.randint(560, 964), np.random.randint(60, 964)
+        rad = np.random.randint(15, 45)
+        val = np.random.uniform(120, 220)
+        cv2.circle(master, (cx, cy), rad, val, -1)
+        cv2.circle(master, (cx, cy), max(3, rad - 7), val * 0.5, -1)
+    # ... plus linear ridges everywhere.
+    for _ in range(6):
+        x0, y0 = np.random.randint(0, w_ohrc), np.random.randint(0, h_ohrc)
+        x1, y1 = np.random.randint(0, w_ohrc), np.random.randint(0, h_ohrc)
+        cv2.line(master, (x0, y0), (x1, y1), 210, 2)
+    master = cv2.GaussianBlur(master, (0, 0), 1.5)
+
+    # Geometry: rotate 1.5 deg about centre + 0.01 shear + translate (+40, -20) px.
+    warp_m = cv2.getRotationMatrix2D((w_ohrc / 2.0, h_ohrc / 2.0), 1.5, 1.0)
+    warp_m[0, 1] += 0.01
+    warp_m[0, 2] += 40.0
+    warp_m[1, 2] += -20.0
+    ohrc_geo = master
+    tmc_geo = cv2.warpAffine(master, warp_m, (w_ohrc, h_ohrc), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+
+    # Downsample warped branch to TMC-2 resolution (51x51 @ 5.0 m/px).
+    w_tmc, h_tmc = 51, 51
+    tmc_small = cv2.resize(tmc_geo, (w_tmc, h_tmc), interpolation=cv2.INTER_AREA)
+
+    # Independent per-sensor photometric stress (two different acquisitions).
+    ramp_o = (xx / w_ohrc + yy / h_ohrc) / 2.0
+    ohrc_raw = np.clip(
+        ohrc_geo * (0.65 + 0.70 * ramp_o) + np.random.normal(0, 5, ohrc_geo.shape), 0, 255
+    ).astype(np.uint8)
+    yy5, xx5 = np.mgrid[0:h_tmc, 0:w_tmc]
+    ramp_t = (xx5 / w_tmc + yy5 / h_tmc) / 2.0
+    tmc_raw = np.clip(
+        ((tmc_small / 255.0) ** 1.35) * 255.0 * (0.80 + 0.40 * (1.0 - ramp_t))
+        + 8.0 + np.random.normal(0, 4, tmc_small.shape),
+        0, 255,
+    ).astype(np.uint8)
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        p_ohrc = Path(tmpdir) / "test_ohrc_stressed.png"
+        p_tmc = Path(tmpdir) / "test_tmc_stressed.png"
+        p_out = Path(tmpdir) / "output_20x_stressed"
+        cv2.imwrite(str(p_ohrc), ohrc_raw)
+        cv2.imwrite(str(p_tmc), tmc_raw)
+
+        res = match_images_cfog(
+            p_ohrc,
+            p_tmc,
+            output_dir=p_out,
+            source_sensor="OHRC",
+            reference_sensor="TMC-2",
+            explicit_gsd1=0.25,
+            explicit_gsd2=5.0,
+        )
+
+        assert res["status"] == "success", f"stressed 20x registration failed: {res.get('message')}"
+        assert res["homography"] is not None
+
+        # Native tiling must fire with the deterministic 2x2 tile layout.
+        assert res["metadata"]["native_tiling_applied"] is True
+        assert res["metadata"]["native_tile_count"] == 4
+
+        # Scale must recover the 20x bridge on both axes despite shear.
+        H = np.array(res["homography"])
+        scale_x = float(np.sqrt(H[0, 0] ** 2 + H[1, 0] ** 2))
+        scale_y = float(np.sqrt(H[0, 1] ** 2 + H[1, 1] ** 2))
+        assert abs(scale_x - 0.05) < 0.005, f"Scale X deviation: {scale_x}"
+        assert abs(scale_y - 0.05) < 0.005, f"Scale Y deviation: {scale_y}"
+
+        # Translation: 0.05 * warp translation part (centre-rotation offset
+        # already baked into warp_m[0:2, 2] by getRotationMatrix2D).
+        exp_tx = float(0.05 * warp_m[0, 2])
+        exp_ty = float(0.05 * warp_m[1, 2])
+        assert abs(float(H[0, 2]) - exp_tx) < 0.75, f"TX: {float(H[0, 2])} vs {exp_tx}"
+        assert abs(float(H[1, 2]) - exp_ty) < 0.75, f"TY: {float(H[1, 2])} vs {exp_ty}"
+
+        outputs = res["outputs"]
+        assert os.path.exists(outputs["registered_raster"])
+        assert os.path.exists(outputs["matches"])
+        assert os.path.exists(outputs["metrics"])
+        assert res["metrics"]["inlier_count"] >= 4
+
+
+# ---------------------------------------------------------------------------
 # Test 10: Metadata Safety Rejects Unknown Sensor Without Explicit GSD
 # ---------------------------------------------------------------------------
 def test_metadata_safety_rejects_unknown_without_gsd():
