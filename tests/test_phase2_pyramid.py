@@ -10,10 +10,12 @@ Covers:
   d) Ablation (pyramid ON vs finest_scale_only): the L1 cascade must not
      reduce support on real pairs; flags must record the mode honestly.
   e) Real-data regression pins: classical (Phase-1-off) status / inliers /
-     fit-RMSE on region_001-006 + both triplets, measured on the CURRENT
-     tree (post-cascade 5ab379d, post-weighted-fix 89f920b). README section 6
-     predates the cascade; finest_scale_only reproduces those older numbers
-     exactly (mechanism verified, not drift) — see test docstrings.
+     fit-RMSE on all 8 benchmark pairs, measured on the CURRENT tree
+     (post-cascade 5ab379d, post-PR#32 re-weighting, post-35842a8 PROSAC
+     validity rework). README section 6 predates the cascade;
+     finest_scale_only reproduces those older support counts exactly.
+     region_004 is pinned ON (recovered by 35842a8) with its OFF-mode
+     fallback pinned alongside.
 """
 
 import sys
@@ -132,8 +134,16 @@ def test_ablation_l1_cascade_does_not_reduce_support(tmp_path):
 
 
 # Classical (Phase-1-off) pins measured on the current tree: post-cascade
-# (5ab379d) + post-weighted-RANSAC-fix (89f920b) + post-PR#32 9-feature model (e9e8998).
-# README section 6 predates the cascade; finest_scale_only reproduces those older numbers.
+# (5ab379d) + post-weighted-RANSAC-fix (89f920b) + post-PR#32 9-feature model
+# + PROSAC validity rework (35842a8). History, verified by re-measurement:
+#   * README section 6 (2026-09-11) predates the cascade; finest_scale_only
+#     reproduces those older support counts exactly (e.g. region_001 49
+#     candidates), so that delta is the cascade working, not drift.
+#   * PR #32 re-weighted consensus (region_002 8->10 inliers, triplet_new_2022
+#     7->9) and briefly regressed region_004 to Gate2-FAIL under cascade-ON +
+#     trained weights; the per-iteration Gate-3-valid refit in 35842a8
+#     resolved it (004 back to success). Two independent re-measurements
+#     agree on every pin below.
 REGRESSION_PINS = {
     # name: (src, ref, status, inliers, rmse_px, match_count)
     "region_001": ("region_001/ohrc_512.png", "region_001/tmc_512.png", "success", 7, 1.67, 75),
@@ -158,3 +168,20 @@ def test_classical_benchmark_regression_pins(name, tmp_path):
     assert int(m.get("inlier_count")) == inliers, f"{name}: inliers {m.get('inlier_count')}"
     assert int(m.get("match_count")) == all_matches, f"{name}: matches {m.get('match_count')}"
     assert abs(float(m.get("fit_rmse_px")) - rmse) < 0.05, f"{name}: rmse {m.get('fit_rmse_px')}"
+
+
+def test_region_004_finest_scale_only_escape_hatch(tmp_path):
+    """region_004 succeeds (7 inliers) with the cascade disabled.
+
+    Retained as fallback-path coverage: during the PR#32 re-weighting the
+    cascade-ON path transiently failed Gate2 here while OFF stayed green.
+    Must stay green.
+    """
+    src, ref = "region_004/ohrc_512.png", "region_004/tmc_512.png"
+    if not (TRIPLETS / src).exists():
+        pytest.skip(f"{src} not on disk")
+    res = _run_pair("pin_004_off", src, ref, tmp_path, finest_scale_only=True)
+    assert res.get("status") == "success"
+    m = res.get("metrics") or {}
+    assert int(m.get("inlier_count")) == 7
+    assert abs(float(m.get("fit_rmse_px")) - 2.71) < 0.05
