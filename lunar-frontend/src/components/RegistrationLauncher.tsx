@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { API_BASE, imageUrl } from "@/lib/api";
+import LunarGlobe from "@/components/hero/LunarGlobe";
+import type { MoonPoint, MoonPointsResponse } from "@/lib/backend-types";
 
 type Sensor = "OHRC" | "TMC" | "IIRS" | "LRO_NAC";
 
@@ -38,6 +40,8 @@ type RegistrationResult = {
   matches_url?: string | null;
   raster_url?: string | null;
   quiver_url?: string | null;
+  job_id?: string | null;
+  report_url?: string | null;
 };
 
 type MatchPoint = {
@@ -105,6 +109,8 @@ const SAMPLE_PAIRS: SamplePair[] = [
       reference_url: "/images/tmc/region_001",
       matches_url: null,
       raster_url: null,
+      job_id: "region_001",
+      report_url: "/api/registration/report/region_001",
     },
     demoPoints: [
       { image1_x: 332, image1_y: 25, image2_x: 285, image2_y: 28, confidence: 0.92 },
@@ -154,6 +160,8 @@ const SAMPLE_PAIRS: SamplePair[] = [
       reference_url: "/images/lro_nac/region_001",
       matches_url: null,
       raster_url: null,
+      job_id: "region_001",
+      report_url: "/api/registration/report/region_001",
     },
     demoPoints: [
       { image1_x: 64, image1_y: 64, image2_x: 66, image2_y: 65, confidence: 0.98 },
@@ -205,6 +213,8 @@ const SAMPLE_PAIRS: SamplePair[] = [
       reference_url: "/images/lro_nac/region_003",
       matches_url: null,
       raster_url: null,
+      job_id: "region_003",
+      report_url: "/api/registration/report/region_003",
     },
     demoPoints: [
       { image1_x: 64, image1_y: 64, image2_x: 65, image2_y: 65, confidence: 0.97 },
@@ -247,6 +257,8 @@ const SAMPLE_PAIRS: SamplePair[] = [
       reference_url: "/images/iirs/region_001",
       matches_url: null,
       raster_url: null,
+      job_id: "region_001",
+      report_url: "/api/registration/report/region_001",
     },
     demoPoints: [],
   },
@@ -289,6 +301,8 @@ const SAMPLE_PAIRS: SamplePair[] = [
       reference_url: "/images/tmc/triplet_new_2022",
       matches_url: null,
       raster_url: null,
+      job_id: "triplet_new_2022",
+      report_url: "/api/registration/report/triplet_new_2022",
     },
     // Exact coords from data_preprocessing_pipeline/matches/triplet_new_2022_matches.json
     demoPoints: [
@@ -547,6 +561,44 @@ export default function RegistrationLauncher() {
   const [points, setPoints] = useState<MatchPoint[]>(defaultSample.demoPoints);
   const [selectedSample, setSelectedSample] = useState<SamplePair | null>(defaultSample);
   const [customMode, setCustomMode] = useState(false);
+  const [resultView, setResultView] = useState<"2d" | "3d">("2d");
+  const [moonPoints, setMoonPoints] = useState<MoonPoint[]>([]);
+  const [moonPointsLoading, setMoonPointsLoading] = useState(false);
+
+  useEffect(() => {
+    const jobId = result?.job_id;
+    if (!jobId) {
+      setMoonPoints([]);
+      return;
+    }
+
+    let active = true;
+    setMoonPointsLoading(true);
+
+    fetch(`${API_BASE}/api/registration/moon-points/${jobId}`)
+      .then((res) => {
+        if (!res.ok) return null;
+        return res.json() as Promise<MoonPointsResponse>;
+      })
+      .then((data) => {
+        if (!active) return;
+        if (data && Array.isArray(data.points)) {
+          setMoonPoints(data.points);
+        } else {
+          setMoonPoints([]);
+        }
+      })
+      .catch(() => {
+        if (active) setMoonPoints([]);
+      })
+      .finally(() => {
+        if (active) setMoonPointsLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [result?.job_id]);
 
   const handleSourceFile = (file: File | null) => {
     setSourceFile(file);
@@ -593,6 +645,8 @@ export default function RegistrationLauncher() {
   const reset = () => {
     setResult(null);
     setPoints([]);
+    setResultView("2d");
+    setMoonPoints([]);
     setResultProvenance("snapshot");
     setError(null);
     setSelectedSample(null);
@@ -1367,24 +1421,104 @@ export default function RegistrationLauncher() {
             </div>
           </div>
 
-          {/* Source & Reference Overlays */}
-          <div className="grid gap-4 lg:grid-cols-2">
-            <OverlayImage
-              title={`Source Image · ${sourceSensor}`}
-              src={sourcePrimarySrc}
-              fallbackSrc={sourceFallbackSrc}
-              secondaryFallback={sourcePreview}
-              points={points}
-              side="source"
-            />
-            <OverlayImage
-              title={`Reference Image · ${referenceSensor}`}
-              src={referencePrimarySrc}
-              fallbackSrc={referencePreview}
-              points={points}
-              side="reference"
-            />
+          {/* View Mode Toggle: 2D Planar Verification vs 3D Lunar Globe */}
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setResultView("2d")}
+                className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+                  resultView === "2d"
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+                }`}
+              >
+                <span>🔍 2D Planar Verification</span>
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                    resultView === "2d" ? "bg-indigo-500/80 text-white" : "bg-slate-200 text-slate-600"
+                  }`}
+                >
+                  {points.length}
+                </span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setResultView("3d")}
+                className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+                  resultView === "3d"
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+                }`}
+              >
+                <span>🌕 3D Lunar Globe Tie-Points</span>
+                {moonPoints.length > 0 && (
+                  <span
+                    className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                      resultView === "3d" ? "bg-indigo-500/80 text-white" : "bg-slate-200 text-slate-600"
+                    }`}
+                  >
+                    {moonPoints.filter((p) => p.georeferenced).length}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {resultView === "3d" && (
+              <span className="text-[11px] text-slate-500">
+                Drag to rotate sphere · Scroll to zoom
+              </span>
+            )}
           </div>
+
+          {resultView === "2d" ? (
+            /* Source & Reference Overlays */
+            <div className="grid gap-4 lg:grid-cols-2">
+              <OverlayImage
+                title={`Source Image · ${sourceSensor}`}
+                src={sourcePrimarySrc}
+                fallbackSrc={sourceFallbackSrc}
+                secondaryFallback={sourcePreview}
+                points={points}
+                side="source"
+              />
+              <OverlayImage
+                title={`Reference Image · ${referenceSensor}`}
+                src={referencePrimarySrc}
+                fallbackSrc={referencePreview}
+                points={points}
+                side="reference"
+              />
+            </div>
+          ) : (
+            /* 3D Lunar Globe View */
+            <div className="relative h-[480px] w-full overflow-hidden rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-950 via-[#0a0f1d] to-slate-950 shadow-inner">
+              <LunarGlobe
+                tiePoints={moonPoints}
+                className="absolute inset-0 h-full w-full cursor-grab active:cursor-grabbing"
+              />
+              {/* Globe Overlay HUD */}
+              <div className="pointer-events-none absolute left-4 top-4 z-20 flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-slate-900/85 px-3 py-1.5 shadow backdrop-blur">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span className="text-xs font-mono font-bold text-slate-200">
+                    {moonPointsLoading
+                      ? "Fetching 3D coordinates..."
+                      : `${moonPoints.filter((p) => p.georeferenced).length} Georeferenced Lunar Coordinates`}
+                  </span>
+                </div>
+                {result?.job_id && (
+                  <span className="text-[10px] font-mono text-slate-400">
+                    Region/Job: {result.job_id}
+                  </span>
+                )}
+              </div>
+
+              <div className="pointer-events-none absolute bottom-4 right-4 z-20 rounded-lg border border-white/10 bg-slate-900/85 px-3 py-1.5 text-[11px] font-medium text-slate-300 backdrop-blur">
+                Spherical Projection · True Lunar Coordinate Mapping
+              </div>
+            </div>
+          )}
 
           {/* Action Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
@@ -1396,7 +1530,21 @@ export default function RegistrationLauncher() {
                 <span className="ml-2 text-rose-400">●</span> Low Confidence
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap items-center gap-2">
+              {result.job_id && (
+                <a
+                  href={`${API_BASE}/api/registration/report/${result.job_id}`}
+                  download={`ISRO_Registration_Report_${result.job_id}.pdf`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-600 bg-indigo-600 px-3.5 py-2 text-[11px] font-bold text-white shadow-sm transition hover:bg-indigo-700 hover:shadow"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  ISRO Verification Report (PDF)
+                </a>
+              )}
               <DownloadLink href={result.warped_url} label="Warped PNG" />
               <DownloadLink href={result.raster_url} label="Registered GeoTIFF" />
               <DownloadLink href={result.matches_url} label="matches.json" />

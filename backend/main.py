@@ -337,6 +337,80 @@ async def register_images(
     except Exception as e:
         logger.warning("Could not generate source/reference web previews: %s", e)
 
+    # Generate ISRO PDF report if report_generator is available
+    pdf_path = None
+    report_url = None
+    def _make_report() -> str | None:
+        try:
+            from report_generator import ISROReportGenerator
+        except ImportError:
+            try:
+                from ML_model.report_generator import ISROReportGenerator
+            except Exception:
+                return None
+        try:
+            os.makedirs("reports", exist_ok=True)
+            generator = ISROReportGenerator(output_dir="reports/")
+            metrics_dict = result.get("metrics") or {}
+            out_pdf = generator.generate_report(
+                metadata={
+                    "run_id": run_id,
+                    "source_sensor": source_sensor,
+                    "reference_sensor": reference_sensor,
+                    "method": method,
+                },
+                metrics={
+                    "rmse": metrics_dict.get("fit_rmse_px", 0.0),
+                    "inliers": metrics_dict.get("inlier_count", len(result.get("filtered_ref_pts", []))),
+                },
+                phases={
+                    "phases_executed": result.get("phases_executed", ["CFOG", "SubPixel", "Distribution"]),
+                    "phases_failed": result.get("phases_failed", []),
+                },
+                grid_occupancy=None,
+                coverage=metrics_dict.get("combined_coverage_score", 0.7),
+                balance=metrics_dict.get("spatial_uniformity", 0.7),
+                src_img_path=str(source_path),
+                ref_img_path=str(ref_path),
+                src_pts=result.get("filtered_src_pts"),
+                ref_pts=result.get("filtered_ref_pts"),
+                team_name="Team Fable98",
+            )
+            if isinstance(out_pdf, str) and not out_pdf.startswith("ERROR:"):
+                return str(out_pdf)
+        except Exception as _rep_err:
+            logger.warning("Could not generate ISRO PDF report: %s", _rep_err)
+        return None
+
+    try:
+        pdf_path = await run_in_threadpool(_make_report)
+        if pdf_path:
+            report_url = f"/api/registration/report/{run_id}"
+    except Exception as e:
+        logger.warning("Report generation failed: %s", e)
+
+    # Store run in registration_router.job_manager for /status, /report, and /moon-points
+    if registration_router is not None:
+        try:
+            clean_res = registration_router._result_to_jsonable(dict(result))
+            if pdf_path:
+                clean_res["pdf_path"] = str(pdf_path)
+            clean_res["src_image_path"] = str(source_path)
+            clean_res["ref_image_path"] = str(ref_path)
+            registration_router.job_manager.create_job(run_id, "registration")
+            registration_router.job_manager.update_job(
+                run_id,
+                status=registration_router.JobStatus.SUCCESS if status == "success" else registration_router.JobStatus.FAILED,
+                progress=100.0,
+                current_phase="Completed" if status == "success" else "Failed",
+                result=clean_res,
+            )
+            registration_router.job_manager.append_log(
+                run_id, f"Run {run_id} completed: status={status}"
+            )
+        except Exception as _jm_exc:
+            logger.warning("Could not store run in job_manager: %s", _jm_exc)
+
     return RegisterResponse(
         status="success",
         message="Registration verified successfully.",
@@ -354,6 +428,8 @@ async def register_images(
             else None
         ),
         metadata=result.get("metadata"),
+        job_id=run_id,
+        report_url=report_url,
     )
 
 

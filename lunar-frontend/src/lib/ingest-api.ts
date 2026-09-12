@@ -109,3 +109,25 @@ export async function getResults(jobId: string): Promise<JobResult> {
   }
   return res.json();
 }
+
+export interface IngestJobSummary {
+  job_id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  stage: string;
+  progress_pct: number;
+  started_at: string | null;
+  completed_at: string | null;
+}
+
+/**
+ * List all past and active ingest jobs.
+ */
+export async function listJobs(): Promise<IngestJobSummary[]> {
+  const res = await fetch(`${API_BASE}/jobs`, {
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) {
+    throw new Error(`Jobs listing failed: ${res.statusText}`);
+  }
+  return res.json();
+}

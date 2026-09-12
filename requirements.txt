@@ -21,3 +21,4 @@ matplotlib==3.10.8
 scikit-image==0.26.0
 scikit-learn==1.9.0
 scipy==1.17.1
+reportlab==5.0.1

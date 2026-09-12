@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+
+import type { MoonPoint } from "@/lib/backend-types";
 
 export type PayloadMode = "optical" | "iirs" | "dem";
 export type LunarPhase = "crescent" | "quarter" | "gibbous" | "full" | "new";
@@ -10,6 +12,8 @@ interface Props {
   payloadMode?: PayloadMode;
   phase?: LunarPhase;
   autoRotate?: boolean;
+  tiePoints?: MoonPoint[];
+  className?: string;
 }
 
 // Generate realistic procedural lunar textures via HTML5 Canvas
@@ -227,11 +231,14 @@ export default function LunarGlobe({
   payloadMode = "optical",
   phase = "crescent",
   autoRotate = true,
+  tiePoints,
+  className,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<THREE.WebGLRenderer | null>(null);
   const sceneRef = useRef<THREE.Scene | null>(null);
   const moonRef = useRef<THREE.Mesh | null>(null);
+  const pointsGroupRef = useRef<THREE.Group | null>(null);
   const sunLightRef = useRef<THREE.DirectionalLight | null>(null);
   const animFrameId = useRef<number | null>(null);
 
@@ -239,6 +246,7 @@ export default function LunarGlobe({
   const isDragging = useRef(false);
   const prevPointer = useRef({ x: 0, y: 0 });
   const rotVel = useRef({ x: 0, y: 0.0012 });
+  const [globeReady, setGlobeReady] = useState(false);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -415,8 +423,10 @@ export default function LunarGlobe({
     };
 
     animFrameId.current = requestAnimationFrame(animate);
+    setGlobeReady(true);
 
     return () => {
+      setGlobeReady(false);
       window.removeEventListener("resize", handleResize);
       dom.removeEventListener("mousedown", onPointerDown);
       window.removeEventListener("mousemove", onPointerMove);
@@ -434,6 +444,112 @@ export default function LunarGlobe({
       glowMat.dispose();
     };
   }, [payloadMode, autoRotate]);
+
+  // Render 3D Lunar Tie-Points on the globe
+  useEffect(() => {
+    const moon = moonRef.current;
+    if (!moon || !globeReady) return;
+
+    // Clean up previous points group if any
+    if (pointsGroupRef.current) {
+      moon.remove(pointsGroupRef.current);
+      pointsGroupRef.current.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry?.dispose();
+          if (Array.isArray(child.material)) {
+            child.material.forEach((m) => m.dispose());
+          } else {
+            child.material?.dispose();
+          }
+        }
+      });
+      pointsGroupRef.current = null;
+    }
+
+    if (!tiePoints || tiePoints.length === 0) return;
+
+    const group = new THREE.Group();
+    const radius = 2.35 * 1.018; // slightly above sphere radius (2.35)
+
+    let sumX = 0;
+    let sumY = 0;
+    let sumZ = 0;
+    let validCount = 0;
+
+    tiePoints.forEach((pt) => {
+      if (pt.latitude === null || pt.latitude === undefined || pt.longitude === null || pt.longitude === undefined) {
+        return;
+      }
+      const lat = pt.latitude;
+      const lon = pt.longitude;
+
+      const polar = (90 - lat) * (Math.PI / 180);
+      const lon360 = lon < 0 ? lon + 360 : lon;
+      const phi = (lon360 / 360) * 2 * Math.PI;
+
+      const x = -radius * Math.cos(phi) * Math.sin(polar);
+      const y = radius * Math.cos(polar);
+      const z = radius * Math.sin(phi) * Math.sin(polar);
+
+      sumX += x;
+      sumY += y;
+      sumZ += z;
+      validCount++;
+
+      const conf = pt.confidence ?? 0.9;
+      const colorHex = conf >= 0.8 ? 0x10b981 : conf >= 0.5 ? 0xf59e0b : 0xf43f5e;
+
+      // Marker sphere
+      const markerGeo = new THREE.SphereGeometry(0.045, 16, 16);
+      const markerMat = new THREE.MeshBasicMaterial({ color: colorHex });
+      const markerMesh = new THREE.Mesh(markerGeo, markerMat);
+      markerMesh.position.set(x, y, z);
+      group.add(markerMesh);
+
+      // Outer glowing ring
+      const ringGeo = new THREE.RingGeometry(0.06, 0.09, 24);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: colorHex,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.75,
+      });
+      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      ringMesh.position.set(x, y, z);
+      const normal = new THREE.Vector3(x, y, z).normalize();
+      ringMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), normal);
+      group.add(ringMesh);
+    });
+
+    if (validCount > 0) {
+      moon.add(group);
+      pointsGroupRef.current = group;
+
+      // Orient the globe towards the tie-point centroid so points face the user
+      const centerAngle = Math.atan2(sumX, sumZ);
+      moon.rotation.y = -centerAngle;
+      if (autoRotate) {
+        rotVel.current = { x: 0, y: 0.0008 };
+      }
+    }
+
+    return () => {
+      if (moon && pointsGroupRef.current) {
+        moon.remove(pointsGroupRef.current);
+        pointsGroupRef.current.traverse((child) => {
+          if (child instanceof THREE.Mesh) {
+            child.geometry?.dispose();
+            if (Array.isArray(child.material)) {
+              child.material.forEach((m) => m.dispose());
+            } else {
+              child.material?.dispose();
+            }
+          }
+        });
+        pointsGroupRef.current = null;
+      }
+    };
+  }, [tiePoints, globeReady, autoRotate]);
 
   // Handle phase changes (Sun angle lighting direction)
   useEffect(() => {
@@ -467,7 +583,7 @@ export default function LunarGlobe({
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 z-10 h-full w-full cursor-grab active:cursor-grabbing"
+      className={className ?? "absolute inset-0 z-10 h-full w-full cursor-grab active:cursor-grabbing"}
     />
   );
 }

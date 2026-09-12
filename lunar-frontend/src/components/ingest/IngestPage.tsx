@@ -10,9 +10,11 @@ import {
   uploadZips,
   pollStatus,
   getResults,
+  listJobs,
   DEFAULT_CONFIG,
   type IngestConfig,
   type JobStatus,
+  type IngestJobSummary,
 } from '@/lib/ingest-api';
 
 type Phase = 'idle' | 'queued' | 'processing' | 'done' | 'error';
@@ -172,7 +174,41 @@ export default function IngestPage() {
   const [status, setStatus] = useState<JobStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [resultTriplets, setResultTriplets] = useState<Record<string, any>[]>([]);
+  const [activeTab, setActiveTab] = useState<'new' | 'history'>('new');
+  const [historyJobs, setHistoryJobs] = useState<IngestJobSummary[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
+
+  const loadHistoryJobs = useCallback(async () => {
+    setHistoryLoading(true);
+    setHistoryError(null);
+    try {
+      const jobs = await listJobs();
+      setHistoryJobs(jobs);
+    } catch (err: any) {
+      setHistoryError(err.message || 'Failed to load past ingestion jobs');
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadHistoryJobs();
+  }, [loadHistoryJobs]);
+
+  const handleSelectHistoricalJob = useCallback(async (selectedId: string) => {
+    setError(null);
+    try {
+      const results = await getResults(selectedId);
+      setJobId(selectedId);
+      setResultTriplets(results.triplets || []);
+      setPhase('done');
+      setActiveTab('new');
+    } catch (err: any) {
+      setError(`Failed to fetch results for job ${selectedId}: ${err.message}`);
+    }
+  }, []);
 
   // Add files (dedup by name)
   const handleFilesSelected = useCallback((newFiles: File[]) => {
@@ -318,220 +354,397 @@ export default function IngestPage() {
         </p>
       </div>
 
-      {/* Drop Zone */}
-      {(phase === 'idle' || phase === 'queued') && (
-        <div style={styles.section}>
-          <DropZone
-            onFilesSelected={handleFilesSelected}
-            disabled={isProcessing}
-          />
-        </div>
-      )}
-
-      {/* File list */}
-      {files.length > 0 && phase !== 'done' && (
-        <div style={styles.section} className="animate-fade-in">
-          <div style={styles.fileList}>
-            {files.map((f) => (
-              <div key={f.name} style={styles.fileChip}>
-                <span>&#128230;</span>
-                <span>{f.name}</span>
-                <span style={styles.fileSize}>{fmtSize(f.size)}</span>
-                {!isProcessing && (
-                  <button
-                    style={styles.removeBtn}
-                    onClick={() => removeFile(f.name)}
-                    title="Remove file"
-                    onMouseEnter={(e) => {
-                      (e.target as HTMLElement).style.color = 'var(--accent-danger)';
-                    }}
-                    onMouseLeave={(e) => {
-                      (e.target as HTMLElement).style.color = 'var(--text-muted)';
-                    }}
-                  >
-                    &times;
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-
-          {/* Stats + Actions */}
-          <div style={styles.actionsRow}>
-            <div style={styles.stats}>
-              <span>
-                <span style={styles.statValue}>{files.length}</span> file(s)
-              </span>
-              <span>
-                <span style={styles.statValue}>{fmtSize(totalSize)}</span> total
-              </span>
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              {!isProcessing && (
-                <button className="btn btn-secondary btn-sm" onClick={clearFiles}>
-                  Clear All
-                </button>
-              )}
-              {!isProcessing && (
-                <button
-                  className="btn btn-primary"
-                  onClick={handleStart}
-                  disabled={files.length === 0}
-                >
-                  Start Processing
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Config panel */}
-      {files.length > 0 && !isProcessing && phase !== 'done' && (
-        <div style={styles.configPanel}>
-          <div
-            style={styles.configToggle}
-            onClick={() => setShowConfig(!showConfig)}
-          >
-            <span style={styles.configTitle}>Pipeline Configuration</span>
-            <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
-              {showConfig ? '▲' : '▼'}
+      {/* Tab Switcher */}
+      <div className="flex items-center justify-center gap-3 mb-8">
+        <button
+          type="button"
+          onClick={() => setActiveTab('new')}
+          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 font-mono text-xs font-bold transition-all ${
+            activeTab === 'new'
+              ? 'bg-[#d4af37] text-black shadow-lg shadow-[#d4af37]/20 scale-105'
+              : 'border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
+          }`}
+        >
+          <span>＋ New Batch Ingestion</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('history');
+            loadHistoryJobs();
+          }}
+          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 font-mono text-xs font-bold transition-all ${
+            activeTab === 'history'
+              ? 'bg-[#d4af37] text-black shadow-lg shadow-[#d4af37]/20 scale-105'
+              : 'border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
+          }`}
+        >
+          <span>📂 Previous Ingestion Runs</span>
+          {historyJobs.length > 0 && (
+            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold">
+              {historyJobs.length}
             </span>
-          </div>
+          )}
+        </button>
+      </div>
 
-          {showConfig && (
-            <div style={styles.configGrid} className="animate-fade-in">
-              <div>
-                <div style={styles.fieldLabel}>Containment Threshold</div>
-                <input
-                  type="number"
-                  step="0.05"
-                  min="0"
-                  max="1"
-                  style={styles.fieldInput}
-                  value={config.containment}
-                  onChange={(e) =>
-                    setConfig({ ...config, containment: parseFloat(e.target.value) || 0.8 })
-                  }
-                  onFocus={(e) => { e.target.style.borderColor = 'var(--accent-primary)'; }}
-                  onBlur={(e) => { e.target.style.borderColor = 'var(--border-default)'; }}
-                />
+      {/* Tab 1: New Batch Ingestion */}
+      {activeTab === 'new' && (
+        <>
+          {/* Drop Zone */}
+          {(phase === 'idle' || phase === 'queued') && (
+            <div style={styles.section}>
+              <DropZone
+                onFilesSelected={handleFilesSelected}
+                disabled={isProcessing}
+              />
+            </div>
+          )}
+
+          {/* File list */}
+          {files.length > 0 && phase !== 'done' && (
+            <div style={styles.section} className="animate-fade-in">
+              <div style={styles.fileList}>
+                {files.map((f) => (
+                  <div key={f.name} style={styles.fileChip}>
+                    <span>&#128230;</span>
+                    <span>{f.name}</span>
+                    <span style={styles.fileSize}>{fmtSize(f.size)}</span>
+                    {!isProcessing && (
+                      <button
+                        style={styles.removeBtn}
+                        onClick={() => removeFile(f.name)}
+                        title="Remove file"
+                        onMouseEnter={(e) => {
+                          (e.target as HTMLElement).style.color = 'var(--accent-danger)';
+                        }}
+                        onMouseLeave={(e) => {
+                          (e.target as HTMLElement).style.color = 'var(--text-muted)';
+                        }}
+                      >
+                        &times;
+                      </button>
+                    )}
+                  </div>
+                ))}
               </div>
-              <div>
-                <div style={styles.fieldLabel}>Tile Size (px)</div>
-                <input
-                  type="number"
-                  step="64"
-                  min="128"
-                  max="2048"
-                  style={styles.fieldInput}
-                  value={config.tileSize}
-                  onChange={(e) =>
-                    setConfig({ ...config, tileSize: parseInt(e.target.value) || 512 })
-                  }
-                  onFocus={(e) => { e.target.style.borderColor = 'var(--accent-primary)'; }}
-                  onBlur={(e) => { e.target.style.borderColor = 'var(--border-default)'; }}
-                />
-              </div>
-              <div>
-                <div style={styles.fieldLabel}>Max Time Gap (days)</div>
-                <input
-                  type="number"
-                  step="1"
-                  min="0"
-                  placeholder="unlimited"
-                  style={styles.fieldInput}
-                  value={config.maxTimeGapDays ?? ''}
-                  onChange={(e) =>
-                    setConfig({
-                      ...config,
-                      maxTimeGapDays: e.target.value ? parseFloat(e.target.value) : null,
-                    })
-                  }
-                  onFocus={(e) => { e.target.style.borderColor = 'var(--accent-primary)'; }}
-                  onBlur={(e) => { e.target.style.borderColor = 'var(--border-default)'; }}
-                />
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={styles.checkboxRow}>
-                  <input
-                    type="checkbox"
-                    checked={config.noLargeAoi}
-                    onChange={(e) =>
-                      setConfig({ ...config, noLargeAoi: e.target.checked })
-                    }
-                  />
-                  Skip Large-AOI IIRS
-                </label>
-                <label style={styles.checkboxRow}>
-                  <input
-                    type="checkbox"
-                    checked={config.noInvariants}
-                    onChange={(e) =>
-                      setConfig({ ...config, noInvariants: e.target.checked })
-                    }
-                  />
-                  Skip Invariant Maps
-                </label>
-                <label style={styles.checkboxRow}>
-                  <input
-                    type="checkbox"
-                    checked={config.requireDates}
-                    onChange={(e) =>
-                      setConfig({ ...config, requireDates: e.target.checked })
-                    }
-                  />
-                  Require Dates
-                </label>
+
+              {/* Stats + Actions */}
+              <div style={styles.actionsRow}>
+                <div style={styles.stats}>
+                  <span>
+                    Files: <span style={styles.statValue}>{files.length}</span>
+                  </span>
+                  <span>
+                    Total: <span style={styles.statValue}>{fmtSize(totalSize)}</span>
+                  </span>
+                </div>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={clearFiles}
+                    disabled={isProcessing}
+                  >
+                    Clear All
+                  </button>
+                  <button
+                    className="btn btn-primary btn-md"
+                    onClick={handleStart}
+                    disabled={isProcessing}
+                  >
+                    Start Ingestion ({files.length})
+                  </button>
+                </div>
               </div>
             </div>
           )}
-        </div>
+
+          {/* Config panel toggle */}
+          {phase === 'idle' && (
+            <div style={styles.configPanel}>
+              <div
+                style={styles.configToggle}
+                onClick={() => setShowConfig(!showConfig)}
+              >
+                <span style={styles.configTitle}>
+                  Pipeline Configuration
+                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  {showConfig ? '▲ Hide' : '▼ Show Advanced'}
+                </span>
+              </div>
+
+              {showConfig && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                    <div>
+                      <label style={styles.label}>
+                        Min Containment ({Math.round(config.containment * 100)}%)
+                      </label>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="1.0"
+                        step="0.05"
+                        value={config.containment}
+                        onChange={(e) =>
+                          setConfig({ ...config, containment: parseFloat(e.target.value) })
+                        }
+                        style={{ width: '100%' }}
+                      />
+                    </div>
+                    <div>
+                      <label style={styles.label}>Tile Size (px)</label>
+                      <select
+                        style={styles.input}
+                        value={config.tileSize}
+                        onChange={(e) =>
+                          setConfig({ ...config, tileSize: parseInt(e.target.value) })
+                        }
+                      >
+                        <option value={256}>256 × 256</option>
+                        <option value={512}>512 × 512 (Standard)</option>
+                        <option value={1024}>1024 × 1024</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={styles.label}>Max Time Gap (Days, Optional)</label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 180 (empty = any)"
+                      style={styles.input}
+                      value={config.maxTimeGapDays ?? ''}
+                      onChange={(e) =>
+                        setConfig({
+                          ...config,
+                          maxTimeGapDays: e.target.value ? parseFloat(e.target.value) : null,
+                        })
+                      }
+                      onFocus={(e) => { e.target.style.borderColor = 'var(--accent-primary)'; }}
+                      onBlur={(e) => { e.target.style.borderColor = 'var(--border-default)'; }}
+                    />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={styles.checkboxRow}>
+                      <input
+                        type="checkbox"
+                        checked={config.noLargeAoi}
+                        onChange={(e) =>
+                          setConfig({ ...config, noLargeAoi: e.target.checked })
+                        }
+                      />
+                      Skip Large-AOI IIRS
+                    </label>
+                    <label style={styles.checkboxRow}>
+                      <input
+                        type="checkbox"
+                        checked={config.noInvariants}
+                        onChange={(e) =>
+                          setConfig({ ...config, noInvariants: e.target.checked })
+                        }
+                      />
+                      Skip Invariant Maps
+                    </label>
+                    <label style={styles.checkboxRow}>
+                      <input
+                        type="checkbox"
+                        checked={config.requireDates}
+                        onChange={(e) =>
+                          setConfig({ ...config, requireDates: e.target.checked })
+                        }
+                      />
+                      Require Dates
+                    </label>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Error banner */}
+          {phase === 'error' && error && !status && (
+            <div
+              style={{
+                marginTop: '24px',
+                padding: '16px 20px',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--accent-danger-bg)',
+                border: '1px solid rgba(248, 113, 113, 0.3)',
+                color: 'var(--accent-danger)',
+                fontSize: '0.9rem',
+              }}
+              className="animate-fade-in"
+            >
+              <strong>Error:</strong> {error}
+              <div style={{ marginTop: '12px' }}>
+                <button className="btn btn-secondary btn-sm" onClick={clearFiles}>
+                  Start Over
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Processing progress */}
+          {status && (phase === 'processing' || phase === 'done' || phase === 'error') && (
+            <div style={styles.section}>
+              <ProcessingProgress status={status} />
+            </div>
+          )}
+
+          {/* Results */}
+          {phase === 'done' && (resultTriplets.length > 0 || status) && (
+            <div style={styles.section} className="animate-fade-in">
+              <ResultsTable
+                triplets={resultTriplets}
+                containment={config.containment}
+              />
+
+              <div style={{ marginTop: '20px', textAlign: 'center' }}>
+                <button className="btn btn-primary btn-lg" onClick={clearFiles}>
+                  Process Another Batch
+                </button>
+              </div>
+            </div>
+          )}
+        </>
       )}
 
-      {/* Error banner */}
-      {phase === 'error' && error && !status && (
-        <div
-          style={{
-            marginTop: '24px',
-            padding: '16px 20px',
-            borderRadius: 'var(--radius-md)',
-            background: 'var(--accent-danger-bg)',
-            border: '1px solid rgba(248, 113, 113, 0.3)',
-            color: 'var(--accent-danger)',
-            fontSize: '0.9rem',
-          }}
-          className="animate-fade-in"
-        >
-          <strong>Error:</strong> {error}
-          <div style={{ marginTop: '12px' }}>
-            <button className="btn btn-secondary btn-sm" onClick={clearFiles}>
-              Start Over
+      {/* Tab 2: Previous Ingestion Runs */}
+      {activeTab === 'history' && (
+        <div className="space-y-4 animate-fade-in">
+          <div className="flex items-center justify-between border-b border-white/10 pb-4">
+            <div>
+              <h2 className="text-lg font-bold text-white">Previous Ingestion Runs</h2>
+              <p className="text-xs text-slate-400">
+                Inspect history and replay discovery results from past PRADAN archive batches.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={loadHistoryJobs}
+              disabled={historyLoading}
+              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 font-mono text-xs font-semibold text-white/85 transition hover:bg-white/10"
+            >
+              <span>{historyLoading ? "Refreshing..." : "↻ Refresh History"}</span>
             </button>
           </div>
-        </div>
-      )}
 
-      {/* Processing progress */}
-      {status && (phase === 'processing' || phase === 'done' || phase === 'error') && (
-        <div style={styles.section}>
-          <ProcessingProgress status={status} />
-        </div>
-      )}
+          {historyError && (
+            <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-300">
+              {historyError}
+            </div>
+          )}
 
-      {/* Results */}
-      {phase === 'done' && status && (
-        <div style={styles.section} className="animate-fade-in">
-          <ResultsTable
-            triplets={resultTriplets}
-            containment={config.containment}
-          />
+          {historyLoading && historyJobs.length === 0 && (
+            <div className="flex h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-8 text-center">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#d4af37] border-t-transparent" />
+              <p className="font-mono text-xs text-slate-400">Loading historical ingestion records...</p>
+            </div>
+          )}
 
-          <div style={{ marginTop: '20px', textAlign: 'center' }}>
-            <button className="btn btn-primary btn-lg" onClick={clearFiles}>
-              Process Another Batch
-            </button>
-          </div>
+          {!historyLoading && historyJobs.length === 0 && !historyError && (
+            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-12 text-center">
+              <span className="text-3xl">📦</span>
+              <h3 className="text-sm font-bold text-white">No Previous Ingestion Runs</h3>
+              <p className="max-w-md text-xs text-slate-400 leading-relaxed">
+                No past ingestion jobs were found on the backend. Upload raw Chandrayaan-2 PRADAN ZIP bundles to start your first discovery run.
+              </p>
+              <button
+                type="button"
+                onClick={() => setActiveTab('new')}
+                className="mt-2 rounded-xl bg-[#d4af37] px-4 py-2 font-mono text-xs font-bold text-black shadow-sm transition hover:bg-[#c29f2f]"
+              >
+                Upload PRADAN Files Now
+              </button>
+            </div>
+          )}
+
+          {historyJobs.length > 0 && (
+            <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/40 backdrop-blur-md shadow-xl">
+              <table className="w-full text-left font-sans text-xs">
+                <thead>
+                  <tr className="border-b border-white/10 bg-white/5 font-mono text-[10px] uppercase tracking-wider text-slate-400">
+                    <th className="py-3 px-4">Job ID</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">Current Stage</th>
+                    <th className="py-3 px-4">Progress</th>
+                    <th className="py-3 px-4">Started</th>
+                    <th className="py-3 px-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {historyJobs.map((job) => {
+                    const statusColor =
+                      job.status === 'completed'
+                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
+                        : job.status === 'running'
+                        ? 'border-blue-500/30 bg-blue-500/10 text-blue-400 animate-pulse'
+                        : job.status === 'failed'
+                        ? 'border-rose-500/30 bg-rose-500/10 text-rose-400'
+                        : 'border-slate-500/30 bg-slate-500/10 text-slate-400';
+
+                    return (
+                      <tr key={job.job_id} className="transition hover:bg-white/[0.03]">
+                        <td className="py-3.5 px-4 font-mono font-medium text-white/90">
+                          {job.job_id.slice(0, 8)}...{job.job_id.slice(-4)}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${statusColor}`}>
+                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                            {job.status}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-slate-300 font-mono text-[11px]">
+                          {job.stage || '—'}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2">
+                            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/10">
+                              <div
+                                className="h-full bg-[#d4af37] transition-all duration-300"
+                                style={{ width: `${job.progress_pct || 0}%` }}
+                              />
+                            </div>
+                            <span className="font-mono text-[10px] text-slate-400">
+                              {Math.round(job.progress_pct || 0)}%
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4 font-mono text-[10px] text-slate-400">
+                          {job.started_at ? new Date(job.started_at).toLocaleString() : '—'}
+                        </td>
+                        <td className="py-3.5 px-4 text-right">
+                          {job.status === 'completed' && (
+                            <button
+                              type="button"
+                              onClick={() => handleSelectHistoricalJob(job.job_id)}
+                              className="rounded-lg border border-[#d4af37]/30 bg-[#d4af37]/10 px-3 py-1 font-mono text-xs font-semibold text-[#d4af37] transition hover:bg-[#d4af37]/20"
+                            >
+                              Load Results →
+                            </button>
+                          )}
+                          {job.status === 'running' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setJobId(job.job_id);
+                                setPhase('processing');
+                                setActiveTab('new');
+                              }}
+                              className="rounded-lg border border-blue-400/30 bg-blue-400/10 px-3 py-1 font-mono text-xs font-semibold text-blue-300 transition hover:bg-blue-400/20"
+                            >
+                              Attach &amp; Monitor
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

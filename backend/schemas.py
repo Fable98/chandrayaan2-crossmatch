@@ -201,5 +201,7 @@ class RegisterResponse(BaseModel):
     raster_url: str | None = None
     quiver_url: str | None = None
     metadata: dict | None = None
+    job_id: str | None = None
+    report_url: str | None = None
 
 

@@ -160,6 +160,8 @@ export interface RegisterResponse {
   "metadata"?: {
   [key: string]: unknown;
 } | null;
+  "job_id"?: string | null;
+  "report_url"?: string | null;
 }
 
 export interface RegistrationRequest {
