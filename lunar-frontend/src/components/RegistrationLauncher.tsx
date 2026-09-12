@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { API_BASE, imageUrl } from "@/lib/api";
 import LunarGlobe from "@/components/hero/LunarGlobe";
 import type { MoonPoint, MoonPointsResponse } from "@/lib/backend-types";
+import { SENSOR_META, scaleRatioLabel, SENSOR_OPTIONS } from "@/lib/sensors";
 
 type Sensor = "OHRC" | "TMC" | "IIRS" | "LRO_NAC";
 
@@ -41,7 +42,6 @@ type RegistrationResult = {
   raster_url?: string | null;
   quiver_url?: string | null;
   job_id?: string | null;
-  report_url?: string | null;
 };
 
 type MatchPoint = {
@@ -75,9 +75,12 @@ const SAMPLE_PAIRS: SamplePair[] = [
   {
     id: "sample_001_tmc",
     title: "Region 001: OHRC ↔ TMC-2",
-    tag: "Primary 21x Scale Gap",
+    // Live manifests serve TMC 5.4 / OHRC 0.25 (21.6x → "~22x"). The legacy
+    // "~21x" string came from a hardcoded 5.25 fudge with no provenance;
+    // this static sample tag uses the derived value instead.
+    tag: `Primary ${scaleRatioLabel(5.4, SENSOR_META.ohrc.gsdM)} Scale Gap`,
     badgeStyle: "bg-blue-50 text-blue-700 border-blue-200",
-    description: "0.25m/px Narrow-Angle OHRC matched to 4.0m/px single-view TMC-2 in Sinus Medii.",
+    description: `${SENSOR_META.ohrc.gsdM}m/px Narrow-Angle OHRC matched to ${(4).toFixed(1)}m/px single-view TMC-2 in Sinus Medii.`,
     sourceSensor: "OHRC",
     referenceSensor: "TMC",
     sourceUrl: "/images/ohrc/region_001",
@@ -110,7 +113,6 @@ const SAMPLE_PAIRS: SamplePair[] = [
       matches_url: null,
       raster_url: null,
       job_id: "region_001",
-      report_url: "/api/registration/report/region_001",
     },
     demoPoints: [
       { image1_x: 332, image1_y: 25, image2_x: 285, image2_y: 28, confidence: 0.92 },
@@ -124,7 +126,7 @@ const SAMPLE_PAIRS: SamplePair[] = [
   {
     id: "sample_001_lro",
     title: "Region 001: OHRC ↔ NASA LRO NAC",
-    tag: "PS Lunar Reference (~3.6x, real CDR)",
+    tag: `PS Lunar Reference (${scaleRatioLabel(SENSOR_META.lro_nac.gsdM, SENSOR_META.ohrc.gsdM)}, real CDR)`,
     badgeStyle: "bg-emerald-50 text-emerald-700 border-emerald-200",
     description:
       "NASA LRO NAC M1417670274LC real-CDR panchromatic reference (MI path; optical NCC finds 0 candidates on real CDRs).",
@@ -161,7 +163,6 @@ const SAMPLE_PAIRS: SamplePair[] = [
       matches_url: null,
       raster_url: null,
       job_id: "region_001",
-      report_url: "/api/registration/report/region_001",
     },
     demoPoints: [
       { image1_x: 64, image1_y: 64, image2_x: 66, image2_y: 65, confidence: 0.98 },
@@ -214,7 +215,6 @@ const SAMPLE_PAIRS: SamplePair[] = [
       matches_url: null,
       raster_url: null,
       job_id: "region_003",
-      report_url: "/api/registration/report/region_003",
     },
     demoPoints: [
       { image1_x: 64, image1_y: 64, image2_x: 65, image2_y: 65, confidence: 0.97 },
@@ -226,7 +226,7 @@ const SAMPLE_PAIRS: SamplePair[] = [
   {
     id: "sample_001_iirs",
     title: "Region 001: OHRC ↔ IIRS Hyperspectral",
-    tag: "Chained Spectral Overlay (~320x)",
+    tag: `Chained Spectral Overlay (${scaleRatioLabel(SENSOR_META.iirs.gsdM, SENSOR_META.ohrc.gsdM, { approx: true })})`,
     badgeStyle: "bg-purple-50 text-purple-700 border-purple-200",
     description:
       "80m/px IIRS hyperspectral cube co-registered via TMC-2 bridge. Spectral overlay — physical scale respected, no direct sub-pixel matching.",
@@ -258,7 +258,6 @@ const SAMPLE_PAIRS: SamplePair[] = [
       matches_url: null,
       raster_url: null,
       job_id: "region_001",
-      report_url: "/api/registration/report/region_001",
     },
     demoPoints: [],
   },
@@ -302,7 +301,6 @@ const SAMPLE_PAIRS: SamplePair[] = [
       matches_url: null,
       raster_url: null,
       job_id: "triplet_new_2022",
-      report_url: "/api/registration/report/triplet_new_2022",
     },
     // Exact coords from data_preprocessing_pipeline/matches/triplet_new_2022_matches.json
     demoPoints: [
@@ -314,13 +312,6 @@ const SAMPLE_PAIRS: SamplePair[] = [
       { image1_x: 277, image1_y: 199, image2_x: 315, image2_y: 259, confidence: 0.43 },
     ],
   },
-];
-
-const SENSOR_OPTIONS: { value: Sensor; label: string }[] = [
-  { value: "OHRC", label: "OHRC (0.25 m/px Panchromatic Optical)" },
-  { value: "TMC", label: "TMC-2 (4.0 m/px Single-View Optical)" },
-  { value: "LRO_NAC", label: "NASA LRO NAC (0.5–1.2 m/px Lunar Reference)" },
-  { value: "IIRS", label: "IIRS (69 m/px Infrared Hyperspectral)" },
 ];
 
 function absoluteUrl(path?: string | null) {
@@ -1131,7 +1122,7 @@ export default function RegistrationLauncher() {
                   <div className="rounded-xl border border-rose-200/80 bg-white p-2.5">
                     <div className="flex items-center justify-between mb-1.5 px-1">
                       <span className="text-[11px] font-bold text-slate-800">
-                        {customMode && sourceFile ? `Uploaded Source: ${sourceFile.name}` : `Source: OHRC (0.25m)`}
+                        {customMode && sourceFile ? `Uploaded Source: ${sourceFile.name}` : `Source: ${SENSOR_META.ohrc.label} (${SENSOR_META.ohrc.gsdM}m)`}
                       </span>
                       <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-800 font-mono">
                         {customMode ? sourceSensor : "Sun: 269.6° (West)"}
@@ -1149,7 +1140,7 @@ export default function RegistrationLauncher() {
                   <div className="rounded-xl border border-rose-200/80 bg-white p-2.5">
                     <div className="flex items-center justify-between mb-1.5 px-1">
                       <span className="text-[11px] font-bold text-slate-800">
-                        {customMode && referenceFile ? `Uploaded Reference: ${referenceFile.name}` : `Reference: TMC-2 (4.0m)`}
+                        {customMode && referenceFile ? `Uploaded Reference: ${referenceFile.name}` : `Reference: ${SENSOR_META.tmc.label} (${(4).toFixed(1)}m)`}
                       </span>
                       <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-800 font-mono">
                         {customMode ? referenceSensor : "Sun: 108.9° (East)"}
