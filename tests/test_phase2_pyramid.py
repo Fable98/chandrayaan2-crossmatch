@@ -154,7 +154,10 @@ def test_ablation_l1_cascade_does_not_reduce_support(tmp_path):
 # inliers/RMSE are therefore a maintenance trap: they fail on healthy stacks.
 # Status and match_count are pinned exact (stable across stacks observed so
 # far); inlier support is a floor (min observed - 1) and fit quality a cap
-# (max observed + 0.5px, always under the Gate-3 5.0px ceiling).
+# (max observed + ~0.5px, always under the Gate-3 5.0px ceiling), with two
+# deliberate exceptions: region_005 floor is 4 (= observed = Gate-1 minimum;
+# min-1 = 3 would legalize below-minimum support) and triplet_new_2022 cap
+# is 3.0 (+0.74 headroom over the 2.26 max observation, rounded for margin).
 # region_001 is the single exact golden case: identical values on every
 # stack measured so far. If IT drifts, something structural changed —
 # investigate, don't just re-pin.
