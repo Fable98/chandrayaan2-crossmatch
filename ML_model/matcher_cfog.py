@@ -310,7 +310,10 @@ def adaptive_illumination_normalization(
     """
     from scipy import ndimage as _ndi
 
-    img_f = np.clip(np.asarray(img_gray, dtype=np.float32), 0.0, 1.0)
+    img_f = np.asarray(img_gray, dtype=np.float32)
+    if img_f.size > 0 and np.max(img_f) > 1.0 + 1e-5:
+        img_f = img_f / 255.0  # Normalize uint8 [0, 255] to [0, 1]
+    img_f = np.clip(img_f, 0.0, 1.0)
     img_255 = (img_f * 255.0).astype(np.float32)
 
     # --- Step 1: edge-preserving smoothing (range kernel keeps crater rims) ---
@@ -1745,7 +1748,7 @@ def estimate_weighted_homography(
     if w.size != n:
         w = np.full(n, 0.5, dtype=np.float64)
     w = np.nan_to_num(w, nan=0.5, posinf=1.0, neginf=0.0)
-    w = np.clip(w, 0.0, None)
+    w = np.clip(w, 1e-3, None)  # epsilon floor: no match is ever fully excluded from sampling
     if float(np.max(w)) > 0:
         w = w / float(np.max(w))
     else:
