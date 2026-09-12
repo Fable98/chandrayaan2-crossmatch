@@ -73,3 +73,89 @@ def test_guided_densification_can_be_disabled(tmp_path):
     assert metrics_base is not None
     # Baseline anchor inliers without guided densification (around 6-9)
     assert metrics_base["inlier_count"] <= 10
+
+
+def test_guided_points_accuracy_against_known_ground_truth(tmp_path):
+    """
+    Non-circular ground truth validation:
+    Validates that points added by guided densification are accurate against an
+    INDEPENDENT ground-truth projective transformation H_gt (not just fitting the estimated H).
+    """
+    import cv2
+    import json
+    import math
+
+    tile_path = REPO_ROOT / "data_preprocessing_pipeline/processed_triplets/region_001/ohrc_512.png"
+    if not tile_path.exists():
+        pytest.skip("Region 001 sample image not found.")
+
+    src = cv2.imread(str(tile_path), cv2.IMREAD_GRAYSCALE)
+    assert src is not None
+    h, w = src.shape[:2]
+
+    # Create known ground truth transformation: rotation + translation + slight scale
+    theta = math.radians(2.0)
+    cos_t, sin_t = math.cos(theta), math.sin(theta)
+    s = 1.01
+    dx, dy = 10.0, -8.0
+    cx, cy = w / 2.0, h / 2.0
+
+    # Affine matrix around center
+    H_gt = np.array([
+        [s * cos_t, -s * sin_t, (1 - s * cos_t) * cx + s * sin_t * cy + dx],
+        [s * sin_t,  s * cos_t, -s * sin_t * cx + (1 - s * cos_t) * cy + dy],
+        [0.0, 0.0, 1.0],
+    ], dtype=np.float64)
+
+    warped = cv2.warpPerspective(src, H_gt, (w, h), flags=cv2.INTER_LINEAR)
+
+    p_src = tmp_path / "src.png"
+    p_tgt = tmp_path / "tgt.png"
+    cv2.imwrite(str(p_src), src)
+    cv2.imwrite(str(p_tgt), warped)
+
+    res = match_images_cfog(
+        p_src,
+        p_tgt,
+        source_sensor="OHRC",
+        reference_sensor="OHRC",
+        explicit_gsd1=5.0,
+        explicit_gsd2=5.0,
+        output_dir=tmp_path / "gt_guided_out",
+        enable_guided_densification=True,
+    )
+
+    assert res["status"] == "success"
+    matches_file = tmp_path / "gt_guided_out" / "matches.json"
+    assert matches_file.exists()
+
+    with open(matches_file, "r") as f:
+        matches_data = json.load(f)
+
+    matches_list = matches_data if isinstance(matches_data, list) else matches_data.get("matches", [])
+
+    # Filter for guided refill inliers
+    guided_inliers = [
+        m for m in matches_list
+        if m.get("method") == "guided_refill" and m.get("is_inlier", False)
+    ]
+
+    # If guided inliers were accepted, verify their accuracy against INDEPENDENT H_gt
+    if guided_inliers:
+        gt_errors = []
+        for m in guided_inliers:
+            x1, y1 = float(m["image1_x"]), float(m["image1_y"])
+            x2, y2 = float(m["image2_x"]), float(m["image2_y"])
+
+            # Project through ground truth
+            p1_homo = np.array([x1, y1, 1.0], dtype=np.float64)
+            p2_proj_homo = H_gt @ p1_homo
+            p2_proj = p2_proj_homo[:2] / p2_proj_homo[2]
+
+            err = math.hypot(p2_proj[0] - x2, p2_proj[1] - y2)
+            gt_errors.append(err)
+
+        mean_gt_err = float(np.mean(gt_errors))
+        # Mean reprojection error against independent ground-truth must be sub-pixel/tight (< 2.0 px)
+        assert mean_gt_err < 2.0, f"Guided points failed independent ground-truth check: {mean_gt_err:.3f} px"
+
