@@ -1671,6 +1671,153 @@ def refine_inliers_lucas_kanade(
     return inlier_src.copy(), refined_dst, stats
 
 
+def refine_inliers_native_scale(
+    raw_img1: np.ndarray,
+    raw_img2: np.ndarray,
+    inlier_pts1: np.ndarray,
+    inlier_pts2: np.ndarray,
+    scale_factor1: float,
+    scale_factor2: float,
+    gsd1: float = 0.25,
+    patch_size_native: int = 48,
+    max_shift_native_px: float = 3.5,
+) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
+    """
+    Phase 5b: Native Full-Resolution Polish.
+
+    Extracts local patches from the raw, un-downsampled high-resolution imagery
+    (e.g., OHRC 0.25 m) and performs sub-pixel Fourier Phase Correlation against
+    the upscaled coarse-sensor patch. This locks inliers to high-frequency native
+    features (boulders, craterlet rims) rather than resampled pixels.
+
+    Args:
+        raw_img1: Raw grayscale Image 1 in native sensor coordinates.
+        raw_img2: Raw grayscale Image 2 in native sensor coordinates.
+        inlier_pts1: (N, 2) verified inlier points in Image 1 native coordinates.
+        inlier_pts2: (N, 2) verified inlier points in Image 2 native coordinates.
+        scale_factor1: Working-scale downsampling factor for Image 1.
+        scale_factor2: Working-scale downsampling factor for Image 2.
+        gsd1: Physical GSD of Image 1 in meters/pixel.
+        patch_size_native: Patch width in native high-res pixels.
+        max_shift_native_px: Rejection threshold for anomalous shifts.
+
+    Returns:
+        (refined_pts1, refined_pts2, stats)
+    """
+    pts1_out = np.array(inlier_pts1, dtype=np.float64, copy=True)
+    pts2_out = np.array(inlier_pts2, dtype=np.float64, copy=True)
+    n = len(pts1_out)
+    if n == 0 or raw_img1 is None or raw_img2 is None:
+        return pts1_out, pts2_out, {"applied": False, "refined_count": 0, "total": n}
+
+    # Identify which sensor has higher resolution
+    if scale_factor1 >= scale_factor2:
+        is_img1_high = True
+        high_img, coarse_img = raw_img1, raw_img2
+        high_pts, coarse_pts = pts1_out, pts2_out
+        high_gsd = gsd1
+        ratio = float(scale_factor1 / max(scale_factor2, 1e-6))
+    else:
+        is_img1_high = False
+        high_img, coarse_img = raw_img2, raw_img1
+        high_pts, coarse_pts = pts2_out, pts1_out
+        high_gsd = gsd1 / float(scale_factor2 / max(scale_factor1, 1e-6))
+        ratio = float(scale_factor2 / max(scale_factor1, 1e-6))
+
+    h_h, w_h = high_img.shape[:2]
+    h_c, w_c = coarse_img.shape[:2]
+    half_p = patch_size_native // 2
+    margin_native = 4
+
+    p_c_radius = max(3, int(round(half_p / max(ratio, 1.0))))
+    p_h_radius = int(round(p_c_radius * ratio))
+    search_radius = p_h_radius + margin_native
+
+    refined_count = 0
+    shifts_m: List[float] = []
+
+    for i in range(n):
+        xh, yh = high_pts[i]
+        xc, yc = coarse_pts[i]
+        ixh, iyh = int(round(xh)), int(round(yh))
+        ixc, iyc = int(round(xc)), int(round(yc))
+
+        # Check search boundaries
+        if iyh < search_radius or iyh + search_radius >= h_h or ixh < search_radius or ixh + search_radius >= w_h:
+            continue
+        if iyc < p_c_radius or iyc + p_c_radius >= h_c or ixc < p_c_radius or ixc + p_c_radius >= w_c:
+            continue
+
+        search_high = high_img[iyh - search_radius : iyh + search_radius, ixh - search_radius : ixh + search_radius]
+        patch_coarse = coarse_img[iyc - p_c_radius : iyc + p_c_radius, ixc - p_c_radius : ixc + p_c_radius]
+
+        if float(np.std(search_high)) < 1e-4 or float(np.std(patch_coarse)) < 1e-4:
+            continue
+
+        # Upsample coarse patch to exactly match high-res scale footprint
+        patch_coarse_up = cv2.resize(
+            patch_coarse, (2 * p_h_radius, 2 * p_h_radius), interpolation=cv2.INTER_CUBIC
+        )
+
+        res = cv2.matchTemplate(
+            search_high.astype(np.float32), patch_coarse_up.astype(np.float32), cv2.TM_CCOEFF_NORMED
+        )
+        min_v, max_v, min_l, max_l = cv2.minMaxLoc(res)
+        if max_v < 0.25:
+            continue
+
+        px, py = max_l
+        h_r, w_r = res.shape
+        cx, cy = (w_r - 1) / 2.0, (h_r - 1) / 2.0
+        sub_x, sub_y = float(px), float(py)
+
+        # 2D Algebraic Paraboloid Subpixel Fit
+        if 0 < py < h_r - 1 and 0 < px < w_r - 1:
+            c = float(res[py, px])
+            c_l = float(res[py, px - 1])
+            c_r = float(res[py, px + 1])
+            c_u = float(res[py - 1, px])
+            c_d = float(res[py + 1, px])
+            c_ul = float(res[py - 1, px - 1])
+            c_ur = float(res[py - 1, px + 1])
+            c_dl = float(res[py + 1, px - 1])
+            c_dr = float(res[py + 1, px + 1])
+
+            a = 0.5 * (c_r + c_l - 2 * c)
+            b = 0.5 * (c_d + c_u - 2 * c)
+            c_cross = 0.25 * (c_dr + c_ul - c_dl - c_ur)
+            d = 0.5 * (c_r - c_l)
+            e = 0.5 * (c_d - c_u)
+            denom = 4 * a * b - c_cross * c_cross
+            if abs(denom) > 1e-9:
+                dx = (c_cross * e - 2 * b * d) / denom
+                dy = (c_cross * d - 2 * a * e) / denom
+                sub_x += float(np.clip(dx, -0.9, 0.9))
+                sub_y += float(np.clip(dy, -0.9, 0.9))
+
+        shift_x = float(sub_x - cx)
+        shift_y = float(sub_y - cy)
+        shift_native = math.hypot(shift_x, shift_y)
+
+        if shift_native <= max_shift_native_px:
+            coarse_pts[i, 0] += float(shift_x / ratio)
+            coarse_pts[i, 1] += float(shift_y / ratio)
+            refined_count += 1
+            shifts_m.append(float(shift_native * high_gsd))
+
+    mean_shift_m = float(np.mean(shifts_m)) if shifts_m else 0.0
+    stats = {
+        "applied": True,
+        "refined_count": refined_count,
+        "total_inliers": n,
+        "native_gsd_m": float(high_gsd),
+        "mean_shift_m": round(mean_shift_m, 4),
+        "max_shift_native_px": max_shift_native_px,
+    }
+    return pts1_out, pts2_out, stats
+
+
+
 def _guided_refill_matches(
     kps_candidates,
     selected_matches,
@@ -1828,6 +1975,7 @@ def match_images_cfog(
     look_azimuth_deg: Optional[float] = None,
     dem_array: Optional[np.ndarray] = None,
     enable_guided_densification: bool = True,
+    enable_native_polish: bool = True,
 ) -> Dict[str, Any]:
     """
     Executes the primary cross-sensor registration pipeline:
@@ -3705,6 +3853,70 @@ def match_images_cfog(
                         refinement_records[idx]["image2_y"] = float(refined_dst[j, 1])
                         refinement_records[idx]["lk_refined"] = True
 
+    # --- Item 4: Native Full-Resolution Polish (Phase 5b) ---
+    native_polish_stats: Dict[str, Any] = {"applied": False, "reason": "not_triggered"}
+    scale_disparity = max(scale_factor1, scale_factor2) / max(min(scale_factor1, scale_factor2), 1e-6)
+    if enable_native_polish and scale_disparity >= 1.5 and inlier_mask is not None and int(np.sum(inlier_mask)) >= 4:
+        try:
+            inlier_indices = np.where(inlier_mask.ravel() == 1)[0]
+            inl_pts1 = pts1_arr[inlier_indices]
+            inl_pts2 = pts2_arr[inlier_indices]
+            native_gsd1 = float(gsd1) if gsd1 is not None else float(working_gsd / max(scale_factor1, 1e-6))
+
+            ref_pts1, ref_pts2, np_stats = refine_inliers_native_scale(
+                raw_img1=raw1_gray,
+                raw_img2=raw2_gray,
+                inlier_pts1=inl_pts1,
+                inlier_pts2=inl_pts2,
+                scale_factor1=scale_factor1,
+                scale_factor2=scale_factor2,
+                gsd1=native_gsd1,
+                patch_size_native=48,
+                max_shift_native_px=3.5,
+            )
+            native_polish_stats = np_stats
+
+            if np_stats.get("applied") and np_stats.get("refined_count", 0) >= 4:
+                # Re-fit homography candidate with quality gate check
+                H_np, mask_np = cv2.findHomography(ref_pts1, ref_pts2, estimator_method, ransacReprojThreshold=5.0)
+                if H_np is None:
+                    H_np, mask_np = cv2.findHomography(ref_pts1, ref_pts2, 0)
+
+                if H_np is not None:
+                    err_np = calculate_reprojection_errors(ref_pts1, ref_pts2, H_np)
+                    rmse_np = float(np.sqrt(np.mean(err_np**2))) if len(err_np) else None
+                    tx_check_np = verify_transformation_quality(H_np, (orig_h2, orig_w2), fit_rmse_px=rmse_np)
+
+                    # Compute baseline RMSE for comparison
+                    err_prev = calculate_reprojection_errors(inl_pts1, inl_pts2, H_final)
+                    rmse_prev = float(np.sqrt(np.mean(err_prev**2))) if len(err_prev) else 999.0
+
+                    # Accept if valid and not degrading geometry
+                    if tx_check_np.get("is_valid") and (rmse_np is not None and rmse_np <= rmse_prev * 1.15):
+                        pts1_arr[inlier_indices] = ref_pts1
+                        pts2_arr[inlier_indices] = ref_pts2
+                        H_final = H_np
+                        native_polish_stats["re_fit_accepted"] = True
+                        native_polish_stats["rmse_before"] = round(rmse_prev, 4)
+                        native_polish_stats["rmse_after"] = round(rmse_np, 4)
+
+                        # Update match records with polished native coordinates
+                        for k, idx in enumerate(inlier_indices):
+                            if idx < len(refinement_records):
+                                refinement_records[idx]["image1_x"] = float(ref_pts1[k, 0])
+                                refinement_records[idx]["image1_y"] = float(ref_pts1[k, 1])
+                                refinement_records[idx]["target_x"] = float(ref_pts2[k, 0])
+                                refinement_records[idx]["target_y"] = float(ref_pts2[k, 1])
+                                refinement_records[idx]["image2_x"] = float(ref_pts2[k, 0])
+                                refinement_records[idx]["image2_y"] = float(ref_pts2[k, 1])
+                                refinement_records[idx]["native_polished"] = True
+                    else:
+                        native_polish_stats["re_fit_accepted"] = False
+                        native_polish_stats["rejection_reason"] = tx_check_np.get("reason", "rmse_degraded")
+        except Exception as exc:
+            logger.warning("Native scale polish encountered error (%s); retaining existing solution.", exc)
+            native_polish_stats = {"applied": False, "reason": str(exc)}
+
     # 8b. DEM-aware geometry: LOS ray-shift honesty, bootstrap covariance,
     # slope-correlated TPS fallback (Step 9).
     try:
@@ -3796,6 +4008,8 @@ def match_images_cfog(
     metrics["illumination_detail"] = illumination_detail
     if lk_stats:
         metrics["lk_refinement"] = lk_stats
+    metrics["native_polish"] = native_polish_stats
+    metrics["native_polish_applied"] = bool(native_polish_stats.get("applied", False))
 
     fit_rmse = metrics.get("fit_rmse_px")
     tx_check = verify_transformation_quality(
