@@ -12,21 +12,15 @@ DEFAULT_MODEL_PATH = Path(__file__).resolve().parent / "ai_verifier_model.pkl"
 
 class AIMatchVerifier:
     """
-    Phase 4: AI Match Verification (EXPERIMENTAL, ships WITHOUT a model).
+    Phase 4: AI Match Verification.
 
-    Honesty note: no trained classifier is bundled with this repository. An
-    earlier RandomForest trained on RANSAC inlier/outlier labels was removed
-    because it was circular — RANSAC consensus labels cannot supervise a
-    filter that runs BEFORE RANSAC; the model just memorized the coarse
-    matcher's own confidence scores and vetoed true low-MI matches on real
-    CDR pairs (measured 2026-09-10: LRO pairs Gate2-FAIL with the stack on).
-
-    A model file (``ai_verifier_model.pkl``) is loaded ONLY if it was trained
-    by train_ai_verifier.py on HAND-LABELLED true/false correspondences (see
-    its --label-key / --allow-ransac-labels contract). Otherwise the verifier
-    falls back to a documented non-ML percentile baseline, and the matcher
-    keeps this entire phase opt-in (experimental_stack=True) with the
-    classical path as default.
+    Loads a hand-trained RandomForest bundle (``label_source=hand``) when
+    present. Predicted inlier probabilities weight Phase 7 RANSAC. A hard
+    pre-RANSAC veto remains opt-in (``experimental_stack=True``) because it
+    rejected true low-MI OHRC↔TMC matches when NCC/MI confidence barely
+    separated classes. RANSAC-labelled bundles are refused at load time
+    (circular supervision). Missing/untrained path: documented non-ML
+    percentile baseline for ``filter_matches`` only.
     """
     def __init__(self, model_path: Optional[str | Path] = None):
         self.model: Any = None

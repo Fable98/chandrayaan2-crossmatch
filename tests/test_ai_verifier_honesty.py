@@ -16,10 +16,13 @@ import json
 import sys
 from pathlib import Path
 
+import cv2
+import numpy as np
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT / "ML_model"))
+sys.path.insert(0, str(REPO_ROOT / "scripts"))
 
 from train_ai_verifier import main as train_main
 from ai_verifier import AIMatchVerifier
@@ -122,4 +125,108 @@ def test_bundled_production_model_loads_and_is_trained():
     assert len(confidences) == 2
     # High-confidence, small-residual match should have higher probability than low-conf, large-residual match
     assert confidences[0] > confidences[1]
+
+
+def test_train_skips_rows_missing_live_features(tmp_path):
+    """Dumps without refinement_dx/dy + spatial_quality_score must not train.
+
+    Defaulting those fields is how a genuine real inlier became statistically
+    identical to the 91% failed-correspondence majority class.
+    """
+    from train_ai_verifier import extract_feature_row, build_dataset
+
+    complete = _record(0.4, dx=0.2, human_label=True)
+    incomplete = {
+        "confidence": 0.4, "source_x": 1.0, "source_y": 2.0,
+        "target_x": 3.0, "target_y": 4.0, "human_label": True,
+    }
+    try:
+        extract_feature_row(incomplete, require_live_features=True)
+        assert False, "missing live features must raise"
+    except KeyError:
+        pass
+    row = extract_feature_row(complete, require_live_features=True)
+    assert len(row) == 4
+
+    mixed = []
+    for i in range(8):
+        rec = _record(0.4 + 0.01 * i, dx=0.2, human_label=True)
+        rec["source_x"] = float(i)
+        mixed.append(rec)
+    mixed.extend(
+        {**incomplete, "human_label": False, "source_x": float(20 + i)} for i in range(8)
+    )
+    f = _write_matches(tmp_path / "mixed_matches.json", mixed)
+    X, y, stats = build_dataset([f], allow_ransac=False)
+    assert stats["skipped_missing_features"] >= 8
+    assert len(y) == 8
+    assert set(y.tolist()) == {1}
+
+
+def test_gt_generator_emits_live_features_and_cross_sensor_domain(tmp_path):
+    from generate_ground_truth_matches import generate_matches_for_image
+
+    img = np.zeros((160, 160), dtype=np.uint8)
+    rng_img = np.random.RandomState(0)
+    for _ in range(18):
+        cv2.circle(
+            img,
+            (int(rng_img.randint(20, 140)), int(rng_img.randint(20, 140))),
+            int(rng_img.randint(6, 16)),
+            int(rng_img.randint(90, 240)),
+            -1,
+        )
+    path = tmp_path / "tile.png"
+    cv2.imwrite(str(path), img)
+    recs = generate_matches_for_image(
+        path, np.random.default_rng(42), domains=("same_sensor", "cross_sensor"),
+    )
+    assert recs, "GT generator produced no labeled rows"
+    for r in recs:
+        assert "spatial_quality_score" in r
+        assert "refinement_dx" in r and "refinement_dy" in r
+        assert r["label_source"] == "hand"
+        assert r["domain"] in ("same_sensor", "cross_sensor")
+    assert any(r["human_label"] for r in recs)
+    assert any(not r["human_label"] for r in recs)
+    assert any(r.get("domain") == "cross_sensor" for r in recs)
+
+
+def test_live_matcher_records_populate_spatial_quality_and_refinement(tmp_path):
+    from matcher_cfog import match_images_cfog
+
+    h, w = 256, 256
+    img1 = np.zeros((h, w), dtype=np.uint8)
+    np.random.seed(42)
+    for _ in range(25):
+        cx = np.random.randint(30, w - 30)
+        cy = np.random.randint(30, h - 30)
+        rad = np.random.randint(10, 25)
+        val = int(np.random.randint(100, 240))
+        cv2.circle(img1, (cx, cy), rad, val, -1)
+    img1 = cv2.GaussianBlur(img1, (5, 5), 1.0)
+    img2 = cv2.warpAffine(img1, np.float32([[1, 0, 6], [0, 1, -4]]), (w, h))
+    p1, p2 = tmp_path / "s.png", tmp_path / "r.png"
+    cv2.imwrite(str(p1), img1)
+    cv2.imwrite(str(p2), img2)
+
+    res = match_images_cfog(
+        p1, p2, output_dir=tmp_path / "out",
+        explicit_gsd1=1.0, explicit_gsd2=1.0, grid_size=6,
+    )
+    matches_path = tmp_path / "out" / "matches.json"
+    if not matches_path.exists():
+        # Some layouts nest matches.json; search.
+        found = list((tmp_path / "out").rglob("matches.json"))
+        assert found, f"no matches.json written; status={res.get('status')}"
+        matches_path = found[0]
+    recs = json.loads(matches_path.read_text(encoding="utf-8"))
+    if isinstance(recs, dict):
+        recs = recs.get("matches") or recs.get("all_matches") or []
+    assert recs, "matcher wrote no correspondence records"
+    for r in recs:
+        assert "spatial_quality_score" in r, r.keys()
+        assert "refinement_dx" in r and "refinement_dy" in r
+        assert 0.0 <= float(r["spatial_quality_score"]) <= 1.0
+        assert "ai_inlier_prob" in r
 

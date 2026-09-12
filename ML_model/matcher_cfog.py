@@ -1372,6 +1372,7 @@ def find_best_correspondence_unified(
     res = cv2.matchTemplate(search_region, tmpl, cv2.TM_CCOEFF_NORMED)
     if not multimodal_pair:
         _, max_val, _, max_loc = cv2.minMaxLoc(res)
+        find_best_correspondence_unified.last_peak_uniqueness = ncc_peak_uniqueness(res, max_loc)
         return float(max_val), max_loc
 
     th, tw = tmpl.shape[:2]
@@ -1385,6 +1386,7 @@ def find_best_correspondence_unified(
             score = w_mi * mi + w_ncc * max(0.0, float(max_val))
         else:
             score = float(max_val)
+        find_best_correspondence_unified.last_peak_uniqueness = ncc_peak_uniqueness(res, max_loc)
         return float(score), max_loc
 
     top_indices = np.argpartition(-flat, k)[:k]
@@ -1406,9 +1408,243 @@ def find_best_correspondence_unified(
 
     if best_score < 0.0:
         _, max_val, _, max_loc = cv2.minMaxLoc(res)
+        find_best_correspondence_unified.last_peak_uniqueness = ncc_peak_uniqueness(res, max_loc)
         return float(max_val), max_loc
 
+    find_best_correspondence_unified.last_peak_uniqueness = ncc_peak_uniqueness(res, best_loc)
     return float(best_score), best_loc
+
+
+def ncc_peak_uniqueness(
+    response: np.ndarray,
+    peak_loc: Tuple[int, int],
+    exclusion_radius: int = 5,
+) -> float:
+    """How much the NCC peak stands above the next lobe (0 = flat, 1 = unique).
+
+    Used as the live ``spatial_quality_score`` ingredient so training and
+    production see the same quantity — not a border-distance proxy that never
+    appears on real match dumps.
+    """
+    if response is None or getattr(response, "size", 0) == 0:
+        return 0.5
+    px, py = int(peak_loc[0]), int(peak_loc[1])
+    h, w = response.shape[:2]
+    if not (0 <= py < h and 0 <= px < w):
+        peak = float(np.nanmax(response))
+    else:
+        peak = float(response[py, px])
+    masked = np.array(response, dtype=np.float64, copy=True)
+    y0, y1 = max(0, py - exclusion_radius), min(h, py + exclusion_radius + 1)
+    x0, x1 = max(0, px - exclusion_radius), min(w, px + exclusion_radius + 1)
+    masked[y0:y1, x0:x1] = -np.inf
+    finite = np.isfinite(masked)
+    second = float(np.max(masked[finite])) if np.any(finite) else peak
+    peak_c = max(0.0, peak)
+    second_c = max(0.0, second)
+    if peak_c <= 1e-6:
+        return 0.0
+    return float(np.clip((peak_c - second_c) / peak_c, 0.0, 1.0))
+
+
+def last_peak_uniqueness(default: float = 0.5) -> float:
+    """Uniqueness from the most recent ``find_best_correspondence_unified`` call."""
+    try:
+        return float(np.clip(getattr(find_best_correspondence_unified, "last_peak_uniqueness", default), 0.0, 1.0))
+    except (TypeError, ValueError):
+        return float(default)
+
+
+def compute_spatial_quality_score(
+    *,
+    peak_uniqueness: Optional[float] = None,
+    refinement_dx: float = 0.0,
+    refinement_dy: float = 0.0,
+    is_refined: bool = False,
+    x: Optional[float] = None,
+    y: Optional[float] = None,
+    width: Optional[float] = None,
+    height: Optional[float] = None,
+) -> float:
+    """Per-candidate spatial quality for the AI verifier feature contract.
+
+    Combines NCC peak uniqueness, sub-pixel refinement tightness, and a weak
+    border prior. Always populated on live matcher records so a genuine
+    RANSAC-confirmed match is not feature-identical to a failed dump that
+    defaulted ``refinement_dx/dy=0`` and omitted ``spatial_quality_score``.
+    """
+    uniq = 0.5 if peak_uniqueness is None else float(np.clip(peak_uniqueness, 0.0, 1.0))
+    mag = math.hypot(float(refinement_dx), float(refinement_dy))
+    if is_refined:
+        refine = float(np.clip(math.exp(-0.75 * mag), 0.15, 1.0))
+    else:
+        refine = 0.35
+    border = 0.5
+    if (
+        x is not None and y is not None
+        and width is not None and height is not None
+        and float(width) > 1.0 and float(height) > 1.0
+    ):
+        dist = min(float(x), float(y), float(width) - float(x), float(height) - float(y))
+        border = float(np.clip(dist / (0.5 * min(float(width), float(height))), 0.05, 1.0))
+    return float(np.clip(0.50 * uniq + 0.35 * refine + 0.15 * border, 0.05, 1.0))
+
+
+def _homography_sample_degenerate(src4: np.ndarray, dst4: np.ndarray, min_span_px: float = 2.0) -> bool:
+    """True if a 4-point sample is collinear / collapsed (ill-conditioned DLT)."""
+    def _collapsed(pts: np.ndarray) -> bool:
+        c = pts.astype(np.float64) - np.mean(pts.astype(np.float64), axis=0)
+        try:
+            s = np.linalg.svd(c, compute_uv=False)
+        except np.linalg.LinAlgError:
+            return True
+        return float(s[-1]) < min_span_px
+    return _collapsed(src4) or _collapsed(dst4)
+
+
+def _weighted_dlt_homography(
+    pts1: np.ndarray,
+    pts2: np.ndarray,
+    weights: np.ndarray,
+) -> Optional[np.ndarray]:
+    """sqrt(w) row-scaled DLT. Returns None if the SVD is unusable."""
+    if len(pts1) < 4:
+        return None
+    sw = np.sqrt(np.clip(np.asarray(weights, dtype=np.float64), 0.0, None))
+    A = []
+    for i in range(len(pts1)):
+        x, y = float(pts1[i, 0]), float(pts1[i, 1])
+        xp, yp = float(pts2[i, 0]), float(pts2[i, 1])
+        s = float(sw[i])
+        A.append([-x * s, -y * s, -s, 0, 0, 0, xp * x * s, xp * y * s, xp * s])
+        A.append([0, 0, 0, -x * s, -y * s, -s, yp * x * s, yp * y * s, yp * s])
+    try:
+        _, _, vt = np.linalg.svd(np.asarray(A, dtype=np.float64))
+    except np.linalg.LinAlgError:
+        return None
+    H = vt[-1].reshape(3, 3)
+    if not np.all(np.isfinite(H)):
+        return None
+    if abs(H[2, 2]) > 1e-12:
+        H = H / H[2, 2]
+    return H
+
+
+def estimate_weighted_homography(
+    pts1: np.ndarray,
+    pts2: np.ndarray,
+    weights: np.ndarray,
+    estimator_method: int = cv2.RANSAC,
+    ransac_reproj_threshold: float = 5.0,
+    image_shape: Tuple[int, int] = (512, 512),
+    rng_seed: int = SEED,
+    n_iters: int = 2000,
+) -> Tuple[Optional[np.ndarray], Optional[np.ndarray], str]:
+    """PROSAC-style weighted homography that Quality Gate 3 will accept.
+
+    The previous manual fallback kept the 4-point DLT (or a weighted DLT on a
+    consensus set seeded by that 4-point model). High-weight but spatially
+    degenerate samples produce an ill-conditioned H that Gate 3 then rejects.
+    Consensus inliers are always *re-fit* with OpenCV's unweighted DLT; the
+    4-point model is used only to score inliers. If the refined H still fails
+    Gate 3, fall back to standard RANSAC on the full set.
+    """
+    pts1 = np.asarray(pts1, dtype=np.float32)
+    pts2 = np.asarray(pts2, dtype=np.float32)
+    w = np.asarray(weights, dtype=np.float64).ravel()
+    n = len(pts1)
+    if n < 4 or len(pts2) != n:
+        return None, None, "insufficient_points"
+    if w.size != n:
+        w = np.full(n, 0.5, dtype=np.float64)
+    w = np.nan_to_num(w, nan=0.5, posinf=1.0, neginf=0.0)
+    w = np.clip(w, 0.0, None)
+    if float(np.max(w)) > 0:
+        w = w / float(np.max(w))
+    else:
+        w = np.full(n, 0.5, dtype=np.float64)
+
+    def _accept(H: Optional[np.ndarray], mask: Optional[np.ndarray]) -> bool:
+        if H is None or mask is None or int(np.sum(mask)) < 4:
+            return False
+        if not np.all(np.isfinite(H)):
+            return False
+        try:
+            idx = np.where(np.asarray(mask).ravel() != 0)[0]
+            err = calculate_reprojection_errors(pts1[idx], pts2[idx], H)
+            rmse = float(np.sqrt(np.mean(err ** 2))) if len(err) else None
+        except Exception:
+            rmse = None
+        return bool(verify_transformation_quality(H, image_shape, fit_rmse_px=rmse).get("is_valid"))
+
+    def _standard():
+        H, mask = cv2.findHomography(
+            pts1, pts2, estimator_method, ransacReprojThreshold=ransac_reproj_threshold,
+        )
+        return H, mask, "standard_ransac"
+
+    try:
+        H_nat, mask_nat = cv2.findHomography(
+            pts1, pts2, estimator_method, ransacReprojThreshold=ransac_reproj_threshold,
+            weights=w.astype(np.float32),
+        )
+        if _accept(H_nat, mask_nat):
+            return H_nat, mask_nat, "native_weights"
+        logger.info("Native weighted findHomography failed Quality Gate 3; using sampling fallback.")
+    except TypeError:
+        logger.info("Native weighted findHomography unavailable; using confidence-weighted sampling.")
+
+    rng = np.random.default_rng(rng_seed)
+    p = w / max(float(np.sum(w)), 1e-12)
+    best_inliers = None
+    best_score = -1.0
+    for _ in range(int(n_iters)):
+        try:
+            idx = rng.choice(n, size=4, replace=False, p=p)
+        except ValueError:
+            break
+        src4, dst4 = pts1[idx], pts2[idx]
+        if _homography_sample_degenerate(src4, dst4):
+            continue
+        H_cand, _ = cv2.findHomography(src4, dst4, 0)
+        if H_cand is None or not np.all(np.isfinite(H_cand)):
+            continue
+        try:
+            if float(np.linalg.cond(H_cand)) >= TUNED_GATE3_MAX_COND:
+                continue
+            if float(np.linalg.det(H_cand)) <= TUNED_GATE3_MIN_DET:
+                continue
+        except Exception:
+            continue
+        try:
+            proj = cv2.perspectiveTransform(pts1.reshape(-1, 1, 2), H_cand).reshape(-1, 2)
+        except cv2.error:
+            continue
+        err = np.linalg.norm(proj - pts2, axis=1)
+        inl = err <= float(ransac_reproj_threshold)
+        if int(np.sum(inl)) < 4:
+            continue
+        score = float(np.sum(w[inl]))
+        if score > best_score:
+            best_score, best_inliers = score, inl
+
+    if best_inliers is None:
+        return _standard()
+
+    ii = np.where(best_inliers)[0]
+    src_i, dst_i, w_i = pts1[ii], pts2[ii], w[ii]
+    H_dlt, _ = cv2.findHomography(src_i, dst_i, 0)
+    mask = best_inliers.reshape(-1, 1).astype(np.uint8)
+
+    H_w = _weighted_dlt_homography(src_i, dst_i, w_i)
+    if _accept(H_w, mask):
+        return H_w, mask, "sampling_weighted_dlt"
+    if _accept(H_dlt, mask):
+        logger.info("Weighted DLT failed Quality Gate 3; using unweighted DLT on consensus inliers.")
+        return H_dlt, mask, "sampling_unweighted_dlt"
+
+    logger.info("Weighted-sampling homography failed Quality Gate 3; falling back to standard RANSAC.")
+    return _standard()
 
 
 def apply_grid_nms(
@@ -1910,6 +2146,7 @@ def _guided_refill_matches(
             max_val, max_loc = find_best_correspondence_unified(
                 search_region, tmpl, multimodal_pair=multimodal_pair
             )
+            peak_uniq = last_peak_uniqueness()
             if max_val > thresh:
                 bx = float(s_min_x + max_loc[0] + half_patch_c)
                 by = float(s_min_y + max_loc[1] + half_patch_c)
@@ -1946,6 +2183,14 @@ def _guided_refill_matches(
                         "refinement_dx": float(ref_dx),
                         "refinement_dy": float(ref_dy),
                         "is_refined": bool(refined),
+                        "peak_uniqueness": float(peak_uniq),
+                        "spatial_quality_score": compute_spatial_quality_score(
+                            peak_uniqueness=peak_uniq,
+                            refinement_dx=ref_dx,
+                            refinement_dy=ref_dy,
+                            is_refined=refined,
+                            x=kx, y=ky, width=work_w1, height=work_h1,
+                        ),
                     })
                     used_coords.append((kx, ky))
         return added
@@ -3025,6 +3270,7 @@ def match_images_cfog(
                     max_val, max_loc = find_best_correspondence_unified(
                         search_area, tmpl, multimodal_pair=False
                     )
+                    peak_uniq = last_peak_uniqueness()
                     if max_val > TUNED_RELAXED_NCC_THRESH:
                         best_x = s_min_x + max_loc[0] + pw
                         best_y = s_min_y + max_loc[1] + pw
@@ -3062,6 +3308,7 @@ def match_images_cfog(
                             "score": float(max_val),
                             "cell": fine_cell,
                             "method": "native_tiling",
+                            "peak_uniqueness": float(peak_uniq),
                         })
                         native_pts1.append([nat_x1, nat_y1])
                         native_pts2.append([nat_x2, nat_y2])
@@ -3070,6 +3317,13 @@ def match_images_cfog(
                             refinement_dx=float(sub_dx),
                             refinement_dy=float(sub_dy),
                             is_refined=bool(valid),
+                            spatial_quality_score=compute_spatial_quality_score(
+                                peak_uniqueness=peak_uniq,
+                                refinement_dx=sub_dx,
+                                refinement_dy=sub_dy,
+                                is_refined=bool(valid),
+                                x=nat_x1, y=nat_y1, width=orig_w1, height=orig_h1,
+                            ),
                         ))
 
         # Spatial Uniformity via Grid NMS
@@ -3229,6 +3483,7 @@ def match_images_cfog(
             max_val, max_loc = find_best_correspondence_unified(
                 search_region, tmpl, multimodal_pair=multimodal_pair
             )
+            peak_uniq = last_peak_uniqueness()
 
             if max_val > (TUNED_MI_THRESH if multimodal_pair else TUNED_NCC_THRESH):  # tuned on 2026-09-10, AUC=0.9010
                 best_x2 = s_min_x + max_loc[0] + half_patch_c
@@ -3244,6 +3499,7 @@ def match_images_cfog(
                     "score": float(max_val),
                     "cell": (gx, gy),
                     "method": "ssc_patch",
+                    "peak_uniqueness": float(peak_uniq),
                 })
 
         # --- 2b. For multimodal pairs, run centroid matching (with SSC on centroids) ---
@@ -3344,6 +3600,7 @@ def match_images_cfog(
                 max_val, max_loc = find_best_correspondence_unified(
                     search_region, tmpl, multimodal_pair=multimodal_pair
                 )
+                peak_uniq = last_peak_uniqueness()
 
                 if max_val > (TUNED_MI_THRESH if multimodal_pair else TUNED_NCC_THRESH):  # tuned on 2026-09-10, AUC=0.9010
                     best_x2 = s_min_x + max_loc[0] + half_patch_c
@@ -3356,6 +3613,7 @@ def match_images_cfog(
                         "score": float(max_val),
                         "cell": (gx, gy),
                         "method": "patch",
+                        "peak_uniqueness": float(peak_uniq),
                     })
 
         # --- Step 2: Post-match Grid Density Budgeting (NxN grid, 10x10) ---
@@ -3407,6 +3665,7 @@ def match_images_cfog(
                 max_val, max_loc = find_best_correspondence_unified(
                     search_region, tmpl, multimodal_pair=multimodal_pair
                 )
+                peak_uniq = last_peak_uniqueness()
                 if max_val > relaxed_ncc:
                     best_x2 = s_min_x + max_loc[0] + half_patch_c
                     best_y2 = s_min_y + max_loc[1] + half_patch_c
@@ -3417,6 +3676,7 @@ def match_images_cfog(
                         "score": float(max_val),
                         "cell": fine_cell,
                         "method": "mandatory_fill",
+                        "peak_uniqueness": float(peak_uniq),
                     })
                     occupied_macro.add((mc_x, mc_y))
                     mandatory_fill_count += 1
@@ -3524,6 +3784,13 @@ def match_images_cfog(
                 refinement_dx=float(ref_dx),
                 refinement_dy=float(ref_dy),
                 is_refined=bool(refined),
+                spatial_quality_score=compute_spatial_quality_score(
+                    peak_uniqueness=m.get("peak_uniqueness"),
+                    refinement_dx=ref_dx,
+                    refinement_dy=ref_dy,
+                    is_refined=refined,
+                    x=nat_x1, y=nat_y1, width=orig_w1, height=orig_h1,
+                ),
             ))
     t_l0 = time.perf_counter() - t_start_l0
     coarse_to_fine_timing = {"L2_s": round(t_l2, 4), "L1_s": round(t_l1, 4), "L0_s": round(t_l0, 4)}
@@ -3540,35 +3807,33 @@ def match_images_cfog(
         _rec.setdefault("match_id", _i)
         _rec["cell"] = _m.get("cell")
 
-    # --- PHASE 4: AI MATCH VERIFICATION (OPT-IN ONLY, NO BUNDLED MODEL) ---
-    # Honesty note: no trained classifier ships with this repo. A prior
-    # RANSAC-trained RandomForest was removed as circular supervision, and
-    # AIMatchVerifier now loads ONLY hand-trained bundles (see
-    # train_ai_verifier.py label contract); otherwise it applies a documented
-    # non-ML percentile baseline. Measured 2026-09-10: with the stack ON, all
-    # 3 real-CDR LRO pairs Gate2-FAIL and the primary benchmark flips outcomes
-    # both ways (003 success->fail, triplet_new_2022 honest-fail->5@0.17
-    # pseudo-success). Same opt-in rule as Phase 1: default path passes
-    # refinement records straight to RANSAC.
+    # --- PHASE 4: AI MATCH VERIFICATION ---
+    # Default: score every candidate with the hand-trained RandomForest (when
+    # present) and pass those probabilities as RANSAC sampling weights. Hard
+    # pre-RANSAC veto remains opt-in (experimental_stack) because a hard
+    # threshold vetoed true low-MI OHRC↔TMC matches when confidence barely
+    # separates classes. Untrained / missing-bundle path is a no-op filter.
     from ai_verifier import AIMatchVerifier
-    try:
-        from metadata import normalize_sensor_name as _raw_norm_s4
+    verifier = AIMatchVerifier()
+    if len(refinement_records) and verifier.is_trained:
+        _ai_probs = verifier.predict_confidence(refinement_records)
+        for _rec, _p in zip(refinement_records, _ai_probs):
+            _rec["ai_inlier_prob"] = float(_p)
+    else:
+        for _rec in refinement_records:
+            _rec.setdefault("ai_inlier_prob", float(_rec.get("confidence", _rec.get("score", 0.5))))
 
-        def _norm_s4(x):
-            return _raw_norm_s4(x) if x else ""
-    except Exception:
-        def _norm_s4(x):
-            return str(x or "").strip().upper()
-    _s4 = {_norm_s4(getattr(meta1, "sensor", "")),
-           _norm_s4(getattr(meta2, "sensor", "")),
-           _norm_s4(source_sensor), _norm_s4(reference_sensor)}
-    _use_verifier = bool(experimental_stack)
-    if _use_verifier:
-        verifier = AIMatchVerifier()
+    if experimental_stack and verifier.is_trained:
         verified_matches, rejected_matches = verifier.filter_matches(refinement_records, threshold=0.5)
+        logger.info("AI Verifier hard filter ON (experimental_stack): kept %d, rejected %d.",
+                    len(verified_matches), len(rejected_matches))
     else:
         verified_matches, rejected_matches = list(refinement_records), []
-        logger.info("AI Verifier off (default classical path; opt in via experimental_stack=True).")
+        if verifier.is_trained:
+            logger.info("AI Verifier: weighting RANSAC with %d scored matches (no hard filter).",
+                        len(refinement_records))
+        else:
+            logger.info("AI Verifier untrained; RANSAC weights fall back to match confidence.")
 
     # Update the points array based on verified matches
     if len(verified_matches) >= 4:
@@ -3611,10 +3876,10 @@ def match_images_cfog(
         )
     else:
         # --- PHASE 7: WEIGHTED (PROSAC-style) RANSAC / MAGSAC ---
-        # High-confidence matches are sampled with higher probability and pull
-        # the final refinement more strongly via weighted DLT. Forward-compatible:
-        # tries native cv2 weights kwarg first, else manual weighted sampling.
-        # NOTE: verified/refinement records carry "confidence" (not "score").
+        # Sample using AI inlier probability when the verifier is trained;
+        # otherwise match confidence. The 4-point DLT is NEVER the returned
+        # model: consensus inliers are re-fit and Gate-3-checked so a
+        # degenerate high-weight sample cannot poison Quality Gate 3.
         try:
             if len(verified_matches) >= 4 and len(verified_matches) == len(pts1_arr):
                 _w_src = verified_matches
@@ -3624,67 +3889,20 @@ def match_images_cfog(
                 _w_src = []
             if len(_w_src) == len(pts1_arr) and len(pts1_arr) >= 4:
                 weights = np.array(
-                    [float(m.get("confidence", m.get("score", 0.5))) for m in _w_src],
+                    [float(m.get("ai_inlier_prob", m.get("confidence", m.get("score", 0.5))))
+                     for m in _w_src],
                     dtype=np.float64,
                 )
-                weights = np.nan_to_num(weights, nan=0.5, posinf=1.0, neginf=0.0)
-                weights = np.clip(weights, 0.0, None)
-                if float(np.max(weights)) > 0:
-                    weights = weights / float(np.max(weights))
-                else:
-                    weights = np.full_like(weights, 0.5)
             else:
                 weights = np.full(len(pts1_arr), 0.5, dtype=np.float64)
-
-            try:
-                # Forward-compat: newer OpenCV builds accept per-point weights.
-                H_final, inlier_mask = cv2.findHomography(
-                    pts1_arr, pts2_arr, estimator_method, ransacReprojThreshold=5.0,  # tuned on 2026-09-10, AUC=0.9010
-                    weights=weights.astype(np.float32),
-                )
-                logger.info("Weighted %s applied successfully (native weights).", chosen_outlier_method.upper())
-            except TypeError:
-                # OpenCV 4.x has no weights kwarg: manual confidence-weighted sampling.
-                logger.info("Native weighted %s unavailable; using confidence-weighted sampling.", chosen_outlier_method.upper())
-                _rng = np.random.default_rng(SEED)
-                _p = weights / max(float(np.sum(weights)), 1e-12)
-                _n = len(pts1_arr)
-                _best_H, _best_inliers, _best_score = None, None, -1.0
-                for _ in range(2000):
-                    _idx = _rng.choice(_n, size=4, replace=False, p=_p)
-                    _H_cand, _ = cv2.findHomography(pts1_arr[_idx], pts2_arr[_idx], 0)
-                    if _H_cand is None or not np.all(np.isfinite(_H_cand)):
-                        continue
-                    _proj = cv2.perspectiveTransform(pts1_arr.reshape(-1, 1, 2), _H_cand).reshape(-1, 2)
-                    _err = np.linalg.norm(_proj - pts2_arr, axis=1)
-                    _inl = _err <= 5.0  # tuned on 2026-09-10, AUC=0.9010
-                    if int(np.sum(_inl)) < 4:
-                        continue
-                    _score = float(np.sum(weights[_inl]))
-                    if _score > _best_score:
-                        _best_score, _best_H, _best_inliers = _score, _H_cand, _inl
-                if _best_H is not None:
-                    # Weighted DLT refinement on inliers (sqrt(w) row scaling + SVD).
-                    _ii = np.where(_best_inliers)[0]
-                    _sw = np.sqrt(weights[_ii])
-                    _A = []
-                    for _k, _i in enumerate(_ii):
-                        _x, _y = float(pts1_arr[_i, 0]), float(pts1_arr[_i, 1])
-                        _xp, _yp = float(pts2_arr[_i, 0]), float(pts2_arr[_i, 1])
-                        _s = float(_sw[_k])
-                        _A.append([-_x * _s, -_y * _s, -_s, 0, 0, 0, _xp * _x * _s, _xp * _y * _s, _xp * _s])
-                        _A.append([0, 0, 0, -_x * _s, -_y * _s, -_s, _yp * _x * _s, _yp * _y * _s, _yp * _s])
-                    _, _, _Vt = np.linalg.svd(np.asarray(_A, dtype=np.float64))
-                    _H_ref = _Vt[-1].reshape(3, 3)
-                    if abs(_H_ref[2, 2]) > 1e-12:
-                        _H_ref = _H_ref / _H_ref[2, 2]
-                    H_final = _H_ref
-                    inlier_mask = _best_inliers.reshape(-1, 1).astype(np.uint8)
-                    logger.info("Weighted %s applied successfully (sampling + weighted DLT).", chosen_outlier_method.upper())
-                else:
-                    H_final, inlier_mask = cv2.findHomography(
-                        pts1_arr, pts2_arr, estimator_method, ransacReprojThreshold=5.0  # tuned on 2026-09-10, AUC=0.9010
-                    )
+            H_final, inlier_mask, _w_tag = estimate_weighted_homography(
+                pts1_arr, pts2_arr, weights,
+                estimator_method=estimator_method,
+                ransac_reproj_threshold=5.0,  # tuned on 2026-09-10, AUC=0.9010
+                image_shape=(orig_h2, orig_w2),
+                rng_seed=SEED,
+            )
+            logger.info("Weighted %s applied (%s).", chosen_outlier_method.upper(), _w_tag)
         except Exception as e:
             logger.warning("Weighted estimation failed (%s). Falling back to standard %s.", e, chosen_outlier_method.upper())
             H_final, inlier_mask = cv2.findHomography(
@@ -3884,6 +4102,15 @@ def match_images_cfog(
                         refinement_dx=float(g.get("refinement_dx", 0.0)),
                         refinement_dy=float(g.get("refinement_dy", 0.0)),
                         is_refined=bool(g.get("is_refined", False)),
+                        spatial_quality_score=float(g.get("spatial_quality_score") or compute_spatial_quality_score(
+                            peak_uniqueness=g.get("peak_uniqueness"),
+                            refinement_dx=float(g.get("refinement_dx", 0.0)),
+                            refinement_dy=float(g.get("refinement_dy", 0.0)),
+                            is_refined=bool(g.get("is_refined", False)),
+                            x=float(g["work_x1"]) * scale_factor1,
+                            y=float(g["work_y1"]) * scale_factor1,
+                            width=orig_w1, height=orig_h1,
+                        )),
                         method="guided_refill",
                         match_id=len(refinement_records),
                     ))
