@@ -3404,7 +3404,7 @@ def match_images_cfog(
             s_min_x = max(0, cx2_l1 - search_half_l1_w)
             s_max_x = min(w2_l1, cx2_l1 + search_half_l1_w)
             s_min_y = max(0, cy2_l1 - search_half_l1_h)
-            s_max_y = min(w2_l1, cy2_l1 + search_half_l1_h)
+            s_max_y = min(h2_l1, cy2_l1 + search_half_l1_h)
             if s_max_x - s_min_x <= tmpl_l1.shape[1] or s_max_y - s_min_y <= tmpl_l1.shape[0]:
                 continue
             search_l1 = pc2_l1[s_min_y:s_max_y, s_min_x:s_max_x]
@@ -3512,7 +3512,7 @@ def match_images_cfog(
                         continue
                     search_area = pc_t_coarse[s_min_y:s_max_y, s_min_x:s_max_x]
                     max_val, max_loc = find_best_correspondence_unified(
-                        search_area, tmpl, multimodal_pair=False
+                        search_area, tmpl, multimodal_pair=bool(multimodal_pair)
                     )
                     peak_uniq = last_peak_uniqueness()
                     if max_val > TUNED_RELAXED_NCC_THRESH:
