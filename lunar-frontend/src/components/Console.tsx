@@ -251,8 +251,39 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                 Menu
               </span>
               <nav className="space-y-1">
+                <button
+                  key="registration"
+                  onClick={() => { setView("registration"); scrollToArena(); }}
+                  className={`group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all ${
+                    view === "registration"
+                      ? "bg-[#EEF2FF] text-[#4F46E5] border-l-4 border-[#4F46E5]"
+                      : "text-slate-600 hover:bg-slate-50 hover:text-slate-900 border-l-4 border-transparent"
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <span className={`text-sm ${view === "registration" ? "text-[#4F46E5]" : "text-slate-400 group-hover:text-slate-600"}`}>
+                      ⊞
+                    </span>
+                    <span>Dashboard QA</span>
+                  </div>
+                  {view === "registration" && (
+                    <span className="h-1.5 w-1.5 rounded-full bg-[#4F46E5]" />
+                  )}
+                </button>
+
+                <a
+                  href="/ingest"
+                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition border-l-4 border-transparent"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-slate-400 group-hover:text-slate-600">
+                      ⚡
+                    </span>
+                    <span>Ingest &amp; Prepare</span>
+                  </div>
+                </a>
+
                 {[
-                  { id: "registration", label: "Dashboard QA", icon: "⊞" },
                   { id: "linked-cursor", label: "Linked Cursor", icon: "⊙" },
                   { id: "map", label: "Planetary Map", icon: "☵" },
                 ].map((item) => {

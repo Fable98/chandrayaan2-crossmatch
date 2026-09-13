@@ -9,100 +9,9 @@ interface ResultsTableProps {
   containment: number;
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  wrapper: {
-    borderRadius: 'var(--radius-lg)',
-    background: 'var(--bg-glass)',
-    backdropFilter: 'blur(20px)',
-    border: '1px solid var(--border-subtle)',
-    boxShadow: 'var(--shadow-md)',
-    overflow: 'hidden',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: '20px 24px',
-    borderBottom: '1px solid var(--border-subtle)',
-  },
-  headerTitle: {
-    fontSize: '1rem',
-    fontWeight: 700,
-    color: 'var(--text-primary)',
-  },
-  headerCount: {
-    fontSize: '0.8rem',
-    color: 'var(--text-muted)',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse' as const,
-    fontSize: '0.8rem',
-  },
-  th: {
-    padding: '12px 16px',
-    textAlign: 'left' as const,
-    fontWeight: 600,
-    fontSize: '0.7rem',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.06em',
-    color: 'var(--text-muted)',
-    borderBottom: '1px solid var(--border-subtle)',
-    background: 'rgba(0,0,0,0.15)',
-    whiteSpace: 'nowrap' as const,
-  },
-  td: {
-    padding: '12px 16px',
-    borderBottom: '1px solid var(--border-subtle)',
-    color: 'var(--text-secondary)',
-    verticalAlign: 'top' as const,
-  },
-  row: {
-    transition: 'background 150ms ease',
-    cursor: 'pointer',
-  },
-  productId: {
-    fontFamily: 'var(--font-mono)',
-    fontSize: '0.7rem',
-    color: 'var(--text-muted)',
-    maxWidth: '180px',
-    overflow: 'hidden' as const,
-    textOverflow: 'ellipsis' as const,
-    whiteSpace: 'nowrap' as const,
-  },
-  detailPanel: {
-    padding: '16px 24px',
-    background: 'rgba(0, 0, 0, 0.1)',
-    borderBottom: '1px solid var(--border-subtle)',
-  },
-  detailGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))',
-    gap: '12px',
-  },
-  detailItem: {
-    fontSize: '0.75rem',
-  },
-  detailLabel: {
-    color: 'var(--text-muted)',
-    fontWeight: 600,
-    marginBottom: '2px',
-  },
-  detailValue: {
-    fontFamily: 'var(--font-mono)',
-    color: 'var(--text-secondary)',
-  },
-  empty: {
-    textAlign: 'center' as const,
-    padding: '48px 24px',
-    color: 'var(--text-muted)',
-    fontSize: '0.9rem',
-  },
-};
-
 function fmtAngle(val: any): string {
   if (val === null || val === undefined) return 'N/A';
-  return `${Number(val).toFixed(1)}deg`;
+  return `${Number(val).toFixed(1)}°`;
 }
 
 function fmtGsd(val: any): string {
@@ -115,10 +24,8 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
 
   if (triplets.length === 0) {
     return (
-      <div style={styles.wrapper}>
-        <div style={styles.empty}>
-          No triplet results yet. Run the pipeline to see results here.
-        </div>
+      <div className="rounded-2xl border border-slate-200/80 bg-white p-12 text-center text-slate-400 text-xs shadow-sm">
+        No triplet results yet. Run the pipeline to see results here.
       </div>
     );
   }
@@ -126,26 +33,36 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
   const threshold = containment * 100;
 
   return (
-    <div style={styles.wrapper} className="animate-fade-in">
-      <div style={styles.header}>
-        <span style={styles.headerTitle}>Discovered Triplets</span>
-        <span style={styles.headerCount}>{triplets.length} triplet(s)</span>
+    <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm overflow-hidden animate-fade-in">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b border-slate-100 bg-white px-6 py-4">
+        <div className="flex items-center gap-2.5">
+          <span className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#4F46E5]">
+            Discovered Triplets
+          </span>
+          <span className="text-sm font-bold text-slate-900">
+            Automated Cross-Match Results
+          </span>
+        </div>
+        <span className="rounded-full bg-slate-100 px-3 py-1 font-mono text-xs font-bold text-slate-600 border border-slate-200">
+          {triplets.length} triplet(s)
+        </span>
       </div>
 
-      <div style={{ overflowX: 'auto' }}>
-        <table style={styles.table}>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-xs border-collapse">
           <thead>
-            <tr>
-              <th style={styles.th}>#</th>
-              <th style={styles.th}>OHRC Product</th>
-              <th style={styles.th}>TMC-2 Product</th>
-              <th style={styles.th}>IIRS Product</th>
-              <th style={styles.th}>Overlap</th>
-              <th style={styles.th}>Sun El (OHRC)</th>
-              <th style={styles.th}>Status</th>
+            <tr className="border-b border-slate-200/80 bg-slate-50 font-sans text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <th className="py-3 px-4">#</th>
+              <th className="py-3 px-4">OHRC Product</th>
+              <th className="py-3 px-4">TMC-2 Product</th>
+              <th className="py-3 px-4">IIRS Product</th>
+              <th className="py-3 px-4">Overlap</th>
+              <th className="py-3 px-4">Sun El (OHRC)</th>
+              <th className="py-3 px-4 text-right">Status</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="divide-y divide-slate-100">
             {triplets.map((t, i) => {
               const overlapPct = t.overlap_triplet_pct ?? 0;
               const pass = overlapPct >= threshold;
@@ -154,54 +71,59 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
               return (
                 <React.Fragment key={i}>
                   <tr
-                    style={{
-                      ...styles.row,
-                      background: isExpanded ? 'rgba(99,102,241,0.05)' : undefined,
-                    }}
                     onClick={() => setExpandedIdx(isExpanded ? null : i)}
-                    onMouseEnter={(e) => {
-                      if (!isExpanded) {
-                        (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.02)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isExpanded) {
-                        (e.currentTarget as HTMLElement).style.background = '';
-                      }
-                    }}
+                    className={`transition-colors cursor-pointer ${
+                      isExpanded ? 'bg-indigo-50/40' : 'hover:bg-slate-50/70'
+                    }`}
                   >
-                    <td style={styles.td}>{i + 1}</td>
-                    <td style={styles.td}>
-                      <div style={styles.productId} title={t.ohrc_product_id}>
+                    <td className="py-3.5 px-4 font-mono font-medium text-slate-400">
+                      {i + 1}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <div
+                        className="font-mono text-xs font-medium text-slate-800 max-w-[180px] truncate"
+                        title={t.ohrc_product_id}
+                      >
                         {t.ohrc_product_id || '---'}
                       </div>
                     </td>
-                    <td style={styles.td}>
-                      <div style={styles.productId} title={t.tmc2_product_id}>
+                    <td className="py-3.5 px-4">
+                      <div
+                        className="font-mono text-xs font-medium text-slate-800 max-w-[180px] truncate"
+                        title={t.tmc2_product_id}
+                      >
                         {t.tmc2_product_id || '---'}
                       </div>
                     </td>
-                    <td style={styles.td}>
-                      <div style={styles.productId} title={t.iirs_product_id}>
+                    <td className="py-3.5 px-4">
+                      <div
+                        className="font-mono text-xs font-medium text-slate-800 max-w-[180px] truncate"
+                        title={t.iirs_product_id}
+                      >
                         {t.iirs_product_id || '---'}
                       </div>
                     </td>
-                    <td style={{
-                      ...styles.td,
-                      fontFamily: 'var(--font-mono)',
-                      fontWeight: 600,
-                      color: pass ? 'var(--accent-success)' : 'var(--accent-danger)',
-                    }}>
-                      {overlapPct.toFixed(1)}%
+                    <td className="py-3.5 px-4">
+                      <span
+                        className={`font-mono text-xs font-bold ${
+                          pass ? 'text-emerald-600' : 'text-rose-600'
+                        }`}
+                      >
+                        {overlapPct.toFixed(1)}%
+                      </span>
                     </td>
-                    <td style={{
-                      ...styles.td,
-                      fontFamily: 'var(--font-mono)',
-                    }}>
+                    <td className="py-3.5 px-4 font-mono text-slate-600">
                       {fmtAngle(t.ohrc_sun_elevation_deg)}
                     </td>
-                    <td style={styles.td}>
-                      <span className={pass ? 'badge badge-pass' : 'badge badge-fail'}>
+                    <td className="py-3.5 px-4 text-right">
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                          pass
+                            ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            : 'border-rose-200 bg-rose-50 text-rose-700'
+                        }`}
+                      >
+                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
                         {pass ? 'PASS' : 'FAIL'}
                       </span>
                     </td>
@@ -210,52 +132,83 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
                   {/* Expanded detail row */}
                   {isExpanded && (
                     <tr>
-                      <td colSpan={7} style={{ padding: 0 }}>
-                        <div style={styles.detailPanel}>
-                          <div style={styles.detailGrid}>
-                            <div style={styles.detailItem}>
-                              <div style={styles.detailLabel}>OHRC Sun Elevation</div>
-                              <div style={styles.detailValue}>{fmtAngle(t.ohrc_sun_elevation_deg)}</div>
+                      <td colSpan={7} className="p-0 border-b border-slate-200 bg-slate-50/60">
+                        <div className="p-5 space-y-4">
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                OHRC Sun Elevation
+                              </span>
+                              <span className="font-mono text-xs font-bold text-slate-800">
+                                {fmtAngle(t.ohrc_sun_elevation_deg)}
+                              </span>
                             </div>
-                            <div style={styles.detailItem}>
-                              <div style={styles.detailLabel}>TMC-2 Sun Elevation</div>
-                              <div style={styles.detailValue}>{fmtAngle(t.tmc2_sun_elevation_deg)}</div>
+
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                TMC-2 Sun Elevation
+                              </span>
+                              <span className="font-mono text-xs font-bold text-slate-800">
+                                {fmtAngle(t.tmc2_sun_elevation_deg)}
+                              </span>
                             </div>
-                            <div style={styles.detailItem}>
-                              <div style={styles.detailLabel}>IIRS Sun Elevation</div>
-                              <div style={styles.detailValue}>{fmtAngle(t.iirs_sun_elevation_deg)}</div>
+
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                IIRS Sun Elevation
+                              </span>
+                              <span className="font-mono text-xs font-bold text-slate-800">
+                                {fmtAngle(t.iirs_sun_elevation_deg)}
+                              </span>
                             </div>
-                            <div style={styles.detailItem}>
-                              <div style={styles.detailLabel}>OHRC GSD</div>
-                              <div style={styles.detailValue}>{fmtGsd(t.ohrc_gsd_m)}</div>
+
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                Triplet Overlap
+                              </span>
+                              <span className="font-mono text-xs font-bold text-[#4F46E5]">
+                                {overlapPct.toFixed(2)}%
+                              </span>
                             </div>
-                            <div style={styles.detailItem}>
-                              <div style={styles.detailLabel}>TMC-2 GSD</div>
-                              <div style={styles.detailValue}>{fmtGsd(t.tmc2_gsd_m)}</div>
+
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                OHRC GSD
+                              </span>
+                              <span className="font-mono text-xs font-bold text-slate-800">
+                                {fmtGsd(t.ohrc_gsd_m)}
+                              </span>
                             </div>
-                            <div style={styles.detailItem}>
-                              <div style={styles.detailLabel}>IIRS GSD</div>
-                              <div style={styles.detailValue}>{fmtGsd(t.iirs_gsd_m)}</div>
+
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                TMC-2 GSD
+                              </span>
+                              <span className="font-mono text-xs font-bold text-slate-800">
+                                {fmtGsd(t.tmc2_gsd_m)}
+                              </span>
                             </div>
-                            <div style={styles.detailItem}>
-                              <div style={styles.detailLabel}>Triplet Overlap</div>
-                              <div style={styles.detailValue}>{overlapPct.toFixed(2)}%</div>
+
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                IIRS GSD
+                              </span>
+                              <span className="font-mono text-xs font-bold text-slate-800">
+                                {fmtGsd(t.iirs_gsd_m)}
+                              </span>
                             </div>
-                            {t.intersection_wkt && (
-                              <div style={{ ...styles.detailItem, gridColumn: '1 / -1' }}>
-                                <div style={styles.detailLabel}>Intersection WKT</div>
-                                <div style={{
-                                  ...styles.detailValue,
-                                  fontSize: '0.65rem',
-                                  wordBreak: 'break-all',
-                                  maxHeight: '60px',
-                                  overflow: 'auto',
-                                }}>
-                                  {t.intersection_wkt}
-                                </div>
-                              </div>
-                            )}
                           </div>
+
+                          {t.intersection_wkt && (
+                            <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                              <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
+                                Intersection Geometry (WKT)
+                              </span>
+                              <div className="font-mono text-[10px] text-slate-600 break-all max-h-24 overflow-y-auto leading-relaxed">
+                                {t.intersection_wkt}
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </td>
                     </tr>

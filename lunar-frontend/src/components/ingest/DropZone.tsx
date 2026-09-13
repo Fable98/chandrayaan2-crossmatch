@@ -5,84 +5,6 @@ interface DropZoneProps {
   disabled?: boolean;
 }
 
-const styles: Record<string, React.CSSProperties> = {
-  wrapper: {
-    position: 'relative',
-    padding: '48px 32px',
-    borderRadius: 'var(--radius-xl)',
-    border: '2px dashed var(--border-default)',
-    background: 'var(--bg-surface)',
-    textAlign: 'center',
-    cursor: 'pointer',
-    transition: 'all 250ms cubic-bezier(0.16, 1, 0.3, 1)',
-    overflow: 'hidden',
-  },
-  wrapperActive: {
-    borderColor: 'var(--accent-primary)',
-    background: 'rgba(99, 102, 241, 0.06)',
-    boxShadow: '0 0 40px rgba(99, 102, 241, 0.15), inset 0 0 60px rgba(99, 102, 241, 0.05)',
-    transform: 'scale(1.01)',
-  },
-  wrapperDisabled: {
-    opacity: 0.5,
-    cursor: 'not-allowed',
-    pointerEvents: 'none' as const,
-  },
-  icon: {
-    fontSize: '3rem',
-    marginBottom: '16px',
-    display: 'block',
-  },
-  title: {
-    fontSize: '1.2rem',
-    fontWeight: 600,
-    color: 'var(--text-primary)',
-    marginBottom: '8px',
-  },
-  subtitle: {
-    fontSize: '0.875rem',
-    color: 'var(--text-secondary)',
-    marginBottom: '20px',
-  },
-  browseBtn: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '6px',
-    padding: '8px 20px',
-    background: 'var(--bg-elevated)',
-    border: '1px solid var(--border-default)',
-    borderRadius: 'var(--radius-md)',
-    color: 'var(--text-secondary)',
-    fontSize: '0.8rem',
-    fontWeight: 500,
-    cursor: 'pointer',
-    transition: 'all 150ms ease',
-    fontFamily: 'var(--font-sans)',
-  },
-  hiddenInput: {
-    display: 'none',
-  },
-  hint: {
-    fontSize: '0.7rem',
-    color: 'var(--text-muted)',
-    marginTop: '16px',
-  },
-  pulseRing: {
-    position: 'absolute' as const,
-    top: '50%',
-    left: '50%',
-    width: '120px',
-    height: '120px',
-    marginTop: '-60px',
-    marginLeft: '-60px',
-    borderRadius: '50%',
-    border: '2px solid var(--accent-primary)',
-    opacity: 0,
-    animation: 'pulse-ring 1.5s ease-out infinite',
-    pointerEvents: 'none' as const,
-  },
-};
-
 export default function DropZone({ onFilesSelected, disabled = false }: DropZoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -97,7 +19,6 @@ export default function DropZone({ onFilesSelected, disabled = false }: DropZone
   const handleDragLeave = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // Only set false if leaving the drop zone itself
     if (e.currentTarget === e.target) {
       setIsDragOver(false);
     }
@@ -152,7 +73,6 @@ export default function DropZone({ onFilesSelected, disabled = false }: DropZone
         allFiles.push(...files);
       }
     } else {
-      // Fallback
       for (let i = 0; i < e.dataTransfer.files.length; i++) {
         allFiles.push(e.dataTransfer.files[i]);
       }
@@ -184,15 +104,15 @@ export default function DropZone({ onFilesSelected, disabled = false }: DropZone
     e.target.value = '';
   }, [onFilesSelected]);
 
-  const combinedStyle: React.CSSProperties = {
-    ...styles.wrapper,
-    ...(isDragOver ? styles.wrapperActive : {}),
-    ...(disabled ? styles.wrapperDisabled : {}),
-  };
-
   return (
     <div
-      style={combinedStyle}
+      className={`relative rounded-2xl border-2 border-dashed p-10 text-center transition-all duration-200 cursor-pointer overflow-hidden ${
+        disabled
+          ? 'opacity-50 cursor-not-allowed pointer-events-none border-slate-200 bg-slate-50/50'
+          : isDragOver
+          ? 'border-[#4F46E5] bg-indigo-50/40 shadow-inner scale-[1.01]'
+          : 'border-slate-300 bg-slate-50/60 hover:bg-indigo-50/20 hover:border-[#4F46E5]/50 shadow-xs'
+      }`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDragOver={handleDragOver}
@@ -208,59 +128,48 @@ export default function DropZone({ onFilesSelected, disabled = false }: DropZone
       }}
       aria-label="Drop zone for zip files"
     >
-      {isDragOver && <div style={styles.pulseRing} />}
+      <div className="flex flex-col items-center justify-center">
+        <span className="text-4xl mb-3">
+          {isDragOver ? '📂' : '🌙'}
+        </span>
 
-      <span style={styles.icon}>
-        {isDragOver ? '📂' : '🌙'}
-      </span>
+        <h3 className="text-base font-bold text-slate-900 mb-1">
+          {isDragOver ? 'Release to upload' : 'Drop PRADAN zip files or a folder here'}
+        </h3>
 
-      <div style={styles.title}>
-        {isDragOver
-          ? 'Release to upload'
-          : 'Drop PRADAN zip files or a folder here'}
-      </div>
+        <p className="text-xs text-slate-500 max-w-md mb-5">
+          Accepts .zip files from ISSDC PRADAN — OHRC, TMC-2, and IIRS products
+        </p>
 
-      <div style={styles.subtitle}>
-        Accepts .zip files from ISSDC PRADAN — OHRC, TMC-2, and IIRS products
-      </div>
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              fileInputRef.current?.click();
+            }}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 hover:border-indigo-300 transition"
+          >
+            <span>📁</span>
+            <span>Browse Files</span>
+          </button>
 
-      <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
-        <button
-          style={styles.browseBtn}
-          onClick={(e) => {
-            e.stopPropagation();
-            fileInputRef.current?.click();
-          }}
-          onMouseEnter={(e) => {
-            (e.target as HTMLElement).style.borderColor = 'var(--accent-primary)';
-            (e.target as HTMLElement).style.color = 'var(--text-primary)';
-          }}
-          onMouseLeave={(e) => {
-            (e.target as HTMLElement).style.borderColor = 'var(--border-default)';
-            (e.target as HTMLElement).style.color = 'var(--text-secondary)';
-          }}
-          type="button"
-        >
-          Browse Files
-        </button>
-        <button
-          style={styles.browseBtn}
-          onClick={(e) => {
-            e.stopPropagation();
-            folderInputRef.current?.click();
-          }}
-          onMouseEnter={(e) => {
-            (e.target as HTMLElement).style.borderColor = 'var(--accent-primary)';
-            (e.target as HTMLElement).style.color = 'var(--text-primary)';
-          }}
-          onMouseLeave={(e) => {
-            (e.target as HTMLElement).style.borderColor = 'var(--border-default)';
-            (e.target as HTMLElement).style.color = 'var(--text-secondary)';
-          }}
-          type="button"
-        >
-          Browse Folder
-        </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              folderInputRef.current?.click();
+            }}
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 hover:border-indigo-300 transition"
+          >
+            <span>📂</span>
+            <span>Browse Folder</span>
+          </button>
+        </div>
+
+        <p className="text-[11px] text-slate-400 font-mono mt-5">
+          Mixed sensor types are fine — the pipeline auto-discovers OHRC + TMC-2 + IIRS triplets
+        </p>
       </div>
 
       <input
@@ -268,7 +177,7 @@ export default function DropZone({ onFilesSelected, disabled = false }: DropZone
         type="file"
         accept=".zip"
         multiple
-        style={styles.hiddenInput}
+        className="hidden"
         onChange={handleFileInput}
       />
       <input
@@ -276,13 +185,9 @@ export default function DropZone({ onFilesSelected, disabled = false }: DropZone
         type="file"
         {...({ webkitdirectory: '' } as { webkitdirectory: string })}
         multiple
-        style={styles.hiddenInput}
+        className="hidden"
         onChange={handleFileInput}
       />
-
-      <div style={styles.hint}>
-        Mixed sensor types are fine — the pipeline auto-discovers OHRC + TMC-2 + IIRS triplets
-      </div>
     </div>
   );
 }

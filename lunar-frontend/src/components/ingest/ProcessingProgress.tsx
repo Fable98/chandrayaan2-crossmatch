@@ -16,75 +16,6 @@ const STAGE_LABELS = [
   'Done!',
 ];
 
-const styles: Record<string, React.CSSProperties> = {
-  wrapper: {
-    padding: '28px',
-    borderRadius: 'var(--radius-lg)',
-    background: 'var(--bg-glass)',
-    backdropFilter: 'blur(20px)',
-    border: '1px solid var(--border-subtle)',
-    boxShadow: 'var(--shadow-md)',
-  },
-  header: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: '20px',
-  },
-  headerLeft: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-  },
-  stageLabel: {
-    fontSize: '1rem',
-    fontWeight: 600,
-    color: 'var(--text-primary)',
-  },
-  pctLabel: {
-    fontSize: '0.8rem',
-    fontWeight: 700,
-    color: 'var(--accent-secondary)',
-    fontFamily: 'var(--font-mono)',
-  },
-  stagesRow: {
-    display: 'flex',
-    gap: '4px',
-    marginBottom: '24px',
-    marginTop: '12px',
-  },
-  stageChip: {
-    flex: 1,
-    height: '4px',
-    borderRadius: '2px',
-    transition: 'all 400ms cubic-bezier(0.16, 1, 0.3, 1)',
-  },
-  logHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: '20px',
-    marginBottom: '8px',
-  },
-  logTitle: {
-    fontSize: '0.75rem',
-    fontWeight: 600,
-    color: 'var(--text-muted)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.08em',
-  },
-  errorBanner: {
-    marginTop: '16px',
-    padding: '12px 16px',
-    borderRadius: 'var(--radius-md)',
-    background: 'var(--accent-danger-bg)',
-    border: '1px solid rgba(248, 113, 113, 0.3)',
-    color: 'var(--accent-danger)',
-    fontSize: '0.85rem',
-    fontWeight: 500,
-  },
-};
-
 function getStageIndex(stage: string): number {
   const idx = STAGE_LABELS.findIndex(
     (s) => stage.toLowerCase().includes(s.toLowerCase().slice(0, 10))
@@ -92,11 +23,11 @@ function getStageIndex(stage: string): number {
   return idx >= 0 ? idx : -1;
 }
 
-function classifyLogLine(line: string): string {
-  if (line.includes('Stage ') && line.includes('/6'))  return 'log-line log-line--stage';
-  if (line.includes('ERROR') || line.includes('FAIL')) return 'log-line log-line--error';
-  if (line.includes('[OK]') || line.includes('PASS'))  return 'log-line log-line--ok';
-  return 'log-line log-line--info';
+function getLogLineClass(line: string): string {
+  if (line.includes('Stage ') && line.includes('/6')) return 'text-indigo-400 font-bold';
+  if (line.includes('ERROR') || line.includes('FAIL')) return 'text-rose-400 font-bold';
+  if (line.includes('[OK]') || line.includes('PASS')) return 'text-emerald-400 font-semibold';
+  return 'text-slate-300';
 }
 
 export default function ProcessingProgress({ status }: ProcessingProgressProps) {
@@ -114,39 +45,52 @@ export default function ProcessingProgress({ status }: ProcessingProgressProps) 
   const isFailed = status.status === 'failed';
 
   return (
-    <div style={styles.wrapper} className="animate-fade-in">
+    <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm space-y-5 animate-fade-in">
       {/* Header */}
-      <div style={styles.header}>
-        <div style={styles.headerLeft}>
-          {isRunning && <div className="spinner" />}
-          {isDone && <span style={{ fontSize: '1.2rem' }}>&#10003;</span>}
-          {isFailed && <span style={{ fontSize: '1.2rem', color: 'var(--accent-danger)' }}>&#10007;</span>}
-          <span style={styles.stageLabel}>{status.stage}</span>
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {isRunning && (
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-[#4F46E5]" />
+            </span>
+          )}
+          {isDone && (
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+              ✓
+            </span>
+          )}
+          {isFailed && (
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-rose-700 text-xs font-bold">
+              ✕
+            </span>
+          )}
+          <span className="text-sm font-bold text-slate-900">{status.stage}</span>
         </div>
-        <span style={styles.pctLabel}>
+        <span className="font-mono text-xs font-bold text-[#4F46E5] bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">
           {Math.round(status.progress_pct)}%
         </span>
       </div>
 
       {/* Progress bar */}
-      <div className="progress-bar-track">
+      <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
         <div
-          className="progress-bar-fill"
+          className="h-full bg-[#4F46E5] transition-all duration-300 rounded-full"
           style={{ width: `${status.progress_pct}%` }}
         />
       </div>
 
       {/* Stage chips */}
-      <div style={styles.stagesRow}>
+      <div className="flex gap-1.5">
         {STAGE_LABELS.slice(0, 7).map((label, i) => {
-          let bg = 'var(--bg-elevated)';
-          if (i < stageIdx || isDone) bg = 'var(--accent-success)';
-          else if (i === stageIdx && isRunning) bg = 'var(--accent-primary)';
-          else if (isFailed && i === stageIdx) bg = 'var(--accent-danger)';
+          let bg = 'bg-slate-200';
+          if (i < stageIdx || isDone) bg = 'bg-emerald-500';
+          else if (i === stageIdx && isRunning) bg = 'bg-[#4F46E5]';
+          else if (isFailed && i === stageIdx) bg = 'bg-rose-500';
           return (
             <div
               key={label}
-              style={{ ...styles.stageChip, background: bg }}
+              className={`h-1.5 flex-1 rounded-full transition-all duration-300 ${bg}`}
               title={label}
             />
           );
@@ -155,29 +99,32 @@ export default function ProcessingProgress({ status }: ProcessingProgressProps) 
 
       {/* Error banner */}
       {isFailed && status.error && (
-        <div style={styles.errorBanner}>
-          <strong>Error:</strong> {status.error}
+        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 font-medium">
+          <strong className="font-bold">Error:</strong> {status.error}
         </div>
       )}
 
       {/* Log console */}
-      <div style={styles.logHeader}>
-        <span style={styles.logTitle}>Pipeline Output</span>
-        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-          {status.log_lines.length} line(s)
-        </span>
-      </div>
-      <div className="log-console" ref={logRef}>
-        {status.log_lines.map((line, i) => (
-          <div key={i} className={classifyLogLine(line)}>
-            {line}
-          </div>
-        ))}
-        {status.log_lines.length === 0 && (
-          <div className="log-line log-line--info" style={{ opacity: 0.5 }}>
-            Waiting for pipeline output...
-          </div>
-        )}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-400">
+          <span>Pipeline Output</span>
+          <span className="font-mono">{status.log_lines.length} line(s)</span>
+        </div>
+        <div
+          ref={logRef}
+          className="rounded-xl bg-slate-950 p-4 font-mono text-xs leading-relaxed text-slate-300 border border-slate-800 shadow-inner max-h-72 overflow-y-auto space-y-1"
+        >
+          {status.log_lines.map((line, i) => (
+            <div key={i} className={getLogLineClass(line)}>
+              {line}
+            </div>
+          ))}
+          {status.log_lines.length === 0 && (
+            <div className="text-slate-500 italic">
+              Waiting for pipeline output...
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

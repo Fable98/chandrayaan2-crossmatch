@@ -1,11 +1,17 @@
 "use client";
 
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
-import { isAuthenticated } from '@/lib/auth';
-import DropZone from './DropZone';
-import ProcessingProgress from './ProcessingProgress';
-import ResultsTable from './ResultsTable';
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { api } from "@/lib/api";
+import { footprintSizeKm } from "@/lib/geo";
+import type { TripletSummary } from "@/lib/types";
+import { isAuthenticated, getCurrentUser, logout, type AuthUser } from "@/lib/auth";
+import VaultModal from "../archive/VaultModal";
+import TheoryModal from "../archive/TheoryModal";
+import DropZone from "./DropZone";
+import ProcessingProgress from "./ProcessingProgress";
+import ResultsTable from "./ResultsTable";
 import {
   uploadZips,
   pollStatus,
@@ -15,149 +21,9 @@ import {
   type IngestConfig,
   type JobStatus,
   type IngestJobSummary,
-} from '@/lib/ingest-api';
+} from "@/lib/ingest-api";
 
-type Phase = 'idle' | 'queued' | 'processing' | 'done' | 'error';
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    maxWidth: '1100px',
-    margin: '0 auto',
-    padding: '32px 24px 80px',
-  },
-  hero: {
-    textAlign: 'center' as const,
-    marginBottom: '40px',
-  },
-  heroTitle: {
-    fontSize: '2rem',
-    fontWeight: 800,
-    background: 'linear-gradient(135deg, var(--accent-primary), var(--accent-secondary), #a78bfa)',
-    WebkitBackgroundClip: 'text',
-    WebkitTextFillColor: 'transparent',
-    marginBottom: '8px',
-    letterSpacing: '-0.02em',
-  },
-  heroSub: {
-    color: 'var(--text-secondary)',
-    fontSize: '0.95rem',
-    maxWidth: '540px',
-    margin: '0 auto',
-    lineHeight: 1.7,
-  },
-  section: {
-    marginBottom: '28px',
-  },
-  fileList: {
-    display: 'flex',
-    flexWrap: 'wrap' as const,
-    gap: '8px',
-    marginTop: '16px',
-  },
-  fileChip: {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '6px 14px',
-    borderRadius: 'var(--radius-full)',
-    background: 'var(--bg-elevated)',
-    border: '1px solid var(--border-subtle)',
-    fontSize: '0.75rem',
-    color: 'var(--text-secondary)',
-    transition: 'all 150ms ease',
-  },
-  fileSize: {
-    fontSize: '0.65rem',
-    color: 'var(--text-muted)',
-    fontFamily: 'var(--font-mono)',
-  },
-  removeBtn: {
-    background: 'none',
-    border: 'none',
-    color: 'var(--text-muted)',
-    cursor: 'pointer',
-    fontSize: '1rem',
-    lineHeight: 1,
-    padding: '0 2px',
-    transition: 'color 150ms ease',
-  },
-  configPanel: {
-    padding: '20px 24px',
-    borderRadius: 'var(--radius-lg)',
-    background: 'var(--bg-glass)',
-    backdropFilter: 'blur(20px)',
-    border: '1px solid var(--border-subtle)',
-    marginTop: '20px',
-  },
-  configToggle: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    cursor: 'pointer',
-    userSelect: 'none' as const,
-  },
-  configTitle: {
-    fontSize: '0.8rem',
-    fontWeight: 600,
-    color: 'var(--text-secondary)',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.06em',
-  },
-  configGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-    gap: '16px',
-    marginTop: '16px',
-  },
-  fieldLabel: {
-    fontSize: '0.7rem',
-    fontWeight: 600,
-    color: 'var(--text-muted)',
-    marginBottom: '4px',
-    textTransform: 'uppercase' as const,
-    letterSpacing: '0.04em',
-  },
-  fieldInput: {
-    width: '100%',
-    padding: '8px 12px',
-    borderRadius: 'var(--radius-sm)',
-    border: '1px solid var(--border-default)',
-    background: 'var(--bg-secondary)',
-    color: 'var(--text-primary)',
-    fontFamily: 'var(--font-mono)',
-    fontSize: '0.8rem',
-    outline: 'none',
-    transition: 'border-color 150ms ease',
-  },
-  checkboxRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '0.8rem',
-    color: 'var(--text-secondary)',
-    cursor: 'pointer',
-    paddingTop: '4px',
-  },
-  actionsRow: {
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: '12px',
-    marginTop: '24px',
-    flexWrap: 'wrap' as const,
-  },
-  stats: {
-    display: 'flex',
-    gap: '24px',
-    fontSize: '0.8rem',
-    color: 'var(--text-muted)',
-  },
-  statValue: {
-    fontWeight: 700,
-    color: 'var(--text-primary)',
-    fontFamily: 'var(--font-mono)',
-  },
-};
+type Phase = "idle" | "queued" | "processing" | "done" | "error";
 
 function fmtSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -166,19 +32,71 @@ function fmtSize(bytes: number): string {
 }
 
 export default function IngestPage() {
+  const router = useRouter();
+
+  // Core Ingestion State
   const [files, setFiles] = useState<File[]>([]);
   const [config, setConfig] = useState<IngestConfig>({ ...DEFAULT_CONFIG });
   const [showConfig, setShowConfig] = useState(false);
-  const [phase, setPhase] = useState<Phase>('idle');
+  const [phase, setPhase] = useState<Phase>("idle");
   const [jobId, setJobId] = useState<string | null>(null);
   const [status, setStatus] = useState<JobStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [resultTriplets, setResultTriplets] = useState<Record<string, any>[]>([]);
-  const [activeTab, setActiveTab] = useState<'new' | 'history'>('new');
+  const [activeTab, setActiveTab] = useState<"new" | "history">("new");
   const [historyJobs, setHistoryJobs] = useState<IngestJobSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
+
+  // Shell & Navigation State
+  const [triplets, setTriplets] = useState<TripletSummary[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
+
+  // Modals State
+  const [vaultOpen, setVaultOpen] = useState(false);
+  const [theoryModalOpen, setTheoryModalOpen] = useState(false);
+
+  useEffect(() => {
+    setCurrentUser(getCurrentUser());
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(event.target as Node)) {
+        setProfileMenuOpen(false);
+      }
+    }
+    if (profileMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [profileMenuOpen]);
+
+  const handleUserLogout = () => {
+    setProfileMenuOpen(false);
+    logout();
+    router.push("/");
+  };
+
+  // Load regions list on mount for sidebar & dataset pill
+  useEffect(() => {
+    api
+      .listTriplets()
+      .then((res) => {
+        setTriplets(res.triplets || []);
+      })
+      .catch(() => {
+        // Handled gracefully
+      });
+  }, []);
+
+  const filteredTriplets = triplets.filter((t) =>
+    t.id.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const loadHistoryJobs = useCallback(async () => {
     setHistoryLoading(true);
@@ -187,7 +105,7 @@ export default function IngestPage() {
       const jobs = await listJobs();
       setHistoryJobs(jobs);
     } catch (err: any) {
-      setHistoryError(err.message || 'Failed to load past ingestion jobs');
+      setHistoryError(err.message || "Failed to load past ingestion jobs");
     } finally {
       setHistoryLoading(false);
     }
@@ -203,8 +121,8 @@ export default function IngestPage() {
       const results = await getResults(selectedId);
       setJobId(selectedId);
       setResultTriplets(results.triplets || []);
-      setPhase('done');
-      setActiveTab('new');
+      setPhase("done");
+      setActiveTab("new");
     } catch (err: any) {
       setError(`Failed to fetch results for job ${selectedId}: ${err.message}`);
     }
@@ -227,7 +145,7 @@ export default function IngestPage() {
   // Clear all files
   const clearFiles = useCallback(() => {
     setFiles([]);
-    setPhase('idle');
+    setPhase("idle");
     setJobId(null);
     setStatus(null);
     setError(null);
@@ -238,47 +156,46 @@ export default function IngestPage() {
   const handleStart = useCallback(async () => {
     if (files.length === 0) return;
 
-    setPhase('queued');
+    setPhase("queued");
     setError(null);
 
     try {
       const res = await uploadZips(files, config);
       setJobId(res.job_id);
-      setPhase('processing');
+      setPhase("processing");
     } catch (e: any) {
-      setError(e.message || 'Upload failed');
-      setPhase('error');
+      setError(e.message || "Upload failed");
+      setPhase("error");
     }
   }, [files, config]);
 
   // Poll loop
   useEffect(() => {
-    if (phase !== 'processing' || !jobId) return;
+    if (phase !== "processing" || !jobId) return;
 
     const poll = async () => {
       try {
         const s = await pollStatus(jobId);
         setStatus(s);
 
-        if (s.status === 'completed') {
-          setPhase('done');
-          // Fetch full results
+        if (s.status === "completed") {
+          setPhase("done");
           try {
             const results = await getResults(jobId);
             setResultTriplets(results.triplets || []);
           } catch {
-            // Results fetch failed, triplets stay empty
+            // Triplets stay empty
           }
-        } else if (s.status === 'failed') {
-          setPhase('error');
-          setError(s.error || 'Pipeline failed');
+        } else if (s.status === "failed") {
+          setPhase("error");
+          setError(s.error || "Pipeline failed");
         }
       } catch {
         // Transient error, keep polling
       }
     };
 
-    poll(); // initial
+    poll();
     const id = window.setInterval(poll, 1500);
     pollRef.current = id;
 
@@ -290,462 +207,828 @@ export default function IngestPage() {
   }, [phase, jobId]);
 
   const totalSize = files.reduce((s, f) => s + f.size, 0);
-  const isProcessing = phase === 'processing' || phase === 'queued';
-
-  // Uploads require a Bearer token (backend enforces auth); explain instead
-  // of showing a form that can only 401.
-  if (!isAuthenticated()) {
-    return (
-      <div style={styles.page}>
-        <div style={{ ...styles.configPanel, textAlign: 'center' as const, padding: '48px 24px' }}>
-          <div style={{ fontSize: '2rem', marginBottom: '12px' }}>🔐</div>
-          <h1 style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-primary)' }}>
-            Sign in required
-          </h1>
-          <p style={{ ...styles.heroSub, marginTop: '8px' }}>
-            The ingest pipeline writes to disk and launches processing jobs, so
-            uploads require an operator session. Please sign in from the home
-            page, then return here.
-          </p>
-          <div style={{ marginTop: '20px' }}>
-            <Link href="/" className="btn btn-primary">
-              Go to Sign In
-            </Link>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const isProcessing = phase === "processing" || phase === "queued";
 
   return (
-    <div style={styles.page}>
-      {/* Top Navigation Header */}
-      <header className="flex items-center justify-between py-4 mb-8 border-b border-white/10">
-        <Link
-          href="/"
-          className="group flex items-center gap-2 font-mono text-xs text-[#9a958e] transition-colors hover:text-white"
-        >
-          <span className="transition-transform duration-200 group-hover:-translate-x-1">
-            ←
-          </span>
-          <span>Return to Lunar Globe</span>
-        </Link>
+    <div className="min-h-screen bg-[#f4f6fb] text-slate-800 flex">
+      {/* ======================================================== */}
+      {/* 1. LEFT SIDEBAR: Brand Logo, Main Menu, Region List      */}
+      {/* ======================================================== */}
+      <aside className="w-64 bg-white border-r border-slate-200/80 flex flex-col justify-between shrink-0 min-h-screen">
+        <div>
+          {/* Brand Header */}
+          <div className="p-6 pb-5 flex items-center justify-between border-b border-slate-100">
+            <Link href="/" className="flex items-center gap-2.5 group">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#4F46E5] text-white font-black text-base shadow-sm group-hover:scale-105 transition-transform">
+                c
+              </div>
+              <div>
+                <h1 className="text-base font-extrabold tracking-tight text-slate-900 leading-none">
+                  chandrayaan
+                </h1>
+                <span className="text-[10px] font-medium text-slate-400">Cross-Match Console</span>
+              </div>
+            </Link>
+          </div>
 
-        <div className="hidden items-center gap-2 font-mono text-xs font-semibold uppercase tracking-widest text-[#d4af37] md:flex">
-          <span className="h-1.5 w-1.5 rounded-full bg-[#d4af37]" />
-          <span>SIH 26166 · Ingest &amp; Prepare Pipeline</span>
+          {/* Navigation Section */}
+          <div className="p-4 space-y-6">
+            <div>
+              <span className="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
+                Menu
+              </span>
+              <nav className="space-y-1">
+                <Link
+                  href="/?view=console"
+                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition border-l-4 border-transparent"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-slate-400 group-hover:text-slate-600">
+                      ⊞
+                    </span>
+                    <span>Dashboard QA</span>
+                  </div>
+                </Link>
+
+                <div
+                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold bg-[#EEF2FF] text-[#4F46E5] border-l-4 border-[#4F46E5]"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-[#4F46E5]">
+                      ⚡
+                    </span>
+                    <span>Ingest &amp; Prepare</span>
+                  </div>
+                  <span className="h-1.5 w-1.5 rounded-full bg-[#4F46E5]" />
+                </div>
+
+                <Link
+                  href="/?view=console&subview=linked-cursor"
+                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition border-l-4 border-transparent"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-slate-400 group-hover:text-slate-600">
+                      ⊙
+                    </span>
+                    <span>Linked Cursor</span>
+                  </div>
+                </Link>
+
+                <Link
+                  href="/?view=console&subview=map"
+                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition border-l-4 border-transparent"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-slate-400 group-hover:text-slate-600">
+                      ☵
+                    </span>
+                    <span>Planetary Map</span>
+                  </div>
+                </Link>
+
+                <button
+                  type="button"
+                  onClick={() => setVaultOpen(true)}
+                  className="group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition border-l-4 border-transparent"
+                >
+                  <span className="text-sm text-slate-400 group-hover:text-slate-600">▤</span>
+                  <span>Archive Vault</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setTheoryModalOpen(true)}
+                  className="group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition border-l-4 border-transparent"
+                >
+                  <span className="text-sm text-slate-400 group-hover:text-slate-600">📖</span>
+                  <span>Methodology</span>
+                </button>
+              </nav>
+            </div>
+
+            {/* Region Directory */}
+            <div>
+              <div className="flex items-center justify-between px-3 mb-2">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
+                  Regions ({filteredTriplets.length})
+                </span>
+              </div>
+
+              <div className="space-y-1 max-h-[260px] overflow-y-auto pr-1">
+                {filteredTriplets.map((t, i) => {
+                  const { widthKm, heightKm } = footprintSizeKm(t.bounds);
+                  return (
+                    <Link
+                      key={t.id}
+                      href={`/?view=console&region=${t.id}`}
+                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-all text-slate-600 hover:bg-slate-50"
+                    >
+                      <div className="truncate">
+                        <span className="text-[10px] font-mono text-slate-400 mr-1.5">
+                          {String(i + 1).padStart(2, "0")}.
+                        </span>
+                        <span>{t.id}</span>
+                        <span className="block text-[10px] text-slate-400 font-normal">
+                          {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {t.dem_available && (
+                          <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold text-[#4F46E5]">
+                            DEM
+                          </span>
+                        )}
+                        {t.lro_nac_available && (
+                          <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">
+                            LRO
+                          </span>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </div>
+      </aside>
 
-        <Link
-          href="/?view=console"
-          className="flex items-center gap-2 rounded-full border border-teal/40 bg-teal/10 px-4 py-1.5 font-mono text-xs font-semibold text-teal backdrop-blur-sm transition-all duration-200 hover:bg-teal/20 hover:scale-105"
-        >
-          <span>Open Dashboard</span>
-          <span>↗</span>
-        </Link>
-      </header>
-
-      {/* Hero */}
-      <div style={styles.hero} className="animate-fade-in">
-        <h1 style={styles.heroTitle}>Ingest &amp; Prepare</h1>
-        <p style={styles.heroSub}>
-          Drop your PRADAN zip files below to automatically discover, match, and
-          process Chandrayaan-2 OHRC + TMC-2 + IIRS triplets.
-        </p>
-      </div>
-
-      {/* Tab Switcher */}
-      <div className="flex items-center justify-center gap-3 mb-8">
-        <button
-          type="button"
-          onClick={() => setActiveTab('new')}
-          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 font-mono text-xs font-bold transition-all ${
-            activeTab === 'new'
-              ? 'bg-[#d4af37] text-black shadow-lg shadow-[#d4af37]/20 scale-105'
-              : 'border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
-          }`}
-        >
-          <span>＋ New Batch Ingestion</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setActiveTab('history');
-            loadHistoryJobs();
-          }}
-          className={`flex items-center gap-2 rounded-xl px-5 py-2.5 font-mono text-xs font-bold transition-all ${
-            activeTab === 'history'
-              ? 'bg-[#d4af37] text-black shadow-lg shadow-[#d4af37]/20 scale-105'
-              : 'border border-white/10 bg-white/5 text-white/70 hover:bg-white/10 hover:text-white'
-          }`}
-        >
-          <span>📂 Previous Ingestion Runs</span>
-          {historyJobs.length > 0 && (
-            <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-bold">
-              {historyJobs.length}
-            </span>
-          )}
-        </button>
-      </div>
-
-      {/* Tab 1: New Batch Ingestion */}
-      {activeTab === 'new' && (
-        <>
-          {/* Drop Zone */}
-          {(phase === 'idle' || phase === 'queued') && (
-            <div style={styles.section}>
-              <DropZone
-                onFilesSelected={handleFilesSelected}
-                disabled={isProcessing}
+      {/* ======================================================== */}
+      {/* 2. MAIN WORKSPACE: Header Bar & Ingest Content           */}
+      {/* ======================================================== */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Top Header Bar */}
+        <header className="h-16 bg-white border-b border-slate-200/80 px-8 flex items-center justify-between gap-4 shrink-0">
+          {/* Search Input */}
+          <div className="relative w-80">
+            <svg
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
               />
-            </div>
-          )}
+            </svg>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search for regions, coordinates..."
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20 focus:border-[#4F46E5] transition"
+            />
+          </div>
 
-          {/* File list */}
-          {files.length > 0 && phase !== 'done' && (
-            <div style={styles.section} className="animate-fade-in">
-              <div style={styles.fileList}>
-                {files.map((f) => (
-                  <div key={f.name} style={styles.fileChip}>
-                    <span>&#128230;</span>
-                    <span>{f.name}</span>
-                    <span style={styles.fileSize}>{fmtSize(f.size)}</span>
-                    {!isProcessing && (
-                      <button
-                        style={styles.removeBtn}
-                        onClick={() => removeFile(f.name)}
-                        title="Remove file"
-                        onMouseEnter={(e) => {
-                          (e.target as HTMLElement).style.color = 'var(--accent-danger)';
-                        }}
-                        onMouseLeave={(e) => {
-                          (e.target as HTMLElement).style.color = 'var(--text-muted)';
-                        }}
-                      >
-                        &times;
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
+          {/* Right Header Controls */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => router.push("/")}
+              className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition shadow-sm flex items-center gap-1.5"
+              title="Return to Mission Overview"
+            >
+              <span>←</span>
+              <span>Back</span>
+            </button>
 
-              {/* Stats + Actions */}
-              <div style={styles.actionsRow}>
-                <div style={styles.stats}>
-                  <span>
-                    Files: <span style={styles.statValue}>{files.length}</span>
-                  </span>
-                  <span>
-                    Total: <span style={styles.statValue}>{fmtSize(totalSize)}</span>
-                  </span>
-                </div>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <button
-                    className="btn btn-secondary btn-sm"
-                    onClick={clearFiles}
-                    disabled={isProcessing}
-                  >
-                    Clear All
-                  </button>
-                  <button
-                    className="btn btn-primary btn-md"
-                    onClick={handleStart}
-                    disabled={isProcessing}
-                  >
-                    Start Ingestion ({files.length})
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
+            <button
+              onClick={() => setVaultOpen(true)}
+              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm flex items-center gap-2"
+              title="Browse all multi-sensor lunar datasets"
+            >
+              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span>{triplets.length} Datasets</span>
+            </button>
 
-          {/* Config panel toggle */}
-          {phase === 'idle' && (
-            <div style={styles.configPanel}>
-              <div
-                style={styles.configToggle}
-                onClick={() => setShowConfig(!showConfig)}
+            <div className="h-8 w-px bg-slate-200 mx-1" />
+
+            {/* Profile Pill with Interactive Dropdown */}
+            <div className="relative" ref={profileMenuRef}>
+              <button
+                type="button"
+                onClick={() => setProfileMenuOpen((prev) => !prev)}
+                className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white p-1.5 pr-3 hover:bg-slate-50 transition shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20"
+                aria-haspopup="true"
+                aria-expanded={profileMenuOpen}
               >
-                <span style={styles.configTitle}>
-                  Pipeline Configuration
-                </span>
-                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                  {showConfig ? '▲ Hide' : '▼ Show Advanced'}
-                </span>
-              </div>
+                <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-[#4F46E5] text-white font-bold text-xs flex items-center justify-center shadow-sm">
+                  {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : "SH"}
+                </div>
+                <div className="hidden sm:block text-left">
+                  <span className="text-xs font-bold text-slate-800 block leading-tight truncate max-w-[120px]">
+                    {currentUser?.name || "Shresth"}
+                  </span>
+                  <span className="text-[10px] text-slate-400 block">Operator</span>
+                </div>
+                <svg
+                  className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${
+                    profileMenuOpen ? "rotate-180" : ""
+                  }`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
 
-              {showConfig && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '16px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
-                    <div>
-                      <label style={styles.label}>
-                        Min Containment ({Math.round(config.containment * 100)}%)
-                      </label>
-                      <input
-                        type="range"
-                        min="0.5"
-                        max="1.0"
-                        step="0.05"
-                        value={config.containment}
-                        onChange={(e) =>
-                          setConfig({ ...config, containment: parseFloat(e.target.value) })
-                        }
-                        style={{ width: '100%' }}
-                      />
-                    </div>
-                    <div>
-                      <label style={styles.label}>Tile Size (px)</label>
-                      <select
-                        style={styles.input}
-                        value={config.tileSize}
-                        onChange={(e) =>
-                          setConfig({ ...config, tileSize: parseInt(e.target.value) })
-                        }
-                      >
-                        <option value={256}>256 × 256</option>
-                        <option value={512}>512 × 512 (Standard)</option>
-                        <option value={1024}>1024 × 1024</option>
-                      </select>
-                    </div>
+              {/* Dropdown Menu */}
+              {profileMenuOpen && (
+                <div className="absolute right-0 mt-2 w-64 rounded-2xl border border-slate-200/80 bg-white p-2 shadow-2xl z-50 animate-fade-in">
+                  <div className="p-3 border-b border-slate-100">
+                    <span className="text-xs font-bold text-slate-900 block truncate">
+                      {currentUser?.name || "ISRO Flight Operator"}
+                    </span>
+                    <span className="text-[11px] text-slate-500 block truncate">
+                      {currentUser?.email || "flight.ops@isro.gov.in"}
+                    </span>
+                    <span className="mt-2 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      Active Session
+                    </span>
                   </div>
-                  <div>
-                    <label style={styles.label}>Max Time Gap (Days, Optional)</label>
-                    <input
-                      type="number"
-                      placeholder="e.g. 180 (empty = any)"
-                      style={styles.input}
-                      value={config.maxTimeGapDays ?? ''}
-                      onChange={(e) =>
-                        setConfig({
-                          ...config,
-                          maxTimeGapDays: e.target.value ? parseFloat(e.target.value) : null,
-                        })
-                      }
-                      onFocus={(e) => { e.target.style.borderColor = 'var(--accent-primary)'; }}
-                      onBlur={(e) => { e.target.style.borderColor = 'var(--border-default)'; }}
-                    />
+
+                  <div className="py-1 space-y-0.5">
+                    <button
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        setVaultOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition text-left"
+                    >
+                      <span className="text-slate-400">▤</span>
+                      <span>Archive Vault ({triplets.length} Datasets)</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        setTheoryModalOpen(true);
+                      }}
+                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition text-left"
+                    >
+                      <span className="text-slate-400">📖</span>
+                      <span>Methodology Reference</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        router.push("/");
+                      }}
+                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition text-left"
+                    >
+                      <span className="text-slate-400">🌐</span>
+                      <span>Mission Overview</span>
+                    </button>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                    <label style={styles.checkboxRow}>
-                      <input
-                        type="checkbox"
-                        checked={config.noLargeAoi}
-                        onChange={(e) =>
-                          setConfig({ ...config, noLargeAoi: e.target.checked })
-                        }
-                      />
-                      Skip Large-AOI IIRS
-                    </label>
-                    <label style={styles.checkboxRow}>
-                      <input
-                        type="checkbox"
-                        checked={config.noInvariants}
-                        onChange={(e) =>
-                          setConfig({ ...config, noInvariants: e.target.checked })
-                        }
-                      />
-                      Skip Invariant Maps
-                    </label>
-                    <label style={styles.checkboxRow}>
-                      <input
-                        type="checkbox"
-                        checked={config.requireDates}
-                        onChange={(e) =>
-                          setConfig({ ...config, requireDates: e.target.checked })
-                        }
-                      />
-                      Require Dates
-                    </label>
+
+                  <div className="pt-1 mt-1 border-t border-slate-100">
+                    <button
+                      onClick={handleUserLogout}
+                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition text-left"
+                    >
+                      <span>🚪</span>
+                      <span>Log Out</span>
+                    </button>
                   </div>
                 </div>
               )}
             </div>
-          )}
-
-          {/* Error banner */}
-          {phase === 'error' && error && !status && (
-            <div
-              style={{
-                marginTop: '24px',
-                padding: '16px 20px',
-                borderRadius: 'var(--radius-md)',
-                background: 'var(--accent-danger-bg)',
-                border: '1px solid rgba(248, 113, 113, 0.3)',
-                color: 'var(--accent-danger)',
-                fontSize: '0.9rem',
-              }}
-              className="animate-fade-in"
-            >
-              <strong>Error:</strong> {error}
-              <div style={{ marginTop: '12px' }}>
-                <button className="btn btn-secondary btn-sm" onClick={clearFiles}>
-                  Start Over
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Processing progress */}
-          {status && (phase === 'processing' || phase === 'done' || phase === 'error') && (
-            <div style={styles.section}>
-              <ProcessingProgress status={status} />
-            </div>
-          )}
-
-          {/* Results */}
-          {phase === 'done' && (resultTriplets.length > 0 || status) && (
-            <div style={styles.section} className="animate-fade-in">
-              <ResultsTable
-                triplets={resultTriplets}
-                containment={config.containment}
-              />
-
-              <div style={{ marginTop: '20px', textAlign: 'center' }}>
-                <button className="btn btn-primary btn-lg" onClick={clearFiles}>
-                  Process Another Batch
-                </button>
-              </div>
-            </div>
-          )}
-        </>
-      )}
-
-      {/* Tab 2: Previous Ingestion Runs */}
-      {activeTab === 'history' && (
-        <div className="space-y-4 animate-fade-in">
-          <div className="flex items-center justify-between border-b border-white/10 pb-4">
-            <div>
-              <h2 className="text-lg font-bold text-white">Previous Ingestion Runs</h2>
-              <p className="text-xs text-slate-400">
-                Inspect history and replay discovery results from past PRADAN archive batches.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={loadHistoryJobs}
-              disabled={historyLoading}
-              className="flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 font-mono text-xs font-semibold text-white/85 transition hover:bg-white/10"
-            >
-              <span>{historyLoading ? "Refreshing..." : "↻ Refresh History"}</span>
-            </button>
           </div>
+        </header>
 
-          {historyError && (
-            <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-4 text-xs text-rose-300">
-              {historyError}
-            </div>
-          )}
-
-          {historyLoading && historyJobs.length === 0 && (
-            <div className="flex h-48 flex-col items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white/[0.02] p-8 text-center">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#d4af37] border-t-transparent" />
-              <p className="font-mono text-xs text-slate-400">Loading historical ingestion records...</p>
-            </div>
-          )}
-
-          {!historyLoading && historyJobs.length === 0 && !historyError && (
-            <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-white/10 bg-white/[0.02] p-12 text-center">
-              <span className="text-3xl">📦</span>
-              <h3 className="text-sm font-bold text-white">No Previous Ingestion Runs</h3>
-              <p className="max-w-md text-xs text-slate-400 leading-relaxed">
-                No past ingestion jobs were found on the backend. Upload raw Chandrayaan-2 PRADAN ZIP bundles to start your first discovery run.
+        {/* Ingest Main Content */}
+        <main className="p-8 space-y-6 overflow-y-auto">
+          {/* Top Title & Subtitle + Action Tabs */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+                Ingest &amp; Prepare
+              </h2>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Drop your PRADAN zip files below to automatically discover, match, and
+                process Chandrayaan-2 OHRC + TMC-2 + IIRS triplets.
               </p>
+            </div>
+
+            {/* Tab Controls & Direct Link to Dashboard */}
+            <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
               <button
                 type="button"
-                onClick={() => setActiveTab('new')}
-                className="mt-2 rounded-xl bg-[#d4af37] px-4 py-2 font-mono text-xs font-bold text-black shadow-sm transition hover:bg-[#c29f2f]"
+                onClick={() => setActiveTab("new")}
+                className={`rounded-xl px-4 py-2 text-xs font-bold transition shadow-sm ${
+                  activeTab === "new"
+                    ? "bg-[#4F46E5] text-white shadow-indigo-200"
+                    : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
               >
-                Upload PRADAN Files Now
+                ＋ New Batch Ingestion
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab("history");
+                  loadHistoryJobs();
+                }}
+                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition shadow-sm ${
+                  activeTab === "history"
+                    ? "bg-[#4F46E5] text-white shadow-indigo-200"
+                    : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                <span>📂 Previous Ingestion Runs</span>
+                {historyJobs.length > 0 && (
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                      activeTab === "history"
+                        ? "bg-white/20 text-white"
+                        : "bg-slate-100 text-slate-600"
+                    }`}
+                  >
+                    {historyJobs.length}
+                  </span>
+                )}
+              </button>
+
+              <Link
+                href="/?view=console"
+                className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm flex items-center gap-1.5"
+              >
+                <span>Open Dashboard</span>
+                <span>↗</span>
+              </Link>
             </div>
-          )}
+          </div>
 
-          {historyJobs.length > 0 && (
-            <div className="overflow-hidden rounded-2xl border border-white/10 bg-black/40 backdrop-blur-md shadow-xl">
-              <table className="w-full text-left font-sans text-xs">
-                <thead>
-                  <tr className="border-b border-white/10 bg-white/5 font-mono text-[10px] uppercase tracking-wider text-slate-400">
-                    <th className="py-3 px-4">Job ID</th>
-                    <th className="py-3 px-4">Status</th>
-                    <th className="py-3 px-4">Current Stage</th>
-                    <th className="py-3 px-4">Progress</th>
-                    <th className="py-3 px-4">Started</th>
-                    <th className="py-3 px-4 text-right">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {historyJobs.map((job) => {
-                    const statusColor =
-                      job.status === 'completed'
-                        ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
-                        : job.status === 'running'
-                        ? 'border-blue-500/30 bg-blue-500/10 text-blue-400 animate-pulse'
-                        : job.status === 'failed'
-                        ? 'border-rose-500/30 bg-rose-500/10 text-rose-400'
-                        : 'border-slate-500/30 bg-slate-500/10 text-slate-400';
+          {/* Auth Guard Check */}
+          {!isAuthenticated() ? (
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-12 text-center shadow-sm max-w-xl mx-auto space-y-4">
+              <div className="text-4xl">🔐</div>
+              <h3 className="text-base font-bold text-slate-900">
+                Sign in Required for Ingestion
+              </h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                The ingest pipeline writes to disk and launches processing jobs, so uploads require an
+                authenticated operator session. Please sign in from the home page, then return here.
+              </p>
+              <div className="pt-2">
+                <Link
+                  href="/"
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#4F46E5] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#4338CA] transition"
+                >
+                  Go to Sign In
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* TAB 1: NEW BATCH INGESTION */}
+              {activeTab === "new" && (
+                <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm md:p-6 space-y-6">
+                  {/* Card Header Bar */}
+                  <div className="flex flex-col justify-between gap-3 border-b border-slate-100 pb-5 md:flex-row md:items-center">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-[#4F46E5] shadow-[0_0_0_4px_rgba(79,70,229,.12)]" />
+                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#4F46E5]">
+                          Live Ingestion Pipeline
+                        </p>
+                      </div>
+                      <h3 className="mt-1 text-xl font-black tracking-tight text-slate-900">
+                        Upload PRADAN Archives
+                      </h3>
+                      <p className="mt-1 max-w-2xl text-xs text-slate-500">
+                        Drop your PRADAN zip files below to automatically extract PDS4 metadata, match
+                        overlapping OHRC + TMC-2 + IIRS triplets, and generate pipeline artifacts.
+                      </p>
+                    </div>
 
-                    return (
-                      <tr key={job.job_id} className="transition hover:bg-white/[0.03]">
-                        <td className="py-3.5 px-4 font-mono font-medium text-white/90">
-                          {job.job_id.slice(0, 8)}...{job.job_id.slice(-4)}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${statusColor}`}>
-                            <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                            {job.status}
+                    <div className="flex items-center gap-2">
+                      <div
+                        className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${
+                          phase === "processing" || phase === "queued"
+                            ? "border-indigo-300 bg-indigo-50 text-[#4F46E5] animate-pulse"
+                            : phase === "done"
+                            ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                            : phase === "error"
+                            ? "border-rose-300 bg-rose-50 text-rose-700"
+                            : "border-slate-200 bg-slate-50 text-slate-500"
+                        }`}
+                      >
+                        {isProcessing
+                          ? "PROCESSING..."
+                          : phase === "done"
+                          ? "COMPLETED"
+                          : phase === "error"
+                          ? "FAILED"
+                          : "READY TO RUN"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Drop Zone */}
+                  {(phase === "idle" || phase === "queued") && (
+                    <DropZone
+                      onFilesSelected={handleFilesSelected}
+                      disabled={isProcessing}
+                    />
+                  )}
+
+                  {/* Uploaded File List & Actions */}
+                  {files.length > 0 && phase !== "done" && (
+                    <div className="space-y-4 animate-fade-in">
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        {files.map((f) => (
+                          <div
+                            key={f.name}
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 shadow-xs"
+                          >
+                            <span>📦</span>
+                            <span className="font-medium max-w-[200px] truncate">{f.name}</span>
+                            <span className="font-mono text-[10px] text-slate-400">
+                              {fmtSize(f.size)}
+                            </span>
+                            {!isProcessing && (
+                              <button
+                                type="button"
+                                onClick={() => removeFile(f.name)}
+                                className="text-slate-400 hover:text-rose-600 transition px-1 text-sm leading-none"
+                                title="Remove file"
+                              >
+                                &times;
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Stats and Action Buttons */}
+                      <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-slate-100">
+                        <div className="flex items-center gap-4 text-xs text-slate-500 font-medium">
+                          <span>
+                            Files: <strong className="font-mono text-slate-800">{files.length}</strong>
                           </span>
-                        </td>
-                        <td className="py-3.5 px-4 text-slate-300 font-mono text-[11px]">
-                          {job.stage || '—'}
-                        </td>
-                        <td className="py-3.5 px-4">
-                          <div className="flex items-center gap-2">
-                            <div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/10">
-                              <div
-                                className="h-full bg-[#d4af37] transition-all duration-300"
-                                style={{ width: `${job.progress_pct || 0}%` }}
+                          <span>
+                            Total: <strong className="font-mono text-slate-800">{fmtSize(totalSize)}</strong>
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={clearFiles}
+                            disabled={isProcessing}
+                            className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition shadow-sm disabled:opacity-40"
+                          >
+                            Clear All
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={handleStart}
+                            disabled={isProcessing}
+                            className="flex items-center gap-2 rounded-xl bg-[#4F46E5] px-6 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white shadow-sm transition hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:opacity-40"
+                          >
+                            {isProcessing ? (
+                              <>
+                                <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                                <span>Running Pipeline...</span>
+                              </>
+                            ) : (
+                              <span>Start Ingestion ({files.length})</span>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Advanced Pipeline Configuration Accordion */}
+                  {phase === "idle" && (
+                    <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 transition">
+                      <button
+                        type="button"
+                        onClick={() => setShowConfig(!showConfig)}
+                        className="w-full flex items-center justify-between text-left focus:outline-none"
+                      >
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                          Pipeline Configuration
+                        </span>
+                        <span className="text-xs font-bold text-[#4F46E5]">
+                          {showConfig ? "▲ Hide Configuration" : "▼ Show Advanced"}
+                        </span>
+                      </button>
+
+                      {showConfig && (
+                        <div className="mt-4 pt-4 border-t border-slate-200/70 space-y-4 animate-fade-in">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                                Min Containment ({Math.round(config.containment * 100)}%)
+                              </label>
+                              <input
+                                type="range"
+                                min="0.5"
+                                max="1.0"
+                                step="0.05"
+                                value={config.containment}
+                                onChange={(e) =>
+                                  setConfig({ ...config, containment: parseFloat(e.target.value) })
+                                }
+                                className="w-full accent-[#4F46E5]"
                               />
                             </div>
-                            <span className="font-mono text-[10px] text-slate-400">
-                              {Math.round(job.progress_pct || 0)}%
-                            </span>
+
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                                Tile Size (px)
+                              </label>
+                              <select
+                                value={config.tileSize}
+                                onChange={(e) =>
+                                  setConfig({ ...config, tileSize: parseInt(e.target.value) })
+                                }
+                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-indigo-100"
+                              >
+                                <option value={256}>256 × 256</option>
+                                <option value={512}>512 × 512 (Standard)</option>
+                                <option value={1024}>1024 × 1024</option>
+                              </select>
+                            </div>
                           </div>
-                        </td>
-                        <td className="py-3.5 px-4 font-mono text-[10px] text-slate-400">
-                          {job.started_at ? new Date(job.started_at).toLocaleString() : '—'}
-                        </td>
-                        <td className="py-3.5 px-4 text-right">
-                          {job.status === 'completed' && (
-                            <button
-                              type="button"
-                              onClick={() => handleSelectHistoricalJob(job.job_id)}
-                              className="rounded-lg border border-[#d4af37]/30 bg-[#d4af37]/10 px-3 py-1 font-mono text-xs font-semibold text-[#d4af37] transition hover:bg-[#d4af37]/20"
-                            >
-                              Load Results →
-                            </button>
-                          )}
-                          {job.status === 'running' && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setJobId(job.job_id);
-                                setPhase('processing');
-                                setActiveTab('new');
-                              }}
-                              className="rounded-lg border border-blue-400/30 bg-blue-400/10 px-3 py-1 font-mono text-xs font-semibold text-blue-300 transition hover:bg-blue-400/20"
-                            >
-                              Attach &amp; Monitor
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+
+                          <div>
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                              Max Time Gap (Days, Optional)
+                            </label>
+                            <input
+                              type="number"
+                              placeholder="e.g. 180 (empty = any)"
+                              value={config.maxTimeGapDays ?? ""}
+                              onChange={(e) =>
+                                setConfig({
+                                  ...config,
+                                  maxTimeGapDays: e.target.value ? parseFloat(e.target.value) : null,
+                                })
+                              }
+                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-700 outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-indigo-100"
+                            />
+                          </div>
+
+                          <div className="flex flex-wrap gap-4 pt-1">
+                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={config.noLargeAoi}
+                                onChange={(e) =>
+                                  setConfig({ ...config, noLargeAoi: e.target.checked })
+                                }
+                                className="rounded accent-[#4F46E5]"
+                              />
+                              Skip Large-AOI IIRS
+                            </label>
+
+                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={config.noInvariants}
+                                onChange={(e) =>
+                                  setConfig({ ...config, noInvariants: e.target.checked })
+                                }
+                                className="rounded accent-[#4F46E5]"
+                              />
+                              Skip Invariant Maps
+                            </label>
+
+                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={config.requireDates}
+                                onChange={(e) =>
+                                  setConfig({ ...config, requireDates: e.target.checked })
+                                }
+                                className="rounded accent-[#4F46E5]"
+                              />
+                              Require Dates
+                            </label>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Error banner */}
+                  {phase === "error" && error && !status && (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 font-medium space-y-2 animate-fade-in">
+                      <div>
+                        <strong className="font-bold">Error:</strong> {error}
+                      </div>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={clearFiles}
+                          className="rounded-lg border border-rose-300 bg-white px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                        >
+                          Start Over
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Processing progress */}
+                  {status && (phase === "processing" || phase === "done" || phase === "error") && (
+                    <ProcessingProgress status={status} />
+                  )}
+
+                  {/* Results */}
+                  {phase === "done" && (resultTriplets.length > 0 || status) && (
+                    <div className="space-y-4 animate-fade-in">
+                      <ResultsTable
+                        triplets={resultTriplets}
+                        containment={config.containment}
+                      />
+
+                      <div className="pt-2 text-center">
+                        <button
+                          type="button"
+                          onClick={clearFiles}
+                          className="rounded-xl bg-[#4F46E5] px-6 py-3 text-xs font-black uppercase tracking-wider text-white shadow-sm hover:bg-[#4338CA] transition"
+                        >
+                          Process Another Batch
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {/* TAB 2: PREVIOUS INGESTION RUNS */}
+              {activeTab === "history" && (
+                <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm md:p-6 space-y-5 animate-fade-in">
+                  <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900">
+                        Previous Ingestion Runs
+                      </h3>
+                      <p className="text-xs text-slate-500">
+                        Inspect history and replay discovery results from past PRADAN archive batches.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={loadHistoryJobs}
+                      disabled={historyLoading}
+                      className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm disabled:opacity-50"
+                    >
+                      <span>{historyLoading ? "Refreshing..." : "↻ Refresh History"}</span>
+                    </button>
+                  </div>
+
+                  {historyError && (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 font-medium">
+                      {historyError}
+                    </div>
+                  )}
+
+                  {historyLoading && historyJobs.length === 0 && (
+                    <div className="flex h-48 flex-col items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-8 text-center">
+                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#4F46E5] border-t-transparent" />
+                      <p className="font-mono text-xs text-slate-500">Loading historical ingestion records...</p>
+                    </div>
+                  )}
+
+                  {!historyLoading && historyJobs.length === 0 && !historyError && (
+                    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-12 text-center">
+                      <span className="text-3xl">📦</span>
+                      <h4 className="text-sm font-bold text-slate-900">No Previous Ingestion Runs</h4>
+                      <p className="max-w-md text-xs text-slate-500 leading-relaxed">
+                        No past ingestion jobs were found on the backend. Upload raw Chandrayaan-2 PRADAN ZIP bundles to start your first discovery run.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("new")}
+                        className="mt-2 rounded-xl bg-[#4F46E5] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#4338CA] transition"
+                      >
+                        Upload PRADAN Files Now
+                      </button>
+                    </div>
+                  )}
+
+                  {historyJobs.length > 0 && (
+                    <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200/80 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            <th className="py-3 px-4">Job ID</th>
+                            <th className="py-3 px-4">Status</th>
+                            <th className="py-3 px-4">Current Stage</th>
+                            <th className="py-3 px-4">Progress</th>
+                            <th className="py-3 px-4">Started</th>
+                            <th className="py-3 px-4 text-right">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {historyJobs.map((job) => {
+                            const statusColor =
+                              job.status === "completed"
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                : job.status === "running"
+                                ? "border-indigo-200 bg-indigo-50 text-[#4F46E5] animate-pulse"
+                                : job.status === "failed"
+                                ? "border-rose-200 bg-rose-50 text-rose-700"
+                                : "border-slate-200 bg-slate-50 text-slate-500";
+
+                            return (
+                              <tr key={job.job_id} className="transition hover:bg-slate-50/60">
+                                <td className="py-3.5 px-4 font-mono font-semibold text-slate-900">
+                                  {job.job_id.slice(0, 8)}...{job.job_id.slice(-4)}
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <span
+                                    className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${statusColor}`}
+                                  >
+                                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                    {job.status}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 text-slate-600 font-mono text-[11px]">
+                                  {job.stage || "—"}
+                                </td>
+                                <td className="py-3.5 px-4">
+                                  <div className="flex items-center gap-2">
+                                    <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
+                                      <div
+                                        className="h-full bg-[#4F46E5] transition-all duration-300"
+                                        style={{ width: `${job.progress_pct || 0}%` }}
+                                      />
+                                    </div>
+                                    <span className="font-mono text-[10px] text-slate-500 font-semibold">
+                                      {Math.round(job.progress_pct || 0)}%
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-4 font-mono text-[10px] text-slate-500">
+                                  {job.started_at ? new Date(job.started_at).toLocaleString() : "—"}
+                                </td>
+                                <td className="py-3.5 px-4 text-right">
+                                  {job.status === "completed" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSelectHistoricalJob(job.job_id)}
+                                      className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1 font-mono text-xs font-bold text-[#4F46E5] hover:bg-indigo-100 transition shadow-xs"
+                                    >
+                                      Load Results →
+                                    </button>
+                                  )}
+                                  {job.status === "running" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setJobId(job.job_id);
+                                        setPhase("processing");
+                                        setActiveTab("new");
+                                      }}
+                                      className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1 font-mono text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-xs"
+                                    >
+                                      Attach &amp; Monitor
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </section>
+              )}
+            </>
           )}
-        </div>
+        </main>
+      </div>
+
+      {/* Modals Shared with Dashboard */}
+      {vaultOpen && (
+        <VaultModal
+          triplets={triplets}
+          initialFilter="all"
+          onClose={() => setVaultOpen(false)}
+          onSelectRegion={(id) => {
+            setVaultOpen(false);
+            router.push(`/?view=console&region=${id}`);
+          }}
+        />
+      )}
+
+      {theoryModalOpen && (
+        <TheoryModal onClose={() => setTheoryModalOpen(false)} />
       )}
     </div>
   );
