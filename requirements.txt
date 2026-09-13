@@ -25,6 +25,8 @@ reportlab==5.0.1
 # Ingest pipeline (data_preprocessing_pipeline/scripts/ingest_and_prepare.py
 # runs as a backend subprocess and needs the geo stack; without these the job
 # fails with ModuleNotFoundError: No module named 'pyproj').
-pyproj==3.7.1
-shapely==2.1.1
-geopandas==1.1.1
+pyproj==3.8.0
+shapely==2.1.2
+geopandas==1.1.4
+tqdm==4.70.1
+pyyaml==6.0.3
