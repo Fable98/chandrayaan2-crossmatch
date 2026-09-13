@@ -22,3 +22,9 @@ scikit-image==0.26.0
 scikit-learn==1.9.0
 scipy==1.17.1
 reportlab==5.0.1
+# Ingest pipeline (data_preprocessing_pipeline/scripts/ingest_and_prepare.py
+# runs as a backend subprocess and needs the geo stack; without these the job
+# fails with ModuleNotFoundError: No module named 'pyproj').
+pyproj==3.7.1
+shapely==2.1.1
+geopandas==1.1.1
