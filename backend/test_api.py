@@ -167,6 +167,23 @@ def test_triplet_detail():
     assert {"ohrc", "tmc", "iirs"}.issubset(sensor_names)
 
 
+def test_lro_flag_present_for_cdr_regions():
+    """Safety net for the frontend vault LRO filter, which derives membership
+    purely from lro_nac_available (no hardcoded region list). If this fails,
+    LRO cards silently vanish from the vault."""
+    _ensure_loaded()
+    for rid, pid in (
+        ("region_001", "M1417670274LC"),
+        ("region_003", "M1417670274LC"),
+        ("region_006", "M1413636095LC"),
+    ):
+        r = client.get(f"/triplets/{rid}")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["lro_nac_available"] is True, f"{rid} lost its LRO flag"
+        assert data["lro_nac_product_id"] == pid, f"{rid} product id changed"
+
+
 def test_triplet_detail_404():
     r = client.get(f"/triplets/{INVALID_ID}")
     assert r.status_code == 404

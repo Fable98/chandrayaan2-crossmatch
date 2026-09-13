@@ -3,6 +3,7 @@
 import { API_BASE, imageUrl } from "@/lib/api";
 import { footprintSizeKm } from "@/lib/geo";
 import type { TripletSummary, MatchMetrics } from "@/lib/types";
+import { SENSOR_META, DOSSIER_SENSOR_LABELS, scaleRatioLabel, sensorMeta } from "@/lib/sensors";
 
 interface Props {
   triplet: TripletSummary;
@@ -96,7 +97,7 @@ export default function DossierModal({
                 </div>
                 <div className="text-xs">
                   <span className="text-slate-900 font-bold block">OHRC Primary</span>
-                  <p className="text-[10px] text-slate-400">0.25–0.32 m/px Optical</p>
+                  <p className="text-[10px] text-slate-400">{DOSSIER_SENSOR_LABELS.ohrc}</p>
                 </div>
               </div>
 
@@ -112,7 +113,7 @@ export default function DossierModal({
                 </div>
                 <div className="text-xs">
                   <span className="text-slate-900 font-bold block">TMC-2 Reference</span>
-                  <p className="text-[10px] text-slate-400">~4–5 m/px Single View</p>
+                  <p className="text-[10px] text-slate-400">{DOSSIER_SENSOR_LABELS.tmc}</p>
                 </div>
               </div>
 
@@ -135,7 +136,7 @@ export default function DossierModal({
                       <span className="text-slate-900 font-bold">NASA LRO NAC</span>
                       <span className="rounded bg-amber-100 px-1 text-[9px] font-bold text-amber-800">Ref</span>
                     </div>
-                    <p className="text-[10px] text-slate-500">~0.9 m/px ({triplet.lro_nac_product_id ?? "External"})</p>
+                    <p className="text-[10px] text-slate-500">{DOSSIER_SENSOR_LABELS.lro_nac(triplet.lro_nac_product_id)}</p>
                   </div>
                 </div>
               )}
@@ -155,7 +156,7 @@ export default function DossierModal({
                 </div>
                 <div className="text-xs">
                   <span className="text-slate-900 font-bold block">IIRS Hyperspectral</span>
-                  <p className="text-[10px] text-slate-400">~70–80 m/px 256-Band</p>
+                  <p className="text-[10px] text-slate-400">{DOSSIER_SENSOR_LABELS.iirs}</p>
                 </div>
               </div>
 
@@ -259,7 +260,7 @@ export default function DossierModal({
                   <div className="flex justify-between border-b border-slate-200/60 pb-2">
                     <span className="font-sans text-slate-500">Lunar Reference Mode</span>
                     <span className="font-bold text-amber-700">
-                      NASA LRO NAC (~3.6x GSD ratio)
+                      NASA LRO NAC ({scaleRatioLabel(SENSOR_META.lro_nac.gsdM, SENSOR_META.ohrc.gsdM)} GSD ratio)
                     </span>
                   </div>
                 )}
@@ -277,7 +278,7 @@ export default function DossierModal({
                 Registration Method
               </h4>
               <p className="mt-3 text-xs leading-relaxed text-slate-600">
-                Cross-modal alignment applies CFOG + phase congruency feature extraction for extreme scale disparities (OHRC ↔ TMC-2 ~21x) and phase-correlation / LK optical flow for close-resolution reference images (OHRC ↔ NASA LRO NAC ~3.6x), coupled with strict iterative RANSAC and physical validation gates.
+                Cross-modal alignment applies CFOG + phase congruency feature extraction for extreme scale disparities (OHRC ↔ TMC-2 {scaleRatioLabel(sensorMeta(triplet, "tmc").gsdM, sensorMeta(triplet, "ohrc").gsdM)}) and phase-correlation / LK optical flow for close-resolution reference images (OHRC ↔ NASA LRO NAC {scaleRatioLabel(SENSOR_META.lro_nac.gsdM, SENSOR_META.ohrc.gsdM)}), coupled with strict iterative RANSAC and physical validation gates.
               </p>
             </div>
           </div>

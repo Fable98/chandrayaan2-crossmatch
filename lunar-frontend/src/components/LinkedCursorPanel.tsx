@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { MatchPoint } from "@/lib/types";
 import { imageUrl } from "@/lib/api";
 import GeoRefBadge from "./GeoRefBadge";
+import { referenceSensorLabel, sourceSensorLabel } from "@/lib/sensors";
 
 const TILE_PX = 512;
 const NEARBY_PX = 45;
@@ -106,7 +107,7 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
   };
 
   const isLro = referenceMode === "lro_nac";
-  const refLabel = isLro ? "NASA LRO NAC · ~0.9 m/px (Reference)" : "TMC-2 · ~4–5 m/px (Reference)";
+  const refLabel = referenceSensorLabel(isLro);
   const refSrc = isLro ? imageUrl(`/images/lro_nac/${tripletId}`) : imageUrl(`/images/tmc/${tripletId}`);
 
   return (
@@ -138,7 +139,7 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
         {/* Left: OHRC Image Pane */}
         <ImagePane
           sensor="ohrc"
-          label="OHRC · 0.25 m/px (Source)"
+          label={sourceSensorLabel()}
           innerRef={ohrcRef}
           src={imageUrl(`/images/ohrc/${tripletId}`)}
           onCanvasClick={(e) => handleCanvasClick(e, "ohrc")}

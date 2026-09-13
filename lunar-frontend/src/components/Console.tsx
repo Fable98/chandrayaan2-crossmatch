@@ -13,6 +13,14 @@ import TheoryModal from "./archive/TheoryModal";
 import InfoModal, { InfoModalContent } from "./archive/InfoModal";
 import RegistrationLauncher from "./RegistrationLauncher";
 import { getCurrentUser, logout, type AuthUser } from "@/lib/auth";
+import {
+  SENSOR_META,
+  sensorMeta,
+  sensorCardGsd,
+  scaleRatioLabel,
+  warpedOhrcTag,
+  checkerboardTag,
+} from "@/lib/sensors";
 
 type View = "registration" | "linked-cursor" | "map";
 
@@ -685,7 +693,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                               ? "bg-white text-slate-900 shadow-sm"
                               : "text-slate-500 hover:text-slate-800"
                           }`}
-                          title="Chandrayaan-2 TMC-2 single-view reference (~21x scale ratio)"
+                          title={`Chandrayaan-2 TMC-2 single-view reference (${scaleRatioLabel(sensorMeta(detail, "tmc").gsdM, sensorMeta(detail, "ohrc").gsdM)} scale ratio)`}
                         >
                           TMC-2 (Mono)
                         </button>
@@ -696,7 +704,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                               ? "bg-amber-500 text-white shadow-sm"
                               : "text-slate-500 hover:text-slate-800"
                           }`}
-                          title="NASA LRO NAC narrow angle camera (~3.6x scale ratio)"
+                          title={`NASA LRO NAC narrow angle camera (${scaleRatioLabel(SENSOR_META.lro_nac.gsdM, SENSOR_META.ohrc.gsdM)} scale ratio)`}
                         >
                           <span>NASA LRO NAC</span>
                           <span className={`rounded px-1 text-[9px] font-bold ${referenceMode === "lro_nac" ? "bg-black/20 text-white" : "bg-amber-100 text-amber-800"}`}>
@@ -764,7 +772,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                           <div className="flex items-center gap-2">
                             <span className="h-2 w-2 rounded-full bg-amber-500" />
                             <span className="font-semibold">NASA LRO NAC External Reference Mode Active</span>
-                            <span className="text-[11px] text-amber-700">· Orbit GSD ~0.91m ({detail.lro_nac_product_id ?? "M1417670274LC"})</span>
+                            <span className="text-[11px] text-amber-700">· Orbit GSD ~{sensorMeta(detail, "lro_nac").gsdM.toFixed(2)}m ({detail.lro_nac_product_id ?? "Unknown product"})</span>
                           </div>
                           <span className="font-mono text-[11px] font-bold text-amber-900">
                             Fit RMSE: {metrics?.fit_rmse_px?.toFixed(3) ?? metrics?.rmse_px?.toFixed(3) ?? "—"} px
@@ -774,14 +782,14 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {[
                           referenceMode === "lro_nac"
-                            ? { src: `/images/registered/lro_nac/${detail.id}/registered_source.png`, fallback: `/images/registered/${detail.id}/registered_ohrc.png`, label: "Warped OHRC", tag: "0.25m Primary (to LRO)" }
-                            : { src: `/images/registered/${detail.id}/registered_ohrc.png`, fallback: `/images/ohrc/${detail.id}`, label: "Warped OHRC", tag: "0.25m Primary (to TMC-2)" },
+                            ? { src: `/images/registered/lro_nac/${detail.id}/registered_source.png`, fallback: `/images/registered/${detail.id}/registered_ohrc.png`, label: "Warped OHRC", tag: warpedOhrcTag(detail, true) }
+                            : { src: `/images/registered/${detail.id}/registered_ohrc.png`, fallback: `/images/ohrc/${detail.id}`, label: "Warped OHRC", tag: warpedOhrcTag(detail, false) },
                           referenceMode === "lro_nac"
                             ? { src: `/images/registered/lro_nac/${detail.id}/blend_overlay.png`, fallback: `/images/lro_nac/${detail.id}`, label: "Blend Overlay", tag: "50% Cross-Fade (OHRC + LRO NAC)" }
                             : { src: `/images/registered/${detail.id}/blend_overlay.png`, fallback: `/images/tmc/${detail.id}`, label: "Blend Overlay", tag: "50% Cross-Fade (OHRC + TMC-2)" },
                           referenceMode === "lro_nac"
-                            ? { src: `/images/registered/lro_nac/${detail.id}/checkerboard_qa.png`, fallback: `/images/lro_nac/${detail.id}`, label: "Checkerboard QA", tag: "Continuity Verification (0.9m grid)" }
-                            : { src: `/images/registered/${detail.id}/checkerboard_qa.png`, fallback: `/images/tmc/${detail.id}`, label: "Checkerboard QA", tag: "Continuity Verification (4m grid)" },
+                            ? { src: `/images/registered/lro_nac/${detail.id}/checkerboard_qa.png`, fallback: `/images/lro_nac/${detail.id}`, label: "Checkerboard QA", tag: checkerboardTag(detail, true) }
+                            : { src: `/images/registered/${detail.id}/checkerboard_qa.png`, fallback: `/images/tmc/${detail.id}`, label: "Checkerboard QA", tag: checkerboardTag(detail, false) },
                         ].map((img, idx) => (
                           <div key={idx} className="flex flex-col rounded-xl border border-slate-200/70 overflow-hidden bg-slate-50">
                             <div className="relative aspect-square overflow-hidden bg-black">
@@ -887,7 +895,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                   <div>
                     <div className="flex justify-between text-slate-700 font-semibold mb-1">
                       <span>OHRC Narrow Angle</span>
-                      <span>0.25 m/px</span>
+                      <span>{sensorCardGsd(detail, "ohrc")}</span>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                       <div className="bg-[#4F46E5] h-full rounded-full" style={{ width: "95%" }} />
@@ -896,7 +904,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                   <div>
                     <div className="flex justify-between text-slate-700 font-semibold mb-1">
                       <span>TMC-2 Single View</span>
-                      <span>4.0 m/px</span>
+                      <span>{sensorCardGsd(detail, "tmc")}</span>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                       <div className="bg-indigo-400 h-full rounded-full" style={{ width: "80%" }} />
@@ -905,7 +913,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                   <div>
                     <div className="flex justify-between text-slate-700 font-semibold mb-1">
                       <span>IIRS Hyperspectral</span>
-                      <span>70 m/px</span>
+                      <span>{sensorCardGsd(detail, "iirs")}</span>
                     </div>
                     <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                       <div className="bg-cyan-500 h-full rounded-full" style={{ width: "65%" }} />
@@ -918,7 +926,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                           <span>NASA LRO NAC</span>
                           <span className="rounded bg-amber-100 px-1 text-[9px] font-bold text-amber-800">Ref</span>
                         </span>
-                        <span>0.9 m/px</span>
+                        <span>{sensorCardGsd(detail, "lro_nac")}</span>
                       </div>
                       <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                         <div className="bg-amber-500 h-full rounded-full" style={{ width: "88%" }} />

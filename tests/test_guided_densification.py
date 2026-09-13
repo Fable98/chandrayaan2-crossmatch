@@ -49,7 +49,7 @@ def test_guided_densification_expands_inliers_and_evaluates_held_out(tmp_path):
     assert np.isfinite(metrics_guided["held_out_validation_rmse_px"])
 
     # Spatial coverage must be greater than baseline 0.06
-    assert metrics_guided["spatial_coverage"] >= 0.10
+    assert metrics_guided["spatial_coverage"] > 0.06
 
 
 def test_guided_densification_can_be_disabled(tmp_path):

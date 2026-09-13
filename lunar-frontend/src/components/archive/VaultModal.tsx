@@ -4,6 +4,7 @@ import { useState } from "react";
 import { API_BASE, imageUrl } from "@/lib/api";
 import { footprintSizeKm } from "@/lib/geo";
 import type { TripletSummary } from "@/lib/types";
+import { sensorBadge, sensorFilterLabel } from "@/lib/sensors";
 
 export type PayloadFilter = "all" | "ohrc" | "tmc" | "iirs" | "lro" | "qa";
 
@@ -31,12 +32,7 @@ export default function VaultModal({
     const matchesSearch = t.id.toLowerCase().includes(search.toLowerCase());
     if (!matchesSearch) return false;
     if (filter === "lro") {
-      return Boolean(
-        t.lro_nac_available ||
-        t.id === "region_001" ||
-        t.id === "region_003" ||
-        t.id === "region_006"
-      );
+      return Boolean(t.lro_nac_available);
     }
     return true;
   });
@@ -83,22 +79,22 @@ export default function VaultModal({
             <FilterButton
               active={filter === "ohrc"}
               onClick={() => setFilter("ohrc")}
-              label="OHRC (0.25m)"
+              label={sensorFilterLabel("ohrc")}
             />
             <FilterButton
               active={filter === "tmc"}
               onClick={() => setFilter("tmc")}
-              label="TMC-2 (4m)"
+              label={sensorFilterLabel("tmc")}
             />
             <FilterButton
               active={filter === "iirs"}
               onClick={() => setFilter("iirs")}
-              label="IIRS (70m)"
+              label={sensorFilterLabel("iirs")}
             />
             <FilterButton
               active={filter === "lro"}
               onClick={() => setFilter("lro")}
-              label="LRO NAC (0.9m)"
+              label={sensorFilterLabel("lro")}
             />
             <FilterButton
               active={filter === "qa"}
@@ -129,24 +125,24 @@ export default function VaultModal({
               const { widthKm, heightKm } = footprintSizeKm(t.bounds);
 
               let thumbUrl = imageUrl(`/images/ohrc/${t.id}`);
-              let badge = "OHRC 0.25m";
+              let badge = sensorBadge("ohrc", t);
               let targetView: "registration" | "linked-cursor" | "map" = "linked-cursor";
 
               if (filter === "tmc") {
                 thumbUrl = imageUrl(`/images/tmc/${t.id}`);
-                badge = "TMC-2 4m";
+                badge = sensorBadge("tmc", t);
                 targetView = "linked-cursor";
               } else if (filter === "iirs") {
                 thumbUrl = imageUrl(`/images/iirs/${t.id}`);
-                badge = "IIRS 70m";
+                badge = sensorBadge("iirs", t);
                 targetView = "map";
               } else if (filter === "lro") {
                 thumbUrl = imageUrl(`/images/lro_nac/${t.id}`);
-                badge = "LRO NAC 0.9m";
+                badge = sensorBadge("lro", t);
                 targetView = "linked-cursor";
               } else if (filter === "qa") {
                 thumbUrl = imageUrl(`/images/registered/${t.id}/blend_overlay.png`);
-                badge = "Co-Reg QA";
+                badge = sensorBadge("qa", t);
                 targetView = "registration";
               }
 
