@@ -1,0 +1,4 @@
+Provenance registry for Phase 14 validated DEM crops.
+Each successfully validated per-region crop writes one
+`<region_id>_dem_provenance.json` here via `scripts/validate_phase14_dem.py`.
+This placeholder keeps the directory tracked while no operator DEM has been supplied yet.

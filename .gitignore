@@ -225,12 +225,19 @@ out/
 # --- Large / downloaded planetary data (do NOT commit raw tiles) ---
 data/raw/
 data/pyramids/
+data/external/dem/*.jp2
+data/external/dem/*.jpx
+data/external/dem/*.img
+data/external/dem/*.tif
+data/external/dem/*.tiff
+data/external/dem/*_AUX.XML
 *.img
 *.cub
 *.lbl
 *.qub
 *.tif
 *.tiff
+*.jp2
 
 # --- Model weights / checkpoints ---
 *.pt

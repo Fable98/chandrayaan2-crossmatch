@@ -1,0 +1,3 @@
+THIS FILE MUST REMAIN HERE SO GIT TRACKS THE DIRECTORY.
+Raw operator-supplied DEM tiles placed alongside this file are ignored (see .gitignore).
+Do NOT commit *.jp2 / *.tif / *.tiff / *.img binaries.

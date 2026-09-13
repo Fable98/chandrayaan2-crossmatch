@@ -1,0 +1,60 @@
+{
+  "contract_version": "phase14-v1",
+  "dataset_id": "LRO-L-LOLA-4-GDR-V1.0",
+  "dem_dir_default": "data/external/dem",
+  "dem_dir_env_override": "CH2X_DEM_DIR",
+  "tiles": [
+    {
+      "product_name": "SLDEM2015 512 ppd tile (Sinus Medii cluster)",
+      "tile_id": "SLDEM2015_512_30S_00S_315_360",
+      "expected_filename": "SLDEM2015_512_30S_00S_315_360.jp2",
+      "accepted_alternates": [
+        "SLDEM2015_512_30S_00S_315_360.tif",
+        "SLDEM2015_512_30S_00S_315_360.img"
+      ],
+      "source_provider": "NASA PDS Geosciences Node / LOLA team (Barker et al. SLDEM2015); tile index https://imbrium.mit.edu/DATA/SLDEM2015/TILES/JP2/",
+      "expected_sha256": null,
+      "expected_sha256_env_override": "SLDEM_TILE_315_360_SHA256",
+      "acquisition_download_date": null,
+      "license_provenance_reference": "PDS Geosciences Node public archive; cite Barker et al., Icarus 2016, doi:10.1016/j.icarus.2015.07.039. Operator records download URL + timestamp on supply.",
+      "expected_geographic_coverage": {
+        "west_lon_deg": 315.0,
+        "east_lon_deg": 360.0,
+        "south_lat_deg": -30.0,
+        "north_lat_deg": 0.0,
+        "longitude_convention": "0-360 East",
+        "units": "meters terrain height (LOLA/GRAIL framework, R=1737400 m)"
+      },
+      "covers_regions": ["region_001", "region_002", "region_003", "region_004"]
+    },
+    {
+      "product_name": "SLDEM2015 512 ppd tile (equatorial highland cluster)",
+      "tile_id": "SLDEM2015_512_00N_30N_225_270",
+      "expected_filename": "SLDEM2015_512_00N_30N_225_270.jp2",
+      "accepted_alternates": [
+        "SLDEM2015_512_00N_30N_225_270.tif",
+        "SLDEM2015_512_00N_30N_225_270.img"
+      ],
+      "source_provider": "NASA PDS Geosciences Node / LOLA team (Barker et al. SLDEM2015); tile index https://imbrium.mit.edu/DATA/SLDEM2015/TILES/JP2/",
+      "expected_sha256": null,
+      "expected_sha256_env_override": "SLDEM_TILE_225_270_SHA256",
+      "acquisition_download_date": null,
+      "license_provenance_reference": "PDS Geosciences Node public archive; cite Barker et al., Icarus 2016, doi:10.1016/j.icarus.2015.07.039. Operator records download URL + timestamp on supply.",
+      "expected_geographic_coverage": {
+        "west_lon_deg": 225.0,
+        "east_lon_deg": 270.0,
+        "south_lat_deg": 0.0,
+        "north_lat_deg": 30.0,
+        "longitude_convention": "0-360 East",
+        "units": "meters terrain height (LOLA/GRAIL framework, R=1737400 m)"
+      },
+      "covers_regions": ["region_005", "region_006"]
+    }
+  ],
+  "notes": [
+    "expected_sha256=null means the operator has not yet supplied checksums: validation MUST fail with DEM files reported missing/blocked.",
+    "Supported raster types: .jp2 (GIS-ready JP2 + AUX.XML preferred), .tif/.tiff, .img (PDS FLOAT_IMG). dem_512.png and any .png are explicitly REJECTED as non-authoritative.",
+    "Place each tile (plus its AUX.XML / .LBL sidecars when available) directly in data/external/dem/ or set CH2X_DEM_DIR to a custom directory.",
+    "Do NOT commit raw DEM binaries to git; only this manifest, checksums, and derived provenance records are tracked."
+  ]
+}
