@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { API_BASE, api, imageUrl } from "@/lib/api";
 import LunarGlobe, { type LunarFootprint } from "@/components/hero/LunarGlobe";
 import type { MoonPoint, MoonPointsResponse } from "@/lib/backend-types";
@@ -552,24 +552,24 @@ function OverlayImage({
 }
 
 export default function RegistrationLauncher() {
-  const defaultSample = SAMPLE_PAIRS[1] || SAMPLE_PAIRS[0];
+  const uploadSectionRef = useRef<HTMLDivElement>(null);
 
   const [sourceFile, setSourceFile] = useState<File | null>(null);
   const [referenceFile, setReferenceFile] = useState<File | null>(null);
-  const [sourcePreview, setSourcePreview] = useState<string | null>(absoluteUrl(defaultSample.sourceUrl));
-  const [referencePreview, setReferencePreview] = useState<string | null>(absoluteUrl(defaultSample.referenceUrl));
+  const [sourcePreview, setSourcePreview] = useState<string | null>(null);
+  const [referencePreview, setReferencePreview] = useState<string | null>(null);
   const [demFile, setDemFile] = useState<File | null>(null);
-  const [sourceSensor, setSourceSensor] = useState<Sensor>(defaultSample.sourceSensor);
-  const [referenceSensor, setReferenceSensor] = useState<Sensor>(defaultSample.referenceSensor);
+  const [sourceSensor, setSourceSensor] = useState<Sensor>("OHRC");
+  const [referenceSensor, setReferenceSensor] = useState<Sensor>("TMC");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<RegistrationResult | null>(defaultSample.demoResult);
+  const [result, setResult] = useState<RegistrationResult | null>(null);
   // Provenance of the currently displayed result: the pre-loaded committed
   // benchmark snapshot vs a genuinely live backend run (Step 13 honesty).
   const [resultProvenance, setResultProvenance] = useState<"snapshot" | "live">("snapshot");
-  const [points, setPoints] = useState<MatchPoint[]>(defaultSample.demoPoints);
-  const [selectedSample, setSelectedSample] = useState<SamplePair | null>(defaultSample);
-  const [customMode, setCustomMode] = useState(false);
+  const [points, setPoints] = useState<MatchPoint[]>([]);
+  const [selectedSample, setSelectedSample] = useState<SamplePair | null>(null);
+  const [customMode, setCustomMode] = useState(true);
   const [resultView, setResultView] = useState<"2d" | "3d">("2d");
   const [moonPoints, setMoonPoints] = useState<MoonPoint[]>([]);
   const [moonPointsLoading, setMoonPointsLoading] = useState(false);
@@ -939,6 +939,123 @@ export default function RegistrationLauncher() {
         </div>
       </div>
 
+      {/* 1. Custom Upload Inputs & Controls (Rendered FIRST, above the fold) */}
+      <div ref={uploadSectionRef} className="mt-5 space-y-4 rounded-xl border border-indigo-100 bg-indigo-50/20 p-4">
+        <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
+          <span className="text-xs font-bold text-slate-800">Upload Custom Multi-Sensor Pair</span>
+          <span className="text-[10px] text-slate-500 font-mono">GeoTIFF (.tif) or PNG (.png)</span>
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <FilePicker
+            label={`Source Image · ${sourceSensor}`}
+            file={sourceFile}
+            preview={sourcePreview}
+            onChange={handleSourceFile}
+          />
+          <FilePicker
+            label={`Reference Image · ${referenceSensor}`}
+            file={referenceFile}
+            preview={referencePreview}
+            onChange={handleReferenceFile}
+          />
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-[1fr_1fr_1.2fr]">
+          <label className="block">
+            <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-500">Source Sensor</span>
+            <select
+              value={sourceSensor}
+              onChange={(e) => setSourceSensor(e.target.value as Sensor)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            >
+              {SENSOR_OPTIONS.filter((s) => s.value !== "LRO_NAC").map((sensor) => (
+                <option key={sensor.value} value={sensor.value}>
+                  {sensor.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-500">Reference Sensor</span>
+            <select
+              value={referenceSensor}
+              onChange={(e) => setReferenceSensor(e.target.value as Sensor)}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            >
+              {SENSOR_OPTIONS.map((sensor) => (
+                <option key={sensor.value} value={sensor.value}>
+                  {sensor.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <FilePicker label="Optional DEM Elevation DTM" file={demFile} optional onChange={setDemFile} />
+        </div>
+
+        {/* Quick Pre-aligned test buttons */}
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-indigo-100/60 text-[10px]">
+          <span className="font-bold text-slate-500">Quick Test Pairs:</span>
+          <button
+            type="button"
+            onClick={() =>
+              loadTestPairIntoForm(
+                "/images/ohrc/region_001.png",
+                "/images/lro_nac/region_001.png",
+                "OHRC",
+                "LRO_NAC",
+                "region_001_ohrc.png",
+                "region_001_lro_nac.png"
+              )
+            }
+            className="rounded-lg border border-indigo-200 bg-white px-2.5 py-1 font-bold text-indigo-600 hover:bg-indigo-50 transition shadow-xs"
+          >
+            🌙 Load Region 001 (OHRC + LRO NAC)
+          </button>
+          <button
+            type="button"
+            onClick={() =>
+              loadTestPairIntoForm(
+                "/images/ohrc/region_001.png",
+                "/images/tmc/region_001.png",
+                "OHRC",
+                "TMC",
+                "region_001_ohrc.png",
+                "region_001_tmc.png"
+              )
+            }
+            className="rounded-lg border border-indigo-200 bg-white px-2.5 py-1 font-bold text-indigo-600 hover:bg-indigo-50 transition shadow-xs"
+          >
+            🪐 Load Region 001 (OHRC + TMC-2)
+          </button>
+        </div>
+
+        {error && customMode && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+            <span className="font-black uppercase tracking-wider">Verification Notice:</span>
+            <span className="ml-2">{error}</span>
+          </div>
+        )}
+
+        <button
+          type="button"
+          onClick={register}
+          disabled={loading || !sourceFile || !referenceFile}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#4F46E5] px-5 py-3 text-xs font-black uppercase tracking-[0.15em] text-white shadow-sm transition hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {loading ? (
+            <>
+              <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              Registering &amp; Validating Correspondences...
+            </>
+          ) : (
+            "Run Registration on Uploaded Pair"
+          )}
+        </button>
+      </div>
+
       {/* Live-run error banner (Step 13: backend failures surface, never snapshots) */}
       {error && !customMode && (
         <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
@@ -947,7 +1064,7 @@ export default function RegistrationLauncher() {
         </div>
       )}
 
-      {/* 1. Benchmark Pair Selector (Always Accessible) */}
+      {/* 2. Benchmark Pair Selector (Rendered AFTER upload section) */}
       <div className="mt-5">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
           <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
@@ -957,21 +1074,20 @@ export default function RegistrationLauncher() {
             <button
               type="button"
               onClick={() => {
-                setCustomMode(!customMode);
-                if (!customMode) {
-                  setSelectedSample(null);
-                  setResult(null);
-                }
+                setCustomMode(true);
+                setSelectedSample(null);
+                setResult(null);
+                uploadSectionRef.current?.scrollIntoView({ behavior: "smooth" });
               }}
               className={`rounded-lg px-2.5 py-1 text-xs font-bold transition flex items-center gap-1.5 ${
-                customMode
+                customMode && !selectedSample
                   ? "bg-indigo-600 text-white shadow-sm"
                   : "bg-slate-100 text-slate-700 hover:bg-slate-200"
               }`}
             >
               <span>+ Custom GeoTIFF Upload</span>
             </button>
-            {(result || customMode) && (
+            {(result || selectedSample || sourceFile || referenceFile) && (
               <button
                 type="button"
                 onClick={reset}
@@ -1015,125 +1131,6 @@ export default function RegistrationLauncher() {
           })}
         </div>
       </div>
-
-      {/* 2. Custom Upload Inputs & Controls (Visible when customMode is active) */}
-      {customMode && (
-        <div className="mt-5 space-y-4 rounded-xl border border-indigo-100 bg-indigo-50/20 p-4">
-          <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
-            <span className="text-xs font-bold text-slate-800">Upload Custom Multi-Sensor Pair</span>
-            <span className="text-[10px] text-slate-500 font-mono">GeoTIFF (.tif) or PNG (.png)</span>
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-2">
-            <FilePicker
-              label={`Source Image · ${sourceSensor}`}
-              file={sourceFile}
-              preview={sourcePreview}
-              onChange={handleSourceFile}
-            />
-            <FilePicker
-              label={`Reference Image · ${referenceSensor}`}
-              file={referenceFile}
-              preview={referencePreview}
-              onChange={handleReferenceFile}
-            />
-          </div>
-
-          <div className="grid gap-3 md:grid-cols-[1fr_1fr_1.2fr]">
-            <label className="block">
-              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-500">Source Sensor</span>
-              <select
-                value={sourceSensor}
-                onChange={(e) => setSourceSensor(e.target.value as Sensor)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              >
-                {SENSOR_OPTIONS.filter((s) => s.value !== "LRO_NAC").map((sensor) => (
-                  <option key={sensor.value} value={sensor.value}>
-                    {sensor.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="block">
-              <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-500">Reference Sensor</span>
-              <select
-                value={referenceSensor}
-                onChange={(e) => setReferenceSensor(e.target.value as Sensor)}
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-              >
-                {SENSOR_OPTIONS.map((sensor) => (
-                  <option key={sensor.value} value={sensor.value}>
-                    {sensor.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <FilePicker label="Optional DEM Elevation DTM" file={demFile} optional onChange={setDemFile} />
-          </div>
-
-          {/* Quick Pre-aligned test buttons */}
-          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-indigo-100/60 text-[10px]">
-            <span className="font-bold text-slate-500">Quick Test Pairs:</span>
-            <button
-              type="button"
-              onClick={() =>
-                loadTestPairIntoForm(
-                  "/images/ohrc/region_001.png",
-                  "/images/lro_nac/region_001.png",
-                  "OHRC",
-                  "LRO_NAC",
-                  "region_001_ohrc.png",
-                  "region_001_lro_nac.png"
-                )
-              }
-              className="rounded-lg border border-indigo-200 bg-white px-2.5 py-1 font-bold text-indigo-600 hover:bg-indigo-50 transition shadow-xs"
-            >
-              🌙 Load Region 001 (OHRC + LRO NAC)
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                loadTestPairIntoForm(
-                  "/images/ohrc/region_001.png",
-                  "/images/tmc/region_001.png",
-                  "OHRC",
-                  "TMC",
-                  "region_001_ohrc.png",
-                  "region_001_tmc.png"
-                )
-              }
-              className="rounded-lg border border-indigo-200 bg-white px-2.5 py-1 font-bold text-indigo-600 hover:bg-indigo-50 transition shadow-xs"
-            >
-              🪐 Load Region 001 (OHRC + TMC-2)
-            </button>
-          </div>
-
-          {error && (
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
-              <span className="font-black uppercase tracking-wider">Verification Notice:</span>
-              <span className="ml-2">{error}</span>
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={register}
-            disabled={loading || !sourceFile || !referenceFile}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#4F46E5] px-5 py-3 text-xs font-black uppercase tracking-[0.15em] text-white shadow-sm transition hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            {loading ? (
-              <>
-                <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                Registering &amp; Validating Correspondences...
-              </>
-            ) : (
-              "Run Registration on Uploaded Pair"
-            )}
-          </button>
-        </div>
-      )}
 
       {/* 3. Scientific Failure State: Quality Gate Rejection Panel */}
       {isFailedRegistration && (
