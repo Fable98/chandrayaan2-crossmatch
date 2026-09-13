@@ -32,9 +32,12 @@ from train_ai_verifier import FEATURE_NAMES as TRAIN_FEATURES
 
 def test_feature_contract_stays_in_sync():
     assert TRAIN_FEATURES == VERIFIER_FEATURES
-    assert TRAIN_FEATURES == [
+    assert TRAIN_FEATURES[:9] == [
         "confidence", "refinement_dx", "refinement_dy", "spatial_quality_score",
         "cfog_distance", "pc_energy_src", "pc_energy_tgt", "nn_ratio", "scale_diff",
+    ]
+    assert TRAIN_FEATURES[9:] == [
+        "disp_consistency", "pairwise_dist_ratio",
     ]
 
 
@@ -52,13 +55,18 @@ def _record(conf: float, dx: float = 0.0, **labels) -> dict:
         "pc_energy_src": 0.7, "pc_energy_tgt": 0.65,
         "nn_ratio": 0.35 if conf >= 0.5 else 0.92,
         "scale_diff": 0.2 if conf >= 0.5 else 2.5,
+        "source_image": "test_src.png",
+        "target_image": "test_tgt.png",
+        "region": "region_001",
+        "domain": "same_sensor",
+        "multimodal_pair": False,
     }
     rec.update(labels)
     return rec
 
 
 def test_train_fails_loudly_on_single_class(tmp_path):
-    only_true = [_record(0.9 - 0.01 * i, human_label=True) for i in range(12)]
+    only_true = [_record(0.9 - 0.01 * i, ground_truth_label=True) for i in range(12)]
     f = _write_matches(tmp_path / "single_matches.json", only_true)
     rc = train_main(["--inputs", str(f), "--output", str(tmp_path / "m.pkl")])
     assert rc == 2, "single-class training must fail loudly (exit 2)"
@@ -76,21 +84,26 @@ def test_train_refuses_ransac_labels_by_default(tmp_path):
     assert not (tmp_path / "m.pkl").exists()
 
 
-def test_hand_labelled_training_roundtrip_and_ransac_bundle_refused(tmp_path):
-    hand = (
-        [_record(0.85 + 0.01 * (i % 5), 0.1 * i, human_label=True) for i in range(12)]
-        + [_record(0.15 + 0.01 * (i % 5), 2.0 + i, human_label=False) for i in range(12)]
+def test_synthetic_geometry_training_roundtrip_and_ransac_bundle_refused(tmp_path):
+    synthetic = (
+        [_record(0.85 + 0.01 * (i % 5), 0.1 * i, ground_truth_label=True,
+                 label_source="synthetic_geometry", source_image=f"s_{i//4}.png", target_image=f"t_{i//4}.png") for i in range(12)]
+        + [_record(0.15 + 0.01 * (i % 5), 2.0 + i, ground_truth_label=False,
+                   label_source="synthetic_geometry", source_image=f"s_{i//4}.png", target_image=f"t_{i//4}.png") for i in range(12)]
     )
-    f = _write_matches(tmp_path / "hand_matches.json", hand)
-    out = tmp_path / "hand.pkl"
+    f = _write_matches(tmp_path / "synthetic_matches.json", synthetic)
+    out = tmp_path / "synthetic.pkl"
     assert train_main(["--inputs", str(f), "--output", str(out)]) == 0
     assert out.exists()
 
     import joblib
-    assert joblib.load(out)["label_source"] == "hand"
+    bundle = joblib.load(out)
+    assert bundle["label_source"] == "synthetic_geometry"
+    assert bundle["n_samples"] == 24
+    assert bundle["n_train"] + bundle["n_test"] == 24
     verifier = AIMatchVerifier(model_path=out)
     assert verifier.is_trained is True
-    kept, rejected = verifier.filter_matches(hand, threshold=0.5)
+    kept, rejected = verifier.filter_matches(synthetic, threshold=0.5)
     assert len(kept) > 0 and len(rejected) > 0
 
     # A RANSAC-trained bundle (explicit opt-in) must NOT gate matches.
@@ -105,6 +118,25 @@ def test_hand_labelled_training_roundtrip_and_ransac_bundle_refused(tmp_path):
     assert joblib.load(out_r)["label_source"] == "ransac-acknowledged"
     refused = AIMatchVerifier(model_path=out_r)
     assert refused.is_trained is False, "circular bundles must be refused at load"
+
+
+def test_legacy_hand_labels_backward_compatibility(tmp_path):
+    hand = (
+        [_record(0.85 + 0.01 * (i % 5), 0.1 * i, human_label=True, label_source="hand",
+                 source_image=f"s_{i//4}.png", target_image=f"t_{i//4}.png") for i in range(12)]
+        + [_record(0.15 + 0.01 * (i % 5), 2.0 + i, human_label=False, label_source="hand",
+                   source_image=f"s_{i//4}.png", target_image=f"t_{i//4}.png") for i in range(12)]
+    )
+    f = _write_matches(tmp_path / "hand_matches.json", hand)
+    out = tmp_path / "hand.pkl"
+    assert train_main(["--inputs", str(f), "--output", str(out), "--label-key", "human_label"]) == 0
+    assert out.exists()
+
+    import joblib
+    bundle = joblib.load(out)
+    assert bundle["label_source"] == "hand"
+    verifier = AIMatchVerifier(model_path=out)
+    assert verifier.is_trained is True
 
 
 def test_default_verifier_is_untrained_baseline(tmp_path):
@@ -183,7 +215,7 @@ def test_train_skips_rows_missing_live_features(tmp_path):
     except KeyError:
         pass
     row = extract_feature_row(complete, require_live_features=True)
-    assert len(row) == 9
+    assert len(row) == len(TRAIN_FEATURES)
 
     mixed = []
     for i in range(8):
@@ -224,10 +256,16 @@ def test_gt_generator_emits_live_features_and_cross_sensor_domain(tmp_path):
         assert "refinement_dx" in r and "refinement_dy" in r
         for k in ("cfog_distance", "pc_energy_src", "pc_energy_tgt", "nn_ratio", "scale_diff"):
             assert k in r, r.keys()
-        assert r["label_source"] == "hand"
-        assert r["domain"] in ("same_sensor", "cross_sensor")
-    assert any(r["human_label"] for r in recs)
-    assert any(not r["human_label"] for r in recs)
+        assert r["label_source"] == "synthetic_geometry"
+        assert "ground_truth_label" in r
+        assert "human_label" not in r, "Generator must not produce misleading human_label"
+        assert "source_image" in r and r["source_image"] == "tile.png"
+        assert "target_image" in r and r["target_image"].startswith("tile_")
+        assert "region" in r
+        assert "domain" in r and r["domain"] in ("same_sensor", "cross_sensor")
+        assert "multimodal_pair" in r
+    assert any(r["ground_truth_label"] for r in recs)
+    assert any(not r["ground_truth_label"] for r in recs)
     assert any(r.get("domain") == "cross_sensor" for r in recs)
 
 
@@ -291,3 +329,136 @@ def test_descriptor_features_are_finite_measurements():
     for v in feats.values():
         assert np.isfinite(v)
 
+
+def test_grouped_evaluation_prevents_leakage(tmp_path):
+    """Grouped evaluation must partition whole groups without train/test overlap."""
+    import joblib
+
+    records = []
+    # 6 distinct image pairs, each with balanced classes
+    for p_idx in range(6):
+        src_name = f"src_{p_idx}.png"
+        tgt_name = f"tgt_{p_idx}.png"
+        reg_name = f"region_{p_idx:03d}"
+        dom = "cross_sensor" if p_idx % 2 == 0 else "same_sensor"
+        for i in range(8):
+            records.append(_record(
+                0.85 + 0.005 * i,
+                dx=0.1 + 0.01 * i,
+                source_x=float(p_idx * 100 + i * 4),
+                source_y=float(p_idx * 100 + i * 4 + 1),
+                target_x=float(p_idx * 100 + i * 4 + 10),
+                target_y=float(p_idx * 100 + i * 4 + 11),
+                ground_truth_label=True,
+                label_source="synthetic_geometry",
+                source_image=src_name,
+                target_image=tgt_name,
+                region=reg_name,
+                domain=dom,
+            ))
+            records.append(_record(
+                0.15 + 0.005 * i,
+                dx=3.0 + 0.01 * i,
+                source_x=float(p_idx * 100 + i * 4 + 2),
+                source_y=float(p_idx * 100 + i * 4 + 3),
+                target_x=float(p_idx * 100 + i * 4 + 20),
+                target_y=float(p_idx * 100 + i * 4 + 21),
+                ground_truth_label=False,
+                label_source="synthetic_geometry",
+                source_image=src_name,
+                target_image=tgt_name,
+                region=reg_name,
+                domain=dom,
+            ))
+
+    f = _write_matches(tmp_path / "grouped_matches.json", records)
+    out = tmp_path / "grouped_model.pkl"
+    rc = train_main(["--inputs", str(f), "--output", str(out), "--split", "grouped"])
+    assert rc == 0
+    assert out.exists()
+
+    bundle = joblib.load(out)
+    assert bundle["split_strategy"] == "grouped"
+    assert bundle["n_samples"] == len(records)
+    assert bundle["n_train"] + bundle["n_test"] == len(records)
+    assert bundle["n_train"] > 0 and bundle["n_test"] > 0
+    assert bundle["group_key"] == "image_pair"
+
+    metrics = bundle["evaluation_metrics"]
+    assert "overall" in metrics
+    assert "cross_sensor" in metrics
+    assert "same_sensor" in metrics
+    assert metrics["overall"]["n_samples"] == bundle["n_test"]
+
+
+def test_grouped_evaluation_fails_loudly_on_insufficient_groups(tmp_path):
+    """Grouped split must refuse to silently revert to random if groups < 2."""
+    records = []
+    # Single image pair only
+    for i in range(12):
+        records.append(_record(
+            0.85 + 0.005 * i,
+            source_x=float(i * 2),
+            source_y=float(i * 2 + 1),
+            target_x=float(i * 2 + 10),
+            target_y=float(i * 2 + 11),
+            ground_truth_label=True, label_source="synthetic_geometry",
+            source_image="solo_src.png", target_image="solo_tgt.png",
+        ))
+        records.append(_record(
+            0.15 + 0.005 * i,
+            source_x=float(i * 2 + 50),
+            source_y=float(i * 2 + 51),
+            target_x=float(i * 2 + 60),
+            target_y=float(i * 2 + 61),
+            ground_truth_label=False, label_source="synthetic_geometry",
+            source_image="solo_src.png", target_image="solo_tgt.png",
+        ))
+
+    f = _write_matches(tmp_path / "single_group.json", records)
+    out = tmp_path / "model.pkl"
+    rc = train_main(["--inputs", str(f), "--output", str(out), "--split", "grouped"])
+    assert rc == 2, "grouped split on single group must fail with exit code 2"
+    assert not out.exists(), "no model may be saved on grouped split failure"
+
+
+def test_evaluation_zero_leakage_and_metadata(tmp_path):
+    """Test model is fitted strictly on training rows and predictions evaluate test only."""
+    from train_ai_verifier import train, build_dataset
+
+    records = []
+    for g_idx in range(4):
+        for i in range(6):
+            records.append(_record(
+                0.8 + 0.01 * i,
+                source_x=float(g_idx * 100 + i * 2),
+                source_y=float(g_idx * 100 + i * 2 + 1),
+                target_x=float(g_idx * 100 + i * 2 + 10),
+                target_y=float(g_idx * 100 + i * 2 + 11),
+                ground_truth_label=True,
+                source_image=f"s_{g_idx}.png", target_image=f"t_{g_idx}.png",
+                region=f"reg_{g_idx}", domain="cross_sensor" if g_idx < 2 else "same_sensor",
+            ))
+            records.append(_record(
+                0.2 + 0.01 * i,
+                source_x=float(g_idx * 100 + i * 2 + 20),
+                source_y=float(g_idx * 100 + i * 2 + 21),
+                target_x=float(g_idx * 100 + i * 2 + 30),
+                target_y=float(g_idx * 100 + i * 2 + 31),
+                ground_truth_label=False,
+                source_image=f"s_{g_idx}.png", target_image=f"t_{g_idx}.png",
+                region=f"reg_{g_idx}", domain="cross_sensor" if g_idx < 2 else "same_sensor",
+            ))
+
+    f = _write_matches(tmp_path / "leak_test.json", records)
+    X, y, stats = build_dataset([f])
+    groups = stats["groups"]
+    domains = stats["domains"]
+
+    clf, eval_results, (X_tr, y_tr, X_te, y_te) = train(
+        X, y, groups=groups, domains=domains, split_strategy="grouped", test_size=0.25
+    )
+
+    assert len(X_tr) + len(X_te) == len(X)
+    assert len(X_tr) > 0 and len(X_te) > 0
+    assert eval_results["overall"]["n_samples"] == len(X_te)

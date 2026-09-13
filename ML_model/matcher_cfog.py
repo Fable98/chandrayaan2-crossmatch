@@ -1382,6 +1382,50 @@ def detect_blob_centroids(image: np.ndarray, min_area: int = 3) -> np.ndarray:
     return np.asarray(found, dtype=np.float32).reshape(-1, 2)
 
 
+def compute_goa_search_surface(
+    search_region: np.ndarray,
+    tmpl: np.ndarray,
+) -> np.ndarray:
+    """Compute dense Gradient Orientation Agreement (GOA) search surface.
+
+    Measures polarity-invariant (modulo pi) gradient orientation agreement
+    between template and search region at every valid sliding position.
+    Returns array of shape (search_region.shape[0] - tmpl.shape[0] + 1,
+    search_region.shape[1] - tmpl.shape[1] + 1) with values in [0.0, 1.0].
+    """
+    th, tw = tmpl.shape[:2]
+    sh, sw = search_region.shape[:2]
+    out_h, out_w = sh - th + 1, sw - tw + 1
+    if out_h <= 0 or out_w <= 0:
+        return np.zeros((max(0, out_h), max(0, out_w)), dtype=np.float32)
+
+    tmpl_f = tmpl.astype(np.float32)
+    sr_f = search_region.astype(np.float32)
+
+    gx1 = cv2.Sobel(tmpl_f, cv2.CV_32F, 1, 0, ksize=3)
+    gy1 = cv2.Sobel(tmpl_f, cv2.CV_32F, 0, 1, ksize=3)
+    m1 = np.sqrt(gx1 * gx1 + gy1 * gy1) + 1e-4
+
+    gx2 = cv2.Sobel(sr_f, cv2.CV_32F, 1, 0, ksize=3)
+    gy2 = cv2.Sobel(sr_f, cv2.CV_32F, 0, 1, ksize=3)
+    m2 = np.sqrt(gx2 * gx2 + gy2 * gy2) + 1e-4
+
+    u1 = (gx1 * gx1 - gy1 * gy1) / m1
+    v1 = (2.0 * gx1 * gy1) / m1
+    u2 = (gx2 * gx2 - gy2 * gy2) / m2
+    v2 = (2.0 * gx2 * gy2) / m2
+
+    corr_u = cv2.matchTemplate(u2, u1, cv2.TM_CCORR)
+    corr_v = cv2.matchTemplate(v2, v1, cv2.TM_CCORR)
+    corr_w = cv2.matchTemplate(m2, m1, cv2.TM_CCORR)
+
+    num = corr_u + corr_v
+    denom = corr_w + 1e-6
+    cos2_dtheta = np.clip(num / denom, -1.0, 1.0)
+    goa = 0.5 * (cos2_dtheta + 1.0)
+    return np.clip(goa, 0.0, 1.0).astype(np.float32)
+
+
 def find_best_correspondence_unified(
     search_region: np.ndarray,
     tmpl: np.ndarray,
@@ -1389,14 +1433,17 @@ def find_best_correspondence_unified(
     w_mi: float = 0.6,
     w_ncc: float = 0.4,
     top_k: int = 5,
+    use_goa_preselection: bool = False,
 ) -> Tuple[float, Tuple[int, int]]:
     """
     Find best match location in search_region for tmpl across a unified similarity surface.
 
     - When multimodal_pair is True:
-        Evaluates top-K candidate peaks from normalized cross correlation on a joint surface:
-        S = w_mi * NMI(tmpl, cand) + w_ncc * max(0.0, NCC)
-        ensuring candidate peak selection is guided by both mutual information and correlation.
+        Preselects top-K candidate peaks using either:
+        * Gradient Orientation Agreement (GOA, polarity-invariant structural metric) if use_goa_preselection=True
+        * Normalized Cross-Correlation (NCC) if use_goa_preselection=False
+        Then evaluates joint score S = w_mi * NMI(tmpl, cand) + w_ncc * max(0.0, NCC)
+        across the preselected candidates.
     - When multimodal_pair is False:
         Operates purely on normalized cross-correlation (cv2.matchTemplate TM_CCOEFF_NORMED).
 
@@ -1410,16 +1457,23 @@ def find_best_correspondence_unified(
         return float(max_val), max_loc
 
     th, tw = tmpl.shape[:2]
-    flat = res.ravel()
+    if use_goa_preselection:
+        preselect_surface = compute_goa_search_surface(search_region, tmpl)
+        flat = preselect_surface.ravel()
+    else:
+        preselect_surface = res
+        flat = res.ravel()
+
     k = min(top_k, flat.size)
     if k <= 1:
-        _, max_val, _, max_loc = cv2.minMaxLoc(res)
+        _, max_val, _, max_loc = cv2.minMaxLoc(preselect_surface)
         cand = search_region[max_loc[1] : max_loc[1] + th, max_loc[0] : max_loc[0] + tw]
         if cand.shape == tmpl.shape:
             mi = mutual_information_score(tmpl, cand)
-            score = w_mi * mi + w_ncc * max(0.0, float(max_val))
+            ncc_val = max(0.0, float(res[max_loc[1], max_loc[0]]))
+            score = w_mi * mi + w_ncc * ncc_val
         else:
-            score = float(max_val)
+            score = float(res[max_loc[1], max_loc[0]])
         find_best_correspondence_unified.last_peak_uniqueness = ncc_peak_uniqueness(res, max_loc)
         return float(score), max_loc
 
@@ -1678,6 +1732,134 @@ def compute_descriptor_match_features(
         "nn_ratio": _lowe_nn_ratio(src_desc, tgt_desc, tgt_gallery),
         "scale_diff": abs(estimate_blob_scale(pc1, x1, y1) - estimate_blob_scale(pc2, x2, y2)),
     }
+
+
+def compute_gradient_orientation_agreement(
+    pc1: np.ndarray,
+    pc2: np.ndarray,
+    x1: float,
+    y1: float,
+    x2: float,
+    y2: float,
+    half: int = 8,
+) -> float:
+    """Polarity-invariant gradient orientation agreement (modulo pi) between Phase Congruency patches.
+
+    Range [0.0, 1.0]. 1.0 = parallel or antiparallel edge alignments; 0.0 = orthogonal.
+    """
+    if pc1 is None or pc2 is None or pc1.size == 0 or pc2.size == 0:
+        return 0.5
+    h1, w1 = pc1.shape[:2]
+    h2, w2 = pc2.shape[:2]
+    ix1, iy1 = int(round(x1)), int(round(y1))
+    ix2, iy2 = int(round(x2)), int(round(y2))
+
+    y0_1, y1_1 = max(0, iy1 - half), min(h1, iy1 + half)
+    x0_1, x1_1 = max(0, ix1 - half), min(w1, ix1 + half)
+    y0_2, y1_2 = max(0, iy2 - half), min(h2, iy2 + half)
+    x0_2, x1_2 = max(0, ix2 - half), min(w2, ix2 + half)
+
+    p1 = pc1[y0_1:y1_1, x0_1:x1_1]
+    p2 = pc2[y0_2:y1_2, x0_2:x1_2]
+
+    target_shape = (2 * half, 2 * half)
+    if p1.shape != target_shape:
+        p1 = cv2.resize(p1, target_shape, interpolation=cv2.INTER_LINEAR) if p1.size >= 4 else np.zeros(target_shape, dtype=np.float32)
+    if p2.shape != target_shape:
+        p2 = cv2.resize(p2, target_shape, interpolation=cv2.INTER_LINEAR) if p2.size >= 4 else np.zeros(target_shape, dtype=np.float32)
+
+    p1 = p1.astype(np.float32)
+    p2 = p2.astype(np.float32)
+
+    gx1 = cv2.Sobel(p1, cv2.CV_32F, 1, 0, ksize=3)
+    gy1 = cv2.Sobel(p1, cv2.CV_32F, 0, 1, ksize=3)
+    gx2 = cv2.Sobel(p2, cv2.CV_32F, 1, 0, ksize=3)
+    gy2 = cv2.Sobel(p2, cv2.CV_32F, 0, 1, ksize=3)
+
+    m1 = np.sqrt(gx1 * gx1 + gy1 * gy1)
+    m2 = np.sqrt(gx2 * gx2 + gy2 * gy2)
+
+    denom = (m1 * m1) * (m2 * m2) + 1e-8
+    cos2_dtheta = ((gx1 * gx1 - gy1 * gy1) * (gx2 * gx2 - gy2 * gy2) + (2.0 * gx1 * gy1) * (2.0 * gx2 * gy2)) / denom
+    orient_agree = 0.5 * (cos2_dtheta + 1.0)
+    w = m1 * m2
+    sw = float(np.sum(w))
+    if sw < 1e-8:
+        return 0.5
+    score = float(np.sum(orient_agree * w) / sw)
+    return float(np.clip(score, 0.0, 1.0))
+
+
+def compute_neighborhood_consistency(
+    matches: List[Dict[str, Any]],
+    k_neighbors: int = 5,
+    sigma_disp: float = 20.0,
+) -> List[Dict[str, float]]:
+    """Compute pre-RANSAC spatial displacement and distance-ratio consistency.
+
+    For each candidate correspondence c_i = (x1, y1) -> (x2, y2), this finds the
+    k nearest candidate points in source image coordinates. Under a coherent
+    geometric transformation (affine/homography), genuine correspondences will
+    share similar displacement vectors and preserve local inter-point distances.
+    Random outliers have erratic displacements that diverge from neighbors.
+
+    Returns a list of dicts with:
+      * 'disp_consistency': normalized displacement error from k nearest neighbors in [0, 1].
+      * 'pairwise_dist_ratio': consistency of target/source distance ratios in [0, 1].
+
+    Guarantees:
+      * Pre-RANSAC only: never uses H_gt, true_reprojection_error_px, or RANSAC inlier flags.
+      * Strictly finite scalar values bounded in [0.0, 1.0].
+      * Deterministic output.
+    """
+    n = len(matches)
+    if n < 4:
+        return [{"disp_consistency": 0.5, "pairwise_dist_ratio": 0.5} for _ in range(n)]
+
+    pts1 = np.array([[float(m.get("source_x", m.get("image1_x", 0.0)) or 0.0),
+                      float(m.get("source_y", m.get("image1_y", 0.0)) or 0.0)] for m in matches], dtype=np.float64)
+    pts2 = np.array([[float(m.get("target_x", m.get("image2_x", 0.0)) or 0.0),
+                      float(m.get("target_y", m.get("image2_y", 0.0)) or 0.0)] for m in matches], dtype=np.float64)
+
+    disps = pts2 - pts1  # (N, 2)
+    diff_s = pts1[:, None, :] - pts1[None, :, :]
+    dist_s = np.linalg.norm(diff_s, axis=2)  # (N, N)
+
+    diff_t = pts2[:, None, :] - pts2[None, :, :]
+    dist_t = np.linalg.norm(diff_t, axis=2)  # (N, N)
+
+    k = min(k_neighbors, n - 1)
+    results: List[Dict[str, float]] = []
+
+    for i in range(n):
+        d_from_i = dist_s[i].copy()
+        d_from_i[i] = np.inf
+        nn_indices = np.argsort(d_from_i)[:k]
+
+        # 1. Displacement consistency with neighbors
+        disp_diffs = disps[nn_indices] - disps[i]
+        disp_errs = np.linalg.norm(disp_diffs, axis=1)
+        mean_disp_err = float(np.mean(disp_errs))
+        disp_c = float(1.0 / (1.0 + mean_disp_err / max(1.0, sigma_disp)))
+
+        # 2. Pairwise distance ratio consistency
+        d_s_nn = dist_s[i, nn_indices]
+        d_t_nn = dist_t[i, nn_indices]
+        valid = d_s_nn > 1e-3
+        if np.any(valid):
+            ratios = d_t_nn[valid] / d_s_nn[valid]
+            med_ratio = np.median(ratios)
+            ratio_dev = float(np.mean(np.abs(ratios - med_ratio)))
+            ratio_c = float(1.0 / (1.0 + ratio_dev))
+        else:
+            ratio_c = 0.5
+
+        results.append({
+            "disp_consistency": float(np.clip(disp_c, 0.0, 1.0)),
+            "pairwise_dist_ratio": float(np.clip(ratio_c, 0.0, 1.0)),
+        })
+
+    return results
 
 
 def _homography_sample_degenerate(src4: np.ndarray, dst4: np.ndarray, min_span_px: float = 2.0) -> bool:
@@ -4084,6 +4266,12 @@ def match_images_cfog(
     for _i, (_rec, _m) in enumerate(zip(refinement_records, selected_matches)):
         _rec.setdefault("match_id", _i)
         _rec["cell"] = _m.get("cell")
+
+    # Attach pre-RANSAC local neighborhood consistency features (zero ground-truth leakage)
+    if len(refinement_records):
+        _neigh_feats = compute_neighborhood_consistency(refinement_records)
+        for _rec, _nf in zip(refinement_records, _neigh_feats):
+            _rec.update(_nf)
 
     # --- PHASE 4: AI MATCH VERIFICATION ---
     # Default: score every candidate with the hand-trained RandomForest (when

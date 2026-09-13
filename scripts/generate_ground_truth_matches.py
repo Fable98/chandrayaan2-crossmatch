@@ -21,10 +21,12 @@ Methodology:
                       scored with the production MI+NCC unified matcher
 4. Sub-pixel Fourier phase correlation + live compute_spatial_quality_score.
 5. Euclidean label vs H_gt:
-     err <= 2.0 px -> human_label True
-     err >= 5.0 px -> human_label False
+     err <= 2.0 px -> ground_truth_label True
+     err >= 5.0 px -> ground_truth_label False
      2–5 px omitted
-6. Writes ML_model/ground_truth_matches.json (label_source=hand).
+6. Writes ML_model/ground_truth_matches.json (label_source=synthetic_geometry).
+   Supervision is synthetic geometric ground truth based on known H_gt reprojection error,
+   not human annotation.
 """
 
 from __future__ import annotations
@@ -46,6 +48,7 @@ from config import SEED
 from matcher_cfog import (
     build_cfog_descriptor_gallery,
     compute_descriptor_match_features,
+    compute_neighborhood_consistency,
     compute_phase_congruency,
     compute_spatial_quality_score,
     detect_salient_keypoints,
@@ -142,6 +145,7 @@ def generate_matches_for_image(
     rng: np.random.Generator,
     domains: Tuple[str, ...] = ("same_sensor", "cross_sensor"),
     scene_sink: List[Dict[str, Any]] | None = None,
+    half_p: int = 8,
 ) -> List[Dict[str, Any]]:
     """Process an image under known transforms in one or more photometric domains.
 
@@ -149,12 +153,17 @@ def generate_matches_for_image(
     appended so a backfill can measure descriptor features at stored coordinates
     without relabelling.
     """
+    image_path = Path(image_path)
     img_gray = cv2.imread(str(image_path), cv2.IMREAD_GRAYSCALE)
     if img_gray is None:
         return []
 
     h, w = img_gray.shape[:2]
     records: List[Dict[str, Any]] = []
+
+    source_image = image_path.name
+    parent_name = image_path.parent.name
+    region = parent_name if parent_name.startswith("region_") else None
 
     domain_specs = {
         "same_sensor": {"multimodal": False, "n_transforms": 2, "jitter": 8.0, "search_rad": 20, "true_px": 2.0, "false_px": 5.0, "n_forced_false": 4},
@@ -164,12 +173,13 @@ def generate_matches_for_image(
     pc1 = compute_phase_congruency(img_gray, num_orientations=4, num_scales=3)
     kps_raw = detect_salient_keypoints(pc1, max_corners=300, quality_level=0.008)
     kps_ssc = suppression_via_square_covering(kps_raw, num_ret_points=60, tolerance=0.12, cols=w, rows=h)
-    half_p = 8
+    half_p = int(half_p)
 
     for domain in domains:
         spec = domain_specs[domain]
         multimodal = bool(spec["multimodal"])
         for _t_idx in range(int(spec["n_transforms"])):
+            target_image = f"{image_path.stem}_{domain}_t{_t_idx}.png"
             H_gt = create_random_homography(w, h, rng)
             warped = cv2.warpPerspective(
                 img_gray, H_gt, (w, h), flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT
@@ -185,20 +195,23 @@ def generate_matches_for_image(
             if scene_sink is not None:
                 scene_sink.append({
                     "domain": domain, "pc1": pc1, "pc2": pc2, "gallery": tgt_gallery,
+                    "H_gt": H_gt, "target_image": target_image, "source_image": source_image, "region": region,
                 })
             search_rad = int(spec["search_rad"])
             jitter = float(spec["jitter"])
 
+            transform_records: List[Dict[str, Any]] = []
             for item in kps_ssc:
                 rec = _match_one_keypoint(
                     kx=float(item[0]), ky=float(item[1]),
                     pc1=pc1, pc2=pc2, tgt_gallery=tgt_gallery, H_gt=H_gt, w=w, h=h,
                     half_p=half_p, search_rad=search_rad, jitter=jitter,
                     multimodal=multimodal, rng=rng, domain=domain,
+                    source_image=source_image, target_image=target_image, region=region,
                     true_px=float(spec["true_px"]), false_px=float(spec["false_px"]),
                 )
                 if rec is not None:
-                    records.append(rec)
+                    transform_records.append(rec)
 
             # Explicit random mismatches so the false class is not only
             # "search failed" — measured live features, known-wrong geometry.
@@ -208,10 +221,17 @@ def generate_matches_for_image(
                     kx=float(item[0]), ky=float(item[1]),
                     pc1=pc1, pc2=pc2, tgt_gallery=tgt_gallery, H_gt=H_gt, w=w, h=h,
                     half_p=half_p, multimodal=multimodal, rng=rng, domain=domain,
+                    source_image=source_image, target_image=target_image, region=region,
                     true_px=float(spec["true_px"]), false_px=float(spec["false_px"]),
                 )
                 if rec is not None:
-                    records.append(rec)
+                    transform_records.append(rec)
+
+            if transform_records:
+                neigh_feats = compute_neighborhood_consistency(transform_records)
+                for r, nf in zip(transform_records, neigh_feats):
+                    r.update(nf)
+            records.extend(transform_records)
 
     return records
 
@@ -220,6 +240,7 @@ def _match_one_keypoint(
     *,
     kx: float, ky: float, pc1, pc2, tgt_gallery, H_gt, w, h, half_p, search_rad, jitter,
     multimodal: bool, rng: np.random.Generator, domain: str,
+    source_image: str, target_image: str, region: str | None,
     true_px: float, false_px: float,
 ) -> Dict[str, Any] | None:
     cx, cy = int(round(kx)), int(round(ky))
@@ -248,6 +269,7 @@ def _match_one_keypoint(
     return _finalize_record(
         kx, ky, found_x, found_y, tmpl, pc1, pc2, tgt_gallery, w, h, half_p,
         gt_x, gt_y, score, peak_uniq, domain, multimodal,
+        source_image=source_image, target_image=target_image, region=region,
         true_px=true_px, false_px=false_px,
     )
 
@@ -256,6 +278,7 @@ def _random_false_match(
     *,
     kx: float, ky: float, pc1, pc2, tgt_gallery, H_gt, w, h, half_p,
     multimodal: bool, rng: np.random.Generator, domain: str,
+    source_image: str, target_image: str, region: str | None,
     true_px: float, false_px: float,
 ) -> Dict[str, Any] | None:
     cx, cy = int(round(kx)), int(round(ky))
@@ -286,9 +309,10 @@ def _random_false_match(
     rec = _finalize_record(
         kx, ky, found_x, found_y, tmpl, pc1, pc2, tgt_gallery, w, h, half_p,
         gt_x, gt_y, score, peak_uniq, domain, multimodal,
+        source_image=source_image, target_image=target_image, region=region,
         true_px=true_px, false_px=false_px,
     )
-    if rec is None or rec["human_label"] is True:
+    if rec is None or rec["ground_truth_label"] is True:
         return None
     rec["forced_mismatch"] = True
     return rec
@@ -297,6 +321,7 @@ def _random_false_match(
 def _finalize_record(
     kx, ky, found_x, found_y, tmpl, pc1, pc2, tgt_gallery, w, h, half_p,
     gt_x, gt_y, score, peak_uniq, domain, multimodal,
+    source_image: str, target_image: str, region: str | None,
     true_px: float = 2.0, false_px: float = 5.0,
 ) -> Dict[str, Any] | None:
     ref_dx, ref_dy = 0.0, 0.0
@@ -329,6 +354,11 @@ def _finalize_record(
         tgt_gallery=tgt_gallery,
     )
     return {
+        "source_image": str(source_image),
+        "target_image": str(target_image),
+        "region": str(region) if region is not None else None,
+        "domain": domain,
+        "multimodal_pair": bool(multimodal),
         "source_x": float(kx),
         "source_y": float(ky),
         "target_x": float(found_x),
@@ -339,10 +369,8 @@ def _finalize_record(
         "spatial_quality_score": float(spatial_quality),
         "is_refined": bool(refined),
         "true_reprojection_error_px": float(round(true_err, 3)),
-        "human_label": bool(label),
-        "label_source": "hand",
-        "domain": domain,
-        "multimodal_pair": bool(multimodal),
+        "ground_truth_label": bool(label),
+        "label_source": "synthetic_geometry",
         **desc,
     }
 
@@ -370,10 +398,10 @@ def main():
         all_records.extend(recs)
         logger.info("  -> Generated %d labeled correspondences so far.", len(all_records))
 
-    true_count = sum(1 for r in all_records if r["human_label"])
-    false_count = sum(1 for r in all_records if not r["human_label"])
-    xs_true = [r["confidence"] for r in all_records if r.get("domain") == "cross_sensor" and r["human_label"]]
-    xs_false = [r["confidence"] for r in all_records if r.get("domain") == "cross_sensor" and not r["human_label"]]
+    true_count = sum(1 for r in all_records if r["ground_truth_label"])
+    false_count = sum(1 for r in all_records if not r["ground_truth_label"])
+    xs_true = [r["confidence"] for r in all_records if r.get("domain") == "cross_sensor" and r["ground_truth_label"]]
+    xs_false = [r["confidence"] for r in all_records if r.get("domain") == "cross_sensor" and not r["ground_truth_label"]]
     logger.info("Generation complete: Total=%d, True=%d (%.1f%%), False=%d (%.1f%%)",
                 len(all_records), true_count, 100.0 * true_count / max(1, len(all_records)),
                 false_count, 100.0 * false_count / max(1, len(all_records)))

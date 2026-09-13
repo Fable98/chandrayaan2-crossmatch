@@ -6,7 +6,7 @@ import logging
 logger = logging.getLogger("ML_model.ai_verifier")
 
 # Must match train_ai_verifier.FEATURE_NAMES and the saved bundle's feature order.
-FEATURE_NAMES = [
+BASE_FEATURE_NAMES = [
     "confidence",
     "refinement_dx",
     "refinement_dy",
@@ -17,6 +17,13 @@ FEATURE_NAMES = [
     "nn_ratio",
     "scale_diff",
 ]
+
+NEW_STRUCTURAL_FEATURE_NAMES = [
+    "disp_consistency",
+    "pairwise_dist_ratio",
+]
+
+FEATURE_NAMES = list(BASE_FEATURE_NAMES) + list(NEW_STRUCTURAL_FEATURE_NAMES)
 DEFAULT_MODEL_PATH = Path(__file__).resolve().parent / "ai_verifier_model.pkl"
 
 _GIT_LFS_PREAMBLE = b"version https://git-lfs"
@@ -41,8 +48,8 @@ class AIMatchVerifier:
     """
     Phase 4: AI Match Verification.
 
-    Loads a hand-trained RandomForest bundle (``label_source=hand``) when
-    present. Predicted inlier probabilities weight Phase 7 RANSAC. A hard
+    Loads a verified RandomForest bundle (``label_source=synthetic_geometry`` or ``hand``)
+    when present. Predicted inlier probabilities weight Phase 7 RANSAC. A hard
     pre-RANSAC veto remains opt-in (``experimental_stack=True``) because it
     rejected true low-MI OHRC↔TMC matches when NCC/MI confidence barely
     separated classes. RANSAC-labelled bundles are refused at load time
@@ -76,8 +83,9 @@ class AIMatchVerifier:
             loaded = joblib.load(path)
             # train_ai_verifier saves {"model": clf, "feature_names": [...], ...}
             if isinstance(loaded, dict) and "model" in loaded:
-                if loaded.get("label_source") not in ("hand", "hand_labelled"):
-                    logger.warning("Model bundle label_source=%r is not hand-labelled; refusing to load "
+                if loaded.get("label_source") not in ("synthetic_geometry", "hand", "hand_labelled"):
+                    logger.warning("Model bundle label_source=%r is not verified ground truth "
+                                   "(synthetic_geometry or hand); refusing to load "
                                    "(RANSAC-derived bundles are circular).",
                                    loaded.get("label_source"))
                     return False
@@ -113,6 +121,16 @@ class AIMatchVerifier:
         names = [n for n in list(self.feature_names or FEATURE_NAMES) if n in FEATURE_NAMES]
         if not names:
             names = list(FEATURE_NAMES)
+
+        # Pre-compute neighborhood consistency if requested and missing from records
+        needs_neigh = any(k in names for k in NEW_STRUCTURAL_FEATURE_NAMES)
+        if needs_neigh and matches and not all("disp_consistency" in m for m in matches):
+            from matcher_cfog import compute_neighborhood_consistency
+            nfs = compute_neighborhood_consistency(matches)
+            for m, nf in zip(matches, nfs):
+                m.setdefault("disp_consistency", nf["disp_consistency"])
+                m.setdefault("pairwise_dist_ratio", nf["pairwise_dist_ratio"])
+
         features = []
         for m in matches:
             conf = float(m.get("confidence", m.get("score", 0.0)))
@@ -136,6 +154,8 @@ class AIMatchVerifier:
                 "pc_energy_tgt": float(m.get("pc_energy_tgt", 0.0) or 0.0),
                 "nn_ratio": float(m.get("nn_ratio", 1.0) if m.get("nn_ratio") is not None else 1.0),
                 "scale_diff": float(m.get("scale_diff", 0.0) or 0.0),
+                "disp_consistency": float(m.get("disp_consistency", 0.5) if m.get("disp_consistency") is not None else 0.5),
+                "pairwise_dist_ratio": float(m.get("pairwise_dist_ratio", 0.5) if m.get("pairwise_dist_ratio") is not None else 0.5),
             }
             features.append([vec[n] for n in names])
         return np.array(features, dtype=np.float64)

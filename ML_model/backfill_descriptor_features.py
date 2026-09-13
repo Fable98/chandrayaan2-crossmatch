@@ -55,7 +55,7 @@ def _row_key(rec: dict, nd: int = 4) -> tuple:
         round(float(rec.get("target_x", 0.0)), nd),
         round(float(rec.get("target_y", 0.0)), nd),
         rec.get("domain"),
-        bool(rec.get("human_label")),
+        bool(rec.get("ground_truth_label", rec.get("human_label"))),
     )
 
 
