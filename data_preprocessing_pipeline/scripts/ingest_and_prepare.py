@@ -13,18 +13,27 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import gc
 import json
 import logging
+import math
+import os
 import shutil
 import sys
 import zipfile
 from pathlib import Path
 
+# Cap GDAL's block cache BEFORE rasterio is imported. Default is ~5% of host
+# RAM (over 800MB on a 17GB machine, measured as phantom peak RSS); on a
+# small host every megabyte counts and our reads are already striped/windowed
+# (contiguous, non-overlapping), so a small cache loses nothing.
+os.environ.setdefault("GDAL_CACHEMAX", "32")
+
 import cv2
 import numpy as np
 import rasterio
 from rasterio.crs import CRS
-from rasterio.transform import from_bounds
+from rasterio.transform import Affine, from_bounds
 from rasterio.warp import reproject, Resampling
 from rasterio.windows import Window
 from rasterio.windows import from_bounds as win_from_bounds
@@ -218,6 +227,64 @@ def _reproject_onto_grid(
     return dst[0]
 
 
+# Peak-RSS guards: the OHRC frame is 12000x93693 (~1.1GB uint8) and GDAL
+# buffers near the full input on decimated reads, so unbounded reads OOM-kill
+# small hosts (measured 6.6GB peak). All raster input goes through
+# _read_window_bounded, which keeps peak input buffering ~64MB.
+_READ_WINDOW_LONG_SIDE_CAP = 1024
+_STRIPE_BYTES = 64 * 1024 * 1024
+
+
+def _read_window_bounded(src_rasterio, window: Window, band: int = 1, src_transform=None):
+    """Read a rasterio window with bounded peak memory.
+
+    Small windows read natively (bit-identical to a direct read). Huge
+    windows are read in row stripes decimated to a <=1024px intermediate, so
+    peak input buffering stays ~64MB regardless of window size.
+
+    *src_transform* is the footprint-derived transform of the open dataset
+    (PDS4 rasters carry no geotransform of their own, so the dataset's native
+    transform must NOT be used); defaults to the dataset transform.
+
+    Returns (array in native dtype, affine transform of the returned array).
+    """
+    c_off, r_off = int(window.col_off), int(window.row_off)
+    c_w, r_h = max(1, int(window.width)), max(1, int(window.height))
+    itemsize = np.dtype(src_rasterio.dtypes[band - 1]).itemsize
+    scale = min(1.0, _READ_WINDOW_LONG_SIDE_CAP / max(c_w, r_h))
+    out_w = max(1, int(round(c_w * scale)))
+    out_h = max(1, int(round(r_h * scale)))
+    if src_transform is None:
+        src_transform = src_rasterio.transform
+    base_tf = rasterio.windows.transform(Window(c_off, r_off, c_w, r_h), src_transform)
+    if c_w * r_h * itemsize <= _STRIPE_BYTES and scale >= 1.0:
+        return src_rasterio.read(band, window=Window(c_off, r_off, c_w, r_h)), base_tf
+
+    n = max(1, int(math.ceil(c_w * r_h * itemsize / _STRIPE_BYTES)))
+    splits = np.linspace(0, r_h, n + 1).astype(int)
+    parts: list[np.ndarray] = []
+    for i in range(n):
+        s0, s1 = int(splits[i]), int(splits[i + 1])
+        if s1 <= s0:
+            continue
+        oh0 = int(round(s0 / r_h * out_h))
+        oh1 = int(round(s1 / r_h * out_h))
+        if oh1 <= oh0:
+            oh1 = oh0 + 1
+        sub = Window(c_off, r_off + s0, c_w, s1 - s0)
+        parts.append(
+            src_rasterio.read(
+                band, window=sub, out_shape=(oh1 - oh0, out_w),
+                resampling=Resampling.bilinear,
+            )
+        )
+    arr = np.vstack(parts)
+    if arr.shape != (out_h, out_w):
+        arr = cv2.resize(arr, (out_w, out_h), interpolation=cv2.INTER_AREA)
+    win_tf = base_tf * Affine.scale(c_w / out_w, r_h / out_h)
+    return arr, win_tf
+
+
 def _crop_and_reproject(
     src_rasterio,
     src_transform,
@@ -226,16 +293,85 @@ def _crop_and_reproject(
     size: int = 512,
     pad: int = 10,
 ) -> np.ndarray:
-    """Windowed read + reproject for TMC / OHRC rasters."""
+    """Windowed read + reproject for TMC / OHRC rasters (memory-bounded)."""
     win = win_from_bounds(*dst_bounds, transform=src_transform)
     c_off = max(0, int(win.col_off) - pad)
     r_off = max(0, int(win.row_off) - pad)
     c_w = min(src_rasterio.width - c_off, int(win.width) + 2 * pad)
     r_h = min(src_rasterio.height - r_off, int(win.height) + 2 * pad)
     read_win = Window(c_off, r_off, max(1, c_w), max(1, r_h))
-    crop = src_rasterio.read(1, window=read_win).astype(np.float32)
-    win_tf = rasterio.windows.transform(read_win, src_transform)
-    return _reproject_onto_grid(crop, win_tf, dst_transform, size)
+    crop, win_tf = _read_window_bounded(src_rasterio, read_win, src_transform=src_transform)
+    return _reproject_onto_grid(crop.astype(np.float32), win_tf, dst_transform, size)
+
+
+def _large_aoi_lonlat(o_meta, t_meta, i_meta) -> tuple[float, float, float, float]:
+    """Expanded large-AOI lon/lat box: shared IIRS-TMC longitude overlap and
+    ~20 km latitude span centered on the OHRC footprint center.
+
+    Returns (large_w, large_e, large_s, large_n). Pure metadata math, no I/O.
+    Single source of truth shared by the IIRS window computation and
+    _generate_large_aoi so the window always covers the destination grid.
+    """
+    full_s, full_n = o_meta.footprint["south_lat"], o_meta.footprint["north_lat"]
+
+    t_fp = t_meta.footprint
+    i_fp = i_meta.footprint
+    large_w = max(i_fp["west_lon"], t_fp["west_lon"])
+    large_e = min(i_fp["east_lon"], t_fp["east_lon"])
+
+    # Moon: 1 deg lat ~ 30.3 km -> +-0.33 deg ~= 20 km total.
+    lat_half_span = 0.33
+    center_lat = (full_s + full_n) / 2.0
+    return (large_w, large_e, center_lat - lat_half_span, center_lat + lat_half_span)
+
+
+def iirs_window_for_lonlat(
+    i_fp: dict,
+    need: tuple[float, float, float, float],
+    width: int,
+    height: int,
+    pad: int = 8,
+) -> tuple[Window, tuple[float, float, float, float]]:
+    """Pixel window of an IIRS raster covering lon/lat box *need* = (w, s, e, n).
+
+    Uses the same north-up linear footprint mapping the pipeline assumes when
+    it builds ``from_bounds`` transforms over PDS4 footprints (row 0 = north),
+    so a windowed read is bit-identical to a full read cropped afterwards —
+    but ~100x smaller in memory (the full 250x5574x256 cube is ~1.4GB float32
+    and OOM-kills small hosts).
+
+    Returns (rasterio Window, (win_w, win_s, win_e, win_n) lon/lat of the window).
+    Raises ValueError if *need* does not intersect the IIRS footprint.
+    """
+    i_w, i_e = i_fp["west_lon"], i_fp["east_lon"]
+    i_s, i_n = i_fp["south_lat"], i_fp["north_lat"]
+    span_lon = i_e - i_w
+    span_lat = i_n - i_s
+    if not (span_lon > 0 and span_lat > 0 and width > 0 and height > 0):
+        raise ValueError(f"Degenerate IIRS footprint/dims: {i_fp}, {width}x{height}")
+
+    ws, ss, es, ns = need
+    # Intersect first: reprojecting outside the source is meaningless.
+    ws, es = max(ws, i_w), min(es, i_e)
+    ss, ns = max(ss, i_s), min(ns, i_n)
+    if not (es > ws and ns > ss):
+        raise ValueError(
+            f"Requested box {(need)} does not intersect IIRS footprint "
+            f"[{i_w}, {i_s}, {i_e}, {i_n}]"
+        )
+
+    c0 = max(0, int((ws - i_w) / span_lon * width) - pad)
+    c1 = min(width, int((es - i_w) / span_lon * width) + pad + 1)
+    r0 = max(0, int((i_n - ns) / span_lat * height) - pad)
+    r1 = min(height, int((i_n - ss) / span_lat * height) + pad + 1)
+    if c1 <= c0 or r1 <= r0:
+        raise ValueError(f"Empty IIRS window for box {(need)}")
+
+    win_w = i_w + c0 / width * span_lon
+    win_e = i_w + c1 / width * span_lon
+    win_n = i_n - r0 / height * span_lat
+    win_s = i_n - r1 / height * span_lat
+    return Window(c0, r0, c1 - c0, r1 - r0), (win_w, win_s, win_e, win_n)
 
 
 def _write_geotiff(path: Path, data_u8: np.ndarray, transform, crs=None):
@@ -295,23 +431,47 @@ def process_single_triplet(
     txs, tys = to_eqc.transform([t_w, t_e, t_e, t_w], [t_s, t_s, t_n, t_n])
     t_bounds = (min(txs), min(tys), max(txs), max(tys))
 
-    # -- IIRS PCA reduction --
+    # -- IIRS PCA reduction (WINDOWED read) --
+    # The full 250x5574x256 uint16 cube is ~0.7GB on disk / ~1.4GB float32
+    # (+PCA temporaries) and OOM-kills small hosts. Only the pixels covering
+    # this region (large-AOI box when enabled, else the OHRC footprint) are
+    # read; PCA then runs on the window. Result is identical to full-read +
+    # crop under the pipeline's north-up linear footprint mapping.
     LOG.info("  Loading IIRS PCA reduction for %s ...", region_id)
-    i_arr, _, _ = open_raster(iirs_xml)
-    i_reduced = iirs_reduce(i_arr, mode="pca", n_components=1)[0]
-
     i_fp = i_meta.footprint
-    i_w, i_e = i_fp["west_lon"], i_fp["east_lon"]
-    i_s, i_n = i_fp["south_lat"], i_fp["north_lat"]
-    ixs, iys = to_eqc.transform([i_w, i_e, i_e, i_w], [i_s, i_s, i_n, i_n])
+    if do_large_aoi:
+        _lw, _le, _ls, _ln = _large_aoi_lonlat(o_meta, t_meta, i_meta)
+        need_box = (_lw, _ls, _le, _ln)
+    else:
+        need_box = (o_w, o_s, o_e, o_n)
+    with rasterio.open(iirs_xml) as i_src:
+        i_win, (ww, ws, we, wn) = iirs_window_for_lonlat(
+            i_fp, need_box, i_src.width, i_src.height
+        )
+        LOG.info(
+            "  IIRS window: %dx%d px (of %dx%d), lon [%.4f, %.4f], lat [%.4f, %.4f]",
+            int(i_win.width), int(i_win.height), i_src.width, i_src.height,
+            ww, we, ws, wn,
+        )
+        i_arr = i_src.read(window=i_win).astype(np.float32)
+    # in_place: i_arr is single-use (deleted below); centers without a copy.
+    i_reduced = iirs_reduce(i_arr, mode="pca", n_components=1, in_place=True)[0]
+    del i_arr
+    gc.collect()
+
+    ixs, iys = to_eqc.transform([ww, we, we, ww], [ws, ws, wn, wn])
     i_bounds = (min(ixs), min(iys), max(ixs), max(iys))
     i_tf = from_bounds(*i_bounds, i_reduced.shape[1], i_reduced.shape[0])
 
-    # -- Process OHRC --
+    # -- Process OHRC (memory-bounded full-frame decimation) --
     with rasterio.open(ohrc_xml) as src:
-        ohrc_raw = src.read(
-            1, out_shape=(tile_size, tile_size), resampling=Resampling.bilinear
-        ).astype(np.float32)
+        ohrc_mid, _ = _read_window_bounded(src, Window(0, 0, src.width, src.height))
+        if ohrc_mid.shape != (tile_size, tile_size):
+            ohrc_mid = cv2.resize(
+                ohrc_mid, (tile_size, tile_size), interpolation=cv2.INTER_AREA
+            )
+        ohrc_raw = ohrc_mid.astype(np.float32)
+        del ohrc_mid
 
     # -- Process TMC --
     with rasterio.open(tmc_xml) as src:
@@ -446,19 +606,9 @@ def _generate_large_aoi(
     txs, tys = to_eqc.transform([t_w, t_e, t_e, t_w], [t_s, t_s, t_n, t_n])
     t_bounds = (min(txs), min(tys), max(txs), max(tys))
 
-    i_fp = i_meta.footprint
-    i_w, i_e = i_fp["west_lon"], i_fp["east_lon"]
-
-    # Shared IIRS-TMC longitude overlap
-    large_w = max(i_w, t_w)
-    large_e = min(i_e, t_e)
-
-    # ~20 km latitude span centered on OHRC footprint center
-    # Moon: 1 deg lat ~ 30.3 km
-    lat_half_span = 0.33  # ~20 km total
-    center_lat = (full_s + full_n) / 2.0
-    large_s = center_lat - lat_half_span
-    large_n = center_lat + lat_half_span
+    # Shared large-AOI box (same helper the IIRS window uses, so the
+    # windowed source always covers this destination grid).
+    large_w, large_e, large_s, large_n = _large_aoi_lonlat(o_meta, t_meta, i_meta)
 
     eqc_xs, eqc_ys = to_eqc.transform(
         [large_w, large_e, large_e, large_w],

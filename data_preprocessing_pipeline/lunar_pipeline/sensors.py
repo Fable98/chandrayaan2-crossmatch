@@ -20,20 +20,32 @@ def destripe_pushbroom(arr: np.ndarray) -> np.ndarray:
     return out.astype(np.float32)
 
 
-def iirs_reduce(arr: np.ndarray, mode: str = "pca", n_components: int = 1, band_index: int = 0) -> np.ndarray:
+def iirs_reduce(
+    arr: np.ndarray,
+    mode: str = "pca",
+    n_components: int = 1,
+    band_index: int = 0,
+    in_place: bool = False,
+) -> np.ndarray:
     if arr.shape[0] == 1:
         return arr
     if mode == "band":
         idx = min(max(band_index, 0), arr.shape[0] - 1)
         return arr[idx : idx + 1]
-    return _pca_bands(arr, max(1, n_components))
+    return _pca_bands(arr, max(1, n_components), in_place=in_place)
 
 
-def _pca_bands(arr: np.ndarray, n_components: int) -> np.ndarray:
+def _pca_bands(arr: np.ndarray, n_components: int, in_place: bool = False) -> np.ndarray:
     bands, h, w = arr.shape
     x = arr.reshape(bands, -1)
     mean = x.mean(axis=1, keepdims=True)
-    xc = x - mean
+    if in_place:
+        # Center the caller's buffer directly: skips a full-size (~66MB for an
+        # IIRS window) temporary. Only pass True for single-use buffers.
+        x -= mean
+        xc = x
+    else:
+        xc = x - mean
     cov = np.cov(xc)
     eigvals, eigvecs = np.linalg.eigh(cov)
     order = np.argsort(eigvals)[::-1]
