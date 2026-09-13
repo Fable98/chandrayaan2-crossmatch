@@ -1,9 +1,27 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { API_BASE, imageUrl } from "@/lib/api";
-import LunarGlobe from "@/components/hero/LunarGlobe";
+import { API_BASE, api, imageUrl } from "@/lib/api";
+import LunarGlobe, { type LunarFootprint } from "@/components/hero/LunarGlobe";
 import type { MoonPoint, MoonPointsResponse } from "@/lib/backend-types";
+import { footprintSizeKm } from "@/lib/geo";
+
+// True selenographic bounds (planetocentric, deg) from
+// data_preprocessing_pipeline/processed_triplets/*/manifest.json. Used as the
+// offline fallback so region footprints render even when /triplets is down;
+// live bounds from GET /triplets replace these when available.
+const FALLBACK_FOOTPRINTS: LunarFootprint[] = [
+  { id: "region_001", west_lon: 336.484646, east_lon: 336.589455, south_lat: -3.3748612, north_lat: -3.2487328 },
+  { id: "region_002", west_lon: 336.484646, east_lon: 336.589455, south_lat: -3.20669, north_lat: -3.0805616 },
+  { id: "region_003", west_lon: 336.484646, east_lon: 336.589455, south_lat: -3.0385188, north_lat: -2.9123904 },
+  { id: "region_004", west_lon: 336.484646, east_lon: 336.589455, south_lat: -2.8703476, north_lat: -2.7442192 },
+  { id: "region_005", west_lon: 234.396774, east_lon: 234.528638, south_lat: 4.86317335, north_lat: 5.0672006 },
+  { id: "region_006", west_lon: 234.396774, east_lon: 234.528638, south_lat: 5.1488115, north_lat: 5.35283875 },
+];
+
+function to180(lon: number): number {
+  return ((((lon + 180) % 360) + 360) % 360) - 180;
+}
 
 type Sensor = "OHRC" | "TMC" | "IIRS" | "LRO_NAC";
 
@@ -564,6 +582,33 @@ export default function RegistrationLauncher() {
   const [resultView, setResultView] = useState<"2d" | "3d">("2d");
   const [moonPoints, setMoonPoints] = useState<MoonPoint[]>([]);
   const [moonPointsLoading, setMoonPointsLoading] = useState(false);
+  const [footprints, setFootprints] = useState<LunarFootprint[]>(FALLBACK_FOOTPRINTS);
+
+  // Live region bounds for the 3D globe footprints (true coordinates).
+  useEffect(() => {
+    let active = true;
+    api
+      .listTriplets()
+      .then((data) => {
+        if (!active) return;
+        const live: LunarFootprint[] = (data.triplets || [])
+          .filter((t) => t?.bounds && /^region_\d+$/i.test(t.id))
+          .map((t) => ({
+            id: t.id,
+            west_lon: t.bounds.west_lon,
+            east_lon: t.bounds.east_lon,
+            south_lat: t.bounds.south_lat,
+            north_lat: t.bounds.north_lat,
+          }));
+        if (live.length > 0) setFootprints(live);
+      })
+      .catch(() => {
+        // Offline: keep FALLBACK_FOOTPRINTS (real manifest coordinates).
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const jobId = result?.job_id;
@@ -846,6 +891,27 @@ export default function RegistrationLauncher() {
 
   const isFailedRegistration =
     ((result && result.status !== "success" && !isIIRSPair) || (customMode && !!error && !isIIRSPair)) as boolean;
+
+  // Active 3D region: match job_id (e.g. "region_001") against footprint ids.
+  const activeFootprintId =
+    footprints.find((f) => f.id === result?.job_id)?.id ??
+    (result?.job_id && /^region_\d+$/i.test(result.job_id) ? result.job_id : footprints[0]?.id ?? null);
+  const activeFootprint = footprints.find((f) => f.id === activeFootprintId) ?? null;
+  const activeCenter = activeFootprint
+    ? {
+        lat: (activeFootprint.south_lat + activeFootprint.north_lat) / 2,
+        lon360: (activeFootprint.west_lon + activeFootprint.east_lon) / 2,
+      }
+    : null;
+  const activeSize =
+    activeFootprint != null
+      ? footprintSizeKm({
+          west_lon: activeFootprint.west_lon,
+          east_lon: activeFootprint.east_lon,
+          south_lat: activeFootprint.south_lat,
+          north_lat: activeFootprint.north_lat,
+        })
+      : null;
 
   return (
     <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm md:p-6">
@@ -1491,31 +1557,83 @@ export default function RegistrationLauncher() {
               />
             </div>
           ) : (
-            /* 3D Lunar Globe View */
-            <div className="relative h-[480px] w-full overflow-hidden rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-950 via-[#0a0f1d] to-slate-950 shadow-inner">
-              <LunarGlobe
-                tiePoints={moonPoints}
-                className="absolute inset-0 h-full w-full cursor-grab active:cursor-grabbing"
-              />
-              {/* Globe Overlay HUD */}
-              <div className="pointer-events-none absolute left-4 top-4 z-20 flex flex-col gap-1.5">
-                <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-slate-900/85 px-3 py-1.5 shadow backdrop-blur">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span className="text-xs font-mono font-bold text-slate-200">
-                    {moonPointsLoading
-                      ? "Fetching 3D coordinates..."
-                      : `${moonPoints.filter((p) => p.georeferenced).length} Georeferenced Lunar Coordinates`}
-                  </span>
+            /* 3D Lunar Globe View — real LROC texture, true-coordinate footprints,
+               generous bottom coordinate readout (never crops the limb). */
+            <div className="relative flex h-[640px] w-full flex-col overflow-hidden rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-950 via-[#0a0f1d] to-slate-950 shadow-inner">
+              <div className="relative w-full flex-1">
+                <LunarGlobe
+                  tiePoints={moonPoints}
+                  footprints={footprints}
+                  activeFootprintId={activeFootprintId}
+                  phase="full"
+                  className="absolute inset-0 h-full w-full cursor-grab active:cursor-grabbing"
+                />
+                {/* Globe Overlay HUD */}
+                <div className="pointer-events-none absolute left-4 top-4 z-20 flex flex-col gap-1.5">
+                  <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-slate-900/85 px-3 py-1.5 shadow backdrop-blur">
+                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-xs font-mono font-bold text-slate-200">
+                      {moonPointsLoading
+                        ? "Fetching 3D coordinates..."
+                        : `${moonPoints.filter((p) => p.georeferenced).length} Georeferenced Lunar Coordinates`}
+                    </span>
+                  </div>
+                  {result?.job_id && (
+                    <span className="text-[10px] font-mono text-slate-400">
+                      Region/Job: {result.job_id}
+                      {activeFootprint ? ` · ${footprints.length} regions plotted` : ""}
+                    </span>
+                  )}
                 </div>
-                {result?.job_id && (
-                  <span className="text-[10px] font-mono text-slate-400">
-                    Region/Job: {result.job_id}
-                  </span>
-                )}
+
+                <div className="pointer-events-none absolute bottom-3 right-4 z-20 rounded-lg border border-white/10 bg-slate-900/85 px-3 py-1.5 text-[11px] font-medium text-slate-300 backdrop-blur">
+                  Spherical Projection · True Lunar Coordinate Mapping
+                </div>
               </div>
 
-              <div className="pointer-events-none absolute bottom-4 right-4 z-20 rounded-lg border border-white/10 bg-slate-900/85 px-3 py-1.5 text-[11px] font-medium text-slate-300 backdrop-blur">
-                Spherical Projection · True Lunar Coordinate Mapping
+              {/* Bottom coordinate readout — real selenographic numbers + space
+                  below the limb so the globe never touches the panel edge. */}
+              <div className="z-20 grid grid-cols-2 gap-3 border-t border-white/10 bg-slate-950/90 px-4 py-4 backdrop-blur sm:grid-cols-4">
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Active region</p>
+                  <p className="mt-1 font-mono text-xs font-bold text-amber-300">
+                    {activeFootprint?.id ?? result?.job_id ?? "—"}
+                  </p>
+                  <p className="font-mono text-[10px] text-slate-500">
+                    {footprints.length} validated footprints
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Centre (lat, lon)</p>
+                  <p className="mt-1 font-mono text-xs font-bold text-slate-100">
+                    {activeCenter ? `${activeCenter.lat.toFixed(4)}°, ${to180(activeCenter.lon360).toFixed(4)}°` : "—"}
+                  </p>
+                  <p className="font-mono text-[10px] text-slate-500">
+                    {activeCenter ? `lon 0–360: ${(((activeCenter.lon360 % 360) + 360) % 360).toFixed(4)}°` : "planetocentric"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Bounds W/E/S/N</p>
+                  <p className="mt-1 font-mono text-[11px] font-bold text-slate-100">
+                    {activeFootprint
+                      ? `${activeFootprint.west_lon.toFixed(3)} / ${activeFootprint.east_lon.toFixed(3)}`
+                      : "—"}
+                  </p>
+                  <p className="font-mono text-[10px] text-slate-500">
+                    {activeFootprint
+                      ? `${activeFootprint.south_lat.toFixed(4)} / ${activeFootprint.north_lat.toFixed(4)}`
+                      : "deg"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Footprint · tie-points</p>
+                  <p className="mt-1 font-mono text-xs font-bold text-slate-100">
+                    {activeSize ? `${activeSize.widthKm.toFixed(2)} × ${activeSize.heightKm.toFixed(2)} km` : "—"}
+                  </p>
+                  <p className="font-mono text-[10px] text-slate-500">
+                    {moonPoints.filter((p) => p.georeferenced).length} georeferenced · drag to rotate
+                  </p>
+                </div>
               </div>
             </div>
           )}
