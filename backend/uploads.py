@@ -37,6 +37,26 @@ def max_upload_bytes() -> int:
         return 20 * 1024 * 1024
 
 
+def max_ingest_file_bytes() -> int:
+    """Per-file cap in bytes for PRADAN ingest zips (env MAX_INGEST_FILE_MB)."""
+    try:
+        from config import settings  # type: ignore[import-not-found]
+
+        return int(getattr(settings, "MAX_INGEST_FILE_MB", 1024)) * 1024 * 1024
+    except Exception:
+        return 1024 * 1024 * 1024
+
+
+def max_ingest_total_bytes() -> int:
+    """Total batch cap in bytes for one ingest upload (env MAX_INGEST_TOTAL_MB)."""
+    try:
+        from config import settings  # type: ignore[import-not-found]
+
+        return int(getattr(settings, "MAX_INGEST_TOTAL_MB", 3072)) * 1024 * 1024
+    except Exception:
+        return 3072 * 1024 * 1024
+
+
 def sanitize_upload_filename(filename: Optional[str], allowed: Iterable[str] = ALLOWED_UPLOAD_EXTENSIONS) -> str:
     """Return a safe basename or raise 400/415. Never returns a path."""
     if not filename or not filename.strip():

@@ -47,7 +47,17 @@ export default function IngestPage() {
   const [historyJobs, setHistoryJobs] = useState<IngestJobSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const pollRef = useRef<number | null>(null);
+
+  // Backend 401 details for a dead/rotated JWT ("Invalid or expired token",
+  // "Authentication required", "User not found"). A stale localStorage token
+  // must never leave the operator on a dead-end error banner.
+  function isAuthError(msg: string): boolean {
+    return /invalid or expired token|authentication required|user not found|not authenticated|\b401\b/i.test(
+      msg || ""
+    );
+  }
 
   // Shell & Navigation State
   const [triplets, setTriplets] = useState<TripletSummary[]>([]);
@@ -149,6 +159,7 @@ export default function IngestPage() {
     setJobId(null);
     setStatus(null);
     setError(null);
+    setSessionExpired(false);
     setResultTriplets([]);
   }, []);
 
@@ -158,13 +169,24 @@ export default function IngestPage() {
 
     setPhase("queued");
     setError(null);
+    setSessionExpired(false);
 
     try {
       const res = await uploadZips(files, config);
       setJobId(res.job_id);
       setPhase("processing");
     } catch (e: any) {
-      setError(e.message || "Upload failed");
+      const msg = e.message || "Upload failed";
+      if (isAuthError(msg)) {
+        // Stale/rotated JWT: drop it so the sign-in wall appears, and say
+        // exactly what happened instead of a generic failure.
+        logout();
+        setCurrentUser(null);
+        setSessionExpired(true);
+        setError("Your session has expired. Please sign in again, then return here to retry the upload.");
+      } else {
+        setError(msg);
+      }
       setPhase("error");
     }
   }, [files, config]);
@@ -828,14 +850,23 @@ export default function IngestPage() {
                       <div>
                         <strong className="font-bold">Error:</strong> {error}
                       </div>
-                      <div>
-                        <button
-                          type="button"
-                          onClick={clearFiles}
-                          className="rounded-lg border border-rose-300 bg-white px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
-                        >
-                          Start Over
-                        </button>
+                      <div className="flex items-center gap-2">
+                        {sessionExpired ? (
+                          <Link
+                            href="/"
+                            className="rounded-lg bg-[#4F46E5] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#4338CA] transition"
+                          >
+                            Go to Sign In
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={clearFiles}
+                            className="rounded-lg border border-rose-300 bg-white px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                          >
+                            Start Over
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}

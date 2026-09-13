@@ -101,6 +101,17 @@ class Settings(BaseSettings):
         description="Optional Redis URL for rate-limit/job backends (falls back to memory).",
     )
     MAX_UPLOAD_MB: int = Field(default=20, description="Per-file upload cap in MB")
+    MAX_INGEST_FILE_MB: int = Field(
+        default=1024,
+        description="Per-file cap in MB for PRADAN ingest zips (single OHRC/TMC-2 "
+        "bundles run 300-800MB; kept separate from MAX_UPLOAD_MB so image "
+        "uploads stay tightly capped).",
+    )
+    MAX_INGEST_TOTAL_MB: int = Field(
+        default=3072,
+        description="Total batch cap in MB for one ingest upload (a full "
+        "OHRC+TMC-2+IIRS triplet is ~1.7GB).",
+    )
     DYNAMIC_RUNS_TTL_HOURS: int = Field(default=24, description="Age after which dynamic_runs are purged")
 
     def require_jwt_secret(self) -> str:

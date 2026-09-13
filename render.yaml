@@ -9,3 +9,7 @@ services:
         value: 3.14.0
       - key: ALLOWED_ORIGINS
         value: "https://chandrayaan2-crossmatch-56fjycajj-fable98s-projects.vercel.app,http://localhost:3000,http://127.0.0.1:3000"
+      - key: MAX_INGEST_FILE_MB
+        value: 1024
+      - key: MAX_INGEST_TOTAL_MB
+        value: 3072

@@ -30,13 +30,15 @@ except ImportError:  # pragma: no cover - direct-router test path
 try:
     from uploads import (
         ALLOWED_INGEST_EXTENSIONS,
-        max_upload_bytes,
+        max_ingest_file_bytes,
+        max_ingest_total_bytes,
         sanitize_upload_filename,
     )
 except ImportError:  # pragma: no cover - direct-router test path
     from backend.uploads import (  # type: ignore
         ALLOWED_INGEST_EXTENSIONS,
-        max_upload_bytes,
+        max_ingest_file_bytes,
+        max_ingest_total_bytes,
         sanitize_upload_filename,
     )
 
@@ -45,8 +47,12 @@ LOG = logging.getLogger("ingest_router")
 router = APIRouter()
 
 # Step 12: hard caps so one upload cannot fill the disk or exhaust memory.
+# Sized for real PRADAN triplets (OHRC+TMC-2+IIRS ~1.7GB); tunable via
+# MAX_INGEST_FILE_MB / MAX_INGEST_TOTAL_MB env without redeploying code.
 MAX_INGEST_FILES = 10
-MAX_INGEST_TOTAL_BYTES = 200 * 1024 * 1024
+# Legacy module constant kept for import compatibility; the live value is
+# max_ingest_total_bytes() (env-driven). Do not read this directly.
+MAX_INGEST_TOTAL_BYTES = 3072 * 1024 * 1024
 
 # ---------------------------------------------------------------------------
 # In-memory job store (suitable for single-server local/preview tool)
@@ -225,7 +231,8 @@ async def upload_and_ingest(
     for f in files:
         sanitize_upload_filename(f.filename, ALLOWED_INGEST_EXTENSIONS)
 
-    per_file_cap = max_upload_bytes()
+    per_file_cap = max_ingest_file_bytes()
+    total_cap = max_ingest_total_bytes()
     saved_files = []
     total_bytes = 0
     try:
@@ -242,8 +249,18 @@ async def upload_and_ingest(
                         break
                     size += len(chunk)
                     total_bytes += len(chunk)
-                    if size > per_file_cap or total_bytes > MAX_INGEST_TOTAL_BYTES:
-                        raise HTTPException(status_code=413, detail="Upload exceeds size limits.")
+                    if size > per_file_cap:
+                        raise HTTPException(
+                            status_code=413,
+                            detail=f"File '{safe}' exceeds the per-file limit of "
+                            f"{per_file_cap // (1024 * 1024)}MB.",
+                        )
+                    if total_bytes > total_cap:
+                        raise HTTPException(
+                            status_code=413,
+                            detail=f"Upload batch exceeds the total limit of "
+                            f"{total_cap // (1024 * 1024)}MB.",
+                        )
                     out.write(chunk)
             try:
                 await f.close()
