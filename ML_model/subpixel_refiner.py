@@ -23,7 +23,11 @@ class SubPixelRefiner:
     axis through the correlation peak to recover the fractional offset.
     """
 
-    def __init__(self, min_patch_std: float = 5.0, min_confidence: float = 0.1):
+    # SIH Task 3: multi-scale pyramid depth for scale-invariant refinement.
+    N_SCALES: int = 3
+
+    def __init__(self, min_patch_std: float = 5.0, min_confidence: float = 0.1,
+                 n_scales: int = 3):
         """Initialise the refiner.
 
         Args:
@@ -32,9 +36,16 @@ class SubPixelRefiner:
                 shadow and are not refined.
             min_confidence: Default confidence cut-off used by
                 :meth:`refine_batch`.
+            n_scales: SIH Task 3 — Gaussian pyramid depth for
+                coarse-to-fine scale-invariant refinement (default 3:
+                fine/medium/coarse).
         """
         self.min_patch_std = float(min_patch_std)
         self.min_confidence = float(min_confidence)
+        try:
+            self.n_scales = max(1, min(int(n_scales), 4))
+        except Exception:
+            self.n_scales = 3
 
     # ------------------------------------------------------------------
     @staticmethod
@@ -168,6 +179,76 @@ class SubPixelRefiner:
         final_y = float(win_y0 + sub_y + half)
         confidence = max(0.0, min(1.0, peak))
         return final_x, final_y, confidence
+
+    # ------------------------------------------------------------------
+    # SIH Task 3: multi-scale (coarse-to-fine) pyramid helpers.
+    # ------------------------------------------------------------------
+    def build_gaussian_pyramid(self, img: np.ndarray, levels: int = 3):
+        """Build a Gaussian pyramid [L0 fine .. L{levels-1} coarse] via pyrDown."""
+        try:
+            n = max(1, min(int(levels), 4))
+        except Exception:
+            n = 3
+        gray = self._to_gray_uint8(img)
+        pyr = [gray]
+        cur = gray
+        for _ in range(1, n):
+            try:
+                if min(cur.shape[:2]) < 32:
+                    pyr.append(cur)
+                else:
+                    cur = cv2.pyrDown(cur)
+                    pyr.append(cur)
+            except Exception:
+                pyr.append(cur)
+        return pyr
+
+    def refine_match_multiscale(
+        self,
+        ref_img: np.ndarray,
+        src_img: np.ndarray,
+        ref_pt: tuple,
+        src_pt: tuple,
+        patch_size: int = 21,
+        levels: int = 3,
+    ) -> tuple:
+        """SIH Task 3 — coarse-to-fine scale-invariant refinement.
+
+        Estimates an integer shift at the coarsest pyramid level, upsamples
+        it through medium to fine, then runs single-scale parabolic
+        :meth:`refine_match` centered on the propagated location. Returns
+        ``(final_x, final_y, confidence, scale_path)`` where ``scale_path``
+        records the per-level shifts for audit.
+        """
+        try:
+            n = max(1, min(int(levels), 4))
+        except Exception:
+            n = 3
+        ref_pyr = self.build_gaussian_pyramid(ref_img, n)
+        src_pyr = self.build_gaussian_pyramid(src_img, n)
+        # Coarsest-first integer propagation.
+        est = (float(src_pt[0]), float(src_pt[1]))
+        path = []
+        for lvl in range(n - 1, -1, -1):
+            div = 2.0 ** lvl
+            r_pt = (float(ref_pt[0]) / div, float(ref_pt[1]) / div)
+            s_pt = (float(est[0]) / div, float(est[1]) / div)
+            try:
+                fx, fy, conf = self.refine_match(
+                    ref_pyr[lvl], src_pyr[lvl], r_pt, s_pt, patch_size=patch_size)
+            except Exception:
+                fx, fy, conf = s_pt[0], s_pt[1], 0.0
+            # Back to finest-scale coords.
+            est = (float(fx) * div, float(fy) * div)
+            path.append({"level": int(lvl), "x": float(est[0]),
+                         "y": float(est[1]), "conf": float(conf)})
+        try:
+            fx0, fy0, conf0 = self.refine_match(ref_img, src_img, ref_pt, est,
+                                               patch_size=patch_size)
+            return float(fx0), float(fy0), float(conf0), path
+        except Exception:
+            last_conf = float(path[-1]["conf"]) if path else 0.0
+            return float(est[0]), float(est[1]), last_conf, path
 
     # ------------------------------------------------------------------
     def refine_batch(

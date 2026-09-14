@@ -109,6 +109,7 @@ class UniformDistributionFilter:
             "filtered_count": 0,
             "coverage_ratio": 0.0,
             "balance_score": 0.0,
+            "uniformity_score": 0.0,
             "grid_occupancy": np.zeros((self.grid_rows, self.grid_cols), dtype=np.int32),
         }
 
@@ -260,6 +261,19 @@ class UniformDistributionFilter:
 
         coverage_ratio = float(np.clip(coverage_ratio, 0.0, 1.0))
 
+        # SIH Task 4: uniformity_score alias (grid coverage + evenness).
+        # Mirrors metrics.calculate_spatial_distribution uniformity semantics:
+        # uniformity = coverage * exp(-CV*0.3) over cell counts.
+        try:
+            _counts = grid_occupancy.astype(np.float64).ravel()
+            _mean = float(m) / float(total_cells) if total_cells > 0 else 0.0
+            _std = float(np.std(_counts)) if _counts.size else 0.0
+            _cv = _std / max(_mean, 1e-4) if _mean > 0 else 0.0
+            import math as _math
+            uniformity_score = float(coverage_ratio * _math.exp(-_cv * 0.3)) if m > 0 else 0.0
+        except Exception:
+            uniformity_score = float(coverage_ratio)
+
         # ---- 6. Return ----
         return {
             "status": "success",
@@ -270,5 +284,6 @@ class UniformDistributionFilter:
             "filtered_count": int(m),
             "coverage_ratio": float(coverage_ratio),
             "balance_score": float(balance_score),
+            "uniformity_score": float(np.clip(uniformity_score, 0.0, 1.0)),
             "grid_occupancy": grid_occupancy,
         }

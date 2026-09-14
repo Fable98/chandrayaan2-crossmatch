@@ -752,6 +752,7 @@ def compute_canonical_metrics(
     ref_img: Optional[np.ndarray] = None,
     warped_source: Optional[np.ndarray] = None,
     anchor_inlier_indices: Optional[List[int] | np.ndarray] = None,
+    cyclic_homographies: Optional[Tuple] = None,
 ) -> Dict[str, Any]:
     """
     Single canonical entry point to compute all registration metrics across the repository.
@@ -775,6 +776,12 @@ def compute_canonical_metrics(
             "fit_rmse_px": None,
             "fit_rmse_insample_px": None,
             "fit_rmse_insample": None,
+            # SIH Task 4 required aliases (strict 5-key contract).
+            "in_sample_rmse": None,
+            "held_out_rmse": None,
+            "uniformity_score": 0.0,
+            "cyclic_rmse": None,
+            "cyclic_status": "not_computable_no_inliers",
             "absolute_rmse_m": None,
             "validation_rmse_px": None,
             "held_out_inlier_validation_rmse_px": None,
@@ -920,6 +927,22 @@ def compute_canonical_metrics(
         ssim=ssim_val,
     )
 
+    # SIH Task 4: cyclic RMSE when a triplet loop is supplied; else None
+    # (single-pair runs cannot close A->B->C->A). Held-out uses 80/20 split
+    # inside evaluate_held_out_validation (test_ratio=0.2).
+    _cyclic_rmse = None
+    _cyclic_status = "single_pair_no_cycle"
+    try:
+        if cyclic_homographies is not None and len(cyclic_homographies) == 3:
+            _cres = compute_cyclic_consistency_error(
+                cyclic_homographies[0], cyclic_homographies[1], cyclic_homographies[2],
+                image_shape=image_shape)
+            _cyclic_rmse = _cres.get("cyclic_rmse")
+            _cyclic_status = str(_cres.get("status", "evaluated"))
+    except Exception:
+        _cyclic_rmse, _cyclic_status = None, "cyclic_failed"
+    _held_out = val_results["validation_rmse_px"]
+
     return {
         "match_count": raw_count,
         "inlier_count": inlier_count,
@@ -927,11 +950,17 @@ def compute_canonical_metrics(
         "fit_rmse_px": round(fit_rmse, 4),
         "fit_rmse_insample_px": round(fit_rmse, 4),
         "fit_rmse_insample": round(fit_rmse, 4),
+        # SIH Task 4 strict 5-key contract.
+        "in_sample_rmse": round(fit_rmse, 4),
+        "held_out_rmse": _held_out,
+        "uniformity_score": dist_metrics["uniformity_score"],
+        "cyclic_rmse": _cyclic_rmse,
+        "cyclic_status": _cyclic_status,
         "absolute_rmse_m": abs_rmse_m,
         "validation_rmse_px": val_results["validation_rmse_px"],  # Kept for API backward compatibility
         "held_out_inlier_validation_rmse_px": val_results["validation_rmse_px"],
         "held_out_validation_rmse_px": val_results["validation_rmse_px"],
-        "held_out_rmse_px": val_results["validation_rmse_px"],
+        "held_out_rmse_px": _held_out,
         "validation_median_error_px": val_results["validation_median_error_px"],
         "validation_status": val_results["validation_status"],
         "held_out_is_h_conditioned": held_out_is_h_conditioned,
@@ -964,6 +993,96 @@ def compute_canonical_metrics(
         "composite_quality_score_formula": composite_res["composite_quality_score_formula"],
         "composite_quality_score_components": composite_res["composite_quality_score_components"],
     }
+
+
+# ---------------------------------------------------------------------------
+# 6b. SIH Task 4: QA artifacts — cyclic consistency + difference map.
+# ---------------------------------------------------------------------------
+
+def compute_cyclic_consistency_error(
+    H_AB,
+    H_BC,
+    H_CA,
+    image_shape: Tuple[int, int] = (512, 512),
+    num_test_points: int = 100,
+) -> Dict[str, Any]:
+    """SIH Task 4 — Cyclic Consistency Error A -> B -> C -> A.
+
+    Transforms a uniform grid of test points through H_AB, H_BC, H_CA and
+    measures the Euclidean closure distance ||A' - A||. Returns a JSON-safe
+    dict with ``cyclic_rmse`` (the required metrics.json key), cyclic mean,
+    closure flag (<5 px), and point count. Never raises: degenerate input
+    yields cyclic_rmse None with a reason.
+    """
+    try:
+        h_ab = np.asarray(H_AB, dtype=np.float64).reshape(3, 3)
+        h_bc = np.asarray(H_BC, dtype=np.float64).reshape(3, 3)
+        h_ca = np.asarray(H_CA, dtype=np.float64).reshape(3, 3)
+        if not (np.all(np.isfinite(h_ab)) and np.all(np.isfinite(h_bc)) and np.all(np.isfinite(h_ca))):
+            raise ValueError("non-finite homography")
+        rmse, mean = compute_triplet_consistency(h_ab, h_bc, h_ca, image_shape, num_test_points)
+        rmse_f, mean_f = float(rmse), float(mean)
+        if not (np.isfinite(rmse_f) and np.isfinite(mean_f)) or rmse_f >= 999.0:
+            raise ValueError("degenerate cycle")
+        grid_n = max(4, int(np.sqrt(int(num_test_points))))
+        return {"cyclic_rmse": round(rmse_f, 4), "cyclic_mean_px": round(mean_f, 4),
+                "cycle_closed": bool(rmse_f < 5.0), "num_test_points": int(grid_n * grid_n),
+                "status": "evaluated"}
+    except Exception as exc:
+        return {"cyclic_rmse": None, "cyclic_mean_px": None, "cycle_closed": False,
+                "num_test_points": 0, "status": f"not_computable: {exc}"}
+
+
+def generate_difference_map(
+    ref_img: np.ndarray,
+    warped_source: np.ndarray,
+    output_path=None,
+) -> Dict[str, Any]:
+    """SIH Task 4 — absolute difference map |Reference - WarpedSource|.
+
+    Saves an 8-bit ``difference_map.png`` (mostly black when alignment is
+    perfect) and returns path + summary stats. Never raises.
+    """
+    try:
+        import cv2 as _cv2
+        from pathlib import Path as _P
+        def _to_gray(a: np.ndarray) -> np.ndarray:
+            arr = np.asarray(a)
+            if arr.ndim == 3:
+                if arr.shape[2] in (3, 4):
+                    return _cv2.cvtColor(arr.astype(np.uint8) if arr.dtype != np.uint8 else arr,
+                                          _cv2.COLOR_BGR2GRAY).astype(np.float32)
+                return np.mean(arr, axis=2).astype(np.float32)
+            return arr.astype(np.float32)
+        r = _to_gray(ref_img)
+        w = _to_gray(warped_source)
+        h = min(r.shape[0], w.shape[0])
+        ww = min(r.shape[1], w.shape[1])
+        r, w = r[:h, :ww], w[:h, :ww]
+        # Normalize both to [0, 255] for a comparable absolute difference.
+        def _n(a: np.ndarray) -> np.ndarray:
+            a = np.asarray(a, dtype=np.float64)
+            mn, mx = float(np.nanmin(a)), float(np.nanmax(a))
+            if mx > mn:
+                return (a - mn) / (mx - mn) * 255.0
+            return np.zeros_like(a)
+        diff = np.abs(_n(r) - _n(w))
+        mean_d = float(np.mean(diff))
+        frac_black = float(np.mean(diff < 8.0))
+        out_p = None
+        if output_path is not None:
+            out_p = _P(str(output_path))
+            try:
+                out_p.parent.mkdir(parents=True, exist_ok=True)
+            except Exception:
+                pass
+            _cv2.imwrite(str(out_p), np.clip(diff, 0, 255).astype(np.uint8))
+        return {"status": "success", "output_path": str(out_p) if out_p else None,
+                "mean_abs_diff": round(mean_d, 4), "fraction_near_black": round(frac_black, 4),
+                "shape": [int(h), int(ww)]}
+    except Exception as exc:
+        return {"status": "failed", "reason": str(exc), "output_path": None,
+                "mean_abs_diff": None, "fraction_near_black": None}
 
 
 # ---------------------------------------------------------------------------

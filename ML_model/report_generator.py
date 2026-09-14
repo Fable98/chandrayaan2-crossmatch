@@ -329,6 +329,17 @@ class ISROReportGenerator:
             except (TypeError, ValueError):
                 improvement = "N/A"
         rmse_para = Paragraph(f'<font color="{_rmse_color(rmse).hexval()}">{rmse_txt}</font>', styles["cell"])
+        # SIH Task 4 strict 5-key proof contract (aliases resolved here).
+        in_sample = _get(metrics, "in_sample_rmse", "fit_rmse_px", "fit_rmse_insample_px", default=None)
+        held_out = _get(metrics, "held_out_rmse", "held_out_rmse_px", "held_out_validation_rmse_px",
+                        "validation_rmse_px", default=None)
+        uniformity = _get(metrics, "uniformity_score", "spatial_uniformity", default=None)
+        cyclic = _get(metrics, "cyclic_rmse", "triplet_cycle_rmse_px", default=None)
+        def _px(v):
+            try:
+                return f"{float(v):.4f} px" if v is not None else "N/A"
+            except (TypeError, ValueError):
+                return _safe(v)
         rows = [
             [Paragraph("<b>Metric</b>", styles["cell"]), Paragraph("<b>Value</b>", styles["cell"])],
             [Paragraph("Total raw matches", styles["cell"]), Paragraph(_safe(raw), styles["cell"])],
@@ -338,10 +349,15 @@ class ISROReportGenerator:
             [Paragraph("CE90", styles["cell"]), Paragraph(_safe(ce90), styles["cell"])],
             [Paragraph("RMSE after Bundle Adjustment", styles["cell"]), Paragraph(_safe(rmse_ba_txt), styles["cell"])],
             [Paragraph("BA improvement", styles["cell"]), Paragraph(_safe(improvement), styles["cell"])],
+            [Paragraph("In-sample RMSE (SIH)", styles["cell"]), Paragraph(_safe(_px(in_sample)), styles["cell"])],
+            [Paragraph("Held-out RMSE 80/20 (SIH)", styles["cell"]), Paragraph(_safe(_px(held_out)), styles["cell"])],
+            [Paragraph("Uniformity score (SIH)", styles["cell"]), Paragraph(_safe(uniformity), styles["cell"])],
+            [Paragraph("Cyclic RMSE A-&gt;B-&gt;C-&gt;A (SIH)", styles["cell"]), Paragraph(_safe(_px(cyclic)), styles["cell"])],
         ]
         story.append(self._section_table(rows, col_widths=[2.6 * inch, 3.9 * inch]))
         story.append(Spacer(1, 0.08 * inch))
         story.append(Paragraph("RMSE color code: green &lt; 0.5px (excellent), yellow 0.5-1.0px (acceptable), red &gt; 1.0px (poor).", styles["body"]))
+        story.append(Paragraph("SIH proof keys: in_sample_rmse (in-sample fit), held_out_rmse (80/20 unseen), inlier_ratio, uniformity_score (grid coverage), cyclic_rmse (A-&gt;B-&gt;C-&gt;A closure).", styles["body"]))
 
     # ------------------------------------------------------------------
     def _create_phase_diagnostics_section(self, story, phases: dict) -> None:
@@ -559,6 +575,33 @@ class ISROReportGenerator:
             self.logger.warning("BA chart failed: %s", exc)
 
     # ------------------------------------------------------------------
+    def _create_difference_map_section(self, story, difference_map_path=None,
+                                       metrics: dict = None) -> None:
+        """SIH Task 4 — embed difference_map.png (|Ref - Warped|, black = perfect)."""
+        styles = self._styles()
+        story.append(Paragraph("7. Difference Map QA (SIH Proof Artifact)", styles["heading"]))
+        try:
+            mean_d = None
+            if isinstance(metrics, dict):
+                dm = metrics.get("difference_map") if isinstance(metrics.get("difference_map"), dict) else None
+                if dm is not None:
+                    mean_d = dm.get("mean_abs_diff")
+                if mean_d is None:
+                    mean_d = metrics.get("difference_map_mean_abs_diff")
+            if difference_map_path is None and isinstance(metrics, dict):
+                difference_map_path = metrics.get("difference_map_path")
+            if difference_map_path is None or not os.path.exists(str(difference_map_path)):
+                story.append(Paragraph("Difference map unavailable (no warped/reference overlap).", styles["body"]))
+                return
+            story.append(RLImage(str(difference_map_path), width=5.5 * inch, height=4.5 * inch))
+            story.append(Spacer(1, 0.08 * inch))
+            txt = f"Absolute difference |Reference - WarpedSource|. Mostly black = sub-pixel alignment. Mean abs diff: {_safe(mean_d)}."
+            story.append(Paragraph(txt, styles["body"]))
+        except Exception as exc:
+            self.logger.warning("Difference map section failed: %s", exc)
+            story.append(Paragraph("Difference map unavailable.", styles["body"]))
+
+    # ------------------------------------------------------------------
     def generate_report(
         self,
         metadata: dict,
@@ -573,6 +616,7 @@ class ISROReportGenerator:
         ref_pts,
         ba_result: dict = None,
         team_name: str = "Team",
+        difference_map_path: str = None,
     ) -> str:
         """Build the full PDF report. NEVER crashes on missing data.
 
@@ -615,6 +659,8 @@ class ISROReportGenerator:
                     _tmp_files=tmp_files)),
                 ("bundle_adjustment", lambda: self._create_bundle_adjustment_section(
                     story, ba_result, tmp_files)),
+                ("difference_map", lambda: self._create_difference_map_section(
+                    story, difference_map_path, metrics)),
             ]
             for name, fn in sections:
                 try:

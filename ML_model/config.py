@@ -65,3 +65,19 @@ try:
     from backend.config import settings, Settings
 except Exception:
     pass
+
+
+# ===========================================================================
+# SIH Compliance: Sun-Angle Invariance (Task 1 — enforced 2026-09-14)
+# ---------------------------------------------------------------------------
+# The SIH problem statement explicitly demands "Sun angle invariant"
+# correspondence. Phase 1 adaptive illumination normalization (homomorphic
+# log decomposition + morphological shadow suppression) is therefore
+# ENABLED BY DEFAULT for every run. It is no longer an opt-in
+# `experimental_stack` feature.
+# ===========================================================================
+SUN_ANGLE_INVARIANCE_ENABLED: bool = True
+ADAPTIVE_ILLUMINATION_NORMALIZATION_ENABLED: bool = True
+# Keep the legacy experimental_stack flag ON by default for backward compat;
+# new code should read ADAPTIVE_ILLUMINATION_NORMALIZATION_ENABLED.
+EXPERIMENTAL_STACK_ENABLED_BY_DEFAULT: bool = True
