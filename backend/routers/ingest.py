@@ -75,6 +75,8 @@ class IngestConfig(BaseModel):
     tile_size: int = 512
     no_large_aoi: bool = False
     no_invariants: bool = False
+    no_matching: bool = False
+    no_registration: bool = False
     max_time_gap_days: float | None = None
     require_dates: bool = False
 
@@ -104,6 +106,14 @@ class JobResult(BaseModel):
 def _parse_stage_from_log(line: str) -> tuple[str, float]:
     """Extract current stage info from a log line."""
     stages = {
+        "Stage 1/7": ("Unzipping & discovering files...", 8.0),
+        "Stage 2/7": ("Parsing PDS4 metadata...", 20.0),
+        "Stage 3/7": ("Matching triplets...", 33.0),
+        "Stage 4/7": ("Processing crops & tiles...", 55.0),
+        "Stage 5/7": ("Cross-sensor matching + registration QA...", 72.0),
+        "Stage 6/7": ("Updating manifest...", 86.0),
+        "Stage 7/7": ("Generating summary...", 95.0),
+        # Legacy 6-stage pipeline logs (pre matching/registration stage).
         "Stage 1/6": ("Unzipping & discovering files...", 10.0),
         "Stage 2/6": ("Parsing PDS4 metadata...", 25.0),
         "Stage 3/6": ("Matching triplets...", 40.0),
@@ -114,7 +124,44 @@ def _parse_stage_from_log(line: str) -> tuple[str, float]:
     for marker, (desc, pct) in stages.items():
         if marker in line:
             return desc, pct
+    # Sub-step markers inside the matching/registration stage.
+    if "cross-sensor matching" in line:
+        return "Cross-sensor matching (linked-cursor dots)...", 68.0
+    if "registration QA" in line:
+        return "Registration QA (blend/checkerboard/quiver)...", 76.0
     return "", -1.0
+
+
+def _enrich_ingest_triplet(entry: dict[str, Any]) -> dict[str, Any]:
+    """Attach data-region parity assets to one ingest result triplet.
+
+    The pipeline's per-run record already carries most of these; this fills
+    gaps for legacy/partial runs so every ingested triplet exposes the same
+    bundle as curated regions: 512 image URLs, matches + footprint URLs for
+    the Linked Cursor view, and registered blend/checkerboard/quiver URLs
+    for the cross-grid QA views.
+    """
+    if not isinstance(entry, dict):
+        return entry
+    out = dict(entry)
+    rid = out.get("region_id")
+    if not rid:
+        return out
+    out.setdefault("images", {
+        "ohrc": f"/images/ohrc/{rid}",
+        "tmc": f"/images/tmc/{rid}",
+        "iirs": f"/images/iirs/{rid}",
+        "dem": f"/images/dem/{rid}",
+    })
+    out.setdefault("matches_url", f"/triplets/{rid}/matches")
+    out.setdefault("footprint_url", f"/triplets/{rid}/footprint")
+    out.setdefault("registered", {
+        "warped": f"/images/registered/{rid}/registered_ohrc.png",
+        "blend": f"/images/registered/{rid}/blend_overlay.png",
+        "checkerboard": f"/images/registered/{rid}/checkerboard_qa.png",
+        "quiver": f"/images/registered/{rid}/displacement_quiver.png",
+    })
+    return out
 
 
 async def _run_ingest_job(job_id: str, input_dir: Path, config: IngestConfig):
@@ -136,6 +183,10 @@ async def _run_ingest_job(job_id: str, input_dir: Path, config: IngestConfig):
         cmd.append("--no-large-aoi")
     if config.no_invariants:
         cmd.append("--no-invariants")
+    if config.no_matching:
+        cmd.append("--no-matching")
+    if config.no_registration:
+        cmd.append("--no-registration")
     if config.max_time_gap_days is not None:
         cmd.extend(["--max-time-gap-days", str(config.max_time_gap_days)])
     if config.require_dates:
@@ -183,9 +234,33 @@ async def _run_ingest_job(job_id: str, input_dir: Path, config: IngestConfig):
             job["summary"] = "\n".join(summary_lines) if summary_lines else "Pipeline completed."
 
             manifest_path = _PIPELINE_ROOT / "user_triplets.json"
-            if manifest_path.exists():
+            per_run_path = _PROCESSED_TRIPLETS / ".last_run_triplets.json"
+            triplets: list[dict[str, Any]] = []
+            # Prefer the per-run triplet list written by this exact job
+            # (Stage 5 of ingest_and_prepare.py). Falls back to the filtered
+            # manifest history when the file is missing/stale.
+            if per_run_path.exists():
+                try:
+                    per_run = json.loads(per_run_path.read_text(encoding="utf-8"))
+                    if isinstance(per_run, dict):
+                        if str(per_run.get("job_input_dir")) == str(input_dir):
+                            triplets = per_run.get("triplets", [])
+                    elif isinstance(per_run, list):
+                        triplets = per_run
+                except (OSError, ValueError):
+                    triplets = []
+            if not triplets and manifest_path.exists():
                 with manifest_path.open("r", encoding="utf-8") as f:
-                    job["triplets"] = json.load(f)
+                    triplets = [t for t in json.load(f) if _is_true_triplet(t)]
+            job["triplets"] = [_enrich_ingest_triplet(t) for t in triplets]
+            # Reload the in-memory catalog so the new region_auto_* folders
+            # immediately serve /images, /matches, /footprint like the
+            # curated data regions (no manual /refresh round-trip).
+            try:
+                from data import loader as _loader
+                _loader.load_all()
+            except Exception as exc:
+                LOG.warning("Post-ingest catalog reload skipped: %s", exc)
         else:
             job["status"] = "failed"
             job["error"] = f"Process exited with code {retcode}"
@@ -199,9 +274,19 @@ async def _run_ingest_job(job_id: str, input_dir: Path, config: IngestConfig):
         job["completed_at"] = datetime.now(timezone.utc).isoformat()
 
 
-# ---------------------------------------------------------------------------
-# Routes
-# ---------------------------------------------------------------------------
+def _is_true_triplet(entry: dict[str, Any]) -> bool:
+    """True OHRC+TMC-2+IIRS triplets only — exclude external LRO_NAC rows.
+
+    user_triplets.json is a mixed manifest: fresh triplets have
+    tmc2_product_id / iirs_product_id / overlap_triplet_pct, while
+    external_LRO_NAC cross-matches have none of those. The results table
+    can only render true triplets, so filter here.
+    """
+    if not isinstance(entry, dict):
+        return False
+    if entry.get("reference_type") == "external_LRO_NAC":
+        return False
+    return bool(entry.get("tmc2_product_id") and entry.get("iirs_product_id"))
 @router.post("/upload")
 async def upload_and_ingest(
     files: list[UploadFile] = File(...),
@@ -209,6 +294,8 @@ async def upload_and_ingest(
     tile_size: int = Form(512),
     no_large_aoi: bool = Form(False),
     no_invariants: bool = Form(False),
+    no_matching: bool = Form(False),
+    no_registration: bool = Form(False),
     max_time_gap_days: float | None = Form(None),
     require_dates: bool = Form(False),
     current_user: dict = Depends(get_current_user),
@@ -281,6 +368,8 @@ async def upload_and_ingest(
         tile_size=tile_size,
         no_large_aoi=no_large_aoi,
         no_invariants=no_invariants,
+        no_matching=no_matching,
+        no_registration=no_registration,
         max_time_gap_days=max_time_gap_days,
         require_dates=require_dates,
     )
@@ -337,7 +426,7 @@ async def get_job_results(job_id: str):
     return JobResult(
         job_id=job["job_id"],
         status=job["status"],
-        triplets=job.get("triplets", []),
+        triplets=[_enrich_ingest_triplet(t) for t in job.get("triplets", [])],
         summary=job.get("summary", ""),
         output_dir=str(_PROCESSED_TRIPLETS),
     )

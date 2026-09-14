@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { imageUrl } from '@/lib/api';
 
 interface TripletResult {
   [key: string]: any;
@@ -22,7 +23,17 @@ function fmtGsd(val: any): string {
 export default function ResultsTable({ triplets, containment }: ResultsTableProps) {
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
-  if (triplets.length === 0) {
+  // user_triplets.json is a mixed manifest: older external_LRO_NAC rows have
+  // no tmc2/iirs ids or overlap. Only true OHRC+TMC-2+IIRS triplets belong here.
+  const rows = (triplets || []).filter(
+    (t) =>
+      t &&
+      t.reference_type !== 'external_LRO_NAC' &&
+      t.tmc2_product_id &&
+      t.iirs_product_id
+  );
+
+  if (rows.length === 0) {
     return (
       <div className="rounded-2xl border border-slate-200/80 bg-white p-12 text-center text-slate-400 text-xs shadow-sm">
         No triplet results yet. Run the pipeline to see results here.
@@ -45,7 +56,7 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
           </span>
         </div>
         <span className="rounded-full bg-slate-100 px-3 py-1 font-mono text-xs font-bold text-slate-600 border border-slate-200">
-          {triplets.length} triplet(s)
+          {rows.length} triplet(s)
         </span>
       </div>
 
@@ -63,7 +74,7 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {triplets.map((t, i) => {
+            {rows.map((t, i) => {
               const overlapPct = t.overlap_triplet_pct ?? 0;
               const pass = overlapPct >= threshold;
               const isExpanded = expandedIdx === i;
@@ -206,6 +217,103 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
                               </span>
                               <div className="font-mono text-[10px] text-slate-600 break-all max-h-24 overflow-y-auto leading-relaxed">
                                 {t.intersection_wkt}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Data-region parity bundle: 512 crops, linked-cursor
+                              matches, cross-grid QA — same views as curated regions */}
+                          {t.region_id && (
+                            <div className="rounded-xl border border-indigo-100 bg-indigo-50/40 p-3 shadow-xs space-y-3">
+                              <div className="flex items-center justify-between flex-wrap gap-2">
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-[#4F46E5]">
+                                  Region bundle · {t.region_id}
+                                </span>
+                                <span className="flex items-center gap-1.5 flex-wrap">
+                                  <a
+                                    href={`/?view=console&region=${t.region_id}`}
+                                    className="rounded-lg bg-[#4F46E5] px-2.5 py-1 text-[10px] font-bold text-white hover:bg-[#4338CA] transition"
+                                  >
+                                    Open Dashboard →
+                                  </a>
+                                  <a
+                                    href={`/?view=console&subview=linked-cursor&region=${t.region_id}`}
+                                    className="rounded-lg border border-indigo-200 bg-white px-2.5 py-1 text-[10px] font-bold text-[#4F46E5] hover:bg-indigo-50 transition"
+                                  >
+                                    ⊙ Linked Cursor
+                                  </a>
+                                  <a
+                                    href={`/?view=console&subview=map&region=${t.region_id}`}
+                                    className="rounded-lg border border-indigo-200 bg-white px-2.5 py-1 text-[10px] font-bold text-[#4F46E5] hover:bg-indigo-50 transition"
+                                  >
+                                    ☵ Planetary Map
+                                  </a>
+                                </span>
+                              </div>
+
+                              <div className="grid grid-cols-3 gap-2">
+                                {(['ohrc', 'tmc', 'iirs'] as const).map((s) => (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    key={s}
+                                    src={imageUrl(`/images/${s}/${t.region_id}`)}
+                                    alt={`${t.region_id} ${s}`}
+                                    className="h-24 w-full rounded-lg border border-slate-200 bg-slate-900 object-cover"
+                                    loading="lazy"
+                                    onError={(e) => {
+                                      (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                    }}
+                                  />
+                                ))}
+                              </div>
+
+                              <div className="flex items-center gap-2 flex-wrap font-mono text-[10px] text-slate-600">
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-bold uppercase tracking-wider ${
+                                    t.matching?.status === 'success'
+                                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                      : 'border-slate-200 bg-white text-slate-500'
+                                  }`}
+                                >
+                                  match: {t.matching?.status || 'pending'}
+                                  {typeof t.matching?.inlier_count === 'number' &&
+                                    ` · n=${t.matching.inlier_count}`}
+                                  {typeof t.matching?.fit_rmse_px === 'number' &&
+                                    ` · ${t.matching.fit_rmse_px.toFixed(2)}px`}
+                                </span>
+                                <span
+                                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-bold uppercase tracking-wider ${
+                                    t.registration?.status === 'success'
+                                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                      : 'border-slate-200 bg-white text-slate-500'
+                                  }`}
+                                >
+                                  reg-qa: {t.registration?.status || 'pending'}
+                                </span>
+                                <a
+                                  className="underline hover:text-[#4F46E5]"
+                                  href={imageUrl(`/images/registered/${t.region_id}/checkerboard_qa.png`)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  checkerboard grid
+                                </a>
+                                <a
+                                  className="underline hover:text-[#4F46E5]"
+                                  href={imageUrl(`/images/registered/${t.region_id}/blend_overlay.png`)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  blend
+                                </a>
+                                <a
+                                  className="underline hover:text-[#4F46E5]"
+                                  href={imageUrl(`/images/registered/${t.region_id}/displacement_quiver.png`)}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  quiver
+                                </a>
                               </div>
                             </div>
                           )}

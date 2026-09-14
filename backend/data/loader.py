@@ -283,6 +283,76 @@ def _metrics_from_benchmark_summary(triplet_id: str, bounds: dict, n_served: int
     }
 
 
+def _metrics_from_registration_products(triplet_id: str, bounds: dict, n_served: int) -> dict | None:
+    """Fallback metrics for freshly ingested regions with no benchmark row.
+
+    Reads ``registration_output/<id>/metrics.json`` written by Stage 5 of
+    ``ingest_and_prepare.py`` (same keys the benchmark path consumes) and
+    derives the honest planar absolute RMSE + feature-only composite with
+    ``ingest_registration_products`` provenance. Returns None when no
+    registration products exist — the API then serves nulls with reasons,
+    never synthesized numbers.
+    """
+    try:
+        metrics_path = os.path.join(REPO_ROOT, "registration_output", triplet_id, "metrics.json")
+        if not os.path.isfile(metrics_path):
+            return None
+        with open(metrics_path, "r") as f:
+            m = json.load(f)
+        if not isinstance(m, dict):
+            return None
+        fit = m.get("fit_rmse_px")
+        n_inl = int(m.get("inlier_count", n_served) or n_served)
+        if fit is None and n_inl <= 0:
+            return None
+        gsd_m = _footprint_gsd_m(bounds) if bounds else None
+        planar_abs_m = round(float(fit) * gsd_m, 4) if fit is not None and gsd_m is not None else None
+        composite = None
+        try:
+            from metrics import calculate_composite_quality_score
+
+            composite = calculate_composite_quality_score(
+                inlier_ratio=float(m.get("inlier_ratio", 0.0) or 0.0),
+                fit_rmse_px=float(fit) if fit is not None else None,
+                spatial_uniformity=float(
+                    m.get("spatial_uniformity", m.get("uniformity_score", 0.0)) or 0.0
+                ),
+            ).get("composite_quality_score")
+        except Exception as exc:
+            logger.warning("Composite score unavailable for %s: %s", triplet_id, exc)
+        notes: dict = {}
+        if m.get("validation_rmse_px") is None:
+            notes["validation_rmse_px"] = f"held-out needs ≥8 inliers (have {n_inl})"
+        if planar_abs_m is None:
+            notes["absolute_rmse_m"] = "no footprint GSD available"
+        for key in ("ssim", "psnr", "nmi"):
+            notes[key] = "no registered overlap rasters on disk for this region"
+        cov = m.get("spatial_coverage", m.get("combined_coverage_score", 0.0)) or 0.0
+        uni = m.get("spatial_uniformity", m.get("uniformity_score", 0.0)) or 0.0
+        return {
+            "num_inliers": n_inl,
+            "num_raw_matches": int(m.get("num_raw_matches", m.get("match_count", n_served)) or n_served),
+            "inlier_ratio": float(m.get("inlier_ratio", 0.0) or 0.0),
+            "rmse_px": float(fit) if fit is not None else 0.0,
+            "fit_rmse_px": fit,
+            "absolute_rmse_m": planar_abs_m,
+            "absolute_rmse_m_provenance": "planar_footprint_gsd_no_dem" if planar_abs_m is not None else None,
+            "validation_rmse_px": m.get("validation_rmse_px"),
+            "validation_status": m.get("validation_status", "insufficient_points_for_holdout"),
+            "sub_pixel_accurate": bool(fit is not None and float(fit) < 1.0),
+            "source_coverage_ratio": float(cov),
+            "destination_coverage_ratio": float(cov),
+            "combined_coverage_score": float(cov),
+            "uniformity_score": float(uni),
+            "composite_quality_score": composite,
+            "method": "CFOG + Phase Congruency (ingest registration products)",
+            "metric_notes": notes or None,
+        }
+    except Exception as exc:
+        logger.warning("Ingest metrics fallback unavailable for %s: %s", triplet_id, exc)
+        return None
+
+
 def _load_match_file(filepath: str) -> list[dict]:
     """
     Load a match file, handling both the ML team's bare-list format
@@ -565,10 +635,13 @@ def load_all() -> None:
 
         # Primary metrics source: the pipeline's own committed benchmark
         # summary (no refit, no contradictions with published tables).
-        # Derived fields (planar absolute, feature-only composite) are computed
-        # from those numbers with documented provenance; anything unavailable
-        # stays null with a reason in metric_notes.
+        # Freshly ingested region_auto_* rows have no benchmark entry, so
+        # fall back to their own registration_output/<id>/metrics.json
+        # (same honest planar derivation, ingest provenance). Anything
+        # unavailable stays null with a reason in metric_notes.
         metrics_data = _metrics_from_benchmark_summary(triplet_id, bounds, len(raw_points))
+        if metrics_data is None:
+            metrics_data = _metrics_from_registration_products(triplet_id, bounds, len(raw_points))
 
         enriched[triplet_id] = {
             "triplet_id": triplet_id,

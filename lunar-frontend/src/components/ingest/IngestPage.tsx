@@ -849,6 +849,30 @@ export default function IngestPage() {
                               />
                               Require Dates
                             </label>
+
+                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={config.noMatching}
+                                onChange={(e) =>
+                                  setConfig({ ...config, noMatching: e.target.checked })
+                                }
+                                className="rounded accent-[#4F46E5]"
+                              />
+                              Skip Matching (linked-cursor dots)
+                            </label>
+
+                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={config.noRegistration}
+                                onChange={(e) =>
+                                  setConfig({ ...config, noRegistration: e.target.checked })
+                                }
+                                className="rounded accent-[#4F46E5]"
+                              />
+                              Skip Registration QA (grid/blend/quiver)
+                            </label>
                           </div>
                         </div>
                       )}

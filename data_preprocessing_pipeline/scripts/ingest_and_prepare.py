@@ -712,6 +712,382 @@ def _generate_large_aoi(
     }
 
 
+def _manifest_bounds(manifest: dict | None) -> dict | None:
+    """Shared optical bounds from a region manifest (loader parity)."""
+    if not isinstance(manifest, dict):
+        return None
+    for key in ("bounds_optical", "bounds", "bounds_iirs"):
+        b = manifest.get(key)
+        if isinstance(b, dict) and all(
+            k in b for k in ("west_lon", "east_lon", "south_lat", "north_lat")
+        ):
+            return dict(b)
+    return None
+
+
+def _bounds_to_eqc_transform(bounds: dict, width: int, height: int):
+    """Lunar EQC Affine from geographic bounds (same math as scripts/register.py)."""
+    try:
+        from rasterio.transform import from_origin
+        import math
+
+        w = float(bounds["west_lon"])
+        e = float(bounds["east_lon"])
+        s = float(bounds["south_lat"])
+        n = float(bounds["north_lat"])
+        if not (e > w and n > s and width > 0 and height > 0):
+            return None
+        radius_m = 1737400.0
+        xw, xe = math.radians(w) * radius_m, math.radians(e) * radius_m
+        ys, yn = math.radians(s) * radius_m, math.radians(n) * radius_m
+        dx, dy = (xe - xw) / width, (yn - ys) / height
+        if not (dx > 0 and dy > 0):
+            return None
+        crs = "+proj=eqc +lat_ts=0 +lon_0=0 +a=1737400 +b=1737400 +units=m +no_defs +type=crs"
+        return from_origin(xw, yn, dx, dy), crs
+    except Exception:
+        return None
+
+
+def stage_match_and_register(
+    results: list[dict],
+    output_dir: Path,
+    do_matching: bool = True,
+    do_registration: bool = True,
+) -> None:
+    """Stage 5: cross-sensor matching + registration QA for ingested regions.
+
+    Gives freshly ingested ``region_auto_*`` folders everything the curated
+    ``region_00*`` data regions have, so the same frontend works unchanged:
+
+    - ``matches/<region_id>_matches.json`` + ``_<transform>.json`` — the
+      backend loader's match source, powering ``/triplets/{id}/matches`` and
+      the Linked Cursor dual-cursor dots (OHRC<->TMC px + lat/lon).
+    - ``registration_output/<region_id>/`` — registered_ohrc.png,
+      blend_overlay.png, checkerboard_qa.png (cross-grid continuity QA),
+      displacement_quiver.png, ohrc_to_tmc_homography.json, transform.json,
+      matches.json, metrics.json, registered_products_manifest.json —
+      served by the backend as ``/images/registered/<id>/...`` for the
+      Console registration/grid views, Vault thumbnails and Dossier blends.
+    - Region ``manifest.json`` gains ``matching`` / ``registration`` /
+      ``images`` blocks (inlier count, fit RMSE, 10x10 grid coverage +
+      uniformity, product paths) for honest provenance.
+
+    Best-effort by design: a matcher/registration failure is recorded on the
+    result + manifest but never fails the region — the 512 crops, DEM,
+    invariants and large-AOI tiles from Stage 4 remain usable.
+    """
+    if not do_matching and not do_registration:
+        return
+
+    matches_dir = _PIPELINE_ROOT / "matches"
+    matches_dir.mkdir(parents=True, exist_ok=True)
+    reg_root = _REPO_ROOT / "registration_output"
+    reg_root.mkdir(parents=True, exist_ok=True)
+
+    for res in results:
+        if not res.get("success"):
+            continue
+        region_id = res.get("region_id")
+        manifest = res.get("manifest") or {}
+        reg_dir = output_dir / region_id
+        ohrc_path = reg_dir / "ohrc_512.png"
+        tmc_path = reg_dir / "tmc_512.png"
+        dem_path = reg_dir / "dem_512.png"
+        if not (ohrc_path.is_file() and tmc_path.is_file()):
+            res["matching"] = {"status": "skipped", "reason": "missing_512_crops"}
+            res["registration"] = {"status": "skipped", "reason": "missing_512_crops"}
+            continue
+
+        match_res: dict | None = None
+        if do_matching:
+            LOG.info("  [%s] cross-sensor matching OHRC->TMC-2 ...", region_id)
+            try:
+                sys.path.insert(0, str(_REPO_ROOT / "ML_model"))
+                from matcher_cfog import match_images_cfog
+
+                match_res = match_images_cfog(
+                    str(ohrc_path),
+                    str(tmc_path),
+                    dem_path=str(dem_path) if dem_path.is_file() else None,
+                    output_dir=str(reg_dir / "match_work"),
+                    source_sensor="OHRC",
+                    reference_sensor="TMC-2",
+                )
+            except Exception as exc:
+                LOG.warning("  [%s] matching failed: %s", region_id, exc)
+                match_res = {"status": "failed", "message": str(exc)}
+
+            status = (match_res or {}).get("status")
+            metrics = (match_res or {}).get("metrics") or {}
+            inliers = (match_res or {}).get("matches") or []
+            H = (match_res or {}).get("homography")
+            # Quality Gate 1 parity with the primary engine: a homography
+            # needs >= 4 genuine correspondences. Fewer than that is
+            # recorded honestly and never persisted as linked-cursor dots.
+            if status == "success" and H is not None and len(inliers) >= 4:
+                try:
+                    with (matches_dir / f"{region_id}_matches.json").open(
+                        "w", encoding="utf-8"
+                    ) as f:
+                        json.dump(inliers, f, indent=2)
+                    with (matches_dir / f"{region_id}_transform.json").open(
+                        "w", encoding="utf-8"
+                    ) as f:
+                        json.dump({"model": "homography", "matrix": H}, f, indent=2)
+                    LOG.info(
+                        "  [%s] wrote %d matches + transform",
+                        region_id, len(inliers),
+                    )
+                except OSError as exc:
+                    LOG.warning("  [%s] could not write match files: %s", region_id, exc)
+                    status = "failed"
+            if status == "success" and len(inliers) < 4:
+                LOG.warning(
+                    "  [%s] insufficient_correspondences (%d < 4); "
+                    "matches not persisted",
+                    region_id, len(inliers),
+                )
+                status = "insufficient_correspondences"
+            res["matching"] = {
+                "status": status or "failed",
+                "inlier_count": len(inliers),
+                "fit_rmse_px": (metrics.get("fit_rmse_px")
+                                if isinstance(metrics, dict) else None),
+                "inlier_ratio": (metrics.get("inlier_ratio")
+                                 if isinstance(metrics, dict) else None),
+                "spatial_coverage": (metrics.get("spatial_coverage")
+                                      if isinstance(metrics, dict) else None),
+                "spatial_uniformity": (metrics.get("spatial_uniformity")
+                                        if isinstance(metrics, dict) else None),
+                "message": (match_res or {}).get("message"),
+            }
+        else:
+            res["matching"] = {"status": "skipped", "reason": "flag_no_matching"}
+
+        if do_registration:
+            LOG.info("  [%s] registration QA products ...", region_id)
+            try:
+                reg_out = _write_registration_products(
+                    region_id=region_id,
+                    reg_dir=reg_dir,
+                    reg_root=reg_root,
+                    match_res=match_res,
+                    manifest=manifest,
+                )
+                res["registration"] = {"status": "success", **reg_out}
+            except Exception as exc:
+                LOG.warning("  [%s] registration QA failed: %s", region_id, exc)
+                res["registration"] = {"status": "failed", "reason": str(exc)}
+        else:
+            res["registration"] = {"status": "skipped", "reason": "flag_no_registration"}
+
+        # Persist provenance onto the region manifest (loader/frontend parity).
+        try:
+            manifest = res.get("manifest") or {}
+            manifest["images"] = {
+                "ohrc": "ohrc_512.png",
+                "tmc": "tmc_512.png",
+                "iirs": "iirs_512.png",
+                "dem": "dem_512.png" if dem_path.is_file() else None,
+            }
+            if res.get("matching"):
+                manifest["matching"] = res["matching"]
+            if res.get("registration"):
+                manifest["registration"] = {
+                    k: v for k, v in res["registration"].items()
+                    if k in ("status", "reason", "products", "inlier_count")
+                }
+            res["manifest"] = manifest
+            with (reg_dir / "manifest.json").open("w", encoding="utf-8") as f:
+                json.dump(manifest, f, indent=2)
+        except OSError as exc:
+            LOG.warning("  [%s] could not update manifest: %s", region_id, exc)
+
+
+def _write_registration_products(
+    region_id: str,
+    reg_dir: Path,
+    reg_root: Path,
+    match_res: dict | None,
+    manifest: dict,
+) -> dict:
+    """Build registration_output/<region_id>/ from matcher output + 512 crops.
+
+    Mirrors scripts/register.py products (registered PNG/TIF, blend overlay,
+    checkerboard cross-grid QA, displacement quiver, homography/transform/
+    matches/metrics sidecars, products manifest) using the already-computed
+    homography when available, else a RANSAC refit from persisted matches.
+    """
+    import cv2
+
+    ohrc_path = reg_dir / "ohrc_512.png"
+    tmc_path = reg_dir / "tmc_512.png"
+    src_img = cv2.imread(str(ohrc_path), cv2.IMREAD_UNCHANGED)
+    dst_img = cv2.imread(str(tmc_path), cv2.IMREAD_UNCHANGED)
+    if src_img is None or dst_img is None:
+        raise RuntimeError("could not read ohrc/tmc 512 crops")
+
+    H = None
+    matches: list[dict] = []
+    metrics: dict = {}
+    if isinstance(match_res, dict):
+        if match_res.get("homography") is not None:
+            H = np.asarray(match_res["homography"], dtype=np.float64)
+        matches = list(match_res.get("matches") or [])
+        if isinstance(match_res.get("metrics"), dict):
+            metrics = dict(match_res["metrics"])
+    if H is None and len(matches) >= 4:
+        s = np.array(
+            [[float(m.get("image1_x", m.get("source_x", 0))),
+              float(m.get("image1_y", m.get("source_y", 0)))] for m in matches],
+            dtype=np.float32,
+        )
+        d = np.array(
+            [[float(m.get("image2_x", m.get("target_x", 0))),
+              float(m.get("image2_y", m.get("target_y", 0)))] for m in matches],
+            dtype=np.float32,
+        )
+        H, _ = cv2.findHomography(s, d, cv2.RANSAC, 5.0)
+    if H is None or len(matches) < 4:
+        # Zero-fake-fallbacks parity: never warp with an identity matrix.
+        # A missing/degenerate H fails closed; the 512 crops + DEM from
+        # Stage 4 remain usable and the manifest records the honest reason.
+        raise RuntimeError(
+            f"insufficient_correspondences for registration QA "
+            f"({len(matches)} < 4, homography={'present' if H is not None else 'missing'})"
+        )
+
+    out_dir = reg_root / region_id
+    out_dir.mkdir(parents=True, exist_ok=True)
+    h, w = dst_img.shape[:2]
+    warped = cv2.warpPerspective(src_img, H, (w, h), flags=cv2.INTER_LANCZOS4)
+
+    def _to_bgr(im: np.ndarray) -> np.ndarray:
+        return cv2.cvtColor(im, cv2.COLOR_GRAY2BGR) if im.ndim == 2 else im
+
+    blend = cv2.addWeighted(_to_bgr(warped), 0.5, _to_bgr(dst_img), 0.5, 0)
+
+    block = 64
+    checker = np.zeros_like(_to_bgr(dst_img))
+    _ws, _wr = _to_bgr(warped), _to_bgr(dst_img)
+    for y in range(0, h, block):
+        for x in range(0, w, block):
+            tile = _ws[y:min(y + block, h), x:min(x + block, w)] \
+                if ((y // block) + (x // block)) % 2 == 0 \
+                else _wr[y:min(y + block, h), x:min(x + block, w)]
+            checker[y:min(y + block, h), x:min(x + block, w)] = tile
+
+    warped_path = out_dir / "registered_ohrc.png"
+    blend_path = out_dir / "blend_overlay.png"
+    checker_path = out_dir / "checkerboard_qa.png"
+    tif_path = out_dir / "registered_ohrc.tif"
+    cv2.imwrite(str(warped_path), warped)
+    cv2.imwrite(str(blend_path), blend)
+    cv2.imwrite(str(checker_path), checker)
+
+    quiver_path: Path | None = out_dir / "displacement_quiver.png"
+    try:
+        sys.path.insert(0, str(_REPO_ROOT / "ML_model"))
+        from quiver import create_displacement_quiver
+
+        if len(matches) >= 3:
+            s = np.array(
+                [[float(m.get("image1_x", m.get("source_x"))),
+                  float(m.get("image1_y", m.get("source_y")))] for m in matches],
+                dtype=np.float32,
+            )
+            d = np.array(
+                [[float(m.get("image2_x", m.get("target_x"))),
+                  float(m.get("image2_y", m.get("target_y")))] for m in matches],
+                dtype=np.float32,
+            )
+            if create_displacement_quiver(s, d, H, (h, w), quiver_path) is None:
+                quiver_path = None
+        else:
+            quiver_path = None
+    except Exception:
+        quiver_path = None
+
+    # Bounds-derived lunar EQC GeoTIFF when the manifest carries bounds.
+    georeferenced = False
+    try:
+        import rasterio
+
+        bounds = _manifest_bounds(manifest)
+        geo = _bounds_to_eqc_transform(bounds, w, h) if bounds else None
+        profile = {
+            "driver": "GTiff",
+            "height": h,
+            "width": w,
+            "count": 1 if warped.ndim == 2 else min(warped.shape[2], 3),
+            "dtype": "uint8",
+            "crs": geo[1] if geo else (
+                "+proj=eqc +lat_ts=0 +lon_0=0 +a=1737400 +b=1737400 "
+                "+units=m +no_defs +type=crs"
+            ),
+            "transform": geo[0] if geo else __import__(
+                "rasterio.transform", fromlist=["from_origin"]
+            ).from_origin(0, h, 1.0, 1.0),
+            "compress": "lzw",
+        }
+        with rasterio.open(str(tif_path), "w", **profile) as dst:
+            if warped.ndim == 3:
+                for b in range(profile["count"]):
+                    dst.write(warped[:, :, profile["count"] - 1 - b], b + 1)
+            else:
+                dst.write(warped, 1)
+        georeferenced = geo is not None
+    except Exception:
+        cv2.imwrite(str(tif_path), warped)
+
+    with (out_dir / "ohrc_to_tmc_homography.json").open("w", encoding="utf-8") as f:
+        json.dump(
+            {
+                "homography": np.asarray(H).tolist(),
+                "inlier_count": len(matches),
+                "fit_rmse_is_in_sample": True,
+                "georeferenced": georeferenced,
+            },
+            f,
+            indent=4,
+        )
+    with (out_dir / "transform.json").open("w", encoding="utf-8") as f:
+        json.dump({"model": "homography", "matrix": np.asarray(H).tolist()}, f, indent=4)
+    with (out_dir / "matches.json").open("w", encoding="utf-8") as f:
+        json.dump(matches, f, indent=4)
+    with (out_dir / "metrics.json").open("w", encoding="utf-8") as f:
+        json.dump(
+            {"region_id": region_id, "inlier_count": len(matches),
+             "georeferenced": georeferenced,
+             **({k: metrics[k] for k in
+                 ("fit_rmse_px", "inlier_ratio", "match_count",
+                  "num_raw_matches", "validation_rmse_px",
+                  "validation_status", "spatial_coverage",
+                  "combined_coverage_score", "spatial_uniformity",
+                  "uniformity_score",
+                  "composite_quality_score") if k in metrics})},
+            f,
+            indent=4,
+        )
+    products = {
+        "registered_ohrc_png": str(warped_path),
+        "registered_ohrc_tif": str(tif_path),
+        "blend_ohrc_tmc": str(blend_path),
+        "checkerboard_ohrc_tmc": str(checker_path),
+        "displacement_quiver": str(quiver_path) if quiver_path else None,
+    }
+    with (out_dir / "registered_products_manifest.json").open("w", encoding="utf-8") as f:
+        json.dump(
+            {"region_id": region_id, "mode": "ohrc_to_tmc",
+             "chain": "OHRC -> TMC-2",
+             "homography": np.asarray(H).tolist(), "products": products},
+            f,
+            indent=4,
+        )
+    return {"inlier_count": len(matches), "products": products}
+
+
 def _next_region_id(output_dir: Path) -> int:
     """Find the next available region_auto_NNN number."""
     existing = 0
@@ -775,11 +1151,40 @@ def stage_process_triplets(
 # --------------------------------------------------------------------------
 # Stage 5: Update user_triplets.json
 # --------------------------------------------------------------------------
+def _triplet_key(triplet: dict) -> tuple:
+    """Unique key for a true OHRC+TMC-2+IIRS triplet.
+
+    Previously deduped on ohrc_product_id alone, which collides with
+    external_LRO_NAC rows sharing the same OHRC and would wrongly skip a
+    new TMC/IIRS pairing as a 'duplicate'.
+    """
+    return (
+        triplet.get("ohrc_product_id"),
+        triplet.get("tmc2_product_id"),
+        triplet.get("iirs_product_id"),
+    )
+
+
 def stage_update_manifest(
     results: list[dict],
     manifest_path: Path,
+    output_dir: Path | None = None,
+    job_input_dir: Path | None = None,
 ):
-    """Append new triplet entries to user_triplets.json."""
+    """Append new triplet entries to user_triplets.json.
+
+    Persists the *enriched* data-region bundle (region_id + bounds +
+    images / matches_url / footprint_url / registered blend+checkerboard
+    cross-grid+quiver + matching/registration provenance) — not the raw
+    footprint-matching triplet — so freshly ingested ``region_auto_*``
+    rows survive restarts and serve /images, /triplets/{id}/matches
+    (linked-cursor dots), /footprint, IIRS overlay and registration QA
+    exactly like curated ``region_00*`` rows, even when the per-run file
+    is missing/stale.
+
+    Returns the list of triplet dicts discovered by THIS run (for the
+    per-run results file), regardless of whether they were new.
+    """
     existing: list[dict] = []
     if manifest_path.exists():
         try:
@@ -789,22 +1194,84 @@ def stage_update_manifest(
             LOG.warning("Could not read existing manifest %s: %s", manifest_path, exc)
             existing = []
 
-    # Build set of existing OHRC product IDs to avoid duplicates
-    existing_ids = {
-        e.get("ohrc_product_id") for e in existing if isinstance(e, dict)
-    }
+    # Build set of existing triplet keys to avoid duplicates.
+    # LRO rows (no tmc2/iirs ids) get their own key space so they never
+    # collide with true triplets sharing the same OHRC.
+    existing_keys = set()
+    for e in existing:
+        if not isinstance(e, dict):
+            continue
+        if e.get("reference_type") == "external_LRO_NAC":
+            existing_keys.add(("LRO", e.get("region_id"), e.get("ohrc_product_id"),
+                               e.get("lro_nac_product_id")))
+        else:
+            existing_keys.add(_triplet_key(e))
 
     added = 0
+    this_run: list[dict] = []
     for res in results:
         if not res["success"]:
             continue
         triplet = res["triplet"]
-        ohrc_id = triplet.get("ohrc_product_id")
-        if ohrc_id in existing_ids:
-            LOG.debug("Skipping duplicate: %s", ohrc_id)
+        # Enrich the per-run/API record with the region linkage + data-region
+        # parity assets (images, matches, linked-cursor + registration QA) so
+        # the frontend can render ingested triplets exactly like curated ones
+        # without waiting for a backend refresh.
+        manifest = res.get("manifest") or {}
+        enriched = dict(triplet)
+        enriched["region_id"] = res.get("region_id")
+        for bkey in ("bounds", "bounds_optical", "bounds_iirs"):
+            if manifest.get(bkey) and not enriched.get(bkey):
+                enriched[bkey] = manifest[bkey]
+        if manifest.get("bounds") and not enriched.get("bounds"):
+            enriched["bounds"] = manifest["bounds"]
+        # Curated regions carry both bounds + bounds_optical (shared 512
+        # grid extent for linked-cursor lat/lon + footprint + map overlay).
+        if enriched.get("bounds") and not enriched.get("bounds_optical"):
+            enriched["bounds_optical"] = enriched["bounds"]
+        rid = res.get("region_id")
+        if rid:
+            enriched["images"] = {
+                "ohrc": f"/images/ohrc/{rid}",
+                "tmc": f"/images/tmc/{rid}",
+                "iirs": f"/images/iirs/{rid}",
+                "dem": f"/images/dem/{rid}",
+            }
+            enriched["matches_url"] = f"/triplets/{rid}/matches"
+            enriched["footprint_url"] = f"/triplets/{rid}/footprint"
+            enriched["registered"] = {
+                "warped": f"/images/registered/{rid}/registered_ohrc.png",
+                "blend": f"/images/registered/{rid}/blend_overlay.png",
+                "checkerboard": f"/images/registered/{rid}/checkerboard_qa.png",
+                "quiver": f"/images/registered/{rid}/displacement_quiver.png",
+            }
+        if res.get("matching"):
+            enriched["matching"] = res["matching"]
+        if res.get("registration"):
+            enriched["registration"] = {
+                k: v for k, v in res["registration"].items()
+                if k in ("status", "reason", "inlier_count")
+            }
+        this_run.append(enriched)
+        key = _triplet_key(triplet)
+        if key in existing_keys:
+            LOG.debug("Skipping duplicate: %s", key)
+            # Upgrade a legacy raw entry (no region bundle) in place so a
+            # re-run backfills region_id/bounds/images/matches/registration.
+            for idx, entry in enumerate(existing):
+                if not isinstance(entry, dict):
+                    continue
+                if entry.get("reference_type") == "external_LRO_NAC":
+                    continue
+                if _triplet_key(entry) == key and not entry.get("region_id"):
+                    existing[idx] = enriched
+                    break
             continue
-        existing.append(triplet)
-        existing_ids.add(ohrc_id)
+        # Persist the enriched data-region bundle so user_triplets.json
+        # alone can hydrate the backend loader (region linkage, shared
+        # bounds for lat/lon + footprint, image/match/registration URLs).
+        existing.append(enriched)
+        existing_keys.add(key)
         added += 1
 
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -812,6 +1279,25 @@ def stage_update_manifest(
         json.dump(existing, f, indent=2)
 
     LOG.info("Updated %s: %d new entries (%d total)", manifest_path, added, len(existing))
+
+    # Per-run file so the API can return exactly this batch's triplets
+    # instead of the whole mixed manifest history.
+    if output_dir is not None:
+        try:
+            per_run_path = Path(output_dir) / ".last_run_triplets.json"
+            with per_run_path.open("w", encoding="utf-8") as f:
+                json.dump(
+                    {
+                        "job_input_dir": str(job_input_dir) if job_input_dir else None,
+                        "triplets": this_run,
+                    },
+                    f,
+                    indent=2,
+                )
+        except OSError as exc:
+            LOG.warning("Could not write per-run triplets file: %s", exc)
+
+    return this_run
 
 
 # --------------------------------------------------------------------------
@@ -850,10 +1336,19 @@ def stage_summary(results: list[dict], containment: float) -> None:
         if ok:
             passed += 1
 
+        m = res.get("matching") or {}
+        r = res.get("registration") or {}
+        extra = ""
+        if m:
+            extra += (f" | match: {m.get('status')} "
+                      f"n={m.get('inlier_count', '?')}")
+        if r:
+            extra += f" | reg: {r.get('status')}"
+
         print(
             f"  {rid} | overlap: {overlap_pct:.1f}% | "
             f"sun_el: OHRC={ohrc_el} TMC={tmc_el} IIRS={iirs_el} | "
-            f"{status}"
+            f"{status}{extra}"
         )
 
     print("-" * 90)
@@ -912,6 +1407,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Skip invariant map (census/gradient/LBP) generation",
     )
     p.add_argument(
+        "--no-matching",
+        action="store_true",
+        help="Skip cross-sensor CFOG matching (matches/*.json for linked cursor)",
+    )
+    p.add_argument(
+        "--no-registration",
+        action="store_true",
+        help="Skip registration QA products (blend/checkerboard/quiver in registration_output/)",
+    )
+    p.add_argument(
         "--max-time-gap-days",
         type=float,
         default=1e9,
@@ -947,20 +1452,20 @@ def main(argv: list[str] | None = None) -> int:
 
     # -- Stage 1: Unzip & Discover --
     LOG.info("=" * 60)
-    LOG.info("Stage 1/6: Unzip & Discover")
+    LOG.info("Stage 1/7: Unzip & Discover")
     LOG.info("=" * 60)
     staging_dir = output_dir / ".staging"
     stage_unzip_and_discover(input_dir, staging_dir)
 
     # -- Stage 2: Parse Metadata --
     LOG.info("=" * 60)
-    LOG.info("Stage 2/6: Parse Metadata")
+    LOG.info("Stage 2/7: Parse Metadata")
     LOG.info("=" * 60)
     gdf = stage_parse_metadata([input_dir, staging_dir])
 
     # -- Stage 3: Batch Triplet Matching --
     LOG.info("=" * 60)
-    LOG.info("Stage 3/6: Batch Triplet Matching")
+    LOG.info("Stage 3/7: Batch Triplet Matching")
     LOG.info("=" * 60)
     triplets = stage_match_triplets(
         gdf,
@@ -976,7 +1481,7 @@ def main(argv: list[str] | None = None) -> int:
 
     # -- Stage 4: Process --
     LOG.info("=" * 60)
-    LOG.info("Stage 4/6: Crop -> Resample -> Normalize -> Tile")
+    LOG.info("Stage 4/7: Crop -> Resample -> Normalize -> Tile")
     LOG.info("=" * 60)
     results = stage_process_triplets(
         triplets=triplets,
@@ -986,19 +1491,32 @@ def main(argv: list[str] | None = None) -> int:
         do_invariants=not args.no_invariants,
     )
 
-    # -- Stage 5: Update Manifest --
+    # -- Stage 5: Cross-sensor matching + registration QA --
+    # Gives ingested regions the same images/matches/linked-cursor/
+    # checkerboard-grid bundle the curated data regions carry.
     LOG.info("=" * 60)
-    LOG.info("Stage 5/6: Update Manifest")
+    LOG.info("Stage 5/7: Cross-Sensor Matching + Registration QA")
+    LOG.info("=" * 60)
+    stage_match_and_register(
+        results,
+        output_dir,
+        do_matching=not args.no_matching,
+        do_registration=not args.no_registration,
+    )
+
+    # -- Stage 6: Update Manifest --
+    LOG.info("=" * 60)
+    LOG.info("Stage 6/7: Update Manifest")
     LOG.info("=" * 60)
     manifest_path = args.manifest
     if not manifest_path.is_absolute():
         # Default to being relative to the pipeline root
         manifest_path = _PIPELINE_ROOT / manifest_path
-    stage_update_manifest(results, manifest_path)
+    stage_update_manifest(results, manifest_path, output_dir, input_dir)
 
-    # -- Stage 6: Summary --
+    # -- Stage 7: Summary --
     LOG.info("=" * 60)
-    LOG.info("Stage 6/6: Summary Report")
+    LOG.info("Stage 7/7: Summary Report")
     LOG.info("=" * 60)
     stage_summary(results, args.containment)
 

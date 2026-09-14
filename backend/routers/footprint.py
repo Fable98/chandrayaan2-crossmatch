@@ -45,6 +45,13 @@ def get_iirs_overlay(triplet_id: str):
 
     Returns the identical bounding box as the footprint endpoint.
     Frontend can render via standard L.imageOverlay or equivalent bounding box layer.
+
+    Data-region parity: every region (curated region_00* and ingested
+    region_auto_*) serves its own per-region 512 crop at
+    /images/iirs/{triplet_id}. The legacy generic tile_id fallback
+    (iirs_overlay.png) would show one region's pixels on every other
+    region's map — the same mislabeling class as the old DEM bug — so
+    the per-region route is always preferred.
     """
     triplet = loader.get_triplet(triplet_id)
     if triplet is None:
@@ -65,10 +72,15 @@ def get_iirs_overlay(triplet_id: str):
             break
 
     tile_id = iirs_entry.get("tile_id", "iirs_overlay.png") if iirs_entry else "iirs_overlay.png"
+    # Per-region crop first; generic tile only when the region id carries
+    # no servable crop (backend /images falls back gracefully).
+    image_url = f"/images/iirs/{triplet_id}"
+    if tile_id and tile_id != "iirs_overlay.png":
+        image_url = f"/images/iirs/{tile_id}"
 
     return IIRSOverlay(
         triplet_id=triplet_id,
-        image_url=f"/images/iirs/{tile_id}",
+        image_url=image_url,
         bounds=bounds,
         opacity_hint=0.6,
     )
