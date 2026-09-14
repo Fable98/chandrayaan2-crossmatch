@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, IBM_Plex_Sans, IBM_Plex_Mono, Playfair_Display } from "next/font/google";
 import "./globals.css";
+import ThemeProvider from "@/lib/theme";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -41,10 +42,18 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${inter.variable} ${playfair.variable} ${plexSans.variable} ${plexMono.variable}`}
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('chandrayaan-theme');if(t==='dark'){document.documentElement.classList.add('dark')}}catch(e){}})()`,
+          }}
+        />
+      </head>
       <body className="bg-[#070d14] text-[#f0f4f5] font-sans antialiased">
-        {children}
+        <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>
   );

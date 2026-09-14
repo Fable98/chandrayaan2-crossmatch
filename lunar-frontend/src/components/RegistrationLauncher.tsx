@@ -97,7 +97,7 @@ const SAMPLE_PAIRS: SamplePair[] = [
     // "~21x" string came from a hardcoded 5.25 fudge with no provenance;
     // this static sample tag uses the derived value instead.
     tag: `Primary ${scaleRatioLabel(5.4, SENSOR_META.ohrc.gsdM)} Scale Gap`,
-    badgeStyle: "bg-blue-50 text-blue-700 border-blue-200",
+    badgeStyle: "bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-900/50",
     description: `${SENSOR_META.ohrc.gsdM}m/px Narrow-Angle OHRC matched to ${(4).toFixed(1)}m/px single-view TMC-2 in Sinus Medii.`,
     sourceSensor: "OHRC",
     referenceSensor: "TMC",
@@ -145,7 +145,7 @@ const SAMPLE_PAIRS: SamplePair[] = [
     id: "sample_001_lro",
     title: "Region 001: OHRC ↔ NASA LRO NAC",
     tag: `PS Lunar Reference (${scaleRatioLabel(SENSOR_META.lro_nac.gsdM, SENSOR_META.ohrc.gsdM)}, real CDR)`,
-    badgeStyle: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    badgeStyle: "bg-emerald-50 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-900/50",
     description:
       "NASA LRO NAC M1417670274LC real-CDR panchromatic reference (MI path; optical NCC finds 0 candidates on real CDRs).",
     sourceSensor: "OHRC",
@@ -197,7 +197,7 @@ const SAMPLE_PAIRS: SamplePair[] = [
     id: "sample_003_lro",
     title: "Region 003: OHRC ↔ NASA LRO NAC",
     tag: "Real CDR, distinct topography",
-    badgeStyle: "bg-purple-50 text-purple-700 border-purple-200",
+    badgeStyle: "bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-900/50",
     description:
       "Real-CDR M1417670274LC across distinct crater topography (Fit: 1.286 px — NOT sub-pixel; honest LOW_CONFIDENCE).",
     sourceSensor: "OHRC",
@@ -245,7 +245,7 @@ const SAMPLE_PAIRS: SamplePair[] = [
     id: "sample_001_iirs",
     title: "Region 001: OHRC ↔ IIRS Hyperspectral",
     tag: `Chained Spectral Overlay (${scaleRatioLabel(SENSOR_META.iirs.gsdM, SENSOR_META.ohrc.gsdM, { approx: true })})`,
-    badgeStyle: "bg-purple-50 text-purple-700 border-purple-200",
+    badgeStyle: "bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-900/50",
     description:
       "80m/px IIRS hyperspectral cube co-registered via TMC-2 bridge. Spectral overlay — physical scale respected, no direct sub-pixel matching.",
     sourceSensor: "OHRC",
@@ -283,7 +283,7 @@ const SAMPLE_PAIRS: SamplePair[] = [
     id: "sample_hardest_case",
     title: "Triplet New: 162° Sun-Gap Hardest Case",
     tag: "Fragile LOW · No Held-Out",
-    badgeStyle: "bg-amber-50 text-amber-700 border-amber-200",
+    badgeStyle: "bg-amber-50 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-900/50",
     description:
       "Diametric illumination reversal (162.25°): formerly a clean Gate-3 refusal, re-measured 2026-09-11 as a fragile 6-inlier LOW fit with no held-out validation. The honest floor of what this pipeline claims.",
     sourceSensor: "OHRC",
@@ -406,16 +406,16 @@ function FilePicker({
   onChange: (file: File | null) => void;
 }) {
   return (
-    <label className="block cursor-pointer rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 transition hover:border-indigo-300 hover:bg-indigo-50/40">
+    <label className="block cursor-pointer rounded-xl border border-dashed border-slate-300 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 p-4 transition hover:border-indigo-300 dark:hover:border-indigo-700 hover:bg-indigo-50/40 dark:hover:bg-indigo-950/40">
       <div className="flex items-center justify-between gap-3">
-        <span className="text-[10px] font-black uppercase tracking-wider text-slate-600">{label}</span>
+        <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">{label}</span>
         {optional && <span className="text-[9px] font-bold text-slate-400">OPTIONAL</span>}
       </div>
       <input
         type="file"
         accept=".jpg,.jpeg,.png,.tif,.tiff,image/*"
         onChange={(event) => onChange(event.target.files?.[0] || null)}
-        className="mt-3 block w-full text-[11px] text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-100 file:px-3 file:py-1.5 file:text-[10px] file:font-bold file:text-indigo-700"
+        className="mt-3 block w-full text-[11px] text-slate-500 dark:text-slate-400 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-100 dark:file:bg-indigo-950 file:px-3 file:py-1.5 file:text-[10px] file:font-bold file:text-indigo-700 dark:file:text-indigo-300"
       />
       <p className="mt-2 truncate text-[10px] text-slate-400">
         {file ? file.name : preview ? "Using pre-loaded sample image" : optional ? "No DEM supplied" : "Choose an image or select sample"}
@@ -443,14 +443,14 @@ function MetricCard({
 }) {
   const missing = value === "—";
   return (
-    <div className={`rounded-xl border p-4 ${emphasis ? "border-indigo-200 bg-indigo-50/60" : "border-slate-200 bg-white"}`}>
+    <div className={`rounded-xl border p-4 ${emphasis ? "border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/60 dark:bg-indigo-950/30" : "border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5"}`}>
       <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{label}</p>
-      <p className={`mt-2 text-2xl font-black tracking-tight ${emphasis ? "text-[#4F46E5]" : "text-slate-900"}`}>
+      <p className={`mt-2 text-2xl font-black tracking-tight ${emphasis ? "text-[#4F46E5] dark:text-indigo-300" : "text-slate-900 dark:text-slate-100"}`}>
         {value}
-        {suffix && !missing && <span className="ml-1 text-xs font-bold text-slate-500">{suffix}</span>}
+        {suffix && !missing && <span className="ml-1 text-xs font-bold text-slate-500 dark:text-slate-400">{suffix}</span>}
       </p>
       {missing && hint ? (
-        <p className="mt-1 text-[10px] font-semibold text-amber-600">{hint}</p>
+        <p className="mt-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400">{hint}</p>
       ) : (
         sublabel && <p className="mt-1 text-[10px] text-slate-400">{sublabel}</p>
       )}
@@ -474,7 +474,7 @@ function DownloadLink({ href, label }: { href?: string | null; label: string }) 
       download
       target="_blank"
       rel="noreferrer"
-      className="rounded-lg border border-indigo-100 bg-white px-3 py-2 text-[10px] font-bold text-indigo-700 transition hover:bg-indigo-50"
+      className="rounded-lg border border-indigo-100 dark:border-indigo-900/50 bg-white dark:bg-white/5 px-3 py-2 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 transition hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
     >
       ↓ {label}
     </a>
@@ -516,9 +516,9 @@ function OverlayImage({
   };
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-3">
+    <div className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-3">
       <div className="mb-2 flex items-center justify-between">
-        <h4 className="text-xs font-bold text-slate-800">{title}</h4>
+        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">{title}</h4>
         <span className="text-[10px] font-mono text-slate-400">{points.length} inlier pts</span>
       </div>
       <div className="relative aspect-square overflow-hidden rounded-lg bg-slate-950 flex items-center justify-center">
@@ -852,12 +852,12 @@ export default function RegistrationLauncher() {
     (result?.status === "success" ? "HIGH_CONFIDENCE" : result?.status?.toUpperCase() || "READY");
   const qualityTone =
     qualityTier === "SPECTRAL_PROJECTION_VALIDATED"
-      ? "border-purple-300 bg-purple-50 text-purple-700"
+      ? "border-purple-300 dark:border-purple-900/50 bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300"
       : qualityTier === "HIGH_CONFIDENCE"
-      ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+      ? "border-emerald-300 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
       : qualityTier === "ACCEPTED"
-      ? "border-cyan-300 bg-cyan-50 text-cyan-700"
-      : "border-rose-300 bg-rose-50 text-rose-700";
+      ? "border-cyan-300 dark:border-cyan-900/50 bg-cyan-50 dark:bg-cyan-950/30 text-cyan-700 dark:text-cyan-300"
+      : "border-rose-300 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300";
 
   const inliers = metric(metrics, "num_inliers", "inlier_count");
   const coverage = metric(metrics, "combined_coverage_score", "source_coverage_ratio", "spatial_coverage");
@@ -905,16 +905,16 @@ export default function RegistrationLauncher() {
       : null;
 
   return (
-    <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm md:p-6">
+    <section className="rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-5 shadow-sm md:p-6">
       {/* Header Bar */}
-      <div className="flex flex-col justify-between gap-3 border-b border-slate-100 pb-5 md:flex-row md:items-center">
+      <div className="flex flex-col justify-between gap-3 border-b border-slate-100 dark:border-[#1b2029] pb-5 md:flex-row md:items-center">
         <div>
           <div className="flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-[#4F46E5] shadow-[0_0_0_4px_rgba(79,70,229,.12)]" />
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#4F46E5]">Live Registration Pipeline</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#4F46E5] dark:text-indigo-300">Live Registration Pipeline</p>
           </div>
-          <h3 className="mt-1 text-xl font-black tracking-tight text-slate-900">Upload &amp; Register</h3>
-          <p className="mt-1 max-w-2xl text-xs text-slate-500">
+          <h3 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-slate-100">Upload &amp; Register</h3>
+          <p className="mt-1 max-w-2xl text-xs text-slate-500 dark:text-slate-400">
             Run the cross-sensor matching engine and inspect sub-pixel alignment, correspondence geometry, and Quality Gates.
           </p>
         </div>
@@ -922,28 +922,28 @@ export default function RegistrationLauncher() {
         <div className="flex items-center gap-2">
           {result && resultProvenance === "snapshot" && (
             <span
-              className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-amber-700"
+              className="rounded-full border border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300"
               title="Committed benchmark snapshot from the repo manifests — press Run to verify live against the backend."
             >
               Snapshot · run live to verify
             </span>
           )}
           {result && resultProvenance === "live" && (
-            <span className="rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-700">
+            <span className="rounded-full border border-emerald-300 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
               Live backend run
             </span>
           )}
-          <div className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${result ? qualityTone : "border-slate-200 bg-slate-50 text-slate-500"}`}>
+          <div className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${result ? qualityTone : "border-slate-200 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400"}`}>
             {loading ? "PROCESSING..." : result ? qualityTier.replaceAll("_", " ") : "READY TO RUN"}
           </div>
         </div>
       </div>
 
       {/* 1. Custom Upload Inputs & Controls (Rendered FIRST, above the fold) */}
-      <div ref={uploadSectionRef} className="mt-5 space-y-4 rounded-xl border border-indigo-100 bg-indigo-50/20 p-4">
-        <div className="flex items-center justify-between border-b border-indigo-100 pb-2">
-          <span className="text-xs font-bold text-slate-800">Upload Custom Multi-Sensor Pair</span>
-          <span className="text-[10px] text-slate-500 font-mono">GeoTIFF (.tif) or PNG (.png)</span>
+      <div ref={uploadSectionRef} className="mt-5 space-y-4 rounded-xl border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/20 dark:bg-indigo-950/30 p-4">
+        <div className="flex items-center justify-between border-b border-indigo-100 dark:border-indigo-900/50 pb-2">
+          <span className="text-xs font-bold text-slate-800 dark:text-slate-100">Upload Custom Multi-Sensor Pair</span>
+          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">GeoTIFF (.tif) or PNG (.png)</span>
         </div>
 
         <div className="grid gap-3 md:grid-cols-2">
@@ -963,11 +963,11 @@ export default function RegistrationLauncher() {
 
         <div className="grid gap-3 md:grid-cols-[1fr_1fr_1.2fr]">
           <label className="block">
-            <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-500">Source Sensor</span>
+            <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Source Sensor</span>
             <select
               value={sourceSensor}
               onChange={(e) => setSourceSensor(e.target.value as Sensor)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              className="w-full rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
             >
               {SENSOR_OPTIONS.filter((s) => s.value !== "LRO_NAC").map((sensor) => (
                 <option key={sensor.value} value={sensor.value}>
@@ -978,11 +978,11 @@ export default function RegistrationLauncher() {
           </label>
 
           <label className="block">
-            <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-500">Reference Sensor</span>
+            <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Reference Sensor</span>
             <select
               value={referenceSensor}
               onChange={(e) => setReferenceSensor(e.target.value as Sensor)}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-700 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+              className="w-full rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
             >
               {SENSOR_OPTIONS.map((sensor) => (
                 <option key={sensor.value} value={sensor.value}>
@@ -996,8 +996,8 @@ export default function RegistrationLauncher() {
         </div>
 
         {/* Quick Pre-aligned test buttons */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-indigo-100/60 text-[10px]">
-          <span className="font-bold text-slate-500">Quick Test Pairs:</span>
+        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-indigo-100/60 dark:border-indigo-900/50 text-[10px]">
+          <span className="font-bold text-slate-500 dark:text-slate-400">Quick Test Pairs:</span>
           <button
             type="button"
             onClick={() =>
@@ -1010,7 +1010,7 @@ export default function RegistrationLauncher() {
                 "region_001_lro_nac.png"
               )
             }
-            className="rounded-lg border border-indigo-200 bg-white px-2.5 py-1 font-bold text-indigo-600 hover:bg-indigo-50 transition shadow-xs"
+            className="rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-white dark:bg-white/5 px-2.5 py-1 font-bold text-indigo-600 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition shadow-xs"
           >
             🌙 Load Region 001 (OHRC + LRO NAC)
           </button>
@@ -1026,14 +1026,14 @@ export default function RegistrationLauncher() {
                 "region_001_tmc.png"
               )
             }
-            className="rounded-lg border border-indigo-200 bg-white px-2.5 py-1 font-bold text-indigo-600 hover:bg-indigo-50 transition shadow-xs"
+            className="rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-white dark:bg-white/5 px-2.5 py-1 font-bold text-indigo-600 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition shadow-xs"
           >
             🪐 Load Region 001 (OHRC + TMC-2)
           </button>
         </div>
 
         {error && customMode && (
-          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+          <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 px-4 py-3 text-xs text-rose-700 dark:text-rose-300">
             <span className="font-black uppercase tracking-wider">Verification Notice:</span>
             <span className="ml-2">{error}</span>
           </div>
@@ -1058,7 +1058,7 @@ export default function RegistrationLauncher() {
 
       {/* Live-run error banner (Step 13: backend failures surface, never snapshots) */}
       {error && !customMode && (
-        <div className="mt-5 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs text-rose-700">
+        <div className="mt-5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 px-4 py-3 text-xs text-rose-700 dark:text-rose-300">
           <span className="font-black uppercase tracking-wider">Backend error:</span>
           <span className="ml-2">{error}</span>
         </div>
@@ -1067,7 +1067,7 @@ export default function RegistrationLauncher() {
       {/* 2. Benchmark Pair Selector (Rendered AFTER upload section) */}
       <div className="mt-5">
         <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
             ⚡ Quick Benchmark Pairs (1-Click Verification)
           </span>
           <div className="flex items-center gap-2">
@@ -1082,7 +1082,7 @@ export default function RegistrationLauncher() {
               className={`rounded-lg px-2.5 py-1 text-xs font-bold transition flex items-center gap-1.5 ${
                 customMode && !selectedSample
                   ? "bg-indigo-600 text-white shadow-sm"
-                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                  : "bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/20"
               }`}
             >
               <span>+ Custom GeoTIFF Upload</span>
@@ -1091,7 +1091,7 @@ export default function RegistrationLauncher() {
               <button
                 type="button"
                 onClick={reset}
-                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                className="rounded-lg border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10"
               >
                 Clear
               </button>
@@ -1109,20 +1109,20 @@ export default function RegistrationLauncher() {
                 onClick={() => loadSample(sample)}
                 className={`flex flex-col justify-between rounded-xl border p-3 text-left transition ${
                   active
-                    ? "border-[#4F46E5] bg-indigo-50/50 shadow-sm ring-2 ring-indigo-200"
-                    : "border-slate-200 bg-slate-50/60 hover:border-slate-300 hover:bg-slate-50"
+                    ? "border-[#4F46E5] bg-indigo-50/50 dark:bg-indigo-950/30 shadow-sm ring-2 ring-indigo-200 dark:ring-indigo-900/50"
+                    : "border-slate-200 dark:border-[#1b2029] bg-slate-50/60 dark:bg-white/5 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-white/10"
                 }`}
               >
                 <div>
                   <div className="flex items-center justify-between gap-1 mb-1.5">
-                    <span className="text-[11px] font-bold text-slate-900 leading-snug">{sample.title}</span>
+                    <span className="text-[11px] font-bold text-slate-900 dark:text-slate-100 leading-snug">{sample.title}</span>
                   </div>
                   <span className={`inline-block rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${sample.badgeStyle}`}>
                     {sample.tag}
                   </span>
-                  <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500 line-clamp-2">{sample.description}</p>
+                  <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-2">{sample.description}</p>
                 </div>
-                <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-1.5 text-[10px] font-bold text-indigo-600">
+                <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 dark:border-[#1b2029] pt-1.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-300">
                   <span>{active ? "✓ Active Verification" : "Load Pair"}</span>
                   <span>→</span>
                 </div>
@@ -1135,59 +1135,59 @@ export default function RegistrationLauncher() {
       {/* 3. Scientific Failure State: Quality Gate Rejection Panel */}
       {isFailedRegistration && (
         <div className="mt-5 space-y-4">
-          <div className="rounded-2xl border border-rose-200 bg-rose-50/70 p-5 md:p-6">
+          <div className="rounded-2xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 dark:bg-rose-950/30 p-5 md:p-6">
             <div className="flex flex-col sm:flex-row items-start gap-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-100 text-2xl text-rose-600">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-100 dark:bg-rose-950/50 text-2xl text-rose-600 dark:text-rose-400">
                 🛡️
               </div>
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-rose-200/90 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-rose-900">
+                  <span className="rounded-full bg-rose-200/90 dark:bg-rose-950/60 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-rose-900 dark:text-rose-200">
                     Quality Gate Rejection
                   </span>
-                  <span className="text-[11px] font-mono font-bold text-rose-700">
+                  <span className="text-[11px] font-mono font-bold text-rose-700 dark:text-rose-300">
                     Zero Synthetic Fallback Standard Enforced
                   </span>
                 </div>
 
-                <h4 className="mt-2 text-base font-bold text-rose-950">
+                <h4 className="mt-2 text-base font-bold text-rose-950 dark:text-rose-100">
                   Robust Geometric Verification Refused Transformation
                 </h4>
 
-                <p className="mt-1.5 text-xs leading-relaxed text-rose-800">
+                <p className="mt-1.5 text-xs leading-relaxed text-rose-800 dark:text-rose-200">
                   In strict compliance with SIH Problem Statement 26166 integrity requirements, Astralynx enforces a strict{" "}
-                  <strong className="font-semibold text-rose-950">Zero Synthetic Fallback policy</strong>. When image pairs lack
+                  <strong className="font-semibold text-rose-950 dark:text-rose-100">Zero Synthetic Fallback policy</strong>. When image pairs lack
                   sufficient consensus crater correspondences or exhibit extreme geometric distortion, the pipeline{" "}
-                  <strong className="font-semibold text-rose-950">cleanly rejects registration</strong> rather than manufacturing
+                  <strong className="font-semibold text-rose-950 dark:text-rose-100">cleanly rejects registration</strong> rather than manufacturing
                   an artificial identity homography or hallucinating correspondence points.
                 </p>
 
-                <div className="mt-4 rounded-xl border border-rose-200/80 bg-white/90 p-3.5 text-xs text-slate-700">
-                  <div className="font-bold text-slate-900 mb-1.5">Verification Audit Details:</div>
+                <div className="mt-4 rounded-xl border border-rose-200/80 dark:border-rose-900/50 bg-white/90 dark:bg-[#0e1117] p-3.5 text-xs text-slate-700 dark:text-slate-300">
+                  <div className="font-bold text-slate-900 dark:text-slate-100 mb-1.5">Verification Audit Details:</div>
                   <div className="space-y-1 font-mono text-[11px]">
-                    <div className="flex justify-between border-b border-slate-100 pb-1">
-                      <span className="font-sans text-slate-500">Rejection Cause:</span>
-                      <span className="font-bold text-rose-700">{result?.message || error || "Robust geometric verification failed to estimate a valid transformation from verified correspondences."}</span>
+                    <div className="flex justify-between border-b border-slate-100 dark:border-[#1b2029] pb-1">
+                      <span className="font-sans text-slate-500 dark:text-slate-400">Rejection Cause:</span>
+                      <span className="font-bold text-rose-700 dark:text-rose-300">{result?.message || error || "Robust geometric verification failed to estimate a valid transformation from verified correspondences."}</span>
                     </div>
-                    <div className="flex justify-between border-b border-slate-100 pb-1">
-                      <span className="font-sans text-slate-500">Verified Inliers:</span>
-                      <span className="font-bold text-slate-900">{result?.metrics?.num_inliers ?? 0} consensus points (minimum 4 required)</span>
+                    <div className="flex justify-between border-b border-slate-100 dark:border-[#1b2029] pb-1">
+                      <span className="font-sans text-slate-500 dark:text-slate-400">Verified Inliers:</span>
+                      <span className="font-bold text-slate-900 dark:text-slate-100">{result?.metrics?.num_inliers ?? 0} consensus points (minimum 4 required)</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="font-sans text-slate-500">Synthetic Fallback Action:</span>
-                      <span className="font-bold text-emerald-700">Refused (Zero fake points generated)</span>
+                      <span className="font-sans text-slate-500 dark:text-slate-400">Synthetic Fallback Action:</span>
+                      <span className="font-bold text-emerald-700 dark:text-emerald-400">Refused (Zero fake points generated)</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Visual Comparison of Divergent Pair */}
                 <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-rose-200/80 bg-white p-2.5">
+                  <div className="rounded-xl border border-rose-200/80 dark:border-rose-900/50 bg-white dark:bg-[#0e1117] p-2.5">
                     <div className="flex items-center justify-between mb-1.5 px-1">
-                      <span className="text-[11px] font-bold text-slate-800">
+                      <span className="text-[11px] font-bold text-slate-800 dark:text-slate-100">
                         {customMode && sourceFile ? `Uploaded Source: ${sourceFile.name}` : `Source: ${SENSOR_META.ohrc.label} (${SENSOR_META.ohrc.gsdM}m)`}
                       </span>
-                      <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-800 font-mono">
+                      <span className="rounded bg-rose-100 dark:bg-rose-950/50 px-1.5 py-0.5 text-[9px] font-bold text-rose-800 dark:text-rose-300 font-mono">
                         {customMode ? sourceSensor : "Sun: 269.6° (West)"}
                       </span>
                     </div>
@@ -1200,12 +1200,12 @@ export default function RegistrationLauncher() {
                       />
                     </div>
                   </div>
-                  <div className="rounded-xl border border-rose-200/80 bg-white p-2.5">
+                  <div className="rounded-xl border border-rose-200/80 dark:border-rose-900/50 bg-white dark:bg-[#0e1117] p-2.5">
                     <div className="flex items-center justify-between mb-1.5 px-1">
-                      <span className="text-[11px] font-bold text-slate-800">
+                      <span className="text-[11px] font-bold text-slate-800 dark:text-slate-100">
                         {customMode && referenceFile ? `Uploaded Reference: ${referenceFile.name}` : `Reference: ${SENSOR_META.tmc.label} (${(4).toFixed(1)}m)`}
                       </span>
-                      <span className="rounded bg-rose-100 px-1.5 py-0.5 text-[9px] font-bold text-rose-800 font-mono">
+                      <span className="rounded bg-rose-100 dark:bg-rose-950/50 px-1.5 py-0.5 text-[9px] font-bold text-rose-800 dark:text-rose-300 font-mono">
                         {customMode ? referenceSensor : "Sun: 108.9° (East)"}
                       </span>
                     </div>
@@ -1219,7 +1219,7 @@ export default function RegistrationLauncher() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-2.5 rounded-lg bg-rose-100/70 py-1.5 px-3 text-center text-[10px] font-bold text-rose-800">
+                <div className="mt-2.5 rounded-lg bg-rose-100/70 dark:bg-rose-950/40 py-1.5 px-3 text-center text-[10px] font-bold text-rose-800 dark:text-rose-300">
                   {customMode
                     ? "⚠️ Insufficient Consensus Overlap: When uploaded images lack sufficient shared crater topography or feature points, the pipeline cleanly rejects registration rather than producing hallucinated matches."
                     : "⚠️ 160.8° Solar Azimuth Inversion: Shadows fall toward opposite crater rims, causing cross-correlation to fail safely rather than producing hallucinated matches."}
@@ -1243,7 +1243,7 @@ export default function RegistrationLauncher() {
                       const tmcSample = SAMPLE_PAIRS[0];
                       loadSample(tmcSample);
                     }}
-                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+                    className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm transition hover:bg-slate-50 dark:hover:bg-white/10"
                   >
                     View 21x Scale Pair (Region 001 TMC-2)
                   </button>
@@ -1261,7 +1261,7 @@ export default function RegistrationLauncher() {
                           "region_001_lro_nac.png"
                         );
                       }}
-                      className="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-xs font-bold text-indigo-700 shadow-sm transition hover:bg-indigo-100"
+                      className="rounded-xl border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-2.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 shadow-sm transition hover:bg-indigo-100 dark:hover:bg-indigo-950/50"
                     >
                       Load Verified Sample Files into Form
                     </button>
@@ -1280,8 +1280,8 @@ export default function RegistrationLauncher() {
             <div
               className={
                 isIIRSPair
-                  ? "rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 text-xs text-purple-800"
-                  : "rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs text-emerald-800"
+                  ? "rounded-xl border border-purple-200 dark:border-purple-900/50 bg-purple-50 dark:bg-purple-950/30 px-4 py-3 text-xs text-purple-800 dark:text-purple-300"
+                  : "rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3 text-xs text-emerald-800 dark:text-emerald-300"
               }
             >
               <span className="font-black uppercase tracking-wider">
@@ -1289,7 +1289,7 @@ export default function RegistrationLauncher() {
               </span>
               <span className="ml-2">{result.message}</span>
               {isIIRSPair && (
-                <span className="ml-2 inline-block rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-700">
+                <span className="ml-2 inline-block rounded-full border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
                   Spectral Projection: Validated via TMC-2 Bridge
                 </span>
               )}
@@ -1299,7 +1299,7 @@ export default function RegistrationLauncher() {
           <div className="grid gap-4 xl:grid-cols-[1.45fr_1fr]">
             {/* Visual Artifacts */}
             <div className="space-y-4">
-              <div className="rounded-xl border border-slate-200 bg-slate-950 p-3">
+              <div className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-slate-950 p-3">
                 <div className="mb-3 flex items-center justify-between px-1">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-300">Primary Visual Proof</p>
@@ -1330,9 +1330,9 @@ export default function RegistrationLauncher() {
                 )}
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <div className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-3">
                 <div className="mb-2 flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-800">Registered Warped Source Image</h4>
+                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">Registered Warped Source Image</h4>
                   <span className="text-[10px] font-mono text-slate-400">Homography Reprojected</span>
                 </div>
                 {absoluteUrl(result.warped_url) ? (
@@ -1349,16 +1349,16 @@ export default function RegistrationLauncher() {
                     }}
                   />
                 ) : (
-                  <div className="flex min-h-[120px] items-center justify-center rounded-lg bg-slate-100 text-xs text-slate-400">
+                  <div className="flex min-h-[120px] items-center justify-center rounded-lg bg-slate-100 dark:bg-white/5 text-xs text-slate-400">
                     No warped image returned.
                   </div>
                 )}
               </div>
 
               {absoluteUrl(result.quiver_url) ? (
-                <div className="rounded-xl border border-slate-200 bg-white p-3">
+                <div className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-3">
                   <div className="mb-2 flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-800">Residual Displacement Vectors</h4>
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">Residual Displacement Vectors</h4>
                     <span className="text-[10px] font-mono text-slate-400">Per-inlier reprojection error</span>
                   </div>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -1400,14 +1400,14 @@ export default function RegistrationLauncher() {
                 }
               />
               {isIIRSPair ? (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600">
+                <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 p-4">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-300">
                     Spectral Projection
                   </p>
-                  <p className="mt-2 text-sm font-black leading-snug tracking-tight text-emerald-800">
+                  <p className="mt-2 text-sm font-black leading-snug tracking-tight text-emerald-800 dark:text-emerald-200">
                     Spectral Projection: Validated via TMC-2 Bridge
                   </p>
-                  <p className="mt-1 text-[10px] text-emerald-600">
+                  <p className="mt-1 text-[10px] text-emerald-600 dark:text-emerald-300">
                     0 direct inliers by design — composed H_TMC→IIRS · H_OHRC→TMC overlay
                   </p>
                 </div>
@@ -1463,7 +1463,7 @@ export default function RegistrationLauncher() {
               <div className={`col-span-2 rounded-xl border p-4 ${qualityTone}`}>
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] font-black uppercase tracking-[0.16em] opacity-70">Quality Tier</p>
-                  <span className="rounded-md border border-indigo-200 bg-white/80 px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider text-indigo-700 shadow-sm">
+                  <span className="rounded-md border border-indigo-200 dark:border-indigo-900/50 bg-white/80 dark:bg-white/5 px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 shadow-sm">
                     Estimator: {outlierMethod}
                   </span>
                 </div>
@@ -1476,7 +1476,7 @@ export default function RegistrationLauncher() {
           </div>
 
           {/* View Mode Toggle: 2D Planar Verification vs 3D Lunar Globe */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-[#1b2029] pb-3">
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -1484,13 +1484,13 @@ export default function RegistrationLauncher() {
                 className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
                   resultView === "2d"
                     ? "bg-indigo-600 text-white shadow-sm"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+                    : "bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/20 hover:text-slate-900 dark:hover:text-slate-100"
                 }`}
               >
                 <span>🔍 2D Planar Verification</span>
                 <span
                   className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                    resultView === "2d" ? "bg-indigo-500/80 text-white" : "bg-slate-200 text-slate-600"
+                    resultView === "2d" ? "bg-indigo-500/80 text-white" : "bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300"
                   }`}
                 >
                   {points.length}
@@ -1502,14 +1502,14 @@ export default function RegistrationLauncher() {
                 className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
                   resultView === "3d"
                     ? "bg-indigo-600 text-white shadow-sm"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900"
+                    : "bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/20 hover:text-slate-900 dark:hover:text-slate-100"
                 }`}
               >
                 <span>🌕 3D Lunar Globe Tie-Points</span>
                 {moonPoints.length > 0 && (
                   <span
                     className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                      resultView === "3d" ? "bg-indigo-500/80 text-white" : "bg-slate-200 text-slate-600"
+                      resultView === "3d" ? "bg-indigo-500/80 text-white" : "bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300"
                     }`}
                   >
                     {moonPoints.filter((p) => p.georeferenced).length}
@@ -1519,7 +1519,7 @@ export default function RegistrationLauncher() {
             </div>
 
             {resultView === "3d" && (
-              <span className="text-[11px] text-slate-500">
+              <span className="text-[11px] text-slate-500 dark:text-slate-400">
                 Drag to rotate sphere · Scroll to zoom
               </span>
             )}
@@ -1627,10 +1627,10 @@ export default function RegistrationLauncher() {
           )}
 
           {/* Action Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 p-4">
             <div>
-              <p className="text-xs font-bold text-slate-800">{points.length} verified correspondences mapped</p>
-              <p className="mt-1 text-[10px] text-slate-500">
+              <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{points.length} verified correspondences mapped</p>
+              <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
                 <span className="text-emerald-500">●</span> High Confidence (&gt;0.8){" "}
                 <span className="ml-2 text-amber-500">●</span> Review (&gt;0.5){" "}
                 <span className="ml-2 text-rose-400">●</span> Low Confidence
@@ -1663,7 +1663,7 @@ export default function RegistrationLauncher() {
             <button
               type="button"
               onClick={reset}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-sm transition hover:bg-slate-50"
+              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm transition hover:bg-slate-50 dark:hover:bg-white/10"
             >
               ← Register Another Pair
             </button>
