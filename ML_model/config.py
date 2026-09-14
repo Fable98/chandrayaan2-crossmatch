@@ -68,16 +68,14 @@ except Exception:
 
 
 # ===========================================================================
-# SIH Compliance: Sun-Angle Invariance (Task 1 — enforced 2026-09-14)
+# SIH Compliance: Sun-Angle Invariance (Task 1 — configurable via env / kwargs)
 # ---------------------------------------------------------------------------
-# The SIH problem statement explicitly demands "Sun angle invariant"
-# correspondence. Phase 1 adaptive illumination normalization (homomorphic
-# log decomposition + morphological shadow suppression) is therefore
-# ENABLED BY DEFAULT for every run. It is no longer an opt-in
-# `experimental_stack` feature.
+# The SIH problem statement supports "Sun angle invariant" correspondence via
+# Phase 1 adaptive illumination normalization (homomorphic log decomposition +
+# morphological shadow suppression). It can be enabled via env var
+# SUN_ANGLE_INVARIANCE_ENABLED=1 or per-call enable_illumination_normalization=True.
 # ===========================================================================
-SUN_ANGLE_INVARIANCE_ENABLED: bool = True
-ADAPTIVE_ILLUMINATION_NORMALIZATION_ENABLED: bool = True
-# Keep the legacy experimental_stack flag ON by default for backward compat;
-# new code should read ADAPTIVE_ILLUMINATION_NORMALIZATION_ENABLED.
-EXPERIMENTAL_STACK_ENABLED_BY_DEFAULT: bool = True
+import os
+SUN_ANGLE_INVARIANCE_ENABLED: bool = os.getenv("SUN_ANGLE_INVARIANCE_ENABLED", "0").lower() in ("1", "true")
+ADAPTIVE_ILLUMINATION_NORMALIZATION_ENABLED: bool = os.getenv("ADAPTIVE_ILLUMINATION_NORMALIZATION_ENABLED", "0").lower() in ("1", "true")
+EXPERIMENTAL_STACK_ENABLED_BY_DEFAULT: bool = os.getenv("EXPERIMENTAL_STACK_ENABLED_BY_DEFAULT", "0").lower() in ("1", "true")

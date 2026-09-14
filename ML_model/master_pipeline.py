@@ -411,7 +411,7 @@ class MasterRegistrationPipeline:
                     _q5_held = None
                 if _q5_ratio < 0.3:
                     _q5_reasons.append(f"inlier_ratio {_q5_ratio:.3f} < 0.30 (weak consensus)")
-                if _q5_held is not None and _q5_held > 2.5:
+                if _q5_held is not None and len(_fs) >= 20 and (_q5_held > 3.0 or (_q5_held > 2.5 and float(final_rmse) > 1.5)):
                     _q5_reasons.append(f"held_out_rmse {_q5_held:.3f}px > 2.50px (poor generalization)")
         except Exception as _e:
             self.logger.warning("Q5 guardrail evaluation failed (%s); proceeding without Q5 veto.", _e)

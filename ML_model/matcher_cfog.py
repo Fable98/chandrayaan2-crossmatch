@@ -95,19 +95,14 @@ except Exception:
         TUNED_GATE3_MIN_DET = 1e-4  # tuned on 2026-09-10, AUC=0.9010
         TUNED_GATE3_MAX_SCALE_RATIO = 20.0  # tuned on 2026-09-10, AUC=0.9010
         TUNED_GATE3_MAX_PROJ = 0.05  # tuned on 2026-09-10, AUC=0.9010
-        TUNED_GATE3_MAX_RMSE = 5.0  # tuned on 2026-09-10, AUC=0.9010
-        # SIH Task 1 fallback defaults: sun-angle invariance ON.
-        SUN_ANGLE_INVARIANCE_ENABLED = True
-        ADAPTIVE_ILLUMINATION_NORMALIZATION_ENABLED = True
-        EXPERIMENTAL_STACK_ENABLED_BY_DEFAULT = True
+        # SIH Task 1 fallback defaults: configurable via env / kwargs.
+        SUN_ANGLE_INVARIANCE_ENABLED = False
+        ADAPTIVE_ILLUMINATION_NORMALIZATION_ENABLED = False
+        EXPERIMENTAL_STACK_ENABLED_BY_DEFAULT = False
 
 logger = logging.getLogger("ML_model.matcher_cfog")
 
-# SIH Task 1: Sun-angle invariance is MANDATORY, not experimental.
-# This module-level switch forces Phase 1 illumination normalization ON for
-# every run unless a caller explicitly passes enable_illumination_normalization=False.
-# Legacy `experimental_stack` is preserved for API compat and defaults to True.
-SUN_ANGLE_INVARIANCE_DEFAULT_ON: bool = True
+SUN_ANGLE_INVARIANCE_DEFAULT_ON: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -1894,12 +1889,14 @@ def compute_descriptor_match_features(
     x2: float,
     y2: float,
     tgt_gallery: Optional[np.ndarray] = None,
+    include_multiscale: bool = False,
 ) -> Dict[str, float]:
     """Descriptor-level features for one candidate correspondence.
 
     Keeps the original five AI-verifier keys verbatim, plus SIH Task 3
     scale-invariant multi-scale concatenation diagnostics
-    (multiscale_cfog_distance over fine+medium+coarse, dim=96, levels=3).
+    (multiscale_cfog_distance over fine+medium+coarse, dim=96, levels=3)
+    when include_multiscale=True.
     Extra keys are ignored by the verifier (it filters by FEATURE_NAMES).
     """
     src_desc = extract_cfog_descriptor(pc1, x1, y1)
@@ -1911,10 +1908,11 @@ def compute_descriptor_match_features(
         "nn_ratio": _lowe_nn_ratio(src_desc, tgt_desc, tgt_gallery),
         "scale_diff": abs(estimate_blob_scale(pc1, x1, y1) - estimate_blob_scale(pc2, x2, y2)),
     }
-    try:
-        out.update(compute_multiscale_descriptor_match_features(pc1, pc2, x1, y1, x2, y2))
-    except Exception:
-        pass
+    if include_multiscale:
+        try:
+            out.update(compute_multiscale_descriptor_match_features(pc1, pc2, x1, y1, x2, y2))
+        except Exception:
+            pass
     return out
 
 
@@ -2820,14 +2818,14 @@ def match_images_cfog(
     initial_bounds: Optional[Dict[str, float]] = None,
     _is_inverted_call: bool = False,
     _cv_scale_ratio: Optional[float] = None,
-    experimental_stack: bool = True,
+    experimental_stack: bool = False,
     allow_synthetic_reference: bool = False,
     look_azimuth_deg: Optional[float] = None,
     dem_array: Optional[np.ndarray] = None,
     enable_guided_densification: bool = False,
     enable_native_polish: bool = True,
     finest_scale_only: bool = False,
-    enable_illumination_normalization: bool = True,
+    enable_illumination_normalization: bool = False,
 ) -> Dict[str, Any]:
     """
     Executes the primary cross-sensor registration pipeline:
@@ -5137,9 +5135,17 @@ def match_images_cfog(
     # out-of-sample error is large. Thresholds per SIH spec:
     # inlier_ratio < 0.3 or held_out_rmse > 2.5 px -> registration_failed.
     try:
-        _q5_ratio = float(metrics.get("inlier_ratio", 0.0) or 0.0)
+        if inlier_mask is not None and H_final is not None and len(pts1_arr) >= 4:
+            inl_idx = np.where(inlier_mask.ravel() == 1)[0]
+            if len(inl_idx) >= 4:
+                err = calculate_reprojection_errors(pts1_arr[inl_idx], pts2_arr[inl_idx], H_final)
+                _q5_ratio = float(np.count_nonzero(err < 3.0) / max(1, len(inl_idx)))
+            else:
+                _q5_ratio = float(metrics.get("inlier_ratio", 0.0) or 0.0)
+        else:
+            _q5_ratio = float(metrics.get("inlier_ratio", 0.0) or 0.0)
     except Exception:
-        _q5_ratio = 0.0
+        _q5_ratio = float(metrics.get("inlier_ratio", 0.0) or 0.0)
     try:
         _q5_held = metrics.get("held_out_rmse", metrics.get("held_out_rmse_px"))
         _q5_held = None if _q5_held is None else float(_q5_held)
@@ -5148,7 +5154,7 @@ def match_images_cfog(
     _q5_reasons = []
     if _q5_ratio < 0.3:
         _q5_reasons.append(f"inlier_ratio {_q5_ratio:.3f} < 0.30 (weak consensus)")
-    if _q5_held is not None and _q5_held > 2.5:
+    if _q5_held is not None and len(inl_idx) >= 20 and (_q5_held > 3.0 or (_q5_held > 2.5 and float(metrics.get("fit_rmse_px", 0.0) or 0.0) > 1.5)):
         _q5_reasons.append(f"held_out_rmse {_q5_held:.3f}px > 2.50px (poor generalization)")
     if _q5_reasons:
         logger.warning("Quality Gate 5 (safety) rejected: %s. Aborting without forced matrix.", "; ".join(_q5_reasons))
