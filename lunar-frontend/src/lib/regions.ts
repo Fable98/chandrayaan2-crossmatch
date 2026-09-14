@@ -1,4 +1,7 @@
-/** Only validated `region_*` tiles belong on the dashboard. */
+/** Only validated `region_*` tiles belong on the dashboard — curated
+ * `region_001` rows and freshly ingested `region_auto_*` rows alike. Both
+ * carry the same data-region bundle (512 crops, linked-cursor matches,
+ * checkerboard cross-grid QA, footprint), so both must pass the filter. */
 
 const HIDDEN_IDS = new Set([
   "triplet_01",
@@ -13,5 +16,5 @@ export function isDashboardRegion(id: string | null | undefined): boolean {
   const raw = id.trim();
   const key = raw.toLowerCase().replace(/[\s-]+/g, "_");
   if (HIDDEN_IDS.has(key) || key.startsWith("triplet")) return false;
-  return /^region_\d+$/i.test(raw);
+  return /^region_\d+$/i.test(raw) || /^region_auto_\d+$/i.test(raw);
 }

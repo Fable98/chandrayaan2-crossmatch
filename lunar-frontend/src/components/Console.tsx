@@ -101,17 +101,31 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
     }
   }, [modalParam, triplets]);
 
-  // Load regions once on mount
+  // Load regions once on mount (honour ?region= deep-links from Ingest results)
+  const regionParam = searchParams.get("region");
   useEffect(() => {
     api
       .listTriplets()
       .then((res) => {
         setTriplets(res.triplets);
-        if (res.triplets.length > 0) setSelectedId(res.triplets[0].id);
+        if (res.triplets.length === 0) return;
+        const wanted = (regionParam || "").trim();
+        const hit = wanted ? res.triplets.find((t) => t.id === wanted) : undefined;
+        setSelectedId(hit ? hit.id : res.triplets[0].id);
       })
       .catch((err) => setError(describeError(err)))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Follow ?region= changes (e.g. clicking another Ingest row without reload)
+  useEffect(() => {
+    if (!regionParam || triplets.length === 0) return;
+    if (triplets.some((t) => t.id === regionParam) && regionParam !== selectedId) {
+      setSelectedId(regionParam);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [regionParam, triplets]);
 
   // Load triplet detail, matches, and IIRS overlay
   useEffect(() => {

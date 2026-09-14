@@ -17,6 +17,8 @@ export interface IngestConfig {
   tileSize: number;
   noLargeAoi: boolean;
   noInvariants: boolean;
+  noMatching: boolean;
+  noRegistration: boolean;
   maxTimeGapDays: number | null;
   requireDates: boolean;
 }
@@ -45,6 +47,8 @@ export const DEFAULT_CONFIG: IngestConfig = {
   tileSize: 512,
   noLargeAoi: false,
   noInvariants: false,
+  noMatching: false,
+  noRegistration: false,
   maxTimeGapDays: null,
   requireDates: false,
 };
@@ -65,6 +69,8 @@ export async function uploadZips(
   form.append('tile_size', String(config.tileSize));
   form.append('no_large_aoi', String(config.noLargeAoi));
   form.append('no_invariants', String(config.noInvariants));
+  form.append('no_matching', String(config.noMatching));
+  form.append('no_registration', String(config.noRegistration));
   if (config.maxTimeGapDays !== null) {
     form.append('max_time_gap_days', String(config.maxTimeGapDays));
   }
