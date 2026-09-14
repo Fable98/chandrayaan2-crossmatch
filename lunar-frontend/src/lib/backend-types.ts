@@ -20,6 +20,8 @@ export interface Body_upload_and_ingest_api_ingest_upload_post {
   "tile_size"?: number;
   "no_large_aoi"?: boolean;
   "no_invariants"?: boolean;
+  "no_matching"?: boolean;
+  "no_registration"?: boolean;
   "max_time_gap_days"?: number | null;
   "require_dates"?: boolean;
 }
@@ -57,6 +59,10 @@ export interface IIRSRegistrationRequest {
   "iirs_image_path": string;
   "ohrc_image_path": string;
   "grid_size"?: number;
+}
+
+export interface JobDeleteBulk {
+  "job_ids": string[];
 }
 
 export type JobStatus = "pending" | "running" | "success" | "failed";
@@ -215,6 +221,9 @@ export interface TripletSummary {
   "lro_nac_gsd_m"?: number | null;
   "dem_available"?: boolean;
   "dem_url"?: string | null;
+  "overlap_triplet_pct"?: number | null;
+  "overlap_ohrc_tmc_pct"?: number | null;
+  "overlap_ohrc_iirs_pct"?: number | null;
 }
 
 export interface UserCreate {
@@ -244,7 +253,8 @@ export interface ValidationError {
 /** All backend routes (path -> methods), for contract tests. */
 export const BACKEND_API_PATHS = [
   "/" /* GET,HEAD */,
-  "/api/ingest/jobs" /* GET */,
+  "/api/ingest/jobs" /* DELETE,GET */,
+  "/api/ingest/jobs/{job_id}" /* DELETE */,
   "/api/ingest/results/{job_id}" /* GET */,
   "/api/ingest/status/{job_id}" /* GET */,
   "/api/ingest/upload" /* POST */,
@@ -263,7 +273,7 @@ export const BACKEND_API_PATHS = [
   "/refresh" /* GET */,
   "/register" /* POST */,
   "/triplets" /* GET */,
-  "/triplets/{triplet_id}" /* GET */,
+  "/triplets/{triplet_id}" /* DELETE,GET */,
   "/triplets/{triplet_id}/footprint" /* GET */,
   "/triplets/{triplet_id}/iirs-overlay" /* GET */,
   "/triplets/{triplet_id}/lro-candidates" /* GET */,

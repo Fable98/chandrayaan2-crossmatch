@@ -37,6 +37,11 @@ export interface TripletSummary {
   incidence_angle?: Record<string, number>;
   dem_available?: boolean;
   dem_url?: string | null;
+  // Triplet footprint overlap from the ingest matcher (tracks backend
+  // TripletSummary). Absent for older runs whose manifests never recorded it.
+  overlap_triplet_pct?: number | null;
+  overlap_ohrc_tmc_pct?: number | null;
+  overlap_ohrc_iirs_pct?: number | null;
   fit_rmse_px?: number | null;
   validation_rmse_px?: number | null;
   spatial_coverage?: number | null;
