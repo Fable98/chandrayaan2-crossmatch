@@ -17,6 +17,8 @@ import {
   pollStatus,
   getResults,
   listJobs,
+  deleteJob,
+  deleteJobs,
   DEFAULT_CONFIG,
   type IngestConfig,
   type JobStatus,
@@ -47,6 +49,8 @@ export default function IngestPage() {
   const [historyJobs, setHistoryJobs] = useState<IngestJobSummary[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
+  const [selectedJobs, setSelectedJobs] = useState<Set<string>>(new Set());
+  const [deletingJobs, setDeletingJobs] = useState(false);
   const [sessionExpired, setSessionExpired] = useState(false);
   const pollRef = useRef<number | null>(null);
 
@@ -120,12 +124,62 @@ export default function IngestPage() {
     try {
       const jobs = await listJobs();
       setHistoryJobs(jobs);
+      // Drop selections for jobs that no longer exist.
+      setSelectedJobs((prev) => {
+        const ids = new Set(jobs.map((j) => j.job_id));
+        const next = new Set<string>();
+        prev.forEach((id) => {
+          if (ids.has(id)) next.add(id);
+        });
+        return next;
+      });
     } catch (err: any) {
       setHistoryError(err.message || "Failed to load past ingestion jobs");
     } finally {
       setHistoryLoading(false);
     }
   }, []);
+
+  const handleDeleteHistoryJob = useCallback(async (id: string) => {
+    if (!window.confirm(`Delete ingestion history entry '${id}'? This removes the job record and its staging upload files.`)) return;
+    setDeletingJobs(true);
+    setHistoryError(null);
+    try {
+      await deleteJob(id);
+      setHistoryJobs((prev) => prev.filter((j) => j.job_id !== id));
+      setSelectedJobs((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    } catch (err: any) {
+      setHistoryError(err.message || "Failed to delete job");
+    } finally {
+      setDeletingJobs(false);
+    }
+  }, []);
+
+  const handleDeleteSelectedJobs = useCallback(async () => {
+    if (selectedJobs.size === 0) return;
+    if (!window.confirm(`Delete ${selectedJobs.size} ingestion histor${selectedJobs.size === 1 ? "y entry" : "y entries"}?`)) return;
+    setDeletingJobs(true);
+    setHistoryError(null);
+    try {
+      const res = await deleteJobs([...selectedJobs]);
+      const gone = new Set(res.deleted || []);
+      setHistoryJobs((prev) => prev.filter((j) => !gone.has(j.job_id)));
+      setSelectedJobs(new Set());
+      const errs = res.errors || {};
+      const failed = Object.entries(errs);
+      if (failed.length > 0) {
+        setHistoryError(`Some entries could not be deleted: ${failed.map(([id, e]) => `${id} (${e})`).join("; ")}`);
+      }
+    } catch (err: any) {
+      setHistoryError(err.message || "Failed to delete jobs");
+    } finally {
+      setDeletingJobs(false);
+    }
+  }, [selectedJobs]);
 
   useEffect(() => {
     loadHistoryJobs();
@@ -946,14 +1000,26 @@ export default function IngestPage() {
                       </p>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={loadHistoryJobs}
-                      disabled={historyLoading}
-                      className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm disabled:opacity-50"
-                    >
-                      <span>{historyLoading ? "Refreshing..." : "↻ Refresh History"}</span>
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {selectedJobs.size > 0 && (
+                        <button
+                          type="button"
+                          onClick={handleDeleteSelectedJobs}
+                          disabled={deletingJobs}
+                          className="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition shadow-sm disabled:opacity-50"
+                        >
+                          <span>{deletingJobs ? "Deleting..." : `🗑 Delete selected (${selectedJobs.size})`}</span>
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={loadHistoryJobs}
+                        disabled={historyLoading}
+                        className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm disabled:opacity-50"
+                      >
+                        <span>{historyLoading ? "Refreshing..." : "↻ Refresh History"}</span>
+                      </button>
+                    </div>
                   </div>
 
                   {historyError && (
@@ -991,6 +1057,21 @@ export default function IngestPage() {
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
                           <tr className="border-b border-slate-200/80 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                            <th className="py-3 px-4">
+                              <input
+                                type="checkbox"
+                                aria-label="Select all jobs"
+                                checked={historyJobs.length > 0 && selectedJobs.size === historyJobs.length}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedJobs(new Set(historyJobs.map((j) => j.job_id)));
+                                  } else {
+                                    setSelectedJobs(new Set());
+                                  }
+                                }}
+                                className="rounded accent-[#4F46E5]"
+                              />
+                            </th>
                             <th className="py-3 px-4">Job ID</th>
                             <th className="py-3 px-4">Status</th>
                             <th className="py-3 px-4">Current Stage</th>
@@ -1012,6 +1093,25 @@ export default function IngestPage() {
 
                             return (
                               <tr key={job.job_id} className="transition hover:bg-slate-50/60">
+                                <td className="py-3.5 px-4">
+                                  <input
+                                    type="checkbox"
+                                    aria-label={`Select job ${job.job_id}`}
+                                    checked={selectedJobs.has(job.job_id)}
+                                    onChange={(e) => {
+                                      setSelectedJobs((prev) => {
+                                        const next = new Set(prev);
+                                        if (e.target.checked) {
+                                          next.add(job.job_id);
+                                        } else {
+                                          next.delete(job.job_id);
+                                        }
+                                        return next;
+                                      });
+                                    }}
+                                    className="rounded accent-[#4F46E5]"
+                                  />
+                                </td>
                                 <td className="py-3.5 px-4 font-mono font-semibold text-slate-900">
                                   {job.job_id.slice(0, 8)}...{job.job_id.slice(-4)}
                                 </td>
@@ -1043,6 +1143,7 @@ export default function IngestPage() {
                                   {job.started_at ? new Date(job.started_at).toLocaleString() : "—"}
                                 </td>
                                 <td className="py-3.5 px-4 text-right">
+                                  <div className="flex items-center justify-end gap-2">
                                   {job.status === "completed" && (
                                     <button
                                       type="button"
@@ -1065,6 +1166,18 @@ export default function IngestPage() {
                                       Attach &amp; Monitor
                                     </button>
                                   )}
+                                  {job.status !== "running" && job.status !== "pending" && (
+                                    <button
+                                      type="button"
+                                      title="Delete this history entry"
+                                      onClick={() => handleDeleteHistoryJob(job.job_id)}
+                                      disabled={deletingJobs}
+                                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-400 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition shadow-xs disabled:opacity-50"
+                                    >
+                                      🗑
+                                    </button>
+                                  )}
+                                  </div>
                                 </td>
                               </tr>
                             );

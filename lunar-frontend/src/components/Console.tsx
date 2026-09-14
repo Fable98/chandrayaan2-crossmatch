@@ -173,6 +173,27 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
     scrollToArena();
   };
 
+  const handleDeleteRegion = async (tripletId: string) => {
+    const curated = /^region_\d+$/i.test(tripletId);
+    try {
+      await api.deleteTriplet(tripletId, false);
+    } catch (err) {
+      // Backend asks for ?force=true on curated seeds — the vault already
+      // confirmed once, so retry with force instead of failing.
+      const msg = err instanceof Error ? err.message : "";
+      if (curated && msg.includes("force=true")) {
+        await api.deleteTriplet(tripletId, true);
+      } else {
+        throw err;
+      }
+    }
+    const res = await api.listTriplets();
+    setTriplets(res.triplets);
+    if (selectedId === tripletId) {
+      setSelectedId(res.triplets.length > 0 ? res.triplets[0].id : "");
+    }
+  };
+
   const handleOpenDossierModal = async (triplet: TripletSummary) => {
     setActiveDossierTriplet(triplet);
     if (triplet.id === selectedId && metrics) {
@@ -1020,6 +1041,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
           initialFilter={vaultInitialFilter}
           onClose={() => setVaultOpen(false)}
           onSelectRegion={(id, preferredView) => handleSelectRegionAndScroll(id, preferredView)}
+          onDeleteRegion={handleDeleteRegion}
         />
       )}
       {theoryModalOpen && (

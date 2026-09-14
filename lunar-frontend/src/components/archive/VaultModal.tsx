@@ -13,6 +13,7 @@ interface Props {
   initialFilter?: PayloadFilter;
   onClose: () => void;
   onSelectRegion: (tripletId: string, preferredView?: "registration" | "linked-cursor" | "map") => void;
+  onDeleteRegion?: (tripletId: string) => Promise<void>;
 }
 
 export default function VaultModal({
@@ -20,9 +21,12 @@ export default function VaultModal({
   initialFilter = "all",
   onClose,
   onSelectRegion,
+  onDeleteRegion,
 }: Props) {
   const [filter, setFilter] = useState<PayloadFilter>(initialFilter);
   const [search, setSearch] = useState("");
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   // Tiles that failed to load, keyed by resolved URL. LRO tiles NEVER fall
   // back to OHRC pixels (that mislabels one sensor as another); they render
   // an explicit unavailable placeholder instead (Step 13 honesty rule).
@@ -120,6 +124,11 @@ export default function VaultModal({
 
         {/* Vault Grid Content */}
         <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30">
+          {deleteError && (
+            <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-medium text-rose-700">
+              Delete failed: {deleteError}
+            </div>
+          )}
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {filteredTriplets.map((t, idx) => {
               const { widthKm, heightKm } = footprintSizeKm(t.bounds);
@@ -245,6 +254,34 @@ export default function VaultModal({
                     >
                       Inspect →
                     </button>
+                    {onDeleteRegion && (
+                      <button
+                        disabled={deletingId === t.id}
+                        title={/^region_\d+$/i.test(t.id) ? "Delete curated seed (requires force confirm)" : "Delete this dataset"}
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          const curated = /^region_\d+$/i.test(t.id);
+                          const ok = window.confirm(
+                            curated
+                              ? `Delete curated seed '${t.id}'? Its on-disk bundle will be removed (restorable via git). Continue?`
+                              : `Delete dataset '${t.id}'? Its tiles, matches and registration products will be removed from disk. Continue?`
+                          );
+                          if (!ok) return;
+                          setDeleteError(null);
+                          setDeletingId(t.id);
+                          try {
+                            await onDeleteRegion(t.id);
+                          } catch (err) {
+                            setDeleteError(err instanceof Error ? err.message : "Delete failed");
+                          } finally {
+                            setDeletingId(null);
+                          }
+                        }}
+                        className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-400 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition-all shadow-sm disabled:opacity-50"
+                      >
+                        {deletingId === t.id ? "…" : "🗑"}
+                      </button>
+                    )}
                   </div>
                 </div>
               );

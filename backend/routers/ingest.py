@@ -446,3 +446,53 @@ async def list_jobs():
         }
         for j in _jobs.values()
     ]
+
+
+class JobDeleteBulk(BaseModel):
+    job_ids: list[str]
+
+
+def _delete_job_entry(job_id: str) -> dict[str, Any]:
+    """Remove one finished job + its staging upload dir. Raises HTTPException."""
+    job = _jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+    if job.get("status") in ("pending", "running"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"Job {job_id} is still {job.get('status')}; wait for completion first",
+        )
+    upload_dir = job.get("upload_dir")
+    if upload_dir:
+        real = os.path.realpath(str(upload_dir))
+        allowed = [os.path.realpath(str(_UPLOAD_ROOT)), os.path.realpath(str(_PROCESSED_TRIPLETS))]
+        if any(real == a or real.startswith(a + os.sep) for a in allowed):
+            shutil.rmtree(real, ignore_errors=True)
+    del _jobs[job_id]
+    return {"job_id": job_id, "deleted": True}
+
+
+@router.delete("/jobs/{job_id}")
+async def delete_job(job_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete one ingestion history entry (finished jobs only)."""
+    return _delete_job_entry(job_id)
+
+
+@router.delete("/jobs")
+async def delete_jobs_bulk(
+    body: JobDeleteBulk, current_user: dict = Depends(get_current_user)
+):
+    """Delete multiple ingestion history entries (finished jobs only)."""
+    deleted: list[str] = []
+    errors: dict[str, str] = {}
+    seen: set[str] = set()
+    for job_id in body.job_ids:
+        if job_id in seen:
+            continue
+        seen.add(job_id)
+        try:
+            _delete_job_entry(job_id)
+            deleted.append(job_id)
+        except HTTPException as exc:
+            errors[job_id] = str(exc.detail)
+    return {"deleted": deleted, "errors": errors}

@@ -93,6 +93,17 @@ export function imageUrl(path: string): string {
 export const api = {
   listTriplets: (): Promise<TripletListResponse> =>
     getJson<TripletListResponse>("/triplets"),
+  deleteTriplet: async (id: string, force = false): Promise<{ triplet_id: string; removed: string[] }> => {
+    const res = await fetch(
+      `${API_BASE}/triplets/${encodeURIComponent(id)}${force ? "?force=true" : ""}`,
+      { method: "DELETE", headers: { ...getAuthHeaders() } }
+    );
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new ApiError(err.detail || "Delete failed", res.status, id);
+    }
+    return res.json();
+  },
   getTriplet: (id: string): Promise<TripletSummary> =>
     getJson<TripletSummary>(`/triplets/${id}`),
   getMatches: (id: string): Promise<MatchesResponse> =>
