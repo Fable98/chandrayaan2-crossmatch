@@ -21,6 +21,10 @@ interface Props {
   // Optional provenance notice (e.g. why zero dots are shown despite
   // reported inliers). Rendered as an honest banner, never silently empty.
   notice?: string | null;
+  // Triplet footprint overlap from the ingest matcher (same number the
+  // ingest results table shows). Null when the region manifest never
+  // recorded one (older runs) — header then omits the badge.
+  overlapPct?: number | null;
 }
 
 interface Selection {
@@ -56,7 +60,7 @@ function findNearestMatch(
   return { match: best, index: bestIdx, distance: bestDist };
 }
 
-export default function LinkedCursorPanel({ tripletId, points, referenceMode = "tmc", notice = null }: Props) {
+export default function LinkedCursorPanel({ tripletId, points, referenceMode = "tmc", notice = null, overlapPct = null }: Props) {
   const [selection, setSelection] = useState<Selection | null>(null);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const [clickNotice, setClickNotice] = useState<string | null>(null);
@@ -121,6 +125,14 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
           <span className="text-xs text-ink-dim font-mono">
             {points.length} verified tie points
           </span>
+          {typeof overlapPct === "number" && (
+            <span
+              title="Shared OHRC+TMC-2+IIRS footprint overlap from triplet matching"
+              className="rounded-full border border-teal/30 bg-teal/10 px-2 py-0.5 font-mono text-[11px] font-bold text-teal"
+            >
+              {overlapPct.toFixed(1)}% overlap
+            </span>
+          )}
         </div>
         <span className="rounded bg-teal/10 border border-teal/30 px-2 py-0.5 font-mono text-3xs uppercase tracking-wider text-teal">
           Stage 4: LK Refinement

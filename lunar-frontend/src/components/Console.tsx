@@ -887,6 +887,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                         points={matches}
                         referenceMode={referenceMode}
                         notice={metrics?.metric_notes?.matches ?? null}
+                        overlapPct={typeof detail.overlap_triplet_pct === "number" ? detail.overlap_triplet_pct : null}
                       />
                     </div>
                   )}

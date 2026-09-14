@@ -548,6 +548,19 @@ def load_all() -> None:
 
     # Build lookup dict and ordered list (deduplicating by id), only keeping
     # production triplets that carry a valid shared bounding box.
+    # First source (processed_triplets manifests) wins, but per-region
+    # manifests from older pipeline runs lack overlap_* fields that
+    # user_triplets.json rows carry — backfill those (plus sun-elevation
+    # metadata) from later duplicates instead of dropping them.
+    _FILL_KEYS = (
+        "overlap_triplet_pct",
+        "overlap_ohrc_tmc_pct",
+        "overlap_ohrc_iirs_pct",
+        "intersection_wkt",
+        "ohrc_sun_elevation_deg",
+        "tmc2_sun_elevation_deg",
+        "iirs_sun_elevation_deg",
+    )
     _triplets = {}
     _triplet_list = []
     for t in triplets_raw:
@@ -558,6 +571,11 @@ def load_all() -> None:
         if tid not in _triplets:
             _triplets[tid] = t
             _triplet_list.append(t)
+        else:
+            kept = _triplets[tid]
+            for key in _FILL_KEYS:
+                if kept.get(key) is None and t.get(key) is not None:
+                    kept[key] = t[key]
 
     # -------------------------------------------------------------------
     # Load match and transform files from two sources:

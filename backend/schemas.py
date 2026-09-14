@@ -76,6 +76,13 @@ class TripletSummary(BaseModel):
     lro_nac_gsd_m: float | None = None
     dem_available: bool = False
     dem_url: str | None = None
+    # Triplet overlap from the ingest matcher (same numbers the ingest
+    # results table shows). The loader passes manifests through untouched,
+    # but this model previously stripped them — the dashboard matching
+    # views never received them. They are contract now.
+    overlap_triplet_pct: float | None = None
+    overlap_ohrc_tmc_pct: float | None = None
+    overlap_ohrc_iirs_pct: float | None = None
 
 
 class TripletListResponse(BaseModel):
