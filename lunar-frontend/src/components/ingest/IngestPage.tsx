@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { footprintSizeKm } from "@/lib/geo";
 import type { TripletSummary } from "@/lib/types";
 import { isAuthenticated, getCurrentUser, logout, type AuthUser } from "@/lib/auth";
+import { useTheme } from "@/lib/theme";
 import VaultModal from "../archive/VaultModal";
 import TheoryModal from "../archive/TheoryModal";
 import DropZone from "./DropZone";
@@ -35,6 +36,7 @@ function fmtSize(bytes: number): string {
 
 export default function IngestPage() {
   const router = useRouter();
+  const { theme, toggle: toggleTheme } = useTheme();
 
   // Core Ingestion State
   const [files, setFiles] = useState<File[]>([]);
@@ -292,20 +294,20 @@ export default function IngestPage() {
   const isProcessing = phase === "processing" || phase === "queued";
 
   return (
-    <div className="min-h-screen bg-[#f4f6fb] text-slate-800 flex">
+    <div className="h-screen overflow-hidden bg-[#f4f6fb] dark:bg-[#090b0e] font-sans text-slate-800 dark:text-slate-200 antialiased flex">
       {/* ======================================================== */}
       {/* 1. LEFT SIDEBAR: Brand Logo, Main Menu, Region List      */}
       {/* ======================================================== */}
-      <aside className="w-64 bg-white border-r border-slate-200/80 flex flex-col justify-between shrink-0 min-h-screen">
-        <div>
+      <aside className="w-64 bg-white dark:bg-[#0e1117] border-r border-slate-200/80 dark:border-[#1b2029] flex flex-col shrink-0 h-screen sticky top-0 overflow-hidden">
+        <div className="flex-1 overflow-y-auto min-h-0">
           {/* Brand Header */}
-          <div className="p-6 pb-5 flex items-center justify-between border-b border-slate-100">
+          <div className="p-6 pb-5 flex items-center justify-between border-b border-slate-100 dark:border-[#1b2029] shrink-0">
             <Link href="/" className="flex items-center gap-2.5 group">
               <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#4F46E5] text-white font-black text-base shadow-sm group-hover:scale-105 transition-transform">
                 c
               </div>
               <div>
-                <h1 className="text-base font-extrabold tracking-tight text-slate-900 leading-none">
+                <h1 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-slate-100 leading-none">
                   chandrayaan
                 </h1>
                 <span className="text-[10px] font-medium text-slate-400">Cross-Match Console</span>
@@ -322,10 +324,10 @@ export default function IngestPage() {
               <nav className="space-y-1">
                 <Link
                   href="/?view=console"
-                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition border-l-4 border-transparent"
+                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-100 transition border-l-4 border-transparent"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-sm text-slate-400 group-hover:text-slate-600">
+                    <span className="text-sm text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">
                       ⊞
                     </span>
                     <span>Dashboard QA</span>
@@ -333,10 +335,10 @@ export default function IngestPage() {
                 </Link>
 
                 <div
-                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold bg-[#EEF2FF] text-[#4F46E5] border-l-4 border-[#4F46E5]"
+                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold bg-[#EEF2FF] dark:bg-indigo-950/60 text-[#4F46E5] dark:text-indigo-300 border-l-4 border-[#4F46E5]"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-sm text-[#4F46E5]">
+                    <span className="text-sm text-[#4F46E5] dark:text-indigo-300">
                       ⚡
                     </span>
                     <span>Ingest &amp; Prepare</span>
@@ -346,10 +348,10 @@ export default function IngestPage() {
 
                 <Link
                   href="/?view=console&subview=linked-cursor"
-                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition border-l-4 border-transparent"
+                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-100 transition border-l-4 border-transparent"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-sm text-slate-400 group-hover:text-slate-600">
+                    <span className="text-sm text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">
                       ⊙
                     </span>
                     <span>Linked Cursor</span>
@@ -358,10 +360,10 @@ export default function IngestPage() {
 
                 <Link
                   href="/?view=console&subview=map"
-                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition border-l-4 border-transparent"
+                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-100 transition border-l-4 border-transparent"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-sm text-slate-400 group-hover:text-slate-600">
+                    <span className="text-sm text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">
                       ☵
                     </span>
                     <span>Planetary Map</span>
@@ -371,18 +373,18 @@ export default function IngestPage() {
                 <button
                   type="button"
                   onClick={() => setVaultOpen(true)}
-                  className="group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition border-l-4 border-transparent"
+                  className="group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-100 transition border-l-4 border-transparent"
                 >
-                  <span className="text-sm text-slate-400 group-hover:text-slate-600">▤</span>
+                  <span className="text-sm text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">▤</span>
                   <span>Archive Vault</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setTheoryModalOpen(true)}
-                  className="group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition border-l-4 border-transparent"
+                  className="group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-100 transition border-l-4 border-transparent"
                 >
-                  <span className="text-sm text-slate-400 group-hover:text-slate-600">📖</span>
+                  <span className="text-sm text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">📖</span>
                   <span>Methodology</span>
                 </button>
               </nav>
@@ -403,7 +405,7 @@ export default function IngestPage() {
                     <Link
                       key={t.id}
                       href={`/?view=console&region=${t.id}`}
-                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-all text-slate-600 hover:bg-slate-50"
+                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-all text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 dark:hover:text-slate-200"
                     >
                       <div className="truncate">
                         <span className="text-[10px] font-mono text-slate-400 mr-1.5">
@@ -416,12 +418,12 @@ export default function IngestPage() {
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         {t.dem_available && (
-                          <span className="rounded-md bg-indigo-50 px-1.5 py-0.5 text-[9px] font-bold text-[#4F46E5]">
+                          <span className="rounded-md bg-indigo-50 dark:bg-indigo-950/50 px-1.5 py-0.5 text-[9px] font-bold text-[#4F46E5] dark:text-indigo-300">
                             DEM
                           </span>
                         )}
                         {t.lro_nac_available && (
-                          <span className="rounded-md bg-amber-50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700">
+                          <span className="rounded-md bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:text-amber-300">
                             LRO
                           </span>
                         )}
@@ -438,9 +440,9 @@ export default function IngestPage() {
       {/* ======================================================== */}
       {/* 2. MAIN WORKSPACE: Header Bar & Ingest Content           */}
       {/* ======================================================== */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         {/* Top Header Bar */}
-        <header className="h-16 bg-white border-b border-slate-200/80 px-8 flex items-center justify-between gap-4 shrink-0">
+        <header className="h-16 bg-white dark:bg-[#0e1117] border-b border-slate-200/80 dark:border-[#1b2029] px-8 flex items-center justify-between gap-4 shrink-0">
           {/* Search Input */}
           <div className="relative w-80">
             <svg
@@ -461,15 +463,26 @@ export default function IngestPage() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search for regions, coordinates..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20 focus:border-[#4F46E5] transition"
+              className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-[#1b2029] rounded-xl text-xs text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20 focus:border-[#4F46E5] transition"
             />
           </div>
 
           {/* Right Header Controls */}
           <div className="flex items-center gap-3">
             <button
+              type="button"
+              onClick={toggleTheme}
+              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm flex items-center gap-1.5"
+              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label="Toggle color theme"
+            >
+              <span>{theme === "dark" ? "☀" : "🌙"}</span>
+              <span className="hidden sm:inline">{theme === "dark" ? "Light" : "Dark"}</span>
+            </button>
+
+            <button
               onClick={() => router.push("/")}
-              className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition shadow-sm flex items-center gap-1.5"
+              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm flex items-center gap-1.5"
               title="Return to Mission Overview"
             >
               <span>←</span>
@@ -478,21 +491,21 @@ export default function IngestPage() {
 
             <button
               onClick={() => setVaultOpen(true)}
-              className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm flex items-center gap-2"
+              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm flex items-center gap-2"
               title="Browse all multi-sensor lunar datasets"
             >
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
               <span>{triplets.length} Datasets</span>
             </button>
 
-            <div className="h-8 w-px bg-slate-200 mx-1" />
+            <div className="h-8 w-px bg-slate-200 dark:bg-[#1b2029] mx-1" />
 
             {/* Profile Pill with Interactive Dropdown */}
             <div className="relative" ref={profileMenuRef}>
               <button
                 type="button"
                 onClick={() => setProfileMenuOpen((prev) => !prev)}
-                className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white p-1.5 pr-3 hover:bg-slate-50 transition shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20"
+                className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-white/5 p-1.5 pr-3 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20"
                 aria-haspopup="true"
                 aria-expanded={profileMenuOpen}
               >
@@ -500,7 +513,7 @@ export default function IngestPage() {
                   {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : "SH"}
                 </div>
                 <div className="hidden sm:block text-left">
-                  <span className="text-xs font-bold text-slate-800 block leading-tight truncate max-w-[120px]">
+                  <span className="text-xs font-bold text-slate-800 dark:text-slate-100 block leading-tight truncate max-w-[120px]">
                     {currentUser?.name || "Shresth"}
                   </span>
                   <span className="text-[10px] text-slate-400 block">Operator</span>
@@ -519,15 +532,15 @@ export default function IngestPage() {
 
               {/* Dropdown Menu */}
               {profileMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 rounded-2xl border border-slate-200/80 bg-white p-2 shadow-2xl z-50 animate-fade-in">
-                  <div className="p-3 border-b border-slate-100">
-                    <span className="text-xs font-bold text-slate-900 block truncate">
+                <div className="absolute right-0 mt-2 w-64 rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-2 shadow-2xl z-50 animate-fade-in">
+                  <div className="p-3 border-b border-slate-100 dark:border-[#1b2029]">
+                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block truncate">
                       {currentUser?.name || "ISRO Flight Operator"}
                     </span>
-                    <span className="text-[11px] text-slate-500 block truncate">
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block truncate">
                       {currentUser?.email || "flight.ops@isro.gov.in"}
                     </span>
-                    <span className="mt-2 inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
+                    <span className="mt-2 inline-flex items-center gap-1 rounded-md bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                       Active Session
                     </span>
@@ -539,7 +552,7 @@ export default function IngestPage() {
                         setProfileMenuOpen(false);
                         setVaultOpen(true);
                       }}
-                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition text-left"
+                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition text-left"
                     >
                       <span className="text-slate-400">▤</span>
                       <span>Archive Vault ({triplets.length} Datasets)</span>
@@ -550,7 +563,7 @@ export default function IngestPage() {
                         setProfileMenuOpen(false);
                         setTheoryModalOpen(true);
                       }}
-                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition text-left"
+                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition text-left"
                     >
                       <span className="text-slate-400">📖</span>
                       <span>Methodology Reference</span>
@@ -561,17 +574,17 @@ export default function IngestPage() {
                         setProfileMenuOpen(false);
                         router.push("/");
                       }}
-                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition text-left"
+                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition text-left"
                     >
                       <span className="text-slate-400">🌐</span>
                       <span>Mission Overview</span>
                     </button>
                   </div>
 
-                  <div className="pt-1 mt-1 border-t border-slate-100">
+                  <div className="pt-1 mt-1 border-t border-slate-100 dark:border-[#1b2029]">
                     <button
                       onClick={handleUserLogout}
-                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 transition text-left"
+                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition text-left"
                     >
                       <span>🚪</span>
                       <span>Log Out</span>
@@ -584,14 +597,14 @@ export default function IngestPage() {
         </header>
 
         {/* Ingest Main Content */}
-        <main className="p-8 space-y-6 overflow-y-auto">
+        <main className="flex-1 min-h-0 overflow-y-auto p-8 space-y-6">
           {/* Top Title & Subtitle + Action Tabs */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <h2 className="text-2xl font-bold tracking-tight text-slate-900">
+              <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
                 Ingest &amp; Prepare
               </h2>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 Drop your PRADAN zip files below to automatically discover, match, and
                 process Chandrayaan-2 OHRC + TMC-2 + IIRS triplets.
               </p>
@@ -605,7 +618,7 @@ export default function IngestPage() {
                 className={`rounded-xl px-4 py-2 text-xs font-bold transition shadow-sm ${
                   activeTab === "new"
                     ? "bg-[#4F46E5] text-white shadow-indigo-200"
-                    : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    : "border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10"
                 }`}
               >
                 ＋ New Batch Ingestion
@@ -620,7 +633,7 @@ export default function IngestPage() {
                 className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition shadow-sm ${
                   activeTab === "history"
                     ? "bg-[#4F46E5] text-white shadow-indigo-200"
-                    : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                    : "border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10"
                 }`}
               >
                 <span>📂 Previous Ingestion Runs</span>
@@ -629,7 +642,7 @@ export default function IngestPage() {
                     className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
                       activeTab === "history"
                         ? "bg-white/20 text-white"
-                        : "bg-slate-100 text-slate-600"
+                        : "bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300"
                     }`}
                   >
                     {historyJobs.length}
@@ -639,7 +652,7 @@ export default function IngestPage() {
 
               <Link
                 href="/?view=console"
-                className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm flex items-center gap-1.5"
+                className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm flex items-center gap-1.5"
               >
                 <span>Open Dashboard</span>
                 <span>↗</span>
@@ -649,17 +662,17 @@ export default function IngestPage() {
 
           {/* Auth Guard Check */}
           {!authChecked ? (
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-12 text-center shadow-sm max-w-xl mx-auto space-y-4">
+            <div className="rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-12 text-center shadow-sm max-w-xl mx-auto space-y-4">
               <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-[#4F46E5] border-r-transparent" />
-              <p className="text-xs text-slate-500 font-medium">Verifying credentials...</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Verifying credentials...</p>
             </div>
           ) : !isAuthed ? (
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-12 text-center shadow-sm max-w-xl mx-auto space-y-4">
+            <div className="rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-12 text-center shadow-sm max-w-xl mx-auto space-y-4">
               <div className="text-4xl">🔐</div>
-              <h3 className="text-base font-bold text-slate-900">
+              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
                 Sign in Required for Ingestion
               </h3>
-              <p className="text-xs text-slate-500 leading-relaxed">
+              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                 The ingest pipeline writes to disk and launches processing jobs, so uploads require an
                 authenticated operator session. Please sign in from the home page, then return here.
               </p>
@@ -676,9 +689,9 @@ export default function IngestPage() {
             <>
               {/* TAB 1: NEW BATCH INGESTION */}
               {activeTab === "new" && (
-                <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm md:p-6 space-y-6">
+                <section className="rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-5 shadow-sm md:p-6 space-y-6">
                   {/* Card Header Bar */}
-                  <div className="flex flex-col justify-between gap-3 border-b border-slate-100 pb-5 md:flex-row md:items-center">
+                  <div className="flex flex-col justify-between gap-3 border-b border-slate-100 dark:border-[#1b2029] pb-5 md:flex-row md:items-center">
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="h-2 w-2 rounded-full bg-[#4F46E5] shadow-[0_0_0_4px_rgba(79,70,229,.12)]" />
@@ -686,10 +699,10 @@ export default function IngestPage() {
                           Live Ingestion Pipeline
                         </p>
                       </div>
-                      <h3 className="mt-1 text-xl font-black tracking-tight text-slate-900">
+                      <h3 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-slate-100">
                         Upload PRADAN Archives
                       </h3>
-                      <p className="mt-1 max-w-2xl text-xs text-slate-500">
+                      <p className="mt-1 max-w-2xl text-xs text-slate-500 dark:text-slate-400">
                         Drop your PRADAN zip files below to automatically extract PDS4 metadata, match
                         overlapping OHRC + TMC-2 + IIRS triplets, and generate pipeline artifacts.
                       </p>
@@ -699,12 +712,12 @@ export default function IngestPage() {
                       <div
                         className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${
                           phase === "processing" || phase === "queued"
-                            ? "border-indigo-300 bg-indigo-50 text-[#4F46E5] animate-pulse"
+                            ? "border-indigo-300 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 text-[#4F46E5] dark:text-indigo-300 animate-pulse"
                             : phase === "done"
-                            ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                            ? "border-emerald-300 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
                             : phase === "error"
-                            ? "border-rose-300 bg-rose-50 text-rose-700"
-                            : "border-slate-200 bg-slate-50 text-slate-500"
+                            ? "border-rose-300 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300"
+                            : "border-slate-200 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400"
                         }`}
                       >
                         {isProcessing
@@ -733,7 +746,7 @@ export default function IngestPage() {
                         {files.map((f) => (
                           <div
                             key={f.name}
-                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 shadow-xs"
+                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 shadow-xs"
                           >
                             <span>📦</span>
                             <span className="font-medium max-w-[200px] truncate">{f.name}</span>
@@ -755,13 +768,13 @@ export default function IngestPage() {
                       </div>
 
                       {/* Stats and Action Buttons */}
-                      <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-slate-100">
-                        <div className="flex items-center gap-4 text-xs text-slate-500 font-medium">
+                      <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-slate-100 dark:border-[#1b2029]">
+                        <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 font-medium">
                           <span>
-                            Files: <strong className="font-mono text-slate-800">{files.length}</strong>
+                            Files: <strong className="font-mono text-slate-800 dark:text-slate-100">{files.length}</strong>
                           </span>
                           <span>
-                            Total: <strong className="font-mono text-slate-800">{fmtSize(totalSize)}</strong>
+                            Total: <strong className="font-mono text-slate-800 dark:text-slate-100">{fmtSize(totalSize)}</strong>
                           </span>
                         </div>
 
@@ -770,7 +783,7 @@ export default function IngestPage() {
                             type="button"
                             onClick={clearFiles}
                             disabled={isProcessing}
-                            className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition shadow-sm disabled:opacity-40"
+                            className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm disabled:opacity-40"
                           >
                             Clear All
                           </button>
@@ -797,13 +810,13 @@ export default function IngestPage() {
 
                   {/* Advanced Pipeline Configuration Accordion */}
                   {phase === "idle" && (
-                    <div className="rounded-xl border border-slate-200/80 bg-slate-50/50 p-4 transition">
+                    <div className="rounded-xl border border-slate-200/80 dark:border-[#1b2029] bg-slate-50/50 dark:bg-white/5 p-4 transition">
                       <button
                         type="button"
                         onClick={() => setShowConfig(!showConfig)}
                         className="w-full flex items-center justify-between text-left focus:outline-none"
                       >
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
                           Pipeline Configuration
                         </span>
                         <span className="text-xs font-bold text-[#4F46E5]">
@@ -812,10 +825,10 @@ export default function IngestPage() {
                       </button>
 
                       {showConfig && (
-                        <div className="mt-4 pt-4 border-t border-slate-200/70 space-y-4 animate-fade-in">
+                        <div className="mt-4 pt-4 border-t border-slate-200/70 dark:border-[#1b2029] space-y-4 animate-fade-in">
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                                 Min Containment ({Math.round(config.containment * 100)}%)
                               </label>
                               <input
@@ -832,7 +845,7 @@ export default function IngestPage() {
                             </div>
 
                             <div>
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                                 Tile Size (px)
                               </label>
                               <select
@@ -840,7 +853,7 @@ export default function IngestPage() {
                                 onChange={(e) =>
                                   setConfig({ ...config, tileSize: parseInt(e.target.value) })
                                 }
-                                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-indigo-100"
+                                className="w-full rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-indigo-100"
                               >
                                 <option value={256}>256 × 256</option>
                                 <option value={512}>512 × 512 (Standard)</option>
@@ -850,7 +863,7 @@ export default function IngestPage() {
                           </div>
 
                           <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">
+                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
                               Max Time Gap (Days, Optional)
                             </label>
                             <input
@@ -863,12 +876,12 @@ export default function IngestPage() {
                                   maxTimeGapDays: e.target.value ? parseFloat(e.target.value) : null,
                                 })
                               }
-                              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-mono text-slate-700 outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-indigo-100"
+                              className="w-full rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3 py-2 text-xs font-mono text-slate-700 dark:text-slate-200 outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-indigo-100"
                             />
                           </div>
 
                           <div className="flex flex-wrap gap-4 pt-1">
-                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={config.noLargeAoi}
@@ -880,7 +893,7 @@ export default function IngestPage() {
                               Skip Large-AOI IIRS
                             </label>
 
-                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={config.noInvariants}
@@ -892,7 +905,7 @@ export default function IngestPage() {
                               Skip Invariant Maps
                             </label>
 
-                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={config.requireDates}
@@ -904,7 +917,7 @@ export default function IngestPage() {
                               Require Dates
                             </label>
 
-                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={config.noMatching}
@@ -916,7 +929,7 @@ export default function IngestPage() {
                               Skip Matching (linked-cursor dots)
                             </label>
 
-                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 cursor-pointer">
+                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
                               <input
                                 type="checkbox"
                                 checked={config.noRegistration}
@@ -935,7 +948,7 @@ export default function IngestPage() {
 
                   {/* Error banner */}
                   {phase === "error" && error && !status && (
-                    <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 font-medium space-y-2 animate-fade-in">
+                    <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 p-4 text-xs text-rose-700 dark:text-rose-300 font-medium space-y-2 animate-fade-in">
                       <div>
                         <strong className="font-bold">Error:</strong> {error}
                       </div>
@@ -951,7 +964,7 @@ export default function IngestPage() {
                           <button
                             type="button"
                             onClick={clearFiles}
-                            className="rounded-lg border border-rose-300 bg-white px-3 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-50"
+                            className="rounded-lg border border-rose-300 dark:border-rose-900/50 bg-white dark:bg-white/5 px-3 py-1 text-xs font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/40"
                           >
                             Start Over
                           </button>
@@ -989,13 +1002,13 @@ export default function IngestPage() {
 
               {/* TAB 2: PREVIOUS INGESTION RUNS */}
               {activeTab === "history" && (
-                <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm md:p-6 space-y-5 animate-fade-in">
-                  <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+                <section className="rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-5 shadow-sm md:p-6 space-y-5 animate-fade-in">
+                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#1b2029] pb-4">
                     <div>
-                      <h3 className="text-lg font-bold text-slate-900">
+                      <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
                         Previous Ingestion Runs
                       </h3>
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">
                         Inspect history and replay discovery results from past PRADAN archive batches.
                       </p>
                     </div>
@@ -1006,7 +1019,7 @@ export default function IngestPage() {
                           type="button"
                           onClick={handleDeleteSelectedJobs}
                           disabled={deletingJobs}
-                          className="flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition shadow-sm disabled:opacity-50"
+                          className="flex items-center gap-1.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 px-3.5 py-1.5 text-xs font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-950/50 transition shadow-sm disabled:opacity-50"
                         >
                           <span>{deletingJobs ? "Deleting..." : `🗑 Delete selected (${selectedJobs.size})`}</span>
                         </button>
@@ -1015,7 +1028,7 @@ export default function IngestPage() {
                         type="button"
                         onClick={loadHistoryJobs}
                         disabled={historyLoading}
-                        className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition shadow-sm disabled:opacity-50"
+                        className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm disabled:opacity-50"
                       >
                         <span>{historyLoading ? "Refreshing..." : "↻ Refresh History"}</span>
                       </button>
@@ -1023,23 +1036,23 @@ export default function IngestPage() {
                   </div>
 
                   {historyError && (
-                    <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 font-medium">
+                    <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 p-4 text-xs text-rose-700 dark:text-rose-300 font-medium">
                       {historyError}
                     </div>
                   )}
 
                   {historyLoading && historyJobs.length === 0 && (
-                    <div className="flex h-48 flex-col items-center justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50/50 p-8 text-center">
+                    <div className="flex h-48 flex-col items-center justify-center gap-3 rounded-xl border border-slate-200 dark:border-[#1b2029] bg-slate-50/50 dark:bg-white/5 p-8 text-center">
                       <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#4F46E5] border-t-transparent" />
-                      <p className="font-mono text-xs text-slate-500">Loading historical ingestion records...</p>
+                      <p className="font-mono text-xs text-slate-500 dark:text-slate-400">Loading historical ingestion records...</p>
                     </div>
                   )}
 
                   {!historyLoading && historyJobs.length === 0 && !historyError && (
-                    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-12 text-center">
+                    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 dark:border-[#1b2029] bg-slate-50/50 dark:bg-white/5 p-12 text-center">
                       <span className="text-3xl">📦</span>
-                      <h4 className="text-sm font-bold text-slate-900">No Previous Ingestion Runs</h4>
-                      <p className="max-w-md text-xs text-slate-500 leading-relaxed">
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">No Previous Ingestion Runs</h4>
+                      <p className="max-w-md text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                         No past ingestion jobs were found on the backend. Upload raw Chandrayaan-2 PRADAN ZIP bundles to start your first discovery run.
                       </p>
                       <button
@@ -1053,10 +1066,10 @@ export default function IngestPage() {
                   )}
 
                   {historyJobs.length > 0 && (
-                    <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white">
+                    <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117]">
                       <table className="w-full text-left text-xs border-collapse">
                         <thead>
-                          <tr className="border-b border-slate-200/80 bg-slate-50 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                          <tr className="border-b border-slate-200/80 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                             <th className="py-3 px-4">
                               <input
                                 type="checkbox"
@@ -1080,19 +1093,19 @@ export default function IngestPage() {
                             <th className="py-3 px-4 text-right">Action</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-slate-100 dark:divide-[#1b2029]">
                           {historyJobs.map((job) => {
                             const statusColor =
                               job.status === "completed"
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                ? "border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
                                 : job.status === "running"
-                                ? "border-indigo-200 bg-indigo-50 text-[#4F46E5] animate-pulse"
+                                ? "border-indigo-200 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 text-[#4F46E5] dark:text-indigo-300 animate-pulse"
                                 : job.status === "failed"
-                                ? "border-rose-200 bg-rose-50 text-rose-700"
-                                : "border-slate-200 bg-slate-50 text-slate-500";
+                                ? "border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300"
+                                : "border-slate-200 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400";
 
                             return (
-                              <tr key={job.job_id} className="transition hover:bg-slate-50/60">
+                              <tr key={job.job_id} className="transition hover:bg-slate-50/60 dark:hover:bg-white/5">
                                 <td className="py-3.5 px-4">
                                   <input
                                     type="checkbox"
@@ -1112,7 +1125,7 @@ export default function IngestPage() {
                                     className="rounded accent-[#4F46E5]"
                                   />
                                 </td>
-                                <td className="py-3.5 px-4 font-mono font-semibold text-slate-900">
+                                <td className="py-3.5 px-4 font-mono font-semibold text-slate-900 dark:text-slate-100">
                                   {job.job_id.slice(0, 8)}...{job.job_id.slice(-4)}
                                 </td>
                                 <td className="py-3.5 px-4">
@@ -1123,23 +1136,23 @@ export default function IngestPage() {
                                     {job.status}
                                   </span>
                                 </td>
-                                <td className="py-3.5 px-4 text-slate-600 font-mono text-[11px]">
+                                <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400 font-mono text-[11px]">
                                   {job.stage || "—"}
                                 </td>
                                 <td className="py-3.5 px-4">
                                   <div className="flex items-center gap-2">
-                                    <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100">
+                                    <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
                                       <div
                                         className="h-full bg-[#4F46E5] transition-all duration-300"
                                         style={{ width: `${job.progress_pct || 0}%` }}
                                       />
                                     </div>
-                                    <span className="font-mono text-[10px] text-slate-500 font-semibold">
+                                    <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
                                       {Math.round(job.progress_pct || 0)}%
                                     </span>
                                   </div>
                                 </td>
-                                <td className="py-3.5 px-4 font-mono text-[10px] text-slate-500">
+                                <td className="py-3.5 px-4 font-mono text-[10px] text-slate-500 dark:text-slate-400">
                                   {job.started_at ? new Date(job.started_at).toLocaleString() : "—"}
                                 </td>
                                 <td className="py-3.5 px-4 text-right">
@@ -1148,7 +1161,7 @@ export default function IngestPage() {
                                     <button
                                       type="button"
                                       onClick={() => handleSelectHistoricalJob(job.job_id)}
-                                      className="rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1 font-mono text-xs font-bold text-[#4F46E5] hover:bg-indigo-100 transition shadow-xs"
+                                      className="rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 px-3 py-1 font-mono text-xs font-bold text-[#4F46E5] dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 transition shadow-xs"
                                     >
                                       Load Results →
                                     </button>
@@ -1161,7 +1174,7 @@ export default function IngestPage() {
                                         setPhase("processing");
                                         setActiveTab("new");
                                       }}
-                                      className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-1 font-mono text-xs font-bold text-blue-700 hover:bg-blue-100 transition shadow-xs"
+                                      className="rounded-lg border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/30 px-3 py-1 font-mono text-xs font-bold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/50 transition shadow-xs"
                                     >
                                       Attach &amp; Monitor
                                     </button>
@@ -1172,7 +1185,7 @@ export default function IngestPage() {
                                       title="Delete this history entry"
                                       onClick={() => handleDeleteHistoryJob(job.job_id)}
                                       disabled={deletingJobs}
-                                      className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-bold text-slate-400 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition shadow-xs disabled:opacity-50"
+                                      className="rounded-lg border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-2.5 py-1 text-xs font-bold text-slate-400 dark:text-slate-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-700 dark:hover:text-rose-300 hover:border-rose-200 dark:hover:border-rose-900/50 transition shadow-xs disabled:opacity-50"
                                     >
                                       🗑
                                     </button>

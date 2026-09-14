@@ -108,10 +108,10 @@ export default function DropZone({ onFilesSelected, disabled = false }: DropZone
     <div
       className={`relative rounded-2xl border-2 border-dashed p-10 text-center transition-all duration-200 cursor-pointer overflow-hidden ${
         disabled
-          ? 'opacity-50 cursor-not-allowed pointer-events-none border-slate-200 bg-slate-50/50'
+          ? 'opacity-50 cursor-not-allowed pointer-events-none border-slate-200 dark:border-[#1b2029] bg-slate-50/50 dark:bg-white/5'
           : isDragOver
-          ? 'border-[#4F46E5] bg-indigo-50/40 shadow-inner scale-[1.01]'
-          : 'border-slate-300 bg-slate-50/60 hover:bg-indigo-50/20 hover:border-[#4F46E5]/50 shadow-xs'
+          ? 'border-[#4F46E5] bg-indigo-50/40 dark:bg-indigo-950/40 shadow-inner scale-[1.01]'
+          : 'border-slate-300 dark:border-[#2a3140] bg-slate-50/60 dark:bg-white/5 hover:bg-indigo-50/20 dark:hover:bg-indigo-950/30 hover:border-[#4F46E5]/50 shadow-xs'
       }`}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -133,11 +133,11 @@ export default function DropZone({ onFilesSelected, disabled = false }: DropZone
           {isDragOver ? '📂' : '🌙'}
         </span>
 
-        <h3 className="text-base font-bold text-slate-900 mb-1">
+        <h3 className="text-base font-bold text-slate-900 dark:text-slate-100 mb-1">
           {isDragOver ? 'Release to upload' : 'Drop PRADAN zip files or a folder here'}
         </h3>
 
-        <p className="text-xs text-slate-500 max-w-md mb-5">
+        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-md mb-5">
           Accepts .zip files from ISSDC PRADAN — OHRC, TMC-2, and IIRS products
         </p>
 
@@ -148,7 +148,7 @@ export default function DropZone({ onFilesSelected, disabled = false }: DropZone
               e.stopPropagation();
               fileInputRef.current?.click();
             }}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 hover:border-indigo-300 transition"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm hover:bg-slate-50 dark:hover:bg-white/10 hover:border-indigo-300 transition"
           >
             <span>📁</span>
             <span>Browse Files</span>
@@ -160,7 +160,7 @@ export default function DropZone({ onFilesSelected, disabled = false }: DropZone
               e.stopPropagation();
               folderInputRef.current?.click();
             }}
-            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-50 hover:border-indigo-300 transition"
+            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-200 shadow-sm hover:bg-slate-50 dark:hover:bg-white/10 hover:border-indigo-300 transition"
           >
             <span>📂</span>
             <span>Browse Folder</span>

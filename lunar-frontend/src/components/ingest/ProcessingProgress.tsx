@@ -45,7 +45,7 @@ export default function ProcessingProgress({ status }: ProcessingProgressProps) 
   const isFailed = status.status === 'failed';
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm space-y-5 animate-fade-in">
+    <div className="rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-6 shadow-sm space-y-5 animate-fade-in">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -56,24 +56,24 @@ export default function ProcessingProgress({ status }: ProcessingProgressProps) 
             </span>
           )}
           {isDone && (
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-xs font-bold">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold">
               ✓
             </span>
           )}
           {isFailed && (
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 text-rose-700 text-xs font-bold">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 text-xs font-bold">
               ✕
             </span>
           )}
-          <span className="text-sm font-bold text-slate-900">{status.stage}</span>
+          <span className="text-sm font-bold text-slate-900 dark:text-slate-100">{status.stage}</span>
         </div>
-        <span className="font-mono text-xs font-bold text-[#4F46E5] bg-indigo-50 px-2.5 py-1 rounded-lg border border-indigo-100">
+        <span className="font-mono text-xs font-bold text-[#4F46E5] dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/30 px-2.5 py-1 rounded-lg border border-indigo-100 dark:border-indigo-900/50">
           {Math.round(status.progress_pct)}%
         </span>
       </div>
 
       {/* Progress bar */}
-      <div className="h-2 w-full rounded-full bg-slate-100 overflow-hidden">
+      <div className="h-2 w-full rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden">
         <div
           className="h-full bg-[#4F46E5] transition-all duration-300 rounded-full"
           style={{ width: `${status.progress_pct}%` }}
@@ -99,7 +99,7 @@ export default function ProcessingProgress({ status }: ProcessingProgressProps) 
 
       {/* Error banner */}
       {isFailed && status.error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-xs text-rose-700 font-medium">
+        <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 p-4 text-xs text-rose-700 dark:text-rose-300 font-medium">
           <strong className="font-bold">Error:</strong> {status.error}
         </div>
       )}
