@@ -15,3 +15,8 @@
 # cryptic KeyError: 118 and silently disables the trained verifier. Later
 # lines win in gitattributes, so this exempts exactly this path.
 ML_model/ai_verifier_model.pkl binary -filter
+# Static Next.js tiles ship RAW in git (not LFS) so plain `git clone` + Vercel
+# build serves them without `git lfs pull`. Matches .gitignore architecture
+# note (public/images intentionally TRACKED). Later lines win, so this
+# exempts the tile tree from the *.png/*.jpg rules above.
+lunar-frontend/public/images/** binary -filter

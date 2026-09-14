@@ -137,3 +137,34 @@ export async function listJobs(): Promise<IngestJobSummary[]> {
   }
   return res.json();
 }
+
+/**
+ * Delete one ingestion history entry (finished jobs only).
+ */
+export async function deleteJob(jobId: string): Promise<{ job_id: string }> {
+  const res = await fetch(`${API_BASE}/jobs/${encodeURIComponent(jobId)}`, {
+    method: 'DELETE',
+    headers: { ...getAuthHeaders() },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || 'Delete failed');
+  }
+  return res.json();
+}
+
+/**
+ * Delete multiple ingestion history entries (finished jobs only).
+ */
+export async function deleteJobs(jobIds: string[]): Promise<{ deleted: string[]; errors: Record<string, string> }> {
+  const res = await fetch(`${API_BASE}/jobs`, {
+    method: 'DELETE',
+    headers: { ...getAuthHeaders(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ job_ids: jobIds }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || 'Bulk delete failed');
+  }
+  return res.json();
+}
