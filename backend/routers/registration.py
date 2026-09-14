@@ -194,6 +194,34 @@ def _run_registration_pipeline(job_id: str, request: RegistrationRequest) -> Non
         result = pipeline.register(request.src_image_path, request.ref_image_path)
         result = dict(result) if isinstance(result, dict) else {"status": "failed"}
 
+        # EPIC 3 UI hook: expose objective-verification keys on every job
+        # result so the frontend can render the Traffic Light badge.
+        # Keys: ssim_score (float 0-1), confidence_score (int 0-100),
+        # traffic_light_color ("GREEN"/"YELLOW"/"RED"). Master pipeline has
+        # no warped-raster SSIM here, so ssim_score=0.0 and the light is
+        # driven by inlier_ratio + held_out_rmse (RED when Task-5 trips).
+        try:
+            if "ssim_score" not in result or "confidence_score" not in result \
+                    or "traffic_light_color" not in result:
+                try:
+                    from metrics import calculate_traffic_light  # type: ignore
+                except ImportError:
+                    from ML_model.metrics import calculate_traffic_light  # type: ignore
+                _tl = calculate_traffic_light({
+                    "held_out_rmse": result.get("held_out_rmse"),
+                    "ssim_score": float(result.get("ssim_score", 0.0) or 0.0),
+                    "ssim": float(result.get("ssim_score", 0.0) or 0.0),
+                    "inlier_ratio": float(result.get("inlier_ratio", 0.0) or 0.0),
+                    "inlier_count": int(result.get("final_inliers", 0) or 0),
+                    "fit_rmse_px": result.get("final_rmse_pixels"),
+                })
+                result.setdefault("ssim_score", float(_tl.get("ssim_score", 0.0)))
+                result.setdefault("confidence_score", int(_tl.get("confidence_score", 0)))
+                result.setdefault("traffic_light_color", str(_tl.get("traffic_light_color", "RED")))
+                result.setdefault("traffic_light", _tl)
+        except Exception as _tl_exc:
+            logger.warning("Job %s: traffic-light enrichment skipped: %s", job_id, _tl_exc)
+
         if result.get("status") == "success":
             job_manager.update_job(job_id, progress=80.0, current_phase="Generating report")
             job_manager.append_log(job_id, "Matching done: generating PDF report.")

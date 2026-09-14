@@ -117,6 +117,11 @@ export interface MatchMetrics {
   validation_status?: string | null;
   quality_tier?: string | null;
   ssim?: number | null;
+  // EPIC 3 objective verification (tracks backend metrics.ssim_score /
+  // confidence_score / traffic_light_color). Renders the Traffic Light badge.
+  ssim_score?: number | null;
+  confidence_score?: number | null;
+  traffic_light_color?: "GREEN" | "YELLOW" | "RED" | null;
   psnr?: number | null;
   nmi?: number | null;
   composite_quality_score?: number | null;

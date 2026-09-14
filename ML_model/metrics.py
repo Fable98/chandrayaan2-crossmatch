@@ -598,6 +598,176 @@ def calculate_ssim_over_overlap(
     return round(float(np.clip(ssim_val, -1.0, 1.0)), 4)
 
 
+def compute_ssim_within_inliers(
+    ref_img: np.ndarray,
+    warped_src_img: np.ndarray,
+    inlier_points: Optional[np.ndarray] = None,
+    win_size: int = 7,
+) -> float:
+    """EPIC 3: SSIM between Reference and Warped Source cropped to the convex
+    hull of the inliers.
+
+    Masks out background outside the inlier convex hull (combined with the
+    valid-overlap mask), then delegates to :func:`calculate_ssim_over_overlap`
+    (skimage when the mask is full, else the NumPy Gaussian-window path).
+    Returns a JSON-safe float in [0.0, 1.0] (negative SSIM clipped to 0.0).
+    With <3 inlier points, falls back to full-overlap SSIM. Never raises:
+    uncomputable input yields 0.0.
+    """
+    try:
+        def _to_2d(img: np.ndarray) -> np.ndarray:
+            arr = np.asarray(img, dtype=np.float64)
+            if arr.ndim == 3:
+                return np.mean(arr, axis=2)
+            return arr
+
+        r_arr = _to_2d(ref_img)
+        w_arr = _to_2d(warped_src_img)
+        h = min(r_arr.shape[0], w_arr.shape[0])
+        w = min(r_arr.shape[1], w_arr.shape[1])
+        if h < 8 or w < 8:
+            return 0.0
+        r_crop = r_arr[:h, :w]
+        w_crop = w_arr[:h, :w]
+
+        overlap = calculate_overlap_mask(w_crop, r_crop)
+        if inlier_points is None:
+            s = calculate_ssim_over_overlap(w_crop, r_crop, mask=overlap, win_size=win_size)
+            return float(np.clip(s if s is not None else 0.0, 0.0, 1.0))
+
+        pts = np.asarray(inlier_points, dtype=np.float64).reshape(-1, 2)
+        pts = pts[np.all(np.isfinite(pts), axis=1)]
+        if pts.shape[0] < 3:
+            s = calculate_ssim_over_overlap(w_crop, r_crop, mask=overlap, win_size=win_size)
+            return float(np.clip(s if s is not None else 0.0, 0.0, 1.0))
+
+        pts[:, 0] = np.clip(pts[:, 0], 0, w - 1)
+        pts[:, 1] = np.clip(pts[:, 1], 0, h - 1)
+        try:
+            hull = cv2.convexHull(pts.astype(np.float32))
+            hull_mask = np.zeros((h, w), dtype=np.uint8)
+            cv2.fillConvexPoly(hull_mask, hull.astype(np.int32), 1)
+            hull_bool = hull_mask.astype(bool)
+        except Exception:
+            hull_bool = np.ones((h, w), dtype=bool)
+
+        mask = overlap & hull_bool
+        if int(np.sum(mask)) < 36:
+            # Hull too small / no overlap: fall back to full overlap honestly.
+            mask = overlap
+        if int(np.sum(mask)) < 36:
+            return 0.0
+        s = calculate_ssim_over_overlap(w_crop, r_crop, mask=mask, win_size=win_size)
+        if s is None or not np.isfinite(s):
+            return 0.0
+        return float(np.clip(s, 0.0, 1.0))
+    except Exception:
+        return 0.0
+
+
+def calculate_traffic_light(metrics: Dict[str, Any]) -> Dict[str, Any]:
+    """EPIC 3: objective verification — 0-100 confidence + GREEN/YELLOW/RED.
+
+    Rules (per spec):
+      GREEN (90-100): held_out_rmse < 1.5 AND ssim > 0.65 AND inlier_ratio > 0.5.
+      YELLOW (60-89): passed Task-5 safety guardrails but borderline.
+      RED (0-59): guardrails tripped (inlier_ratio < 0.3, <4 inliers, or
+        held_out badly diverged). Callers must emit honest
+        ``registration_failed`` instead of a forced matrix; this function
+        only labels, never overrides that veto.
+
+    Accepts ssim under ``ssim_score`` or legacy ``ssim``; held-out under
+    ``held_out_rmse`` / ``held_out_validation_rmse_px`` / ``validation_rmse_px``.
+    Always returns JSON-safe ``{ssim_score, confidence_score, traffic_light_color}``
+    (+ ``traffic_light_reasons`` for audit).
+    """
+    try:
+        ratio = float(metrics.get("inlier_ratio", 0.0) or 0.0)
+    except Exception:
+        ratio = 0.0
+    try:
+        count = int(metrics.get("inlier_count", metrics.get("inliers", 0)) or 0)
+    except Exception:
+        count = 0
+    held = metrics.get("held_out_rmse", metrics.get("held_out_validation_rmse_px",
+                       metrics.get("validation_rmse_px", metrics.get("held_out_rmse_px"))))
+    try:
+        held_f = None if held is None else float(held)
+        if held_f is not None and not np.isfinite(held_f):
+            held_f = None
+    except Exception:
+        held_f = None
+    ssim_raw = metrics.get("ssim_score", metrics.get("ssim"))
+    try:
+        ssim_v = 0.0 if ssim_raw is None else float(np.clip(float(ssim_raw), 0.0, 1.0))
+    except Exception:
+        ssim_v = 0.0
+    try:
+        fit_rmse = metrics.get("fit_rmse_px", metrics.get("in_sample_rmse"))
+        fit_f = None if fit_rmse is None else float(fit_rmse)
+    except Exception:
+        fit_f = None
+
+    reasons: List[str] = []
+    # --- Task-5 guardrail trip -> RED (honest failure) ---
+    tripped = False
+    if count > 0 and count < 4:
+        tripped = True
+        reasons.append(f"inlier_count {count} < 4")
+    elif count == 0 and ratio <= 0.0:
+        tripped = True
+        reasons.append("no inliers")
+    if ratio < 0.3:
+        tripped = True
+        reasons.append(f"inlier_ratio {ratio:.3f} < 0.30 (weak consensus)")
+    if held_f is not None and held_f > 3.0:
+        tripped = True
+        reasons.append(f"held_out_rmse {held_f:.3f}px > 3.00px (poor generalization)")
+    elif held_f is not None and fit_f is not None and held_f > 2.5 and fit_f > 1.5 and count >= 20:
+        tripped = True
+        reasons.append(f"held_out_rmse {held_f:.3f}px > 2.50px with fit {fit_f:.3f}px (poor generalization)")
+
+    if tripped:
+        r_term = float(np.clip(ratio / 0.3, 0.0, 1.0))
+        conf = int(np.clip(round(59.0 * (0.5 * r_term + 0.5 * ssim_v)), 0, 59))
+        return {
+            "ssim_score": float(np.clip(ssim_v, 0.0, 1.0)),
+            "confidence_score": conf,
+            "traffic_light_color": "RED",
+            "traffic_light_reasons": reasons or ["safety guardrail tripped"],
+        }
+
+    # --- GREEN: all three strict gates ---
+    if held_f is not None and held_f < 1.5 and ssim_v > 0.65 and ratio > 0.5:
+        r_m = float(np.clip((ratio - 0.5) / 0.5, 0.0, 1.0))
+        s_m = float(np.clip((ssim_v - 0.65) / 0.35, 0.0, 1.0))
+        h_m = float(np.clip((1.5 - held_f) / 1.5, 0.0, 1.0))
+        conf = int(np.clip(round(90.0 + 10.0 * (0.4 * r_m + 0.3 * s_m + 0.3 * h_m)), 90, 100))
+        return {
+            "ssim_score": float(np.clip(ssim_v, 0.0, 1.0)),
+            "confidence_score": conf,
+            "traffic_light_color": "GREEN",
+            "traffic_light_reasons": ["held_out<1.5px, ssim>0.65, inlier_ratio>0.5"],
+        }
+
+    # --- YELLOW: survived guardrails, borderline metrics ---
+    if held_f is None:
+        # No held-out (small-N): judge on consensus + structure only.
+        r_term = float(np.clip((ratio - 0.3) / 0.7, 0.0, 1.0))
+        combo = 0.55 * r_term + 0.45 * ssim_v
+    else:
+        r_term = float(np.clip((ratio - 0.3) / 0.7, 0.0, 1.0))
+        h_term = float(np.clip(1.0 - held_f / 3.0, 0.0, 1.0))
+        combo = 0.4 * r_term + 0.3 * ssim_v + 0.3 * h_term
+    conf = int(np.clip(round(60.0 + 29.0 * float(np.clip(combo, 0.0, 1.0))), 60, 89))
+    return {
+        "ssim_score": float(np.clip(ssim_v, 0.0, 1.0)),
+        "confidence_score": conf,
+        "traffic_light_color": "YELLOW",
+        "traffic_light_reasons": reasons or ["passed guardrails; metrics borderline"],
+    }
+
+
 def calculate_normalized_mutual_information(
     img_a: np.ndarray,
     img_b: np.ndarray,
@@ -769,6 +939,17 @@ def compute_canonical_metrics(
 
     if inlier_count == 0 or H is None:
         empty_comp = calculate_composite_quality_score(0.0, None, 0.0)
+        # EPIC 3: honest RED traffic light on the empty/failed path (Task-5
+        # guardrail intact — never a forced matrix, always registration_failed
+        # upstream). ssim_score 0.0 keeps the JSON contract float 0-1.
+        try:
+            _empty_tl = calculate_traffic_light({
+                "held_out_rmse": None, "ssim_score": 0.0, "ssim": 0.0,
+                "inlier_ratio": 0.0, "inlier_count": 0,
+            })
+        except Exception:
+            _empty_tl = {"ssim_score": 0.0, "confidence_score": 0,
+                         "traffic_light_color": "RED", "traffic_light_reasons": ["no inliers"]}
         return {
             "match_count": raw_count,
             "inlier_count": 0,
@@ -805,6 +986,10 @@ def compute_canonical_metrics(
             "spatial_distribution": calculate_spatial_distribution(np.zeros((0, 2)), image_shape, grid_size),
             "transform_quality": {"is_valid": False, "reason": "No valid transformation"},
             "ssim": None,
+            "ssim_score": float(_empty_tl.get("ssim_score", 0.0)),
+            "confidence_score": int(_empty_tl.get("confidence_score", 0)),
+            "traffic_light_color": str(_empty_tl.get("traffic_light_color", "RED")),
+            "traffic_light": _empty_tl,
             "psnr": None,
             "nmi": None,
             "composite_quality_score": empty_comp["composite_quality_score"],
@@ -919,6 +1104,23 @@ def compute_canonical_metrics(
         except Exception as e:
             logger.warning("Failed to compute photometric/structural metrics: %s", e)
 
+    # EPIC 3: objective verification — hull-masked SSIM + traffic light.
+    # ssim_score crops to the convex hull of the inliers (background outside
+    # masked out); falls back to full-overlap ssim when images/hull missing.
+    try:
+        if actual_warped is not None and ref_img is not None and inlier_count >= 3:
+            ssim_inliers = compute_ssim_within_inliers(
+                ref_img, actual_warped, inliers_dst, win_size=7)
+        elif ssim_val is not None:
+            ssim_inliers = float(np.clip(float(ssim_val), 0.0, 1.0))
+        else:
+            ssim_inliers = 0.0
+    except Exception:
+        try:
+            ssim_inliers = float(np.clip(float(ssim_val), 0.0, 1.0)) if ssim_val is not None else 0.0
+        except Exception:
+            ssim_inliers = 0.0
+
     composite_res = calculate_composite_quality_score(
         inlier_ratio=inlier_ratio,
         fit_rmse_px=fit_rmse,
@@ -942,6 +1144,32 @@ def compute_canonical_metrics(
     except Exception:
         _cyclic_rmse, _cyclic_status = None, "cyclic_failed"
     _held_out = val_results["validation_rmse_px"]
+
+    # EPIC 3 traffic light (never overrides Task-5 honest-failure veto upstream).
+    try:
+        _tl = calculate_traffic_light({
+            "held_out_rmse": _held_out,
+            "ssim_score": float(ssim_inliers),
+            "ssim": ssim_val,
+            "inlier_ratio": float(inlier_ratio),
+            "inlier_count": int(inlier_count),
+            "fit_rmse_px": float(fit_rmse),
+        })
+    except Exception:
+        _tl = {"ssim_score": float(ssim_inliers) if 'ssim_inliers' in dir() else 0.0,
+               "confidence_score": 60, "traffic_light_color": "YELLOW",
+               "traffic_light_reasons": ["traffic-light fallback"]}
+    try:
+        _ssim_score_out = float(_tl.get("ssim_score", ssim_inliers))
+    except Exception:
+        _ssim_score_out = 0.0
+    try:
+        _conf_out = int(_tl.get("confidence_score", 60))
+    except Exception:
+        _conf_out = 60
+    _color_out = str(_tl.get("traffic_light_color", "YELLOW"))
+    if _color_out not in ("GREEN", "YELLOW", "RED"):
+        _color_out = "YELLOW"
 
     return {
         "match_count": raw_count,
@@ -985,6 +1213,10 @@ def compute_canonical_metrics(
         "spatial_distribution": dist_metrics,
         "transform_quality": tx_quality,
         "ssim": ssim_val,
+        "ssim_score": _ssim_score_out,
+        "confidence_score": _conf_out,
+        "traffic_light_color": _color_out,
+        "traffic_light": _tl,
         "psnr": psnr_val,
         "nmi": nmi_val,
         "composite_quality_score": composite_res["composite_quality_score"],

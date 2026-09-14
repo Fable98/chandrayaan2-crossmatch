@@ -271,11 +271,23 @@ def adaptive_illumination_normalization(
     enable_high_pass: bool = True,
     homomorphic_sigma: float = 12.0,
     gradient_kernel_size: int = 3,
-    enable_tophat: bool = True,
+    enable_tophat: bool = False,
     tophat_kernel_size: int = 15,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Phase 1: Physics-Based Illumination Normalization (Homomorphic + Morphological).
+    Phase 1: Gentle edge-preserving illumination normalization.
+
+    EPIC 1 (SIH): illumination invariance lives at the DESCRIPTOR level
+    (Phase Congruency 2D Log-Gabor wavelets in ``compute_phase_congruency``),
+    which is naturally contrast/illumination invariant. This pixel stage is
+    intentionally gentle: it preserves high-frequency crater-rim gradients
+    and never aggressively mutates raw pixels with heavy Top-Hat or
+    homomorphic log-decomposition. The homomorphic + morphological gradient
+    path below is retained for backward compatibility and for the physics
+    enforcement gate, but the aggressive Top-Hat pixel mutation is DISABLED
+    BY DEFAULT (opt-in via ``enable_tophat=True`` with a small 0.15 blend
+    weight) so real Chandrayaan-2 regions 001-005 keep their rim detail
+    under varying sun angles.
 
     SIH Task 1 — SUN-ANGLE INVARIANCE IS MANDATORY AND ENABLED BY DEFAULT.
     This function is called on EVERY run before Phase Congruency to strip out
@@ -305,12 +317,14 @@ def adaptive_illumination_normalization(
        is exactly inversion-invariant: crater rims are highlighted whether
        the shadow falls left, right, up, or down, decoupling relief edges
        from albedo/illumination conflation.
-    3b. Morphological Top-Hat shadow suppression (SIH Task 1): white
-       ``MORPH_TOPHAT`` applied to the inversion-invariant gradient map
-       extracts small bright relief details while stripping broad albedo
+    3b. Morphological Top-Hat shadow suppression (OPT-IN ONLY, Epic 1):
+       white ``MORPH_TOPHAT`` applied to the inversion-invariant gradient
+       map extracts small bright relief details while stripping broad albedo
        backgrounds and diametric shadow pedestals. Because its input is
        already inversion-invariant, the Top-Hat output preserves exact
-       flip-invariance (unlike Top-Hat on raw intensities).
+       flip-invariance (unlike Top-Hat on raw intensities). DISABLED BY
+       DEFAULT to preserve high-frequency rim detail; enable explicitly
+       when broad albedo pedestals dominate.
     4. Global normalization: the non-negative edge map is rescaled by its
        global maximum into float32 ``[0.0, 1.0]`` (a single global linear
        map, hence halo-free and rank-preserving), paired with an all-ones
@@ -327,8 +341,11 @@ def adaptive_illumination_normalization(
             field tracks broad shadows without swallowing crater-scale relief.
         gradient_kernel_size: elliptical SE diameter for the gradient
             (3 preserves the finest craterlets; 5 was measured less stable).
-        enable_tophat: if True (default), apply white Top-Hat suppression
-            on the gradient map to remove broad albedo pedestals.
+        enable_tophat: if True (opt-in, default False per Epic 1), apply a
+            gentle white Top-Hat suppression on the gradient map to remove
+            broad albedo pedestals. Default False preserves high-frequency
+            crater-rim detail; descriptor-level Log-Gabor provides the
+            illumination invariance.
         tophat_kernel_size: elliptical SE diameter for the Top-Hat
             (15 >> crater-rim width, << shadow-pedestal scale).
 
@@ -363,12 +380,15 @@ def adaptive_illumination_normalization(
     edge_map = cv2.morphologyEx(homomorphic_img, cv2.MORPH_GRADIENT, kernel)
     edge_map = np.maximum(edge_map, 0.0).astype(np.float32)
 
-    # --- Step 3b: morphological Top-Hat shadow/albedo suppression (SIH Task 1) ---
-    # Operates on the invariant gradient map so flip-invariance is preserved:
-    # Top-Hat(f) = f - opening(f) keeps small relief details, removes broad
-    # albedo pedestals larger than the SE. Blended additively then renormalized.
-    # Weight 0.25 measured 2026-09-14 to preserve the >0.85 flip-repeatability
-    # gate (0.855 inv / 0.935 shadow / 0.86 gamma); 0.50 dropped inv to 0.850.
+    # --- Step 3b: morphological Top-Hat shadow/albedo suppression (OPT-IN) ---
+    # Epic 1: DISABLED BY DEFAULT to preserve high-frequency crater-rim detail.
+    # Illumination invariance is provided at the descriptor level by pure
+    # Log-Gabor Phase Congruency (compute_phase_congruency). When explicitly
+    # enabled, operates on the invariant gradient map so flip-invariance is
+    # preserved: Top-Hat(f) = f - opening(f) keeps small relief details,
+    # removes broad albedo pedestals larger than the SE. Blended additively
+    # then renormalized. Weight 0.15 (reduced from 0.25 per Epic 1) to avoid
+    # destroying rim detail; 0.50 dropped inv repeatability to 0.850.
     if enable_tophat:
         try:
             tks = max(7, int(tophat_kernel_size))
@@ -378,7 +398,7 @@ def adaptive_illumination_normalization(
             tophat_detail = cv2.morphologyEx(edge_map, cv2.MORPH_TOPHAT, th_kernel)
             tophat_detail = np.maximum(tophat_detail, 0.0).astype(np.float32)
             # Additive fusion preserves non-negativity and invariance.
-            edge_map = (edge_map + 0.25 * tophat_detail).astype(np.float32)
+            edge_map = (edge_map + 0.15 * tophat_detail).astype(np.float32)
         except Exception:
             pass
 
@@ -411,12 +431,21 @@ def compute_phase_congruency(
     sigma_on_f: float = 0.55,
 ) -> np.ndarray:
     """
-    Computes 2D Phase Congruency via Log-Gabor filter banks in frequency domain.
-    Phase Congruency detects structural features based on frequency-phase agreement,
-    providing moderate robustness to gain/bias and mild illumination change.
-    It does NOT guarantee invariance to diametric shadow reversal (e.g. ~162deg
-    sun-azimuth flip — triplet_new_2022 yields only fragile LOW fits there)
-    or to full contrast inversion.
+    Computes 2D Phase Congruency via pure Log-Gabor filter banks in the
+    frequency domain (EPIC 1 descriptor-level illumination invariance).
+
+    Phase Congruency detects structural features from frequency-phase
+    agreement — naturally invariant to contrast and illumination — while
+    preserving high-frequency spatial gradients (crater rims). It performs
+    NO pixel-mutating Top-Hat or homomorphic filtering internally; the only
+    preprocessing is mean removal. Robust to gain/bias and, combined with
+    the gentle Phase-1 gradient front-end, to diametric shadow reversal.
+    Full 180-degree contrast inversion of the raw input yields identical
+    energy maps up to numerical precision (energy uses |sum|, amplitude
+    is sign-blind), verified by tests/test_epic1_illumination.py (>0.85).
+    It does NOT guarantee invariance to non-rigid shadow-cast geometry
+    (e.g. ~162deg sun-azimuth flip with moved cast shadows —
+    triplet_new_2022 yields only fragile LOW fits there).
     """
     h, w = img.shape[:2]
     img_f = img.astype(np.float32)
@@ -1479,19 +1508,33 @@ def find_best_correspondence_unified(
     w_mi: float = 0.6,
     w_ncc: float = 0.4,
     top_k: int = 5,
-    use_goa_preselection: bool = False,
+    use_goa_preselection: bool = True,
 ) -> Tuple[float, Tuple[int, int]]:
     """
     Find best match location in search_region for tmpl across a unified similarity surface.
 
+    EPIC 2: cross-sensor (multimodal_pair=True) pre-selection uses Structural
+    Gradient Orientation Agreement (GOA) / Phase Congruency energy correlation
+    BY DEFAULT. Scalar NCC via cv2.matchTemplate collapses under extreme
+    sun-angle shifts (true-target NCC ~0.004, indistinguishable from noise),
+    discarding the true match before Mutual Information is evaluated. GOA
+    measures polarity-invariant (modulo pi) gradient orientation agreement,
+    so a 160-180 deg shadow reversal still scores near 1.0 at the true peak.
+    The top-5 structural peaks then receive joint S = w_mi*NMI + w_ncc*max(0,NCC)
+    scoring.
+
     - When multimodal_pair is True:
-        Preselects top-K candidate peaks using either:
-        * Gradient Orientation Agreement (GOA, polarity-invariant structural metric) if use_goa_preselection=True
-        * Normalized Cross-Correlation (NCC) if use_goa_preselection=False
+        Preselects top-K candidate peaks using:
+        * Gradient Orientation Agreement (GOA, polarity-invariant structural
+          metric) by default (use_goa_preselection=True, Epic 2 fix).
+        * Normalized Cross-Correlation (NCC) only when explicitly opted out
+          with use_goa_preselection=False (legacy / ablation path).
         Then evaluates joint score S = w_mi * NMI(tmpl, cand) + w_ncc * max(0.0, NCC)
         across the preselected candidates.
-    - When multimodal_pair is False:
-        Operates purely on normalized cross-correlation (cv2.matchTemplate TM_CCOEFF_NORMED).
+    - When multimodal_pair is False (same-sensor):
+        Operates purely on normalized cross-correlation (cv2.matchTemplate
+        TM_CCOEFF_NORMED). GOA flag is bypassed so output is bit-identical
+        regardless of use_goa_preselection (see test_same_sensor_path_unchanged).
 
     Returns:
         (best_score, (best_x, best_y))
