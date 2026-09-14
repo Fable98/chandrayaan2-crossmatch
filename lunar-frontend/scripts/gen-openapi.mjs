@@ -118,7 +118,10 @@ async function main() {
   lines.push("");
   const out = lines.join("\n");
   if (CHECK) {
-    const current = readFileSync(OUT, "utf-8");
+    // Canonical comparison is LF-based (the generator emits LF joins); a
+    // CRLF worktree file is semantically identical, so normalize before
+    // comparing instead of reporting phantom drift.
+    const current = readFileSync(OUT, "utf-8").replace(/\r\n/g, "\n");
     if (current !== out) {
       console.error("backend-types.ts drifted from backend openapi.json. Run `npm run gen:api`.");
       process.exit(1);

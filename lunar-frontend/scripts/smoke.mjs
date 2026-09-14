@@ -106,4 +106,20 @@ describe("frontend contract smoke", () => {
     assert.ok(!text.includes("336.0 +"), "demo lat/lon patch must stay deleted");
     assert.ok(text.includes("georeferenced"), "no-georef flag must be served");
   });
+
+  it("traffic-light badge exists, is null-safe, and is rendered", () => {
+    const badge = join(SRC, "components", "TrafficLightBadge.tsx");
+    assert.ok(existsSync(badge), "TrafficLightBadge.tsx must exist");
+    const text = readFileSync(badge, "utf-8");
+    for (const label of ["Photogrammetric Grade", "Acceptable / Review", "Rejected / Low Confidence"]) {
+      assert.ok(text.includes(label), `badge must label verdicts (${label})`);
+    }
+    assert.ok(text.includes("Unverified"), "badge must handle null/unknown color");
+    assert.ok(text.includes("confidence_score"), "badge must accept confidence_score");
+    assert.ok(text.includes("ssim_score"), "badge must accept ssim_score");
+    for (const host of ["components/RegistrationLauncher.tsx", "components/ingest/ResultsTable.tsx"]) {
+      const hostText = readFileSync(join(SRC, host), "utf-8");
+      assert.ok(hostText.includes("TrafficLightBadge"), `${host} must render the badge`);
+    }
+  });
 });

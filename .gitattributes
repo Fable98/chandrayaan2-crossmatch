@@ -20,3 +20,9 @@ ML_model/ai_verifier_model.pkl binary -filter
 # note (public/images intentionally TRACKED). Later lines win, so this
 # exempts the tile tree from the *.png/*.jpg rules above.
 lunar-frontend/public/images/** binary -filter
+# Generated API contract must keep LF endings on every platform: the
+# gen-openapi.mjs --check contract test byte-compares against LF-canonical
+# generator output, and a CRLF worktree (core.autocrlf=true) otherwise fails
+# the check with no schema drift at all.
+lunar-frontend/src/lib/backend-types.ts text eol=lf
+lunar-frontend/scripts/gen-openapi.mjs text eol=lf

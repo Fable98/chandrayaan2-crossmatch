@@ -208,6 +208,9 @@ def evaluate_all(
     abs_rmses: List[float] = []
     inlier_counts: List[float] = []
     uniformities: List[float] = []
+    ssim_vals: List[float] = []
+    confidence_vals: List[float] = []
+    traffic_counts = {"GREEN": 0, "YELLOW": 0, "RED": 0, "UNKNOWN": 0}
 
     successful = 0
     failed = 0
@@ -250,6 +253,18 @@ def evaluate_all(
 
         fit_insample = _safe_float(metrics.get("fit_rmse_insample_px") or metrics.get("fit_rmse_px")) if (status == "success" and isinstance(metrics, dict)) else None
         heldout = _safe_float(metrics.get("held_out_validation_rmse_px") or metrics.get("held_out_rmse_px") or metrics.get("validation_rmse_px")) if (status == "success" and isinstance(metrics, dict)) else None
+        # Epic 3 objective-verification keys (honest nulls when unavailable).
+        _m = metrics if (status == "success" and isinstance(metrics, dict)) else {}
+        tl_color = _m.get("traffic_light_color")
+        tl_color = tl_color if tl_color in ("GREEN", "YELLOW", "RED") else None
+        ssim_score = _safe_float(_m.get("ssim_score", _m.get("ssim")))
+        confidence_score = _safe_float(_m.get("confidence_score"))
+        if confidence_score is not None:
+            confidence_score = int(max(0, min(100, round(confidence_score))))
+        inlier_ratio = _safe_float(_m.get("inlier_ratio"))
+        held_out_rmse = _safe_float(_m.get("held_out_rmse", _m.get("held_out_rmse_px")))
+        uniformity = _uniformity_of(_m) if _m else None
+        cyclic_rmse = _safe_float(_m.get("cyclic_rmse"))
 
         record = to_json_safe({
             "id": pid,
@@ -260,6 +275,13 @@ def evaluate_all(
             "message": message,
             "fit_insample": fit_insample,
             "heldout": heldout,
+            "ssim_score": ssim_score,
+            "confidence_score": confidence_score,
+            "traffic_light_color": tl_color,
+            "held_out_rmse": held_out_rmse,
+            "inlier_ratio": inlier_ratio,
+            "uniformity_score": uniformity,
+            "cyclic_rmse": cyclic_rmse,
             "metrics": metrics,
         })
         pairwise.append(record)
@@ -279,6 +301,14 @@ def evaluate_all(
             uni = _uniformity_of(metrics)
             if uni is not None:
                 uniformities.append(uni)
+            if ssim_score is not None:
+                ssim_vals.append(ssim_score)
+            if confidence_score is not None:
+                confidence_vals.append(float(confidence_score))
+            if tl_color in ("GREEN", "YELLOW", "RED"):
+                traffic_counts[tl_color] += 1
+            else:
+                traffic_counts["UNKNOWN"] += 1
         else:
             failed += 1
             logger.warning("Pair id=%s failed (status=%s): %s", pid, status, message)
@@ -301,6 +331,9 @@ def evaluate_all(
         "average_absolute_rmse_m": _mean(abs_rmses),
         "average_inlier_count": _mean(inlier_counts),
         "average_spatial_uniformity": _mean(uniformities),
+        "average_ssim": _mean(ssim_vals),
+        "average_confidence_score": _mean(confidence_vals),
+        "traffic_light_distribution": dict(traffic_counts),
         "bootstrap_ci_95": {
             "fit_rmse_insample_px": _bootstrap_ci(fit_rmses),
             "held_out_rmse_px": _bootstrap_ci(held_out_rmses),
@@ -330,6 +363,7 @@ def write_markdown_report(summary: Dict, output_dir: Path) -> Path:
         return f"{ci_dict.get('mean', 'N/A')} [{ci_dict.get('ci_lower', 'N/A')}, {ci_dict.get('ci_upper', 'N/A')}]"
 
     b_ci = summary.get("bootstrap_ci_95", {}) or {}
+    tl = summary.get("traffic_light_distribution", {}) or {}
 
     lines = [
         "# ISRO Evaluation Summary — Chandrayaan-2 Cross-Sensor Registration",
@@ -349,6 +383,9 @@ def write_markdown_report(summary: Dict, output_dir: Path) -> Path:
         f"| Average absolute RMSE (m, DEM-corrected) | {_fmt(summary.get('average_absolute_rmse_m'))} | {_fmt_ci(b_ci.get('absolute_rmse_m'))} |",
         f"| Average inlier count | {_fmt(summary.get('average_inlier_count'), 2)} | — |",
         f"| Average spatial uniformity | {_fmt(summary.get('average_spatial_uniformity'))} | — |",
+        f"| Average SSIM | {_fmt(summary.get('average_ssim'))} | — |",
+        f"| Average confidence score | {_fmt(summary.get('average_confidence_score'), 1)} | — |",
+        f"| Traffic light GREEN / YELLOW / RED / unknown | {tl.get('GREEN', 0)} / {tl.get('YELLOW', 0)} / {tl.get('RED', 0)} / {tl.get('UNKNOWN', 0)} | — |",
         "",
         "## Integrity & Survivorship Notes",
         "",

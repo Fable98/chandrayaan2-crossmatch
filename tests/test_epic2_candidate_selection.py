@@ -119,3 +119,23 @@ def test_epic2_unified_multimodal_uses_structural_preselection():
         f"multimodal pre-selection collapsed: returned {loc} "
         f"{dist:.2f}px from truth {truth} (score={score:.4f})"
     )
+
+
+def test_epic2_small_search_surface_never_crashes():
+    """Tiny search surfaces (fewer cells than top_k) must not raise.
+
+    Regression: np.argpartition(-flat, k) with k == flat.size raised
+    ValueError (kth out of bounds), crashing match_images_cfog on real
+    region tiles instead of failing cleanly.
+    """
+    rng = np.random.default_rng(11)
+    for use_goa in (True, False):
+        # Surface with only 2x2 = 4 cells < top_k=5.
+        sr = rng.normal(0, 1, (18, 18)).astype(np.float32)
+        tmpl = rng.normal(0, 1, (17, 17)).astype(np.float32)
+        score, loc = find_best_correspondence_unified(
+            sr, tmpl, multimodal_pair=True, top_k=5,
+            use_goa_preselection=use_goa,
+        )
+        assert np.isfinite(score)
+        assert isinstance(loc, tuple) and len(loc) == 2

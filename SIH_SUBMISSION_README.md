@@ -9,48 +9,39 @@ Physical GSD normalization and chained-homography logic were preserved.
 
 ---
 
-## 1. Sun Angle Invariance (Task 1) — Shadow Suppression ✅
+## 1. Sun Angle Invariance (Task 1) — Descriptor-Level Illumination Invariance ✅
 
-**Requirement:** illumination normalization must be enabled by default, with
-Top-Hat or Homomorphic filtering before Phase Congruency.
+**Requirement:** correspondence must survive sun-angle variation, including
+diametric shadow reversal.
 
-**Implementation:**
-- `ML_model/config.py`: `SUN_ANGLE_INVARIANCE_ENABLED=True`,
-  `ADAPTIVE_ILLUMINATION_NORMALIZATION_ENABLED=True`,
-  `EXPERIMENTAL_STACK_ENABLED_BY_DEFAULT=True`.
-- `ML_model/matcher_cfog.py`:
-  - `match_images_cfog(..., experimental_stack=True,
-    enable_illumination_normalization=True)` — both default `True`.
-  - Opt-out requires BOTH flags `False` (explicit ablation only).
-  - `adaptive_illumination_normalization()` runs on EVERY call before
-    `compute_phase_congruency()`: bilateral smoothing → homomorphic log
-    decomposition (`log1p`/`gaussian_filter`/`expm1`) → `MORPH_GRADIENT`
-    inversion-invariant edges → white `MORPH_TOPHAT` shadow/albedo
-    suppression (0.25 blend, kernel 15) → global max-normalization.
-- `ML_model/master_pipeline.py`: class flags `True`, instance flags `True`,
-  and `_run_cfog_phase()` forces `experimental_stack=True,
-  enable_illumination_normalization=True` on every CFOG call.
+**Implementation (Epic 1):** illumination invariance lives at the
+*descriptor level* via Log-Gabor Phase Congruency
+(`compute_phase_congruency()` in `ML_model/matcher_cfog.py`) — pure 2D
+Log-Gabor filter banks in the frequency domain, naturally invariant to
+contrast/illumination while preserving high-frequency crater-rim gradients.
+No pixel-mutating Top-Hat or homomorphic filtering runs inside the
+descriptor (only mean removal). The pixel front-end
+(`adaptive_illumination_normalization()`: edge-preserving bilateral
+smoothing → gentle homomorphic log decomposition
+(`log1p`/`gaussian_filter`/`expm1`) → inversion-invariant `MORPH_GRADIENT`
+edges → global max-normalization) is intentionally gentle; aggressive
+`MORPH_TOPHAT` pixel mutation is DISABLED by default (`enable_tophat=False`,
+0.15 blend only when explicitly opted in) so real Chandrayaan-2 rim detail
+survives varying sun angles. `MasterRegistrationPipeline` enables the
+illumination-normalization path on every run.
 
 **Verification:**
-```python
-sys.path.insert(0,'ML_model')
-from config import SUN_ANGLE_INVARIANCE_ENABLED, ...
-assert ... is True  # all three
-inspect.signature(match_images_cfog).parameters['experimental_stack'].default is True
-MasterRegistrationPipeline().enable_illumination_normalization is True
-adaptive_illumination_normalization(rand(64,64))  # Top-Hat + homomorphic active
-```
-Result: `TASK1 CHECK PASSED`. Existing `test_phase1_physics_enforcement.py`
-(AST + 180° flip repeatability >0.85) still constrains the physics pipeline.
+- `tests/test_epic1_illumination.py`: shadow-inverted image pair yields
+  structurally >85% identical Phase Congruency edge maps WITHOUT Top-Hat;
+  Log-Gabor descriptor contract enforced.
+- `tests/test_phase1_physics_enforcement.py` (AST + 180° flip repeatability
+  >0.85) still constrains the physics pipeline — all pass.
 
-**Honest note:** forcing Phase 1 ON changes real-pair matching vs the
-pre-SIh `experimental_stack=False` baseline (HEAD `region_001` 7/75 success
-→ 0/fail with Phase 1 ON; only `region_006` still succeeds at 4/4). The
-frozen `test_phase2_pyramid.py` exact-count guards were calibrated pre-Phase 1
-and now fail (e.g. `region_004` finest-scale-only 4 vs expected ≥6). This is
-an intentional SIH-compliance trade-off, not a Task 3 regression (proven by
-identical 4/5 with and without multiscale). Recalibration of those guards is
-tracked as future work; SIH mandate takes precedence.
+**Honest note:** descriptor-level illumination invariance covers gain/bias
+and polarity reversal (proven >0.85). It does NOT cover moved cast-shadow
+*geometry* at ~160° sun-azimuth mismatch (real region pairs still yield only
+fragile LOW fits, traffic RED — see `reports/current_region_matching_summary.json`).
+This residual limit is reported, not hidden.
 
 ---
 
@@ -199,6 +190,41 @@ structured `registration_failed`, never a forced/garbage matrix.
 
 ---
 
+## 6. Cross-Sensor Robustness (Epics 2–3) — GOA Preselection + Traffic-Light Objective Verification ✅
+
+**Requirement:** cross-sensor matching must not collapse under sun-angle
+shifts, and alignment quality must be objectively proven (not eyeballed).
+
+**Implementation:**
+- **GOA preselection (Epic 2):** `find_best_correspondence_unified()` in
+  `ML_model/matcher_cfog.py` uses Structural Gradient Orientation Agreement
+  (polarity-invariant, modulo-π gradient orientation agreement) as the
+  default structural orientation candidate selection for cross-sensor
+  (`multimodal_pair=True`) pairs: top-5 structural peaks → joint MI+NCC
+  scoring. Scalar NCC alone drops to noise (~0.004) at the true target under
+  extreme sun shifts and discards it before MI runs; GOA scores ≈1.0 there.
+  Same-sensor path is pure NCC, bit-identical regardless of the flag.
+- **Traffic-light objective verification (Epic 3):** `ML_model/metrics.py`
+  adds `compute_ssim_within_inliers()` (structural similarity between the
+  reference and warped source, masked to the inlier convex hull) and
+  `calculate_traffic_light()` — GREEN (90–100: `held_out_rmse<1.5` AND
+  `ssim>0.65` AND `inlier_ratio>0.5`), YELLOW (60–89: guardrails pass,
+  borderline), RED (<60: guardrails trip). `compute_canonical_metrics`
+  always emits `ssim_score`, `confidence_score`, `traffic_light_color` on
+  both success and empty paths; `backend/routers/registration.py` exposes
+  them on job results and `lunar-frontend/src/lib/types.ts` carries them
+  for the Traffic Light badge.
+
+**Verification:**
+- `tests/test_epic2_candidate_selection.py` (true target in top-5 under
+  simulated cross-sensor shift; unified default path lands on truth).
+- `tests/test_epic3_traffic_light.py` (`metrics.json` carries all three
+  keys; successful synthetic registration is GREEN/YELLOW, never forced).
+- `tests/test_matcher_magsac.py`, `tests/test_metrics.py` — RANSAC input
+  quality and metric contracts intact.
+
+---
+
 ## Files changed
 
 - `ML_model/config.py` (Task 1 defaults — pre-existing, verified)
@@ -215,13 +241,17 @@ structured `registration_failed`, never a forced/garbage matrix.
 ## Re-run cheat sheet
 
 ```bash
-# Task 1: defaults + Top-Hat/homomorphic before PC
-python3 -c "import sys; sys.path.insert(0,'ML_model'); ..."
+# Epic 1: descriptor-level illumination invariance (Top-Hat OFF by default)
+python -m pytest tests/test_epic1_illumination.py tests/test_phase1_physics_enforcement.py -v
+# Epic 2: GOA structural preselection (default for cross-sensor)
+python -m pytest tests/test_epic2_candidate_selection.py tests/test_matcher_magsac.py -v
+# Epic 3: traffic-light objective verification in metrics.json
+python -m pytest tests/test_epic3_traffic_light.py tests/test_metrics.py -v
 # Task 2: direct + chained keys
 python3 -c "from iirs_multimodal_registrar import ...; direct_multimodal_attempt(...)"
 # Task 3: 96-dim concatenation + 3-level pyramid
 python3 -c "from matcher_cfog import extract_multiscale_cfog_descriptor; ..."
-# Task 4: 5 keys + difference_map.png (use region_006 under Phase-1 ON)
+# Task 4: 5 keys + difference_map.png
 python3 -c "from matcher_cfog import match_images_cfog; ..."
 # Task 5: noise abort
 python3 -c "from matcher_cfog import match_images_cfog; ... # noise → failure, H None"
@@ -230,9 +260,14 @@ pytest tests/test_iirs.py -q  # registrar import + spectral
 
 ## Open limitations (not hidden)
 
-1. SIH Phase-1 ON degrades real OHRC→TMC matching on current thresholds
-   (only `region_006` succeeds; `region_001/002/003/005` fail Gates). Stale
-   exact-count regression guards need recalibration; SIH compliance kept.
+1. Real OHRC→TMC pairs at ~160° sun-azimuth mismatch yield fragile LOW fits:
+   measured 2026-09-14 (`reports/current_region_matching_summary.json`),
+   all six stored regions pass Gate 1 with 5–8 inliers (fit 0.0–1.6px) but
+   every region reports traffic RED (`inlier_ratio` 0.08–0.11 < 0.30, SSIM
+   0.10–0.30, uniformity ~0.01–0.02). The Epic-3 light is the honest signal
+   here — no matrix is forced and both Gate-1 and RED outcomes are recorded
+   per region. Mitigation path: DEM-anchored hillshade reference projection
+   (intercept exists, needs DEM + sun geometry) and denser candidate search.
 2. `held_out_rmse=None` when <8 inliers; `cyclic_rmse=None` on single pairs —
    honest nulls, not errors.
 3. Direct OHRC→IIRS (even 25-inlier synthetic) is a keyword artifact over a

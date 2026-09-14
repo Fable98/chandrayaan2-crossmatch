@@ -1566,7 +1566,11 @@ def find_best_correspondence_unified(
         find_best_correspondence_unified.last_peak_uniqueness = ncc_peak_uniqueness(res, max_loc)
         return float(score), max_loc
 
-    top_indices = np.argpartition(-flat, k)[:k]
+    top_indices = (
+        np.argsort(-flat)
+        if k >= flat.size
+        else np.argpartition(-flat, k)[:k]
+    )
     top_indices = top_indices[np.argsort(-flat[top_indices])]
 
     best_score = -1.0

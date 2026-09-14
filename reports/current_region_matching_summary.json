@@ -1,0 +1,99 @@
+{
+  "timestamp": "2026-09-14T17:00:22.727194+00:00",
+  "settings": {
+    "pair": "ohrc_512->tmc_512",
+    "sensors": "OHRC->TMC-2",
+    "gsd": "manifest sidecar (common grid)",
+    "enable_illumination_normalization": true
+  },
+  "regions_processed": [
+    "region_001",
+    "region_002",
+    "region_003",
+    "region_004",
+    "region_005",
+    "region_006"
+  ],
+  "success_count": 6,
+  "failed_count": 0,
+  "per_region_results": {
+    "region_001": {
+      "status": "success",
+      "reason": null,
+      "inlier_count": 6,
+      "inlier_ratio": 0.1,
+      "held_out_rmse": null,
+      "ssim_score": 0.2727,
+      "confidence_score": 18,
+      "traffic_light_color": "RED",
+      "fit_rmse_px": 0.6609,
+      "uniformity_score": 0.0183,
+      "cyclic_rmse": null
+    },
+    "region_002": {
+      "status": "success",
+      "reason": null,
+      "inlier_count": 6,
+      "inlier_ratio": 0.0845,
+      "held_out_rmse": null,
+      "ssim_score": 0.2086,
+      "confidence_score": 14,
+      "traffic_light_color": "RED",
+      "fit_rmse_px": 1.5861,
+      "uniformity_score": 0.0183,
+      "cyclic_rmse": null
+    },
+    "region_003": {
+      "status": "success",
+      "reason": null,
+      "inlier_count": 8,
+      "inlier_ratio": 0.1026,
+      "held_out_rmse": 1.6486,
+      "ssim_score": 0.2397,
+      "confidence_score": 17,
+      "traffic_light_color": "RED",
+      "fit_rmse_px": 1.6091,
+      "uniformity_score": 0.0222,
+      "cyclic_rmse": null
+    },
+    "region_004": {
+      "status": "success",
+      "reason": null,
+      "inlier_count": 8,
+      "inlier_ratio": 0.1111,
+      "held_out_rmse": 27.9059,
+      "ssim_score": 0.2463,
+      "confidence_score": 18,
+      "traffic_light_color": "RED",
+      "fit_rmse_px": 1.0764,
+      "uniformity_score": 0.0222,
+      "cyclic_rmse": null
+    },
+    "region_005": {
+      "status": "success",
+      "reason": null,
+      "inlier_count": 5,
+      "inlier_ratio": 0.0926,
+      "held_out_rmse": null,
+      "ssim_score": 0.3015,
+      "confidence_score": 18,
+      "traffic_light_color": "RED",
+      "fit_rmse_px": 0.0,
+      "uniformity_score": 0.0084,
+      "cyclic_rmse": null
+    },
+    "region_006": {
+      "status": "success",
+      "reason": null,
+      "inlier_count": 5,
+      "inlier_ratio": 0.082,
+      "held_out_rmse": null,
+      "ssim_score": 0.0965,
+      "confidence_score": 11,
+      "traffic_light_color": "RED",
+      "fit_rmse_px": 0.9748,
+      "uniformity_score": 0.0135,
+      "cyclic_rmse": null
+    }
+  }
+}

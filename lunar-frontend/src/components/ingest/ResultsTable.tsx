@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { imageUrl } from '@/lib/api';
+import TrafficLightBadge from '@/components/TrafficLightBadge';
 
 interface TripletResult {
   [key: string]: any;
@@ -290,6 +291,28 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
                                 >
                                   reg-qa: {t.registration?.status || 'pending'}
                                 </span>
+                                <TrafficLightBadge
+                                  color={
+                                    t.matching?.traffic_light_color ??
+                                    t.registration?.traffic_light_color ??
+                                    null
+                                  }
+                                  confidence_score={
+                                    t.matching?.confidence_score ??
+                                    t.registration?.confidence_score ??
+                                    null
+                                  }
+                                  ssim_score={
+                                    t.matching?.ssim_score ??
+                                    t.registration?.ssim_score ??
+                                    null
+                                  }
+                                  held_out_rmse={
+                                    t.matching?.held_out_rmse ??
+                                    t.registration?.held_out_rmse ??
+                                    null
+                                  }
+                                />
                                 <a
                                   className="underline hover:text-[#4F46E5]"
                                   href={imageUrl(`/images/registered/${t.region_id}/checkerboard_qa.png`)}

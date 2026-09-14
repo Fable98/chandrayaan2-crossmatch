@@ -6,6 +6,7 @@ import LunarGlobe, { type LunarFootprint } from "@/components/hero/LunarGlobe";
 import type { MoonPoint, MoonPointsResponse } from "@/lib/backend-types";
 import { footprintSizeKm } from "@/lib/geo";
 import { SENSOR_META, scaleRatioLabel, SENSOR_OPTIONS } from "@/lib/sensors";
+import TrafficLightBadge from "@/components/TrafficLightBadge";
 
 // True selenographic bounds (planetocentric, deg) from
 // data_preprocessing_pipeline/processed_triplets/*/manifest.json. Used as the
@@ -42,6 +43,13 @@ type RegistrationMetrics = {
   spatial_uniformity?: number | null;
   quality_tier?: string | null;
   ssim?: number | null;
+  // Epic 3 objective verification (tracks backend metrics.ssim_score /
+  // confidence_score / traffic_light_color); rendered via TrafficLightBadge.
+  ssim_score?: number | null;
+  confidence_score?: number | null;
+  traffic_light_color?: "GREEN" | "YELLOW" | "RED" | string | null;
+  held_out_rmse?: number | null;
+  held_out_validation_rmse_px?: number | null;
   psnr?: number | null;
   nmi?: number | null;
   composite_quality_score?: number | null;
@@ -866,10 +874,16 @@ export default function RegistrationLauncher() {
   const fitRmse = metric(metrics, "fit_rmse_px", "rmse_px");
   const valRmse = metric(metrics, "validation_rmse_px");
   const ssimVal = metric(metrics, "ssim");
+  const ssimScore = metric(metrics, "ssim_score", "ssim");
   const psnrVal = metric(metrics, "psnr");
   const nmiVal = metric(metrics, "nmi");
   const compositeScore = metric(metrics, "composite_quality_score");
   const outlierMethod = metrics?.outlier_method || "RANSAC";
+  // Epic 3 traffic-light verdict (null-safe; badge renders Unverified).
+  const trafficColor =
+    typeof metrics?.traffic_light_color === "string" ? metrics.traffic_light_color : null;
+  const confidenceScore = metric(metrics, "confidence_score");
+  const heldOutRmse = metric(metrics, "held_out_rmse", "held_out_validation_rmse_px", "validation_rmse_px");
 
   const sourcePrimarySrc = result?.source_url
     ? absoluteUrl(result.source_url)
@@ -936,6 +950,14 @@ export default function RegistrationLauncher() {
           <div className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${result ? qualityTone : "border-slate-200 bg-slate-50 text-slate-500"}`}>
             {loading ? "PROCESSING..." : result ? qualityTier.replaceAll("_", " ") : "READY TO RUN"}
           </div>
+          {result && !loading && (
+            <TrafficLightBadge
+              color={trafficColor}
+              confidence_score={confidenceScore}
+              ssim_score={ssimScore}
+              held_out_rmse={heldOutRmse}
+            />
+          )}
         </div>
       </div>
 
