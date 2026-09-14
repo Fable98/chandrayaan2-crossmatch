@@ -63,6 +63,8 @@ export default function IngestPage() {
   const [triplets, setTriplets] = useState<TripletSummary[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [isAuthed, setIsAuthed] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const profileMenuRef = useRef<HTMLDivElement>(null);
 
@@ -71,7 +73,9 @@ export default function IngestPage() {
   const [theoryModalOpen, setTheoryModalOpen] = useState(false);
 
   useEffect(() => {
+    setIsAuthed(isAuthenticated());
     setCurrentUser(getCurrentUser());
+    setAuthChecked(true);
   }, []);
 
   useEffect(() => {
@@ -89,6 +93,8 @@ export default function IngestPage() {
   const handleUserLogout = () => {
     setProfileMenuOpen(false);
     logout();
+    setIsAuthed(false);
+    setCurrentUser(null);
     router.push("/");
   };
 
@@ -588,7 +594,12 @@ export default function IngestPage() {
           </div>
 
           {/* Auth Guard Check */}
-          {!isAuthenticated() ? (
+          {!authChecked ? (
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-12 text-center shadow-sm max-w-xl mx-auto space-y-4">
+              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-[#4F46E5] border-r-transparent" />
+              <p className="text-xs text-slate-500 font-medium">Verifying credentials...</p>
+            </div>
+          ) : !isAuthed ? (
             <div className="rounded-2xl border border-slate-200/80 bg-white p-12 text-center shadow-sm max-w-xl mx-auto space-y-4">
               <div className="text-4xl">🔐</div>
               <h3 className="text-base font-bold text-slate-900">
