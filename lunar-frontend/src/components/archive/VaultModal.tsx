@@ -184,7 +184,18 @@ export default function VaultModal({
                             if (filter === "lro") {
                               setFailedThumbs((prev) => new Set(prev).add(thumbUrl));
                             } else {
-                              (e.currentTarget as HTMLImageElement).src = imageUrl(filter === "iirs" ? "/images/iirs/iirs_overlay.png" : `/images/ohrc/${t.id}`);
+                              // Guard against error-loop: only swap when the
+                              // fallback differs from the URL that just failed
+                              // (previously re-set the identical ohrc URL, so a
+                              // genuine 404 retried forever on a black tile).
+                              const fallback = imageUrl(filter === "iirs" ? "/images/iirs/iirs_overlay.png" : `/images/ohrc/${t.id}`);
+                              const img = e.currentTarget as HTMLImageElement;
+                              if (img.src !== fallback && !img.dataset.fbk) {
+                                img.dataset.fbk = "1";
+                                img.src = fallback;
+                              } else {
+                                img.style.opacity = "0.25";
+                              }
                             }
                           }}
                         />
