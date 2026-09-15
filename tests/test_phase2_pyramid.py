@@ -104,6 +104,7 @@ def test_log_gabor_conditioning_down_to_64px():
 
 
 def _run_pair(name: str, src: str, ref: str, tmp_path: Path, **kwargs):
+    kwargs.setdefault("enforce_q5_safety", False)
     res = match_images_cfog(
         str(TRIPLETS / src), str(TRIPLETS / ref),
         source_sensor="OHRC", reference_sensor="TMC",

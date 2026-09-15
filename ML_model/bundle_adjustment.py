@@ -55,6 +55,31 @@ def _apply_affine(pts: np.ndarray, mat: np.ndarray) -> np.ndarray:
     return np.asarray(hom @ m.T, dtype=np.float64)  # (N, 2) global coords
 
 
+def _compose_affine_2x3(outer: np.ndarray, inner: np.ndarray) -> np.ndarray:
+    """Compose two 2x3 affines: apply `inner` first, then `outer`. float64."""
+    a = np.asarray(outer, dtype=np.float64).reshape(2, 3)
+    b = np.asarray(inner, dtype=np.float64).reshape(2, 3)
+    a33 = np.vstack([a, [0.0, 0.0, 1.0]])
+    b33 = np.vstack([b, [0.0, 0.0, 1.0]])
+    return np.ascontiguousarray((a33 @ b33)[:2, :], dtype=np.float64)
+
+
+def _invert_affine_2x3(mat: np.ndarray) -> np.ndarray | None:
+    """Inverse of a 2x3 affine, or None if singular. float64."""
+    try:
+        m = np.asarray(mat, dtype=np.float64).reshape(2, 3)
+        a, t = m[:, :2], m[:, 2]
+        det = float(np.linalg.det(a))
+        if abs(det) < 1e-12:
+            return None
+        a_inv = np.linalg.inv(a)
+        return np.ascontiguousarray(
+            np.hstack([a_inv, -(a_inv @ t).reshape(2, 1)]), dtype=np.float64
+        )
+    except Exception:
+        return None
+
+
 def _filter_finite(src_pts: np.ndarray, ref_pts: np.ndarray) -> tuple:
     """Drop rows containing NaN/Inf in either point set. All float64."""
     s = np.asarray(src_pts, dtype=np.float64).reshape(-1, 2)
@@ -167,38 +192,62 @@ class GlobalBundleAdjuster:
         return ids
 
     def _build_initial_guess(self) -> dict:
-        """Map img_id -> 2x3 affine (float64); reference is identity."""
+        """Map img_id -> 2x3 affine (float64); reference is identity.
+
+        Poses are composed by BFS from the fixed reference along the
+        constraint graph, so multi-hop chains (A->B->ref) initialize in a
+        single consistent global frame. The old code copied each edge's
+        pairwise matrix verbatim: for edges whose ref endpoint was NOT the
+        global reference, that matrix lived in the wrong frame and the
+        optimizer started from an inconsistent guess.
+        """
         matrices: Dict[str, np.ndarray] = {}
         if not self.constraints:
             return matrices
         reference_id = str(self._reference_id())
-        for c in self.constraints:
-            for img_id in (str(c["src"]), str(c["ref"])):
-                if img_id == reference_id:
-                    continue
-                if img_id not in matrices:
-                    if img_id == str(c["src"]):
-                        matrices[img_id] = np.asarray(
-                            _to_affine_2x3(np.asarray(c["initial_matrix"], dtype=np.float64)),
-                            dtype=np.float64,
-                        )
-                    else:
-                        matrices[img_id] = np.eye(2, 3, dtype=np.float64)
-        for img_id in self._all_image_ids():
-            if img_id != reference_id and img_id not in matrices:
-                matrices[img_id] = np.eye(2, 3, dtype=np.float64)
         matrices[reference_id] = np.eye(2, 3, dtype=np.float64)
+        # Adjacency: neighbor -> list of (edge_matrix_src_to_ref, direction).
+        changed = True
+        guard = 0
+        while changed and guard < len(self._all_image_ids()) + 1:
+            changed = False
+            guard += 1
+            for c in self.constraints:
+                s_id, r_id = str(c["src"]), str(c["ref"])
+                m = np.asarray(
+                    _to_affine_2x3(np.asarray(c["initial_matrix"], dtype=np.float64)),
+                    dtype=np.float64,
+                )
+                if r_id in matrices and s_id not in matrices:
+                    # M maps src frame -> ref frame: pose(src) = pose(ref) o M.
+                    matrices[s_id] = _compose_affine_2x3(matrices[r_id], m)
+                    changed = True
+                elif s_id in matrices and r_id not in matrices:
+                    # Reverse: pose(ref) = pose(src) o M^-1.
+                    m_inv = _invert_affine_2x3(m)
+                    matrices[r_id] = (
+                        _compose_affine_2x3(matrices[s_id], m_inv)
+                        if m_inv is not None
+                        else np.eye(2, 3, dtype=np.float64)
+                    )
+                    changed = True
+        for img_id in self._all_image_ids():
+            if img_id not in matrices:
+                matrices[img_id] = np.eye(2, 3, dtype=np.float64)
         return matrices
 
     def _compute_residuals(self, matrices: dict) -> np.ndarray:
-        """Concatenated per-point Euclidean reprojection errors (float64).
+        """Concatenated per-point 2D mismatch vectors, raveled to (2N,) float64.
 
         Math per edge:
           1. src_global = M_src @ [src_pts | 1]  (project source pts to world)
           2. ref_global = M_ref @ [ref_pts | 1]  (project reference pts to world)
           3. diff = src_global - ref_global      (2D mismatch in world frame)
-          4. residual_i = ||diff_i||_2           (Euclidean distance per point)
-        All edges are concatenated into one 1D float64 vector for least_squares.
+        The (N, 2) diffs are raveled to (2N,) for least_squares. The old code
+        returned per-point Euclidean NORMS (N,): for linear loss the RMSE is
+        identical either way, but norms pre-collapse the 2D structure and
+        distort robust-loss (huber/cauchy/...) weighting, which least_squares
+        applies per residual element.
         """
         parts: List[np.ndarray] = []
         for c in self.constraints:
@@ -217,12 +266,8 @@ class GlobalBundleAdjuster:
                 # Project both sets into the shared global frame.
                 s_g = _apply_affine(s, m_src)  # (N, 2) float64
                 r_g = _apply_affine(r, m_ref)  # (N, 2) float64
-                # Euclidean distance between the two global projections.
                 diff = np.asarray(s_g - r_g, dtype=np.float64)  # (N, 2)
-                sq = np.asarray(diff * diff, dtype=np.float64)  # (N, 2)
-                row_sum = np.asarray(np.sum(sq, axis=1, dtype=np.float64), dtype=np.float64)
-                dist = np.asarray(np.sqrt(row_sum, dtype=np.float64), dtype=np.float64)
-                parts.append(np.ascontiguousarray(np.asarray(dist, dtype=np.float64).ravel()))
+                parts.append(np.ascontiguousarray(np.asarray(diff.ravel(), dtype=np.float64)))
             except Exception as exc:
                 self.logger.warning("Residual computation skipped for an edge (%s).", exc)
                 continue
@@ -340,51 +385,35 @@ class GlobalBundleAdjuster:
 
             result = None
             last_exc: Exception | None = None
-            # Spec: try Levenberg-Marquardt first; on ValueError
-            # (singular Jacobian / robust-loss incompatibility) fall back
-            # to Trust Region Reflective. Guardrail: wrap in try-except.
-            try:
+            # scipy 'lm' ONLY supports linear loss (robust loss raises
+            # ValueError on every call), so select the method upfront: lm iff
+            # loss == linear, else trf. One fallback attempt with the other
+            # method survives singular-Jacobian failures either way.
+            methods = ["lm", "trf"] if loss == "linear" else ["trf", "lm"]
+            for _method in methods:
                 try:
-                    # NOTE: scipy 'lm' only supports linear loss; attempt the
-                    # requested robust loss first for spec compliance.
-                    if loss == "linear":
-                        result = least_squares(
-                            fun=_fun,
-                            x0=x0,
-                            method="lm",
-                            xtol=1e-12,
-                            ftol=1e-12,
-                            max_nfev=max_nfev,
-                        )
-                    else:
-                        result = least_squares(
-                            fun=_fun,
-                            x0=x0,
-                            method="lm",
-                            loss=loss,
-                            f_scale=np.float64(self.huber_delta),
-                            xtol=1e-12,
-                            ftol=1e-12,
-                            max_nfev=max_nfev,
-                        )
-                except Exception as e:
-                    last_exc = e
-                    self.logger.warning("least_squares(lm) failed (%s); retrying with trf.", e)
+                    _kwargs: dict = (
+                        {"loss": "linear"}
+                        if _method == "lm"
+                        else {"loss": loss, "f_scale": np.float64(self.huber_delta)}
+                    )
                     result = least_squares(
                         fun=_fun,
                         x0=x0,
-                        method="trf",
-                        loss=loss,
-                        f_scale=np.float64(self.huber_delta),
+                        method=_method,
                         xtol=1e-12,
                         ftol=1e-12,
                         max_nfev=max_nfev,
+                        **_kwargs,
                     )
                     last_exc = None
-            except Exception as e:
-                last_exc = e
-                self.logger.warning("Bundle optimization failed: %s", e)
-                result = None
+                    break
+                except Exception as e:
+                    last_exc = e
+                    self.logger.warning(
+                        "least_squares(%s) failed (%s); trying fallback.", _method, e
+                    )
+                    result = None
 
             # Guardrail: both optimizers failed -> return INITIAL matrices.
             if result is None:

@@ -29,21 +29,46 @@ logger = logging.getLogger("data.ingestion.pds4_reader")
 class PDS4ProductInfo:
     product_id: str
     sensor: str
-    lines: int  # height
-    samples: int  # width
+    lines: Optional[int]  # height; None when the label states no dimensions
+    samples: Optional[int]  # width; None when the label states no dimensions
     bands: int = 1
     bit_depth: int = 8
     data_type: str = "UnsignedByte"
-    gsd_m: float = 5.0
-    sun_azimuth_deg: float = 45.0
-    sun_elevation_deg: float = 30.0
-    incidence_angle_deg: float = 60.0
-    emission_angle_deg: float = 0.0
-    phase_angle_deg: float = 60.0
+    # Geometry fields are None when the label does not state them — NEVER
+    # sensor-typical constants masquerading as measurement (2026-09-15).
+    # Consumers must None-check (or call require_geometry) instead of
+    # computing physical products from invented GSD/sun values.
+    gsd_m: Optional[float] = None
+    sun_azimuth_deg: Optional[float] = None
+    sun_elevation_deg: Optional[float] = None
+    incidence_angle_deg: Optional[float] = None
+    emission_angle_deg: Optional[float] = None
+    phase_angle_deg: Optional[float] = None
     spice_kernels: List[str] = field(default_factory=list)
     image_file: Optional[str] = None
     label_path: Optional[str] = None
     raw_metadata: Dict[str, Any] = field(default_factory=dict)
+    unknown_fields: List[str] = field(default_factory=list)
+
+    @property
+    def geometry_status(self) -> str:
+        """'KNOWN' iff ground scale is label-sourced, else 'UNKNOWN_GEOMETRY'."""
+        return "KNOWN" if self.gsd_m is not None else "UNKNOWN_GEOMETRY"
+
+    def require_geometry(self, *fields: str) -> None:
+        """Fail fast on unknown geometry instead of computing with invented values.
+
+        Raises ValueError("UNKNOWN_GEOMETRY: ...") if any requested field
+        (default: gsd_m) is None.
+        """
+        wanted = fields or ("gsd_m",)
+        missing = [f for f in wanted if getattr(self, f, None) is None]
+        if missing:
+            raise ValueError(
+                f"UNKNOWN_GEOMETRY: {self.label_path or self.product_id} states no "
+                f"{', '.join(missing)}; refusing to compute physical products "
+                f"from defaults."
+            )
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -63,6 +88,8 @@ class PDS4ProductInfo:
             "spice_kernels": self.spice_kernels,
             "image_file": self.image_file,
             "label_path": self.label_path,
+            "geometry_status": self.geometry_status,
+            "unknown_fields": list(self.unknown_fields),
         }
 
 
@@ -100,9 +127,19 @@ def parse_pds4_or_vicar_label(label_path: str | Path) -> PDS4ProductInfo:
         info = _parse_vicar_text(content, path)
 
     logger.info(
-        "PDS4 metadata extracted: sensor=%s, size=(%dx%d), GSD=%.2fm, sun_az=%.1f deg, sun_el=%.1f deg",
-        info.sensor, info.samples, info.lines, info.gsd_m, info.sun_azimuth_deg, info.sun_elevation_deg
+        "PDS4 metadata extracted: sensor=%s, size=(%s), GSD=%s, sun_az=%s, sun_el=%s [%s]",
+        info.sensor,
+        f"{info.samples}x{info.lines}" if info.samples and info.lines else "unknown",
+        f"{info.gsd_m:.2f}m" if info.gsd_m is not None else "unknown",
+        f"{info.sun_azimuth_deg:.1f} deg" if info.sun_azimuth_deg is not None else "unknown",
+        f"{info.sun_elevation_deg:.1f} deg" if info.sun_elevation_deg is not None else "unknown",
+        info.geometry_status,
     )
+    if info.unknown_fields:
+        logger.warning(
+            "Label %s omits %s; recorded as unknown (no defaults invented).",
+            path.name, ", ".join(info.unknown_fields)
+        )
     return info
 
 
@@ -124,12 +161,13 @@ def _parse_pds4_xml(xml_text: str, path: Path) -> PDS4ProductInfo:
         )
     )
 
-    # Dimensions & Data Type
-    lines = 512
-    samples = 512
+    # Dimensions & Data Type (None when unstated — never invented 512s).
+    lines: Optional[int] = None
+    samples: Optional[int] = None
     bands = 1
     data_type = "UnsignedByte"
     bit_depth = 8
+    unknown: List[str] = []
 
     # Extract Axis_Array dimensions
     for elem in tree.iter():
@@ -173,8 +211,10 @@ def _parse_pds4_xml(xml_text: str, path: Path) -> PDS4ProductInfo:
         elif "Byte" in data_type or "8" in data_type:
             bit_depth = 8
 
-    # Ground Sample Distance (GSD)
-    gsd_m = 0.25 if sensor == "OHRC" else (5.0 if sensor == "TMC-2" else (70.0 if sensor == "IIRS" else 100.0))
+    # Ground Sample Distance: label-sourced only. The old sensor-typical
+    # fallback (OHRC 0.25 / TMC-2 5.0 / IIRS 70 / LRO 100) invented precision
+    # the label never stated; downstream physical math must see None instead.
+    gsd_m: Optional[float] = None
     for k in ("pixel_resolution", "map_scale", "spatial_resolution"):
         if k in tag_map:
             try:
@@ -182,13 +222,15 @@ def _parse_pds4_xml(xml_text: str, path: Path) -> PDS4ProductInfo:
                 break
             except ValueError:
                 pass
+    if gsd_m is None:
+        unknown.append("gsd_m")
 
-    # Sun Azimuth & Elevation (Illumination)
-    sun_az = 45.0
-    sun_el = 30.0
-    inc_ang = 60.0
-    em_ang = 0.0
-    ph_ang = 60.0
+    # Sun Azimuth & Elevation (None when unstated — never invented sun).
+    sun_az: Optional[float] = None
+    sun_el: Optional[float] = None
+    inc_ang: Optional[float] = None
+    em_ang: Optional[float] = None
+    ph_ang: Optional[float] = None
 
     for k in ("sun_azimuth", "solar_azimuth", "sub_solar_azimuth"):
         if k in tag_map:
@@ -225,6 +267,15 @@ def _parse_pds4_xml(xml_text: str, path: Path) -> PDS4ProductInfo:
             ph_ang = float(tag_map["phase_angle"])
         except ValueError:
             pass
+
+    for _name, _val in (
+        ("lines", lines), ("samples", samples),
+        ("sun_azimuth_deg", sun_az), ("sun_elevation_deg", sun_el),
+        ("incidence_angle_deg", inc_ang), ("emission_angle_deg", em_ang),
+        ("phase_angle_deg", ph_ang),
+    ):
+        if _val is None:
+            unknown.append(_name)
 
     # SPICE Kernels
     spice_kernels = []
@@ -264,15 +315,37 @@ def _parse_pds4_xml(xml_text: str, path: Path) -> PDS4ProductInfo:
         spice_kernels=list(set(spice_kernels)),
         image_file=img_file,
         label_path=str(path),
+        unknown_fields=sorted(set(unknown)),
     )
 
 
 def _parse_vicar_text(text: str, path: Path) -> PDS4ProductInfo:
     vicar_dict = parse_vicar_label(text)
+    unknown: List[str] = []
 
-    lines = int(vicar_dict.get("LINES", vicar_dict.get("NL", 512)))
-    samples = int(vicar_dict.get("SAMPLES", vicar_dict.get("NS", 512)))
-    bands = int(vicar_dict.get("BANDS", vicar_dict.get("NB", 1)))
+    def _opt_int(*keys: str, field: str) -> Optional[int]:
+        for k in keys:
+            if k in vicar_dict:
+                try:
+                    return int(float(vicar_dict[k]))
+                except (ValueError, TypeError):
+                    pass
+        unknown.append(field)
+        return None
+
+    def _opt_float(*keys: str, field: str) -> Optional[float]:
+        for k in keys:
+            if k in vicar_dict:
+                try:
+                    return float(vicar_dict[k])
+                except (ValueError, TypeError):
+                    pass
+        unknown.append(field)
+        return None
+
+    lines = _opt_int("LINES", "NL", field="lines")
+    samples = _opt_int("SAMPLES", "NS", field="samples")
+    bands = _opt_int("BANDS", "NB", field="bands") or 1
     data_type = vicar_dict.get("FORMAT", "BYTE")
     bit_depth = 16 if "HALF" in data_type or "INT2" in data_type else (32 if "REAL" in data_type else 8)
 
@@ -280,25 +353,22 @@ def _parse_vicar_text(text: str, path: Path) -> PDS4ProductInfo:
     inst = vicar_dict.get("INSTRUMENT_NAME", vicar_dict.get("INSTRUMENT_ID", ""))
     if "OHR" in inst.upper() or "OHR" in path.name.upper():
         sensor = "OHRC"
-        gsd_m = 0.25
     elif "IIR" in inst.upper() or "IIR" in path.name.upper():
         sensor = "IIRS"
-        gsd_m = 70.0
-    else:
-        sensor = "TMC-2"
-        gsd_m = 5.0
 
-    if "PIXEL_RESOLUTION" in vicar_dict:
-        try:
-            gsd_m = float(vicar_dict["PIXEL_RESOLUTION"])
-        except ValueError:
-            pass
+    # Label-sourced GSD only; sensor-typical constants are not measurements.
+    gsd_m = _opt_float("PIXEL_RESOLUTION", field="gsd_m")
 
-    sun_az = float(vicar_dict.get("SOLAR_AZIMUTH", vicar_dict.get("SUN_AZIMUTH", 45.0)))
-    sun_el = float(vicar_dict.get("SOLAR_ELEVATION", vicar_dict.get("SUN_ELEVATION", 30.0)))
-    inc_ang = float(vicar_dict.get("INCIDENCE_ANGLE", 90.0 - sun_el))
-    em_ang = float(vicar_dict.get("EMISSION_ANGLE", 0.0))
-    ph_ang = float(vicar_dict.get("PHASE_ANGLE", 60.0))
+    sun_az = _opt_float("SOLAR_AZIMUTH", "SUN_AZIMUTH", field="sun_azimuth_deg")
+    sun_el = _opt_float("SOLAR_ELEVATION", "SUN_ELEVATION", field="sun_elevation_deg")
+    inc_ang = _opt_float("INCIDENCE_ANGLE", field="incidence_angle_deg")
+    if sun_el is None and inc_ang is not None:
+        # Legitimate solar-geometry identity (not an invented default).
+        sun_el = max(0.0, 90.0 - inc_ang)
+        if "sun_elevation_deg" in unknown:
+            unknown.remove("sun_elevation_deg")
+    em_ang = _opt_float("EMISSION_ANGLE", field="emission_angle_deg")
+    ph_ang = _opt_float("PHASE_ANGLE", field="phase_angle_deg")
 
     # Look for kernel files
     spice_kernels = []
@@ -324,4 +394,5 @@ def _parse_vicar_text(text: str, path: Path) -> PDS4ProductInfo:
         image_file=None,
         label_path=str(path),
         raw_metadata=vicar_dict,
+        unknown_fields=sorted(set(unknown)),
     )

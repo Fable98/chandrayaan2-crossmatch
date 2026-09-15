@@ -63,14 +63,27 @@ def match_images(img_path1, img_path2, output_dir="output"):
     orig_h1, orig_w1 = img1_orig.shape[:2]
     orig_h2, orig_w2 = img2_orig.shape[:2]
 
-    # 2. Prepare for LoFTR (Resize internally for inference only)
-    # LoFTR performs best on ~512x512. We resize for the network, then scale coordinates back.
+    # 2. Prepare for LoFTR (uniform scale + center-pad ONLY: the old anisotropic
+    # cv2.resize to exactly 512x512 stretched non-square inputs and corrupted
+    # keypoint geometry. Letterbox preserves aspect ratio; per-axis offsets and
+    # the uniform scale below invert the mapping exactly.)
     target_size = 512
-    img1_resized = cv2.resize(img1_orig, (target_size, target_size), interpolation=cv2.INTER_AREA)
-    img2_resized = cv2.resize(img2_orig, (target_size, target_size), interpolation=cv2.INTER_AREA)
 
-    t_img1 = K.image_to_tensor(img1_resized, False).float() / 255.0
-    t_img2 = K.image_to_tensor(img2_resized, False).float() / 255.0
+    def _letterbox(gray):
+        h, w = gray.shape[:2]
+        s = target_size / float(max(h, w))
+        nw, nh = max(1, int(round(w * s))), max(1, int(round(h * s)))
+        resized = cv2.resize(gray, (nw, nh), interpolation=cv2.INTER_AREA)
+        canvas = np.zeros((target_size, target_size), dtype=resized.dtype)
+        ox, oy = (target_size - nw) // 2, (target_size - nh) // 2
+        canvas[oy:oy + nh, ox:ox + nw] = resized
+        return canvas, s, ox, oy
+
+    img1_net, s1, ox1, oy1 = _letterbox(img1_orig)
+    img2_net, s2, ox2, oy2 = _letterbox(img2_orig)
+
+    t_img1 = K.image_to_tensor(img1_net, False).float() / 255.0
+    t_img2 = K.image_to_tensor(img2_net, False).float() / 255.0
 
     t_img1 = t_img1.to(device)
     t_img2 = t_img2.to(device)
@@ -102,20 +115,23 @@ def match_images(img_path1, img_path2, output_dir="output"):
             "homography": None,
         }
 
-    # 4. Map coordinates back to NATIVE image space
-    scale_x1, scale_y1 = orig_w1 / float(target_size), orig_h1 / float(target_size)
-    scale_x2, scale_y2 = orig_w2 / float(target_size), orig_h2 / float(target_size)
+    # 4. Map coordinates back to NATIVE image space (exact letterbox inverse:
+    # subtract pad offset, divide uniform scale).
+    mkpts0 = (mkpts0_resized - np.array([ox1, oy1], dtype=np.float64)) / s1
+    mkpts1 = (mkpts1_resized - np.array([ox2, oy2], dtype=np.float64)) / s2
 
-    mkpts0 = mkpts0_resized.copy()
-    mkpts1 = mkpts1_resized.copy()
-    
-    mkpts0[:, 0] *= scale_x1
-    mkpts0[:, 1] *= scale_y1
-    mkpts1[:, 0] *= scale_x2
-    mkpts1[:, 1] *= scale_y2
-
-    # 5. RANSAC Filtering in original space
+    # 5. RANSAC Filtering in original space (fail-closed: no mask -> no siege
+    # of downstream code on None).
     H, mask = cv2.findHomography(mkpts0, mkpts1, cv2.RANSAC, 5.0)
+    if H is None or mask is None or int(np.sum(mask)) < 4:
+        return {
+            "status": "geometric_verification_failed",
+            "message": "LoFTR baseline RANSAC found no consistent geometry.",
+            "match_count": len(mkpts0_resized),
+            "inlier_count": 0,
+            "metrics": None,
+            "homography": None,
+        }
     inliers_idx = np.where(mask.ravel() == 1)[0]
     
     good_mkpts0 = mkpts0[inliers_idx]
@@ -177,8 +193,27 @@ def match_images(img_path1, img_path2, output_dir="output"):
             refined_mkpts1[i][0] += dx
             refined_mkpts1[i][1] += dy
 
-    # 8. Compute Final Homography with Refined Sub-Pixel Matches
-    H_final, _ = cv2.findHomography(uniform_mkpts0, refined_mkpts1, cv2.RANSAC, 3.0)
+    # 8. Compute Final Homography with Refined Sub-Pixel Matches (fail-closed:
+    # a failed re-fit must not crash warpPerspective on None below).
+    if len(uniform_mkpts0) < 4:
+        return {
+            "status": "geometric_verification_failed",
+            "message": "LoFTR baseline spatial filter left too few points to re-fit.",
+            "match_count": len(mkpts0_resized),
+            "inlier_count": 0,
+            "metrics": None,
+            "homography": None,
+        }
+    H_final, final_mask = cv2.findHomography(uniform_mkpts0, refined_mkpts1, cv2.RANSAC, 3.0)
+    if H_final is None or final_mask is None or int(np.sum(final_mask)) < 4:
+        return {
+            "status": "geometric_verification_failed",
+            "message": "LoFTR baseline refined re-fit found no consistent geometry.",
+            "match_count": len(mkpts0_resized),
+            "inlier_count": 0,
+            "metrics": None,
+            "homography": None,
+        }
     
     # 9. Generate Registered Product (Visual Output)
     # Warp Image 1 to Image 2's perspective
@@ -197,8 +232,9 @@ def match_images(img_path1, img_path2, output_dir="output"):
     warp_path = os.path.join(output_dir, "warped_source.jpg")
     cv2.imwrite(warp_path, warped_img1)
 
-    # 10. Compute Canonical Master Metrics
-    inlier_mask_final = np.ones((len(uniform_mkpts0), 1), dtype=np.uint8)
+    # 10. Compute Canonical Master Metrics with the REAL final RANSAC mask
+    # (the old np.ones() mask reported inlier_ratio 1.0 unconditionally).
+    inlier_mask_final = final_mask.reshape(-1, 1).astype(np.uint8)
     metrics = compute_canonical_metrics(
         uniform_mkpts0, refined_mkpts1, inlier_mask_final, H_final, (orig_h2, orig_w2), grid_size
     )
@@ -207,7 +243,8 @@ def match_images(img_path1, img_path2, output_dir="output"):
     metrics["rmse_px"] = metrics["fit_rmse_px"]
     metrics["uniformity_score"] = metrics["spatial_uniformity"]
 
-    # Save matches to JSON
+    # Save matches to JSON (honest per-point inlier flags from the final mask)
+    final_inliers = set(np.where(final_mask.ravel() == 1)[0].tolist())
     matches_data = []
     for i in range(len(uniform_mkpts0)):
         matches_data.append({
@@ -215,7 +252,7 @@ def match_images(img_path1, img_path2, output_dir="output"):
             "source_y": float(uniform_mkpts0[i][1]),
             "target_x": float(refined_mkpts1[i][0]),
             "target_y": float(refined_mkpts1[i][1]),
-            "is_inlier": True,
+            "is_inlier": bool(i in final_inliers),
         })
         
     json_path = os.path.join(output_dir, "matches.json")

@@ -19,9 +19,54 @@ import cv2
 logger = logging.getLogger("ML_model.spectral")
 
 
+def _as_hwb(
+    cube: np.ndarray,
+    layout: str = "auto",
+    wavelengths: Optional[np.ndarray] = None,
+) -> np.ndarray:
+    """Standardize a spectral cube to (H, W, B) with an owned (copied) array.
+
+    layout: "hwb" (already H-first), "bhw" (transpose), or "auto" (guess).
+    "auto" prefers a wavelengths vector matching exactly one axis, then falls
+    back to the legacy smallest-first-dim heuristic — which is AMBIGUOUS when
+    the band count meets/exceeds a spatial dim (e.g. a 256-band strip that is
+    32 px wide). Callers that KNOW their layout (rasterio always yields BHW,
+    cv2 always HWB) must pass it explicitly instead of relying on "auto".
+    The returned array is always a copy: median-imputation below mutates it
+    in place and must never write back into the caller's cube.
+    """
+    arr = np.array(cube, dtype=np.float32, copy=True)
+    if arr.ndim != 3:
+        return arr
+    lay = str(layout).strip().lower()
+    if lay in ("bhw", "b,h,w", "bands_first"):
+        return np.ascontiguousarray(np.transpose(arr, (1, 2, 0)))
+    if lay in ("hwb", "h,w,b", "bands_last"):
+        return arr
+    if lay != "auto":
+        raise ValueError(f"Unknown layout {layout!r}; expected 'hwb', 'bhw', or 'auto'.")
+    try:
+        wl = np.asarray(wavelengths).ravel() if wavelengths is not None else None
+    except Exception:
+        wl = None
+    if wl is not None and wl.size > 1:
+        if wl.size == arr.shape[0] and wl.size != arr.shape[2]:
+            return np.ascontiguousarray(np.transpose(arr, (1, 2, 0)))
+        if wl.size == arr.shape[2] and wl.size != arr.shape[0]:
+            return arr
+    if arr.shape[0] < arr.shape[1] and arr.shape[0] < arr.shape[2] and arr.shape[0] > 1:
+        logger.debug(
+            "layout='auto' guessed BHW for shape %s via smallest-first-dim heuristic.",
+            arr.shape,
+        )
+        return np.ascontiguousarray(np.transpose(arr, (1, 2, 0)))
+    return arr
+
+
 def enhance_iirs_structural_features(
     hypercube: np.ndarray,
     wavelengths: Optional[np.ndarray] = None,
+    layout: str = "auto",
 ) -> np.ndarray:
     """
     Transforms a multi-band/hyperspectral IIRS data cube into a single high-contrast
@@ -33,20 +78,18 @@ def enhance_iirs_structural_features(
     Args:
         hypercube: 3D array of shape (H, W, B) or (B, H, W) where B >= 3 bands.
         wavelengths: Optional 1D array of band wavelengths in nanometers.
+        layout: "hwb", "bhw", or "auto" (see _as_hwb). Pass explicitly whenever
+            the reader is known: rasterio yields BHW, cv2 yields HWB.
 
     Returns:
         2D float32 array normalized to [0.0, 1.0] with enhanced morphological boundaries.
     """
-    arr = np.asarray(hypercube, dtype=np.float32)
+    arr = _as_hwb(hypercube, layout=layout, wavelengths=wavelengths)
 
     # Standardize dimensions to (H, W, B)
     if arr.ndim == 2:
         return np.clip(arr / 255.0 if arr.max() > 1.0 else arr, 0.0, 1.0)
-    elif arr.ndim == 3:
-        if arr.shape[0] < arr.shape[1] and arr.shape[0] < arr.shape[2] and arr.shape[0] > 1:
-            # (B, H, W) -> (H, W, B)
-            arr = np.transpose(arr, (1, 2, 0))
-    else:
+    elif arr.ndim != 3:
         raise ValueError(f"Invalid hyperspectral array shape: {arr.shape}")
 
     h, w, b = arr.shape
@@ -156,6 +199,7 @@ def compute_sam_angle_map(
     hypercube: np.ndarray,
     reference_spectrum: Optional[np.ndarray] = None,
     eps: float = 1e-8,
+    layout: str = "auto",
 ) -> np.ndarray:
     """Per-pixel Spectral Angle Mapper divergence in radians.
 
@@ -165,15 +209,15 @@ def compute_sam_angle_map(
         hypercube: (H, W, B) or (B, H, W) spectral cube.
         reference_spectrum: (B,) reference vector; defaults to spatial mean.
         eps: small stabilizer for the denominator.
+        layout: "hwb", "bhw", or "auto" (see _as_hwb).
 
     Returns:
         (H, W) float32 array of spectral angles in radians in [0, pi].
     """
-    arr = np.asarray(hypercube, dtype=np.float64)
-    if arr.ndim == 3 and arr.shape[0] < arr.shape[1] and arr.shape[0] < arr.shape[2]:
-        arr = np.transpose(arr, (1, 2, 0))
+    arr = _as_hwb(hypercube, layout=layout)
     if arr.ndim != 3:
         raise ValueError(f"hypercube must be 3D, got shape {arr.shape}")
+    arr = np.asarray(arr, dtype=np.float64)
     h, w, nb = arr.shape
     flat = arr.reshape(-1, nb)
     if reference_spectrum is None:
@@ -236,6 +280,7 @@ def apply_sam_gate_to_overlay(
 def quantify_iirs_residuals(
     hypercube: np.ndarray,
     reprojection_errors_px: np.ndarray,
+    layout: str = "auto",
 ) -> Dict[str, Any]:
     """
     Separates geometric Spatial Misalignment from physical Spectral Variance
@@ -246,9 +291,7 @@ def quantify_iirs_residuals(
         spectral_variance: Normalized variance across spectral bands.
         mean_spectral_angle_deg: Average spectral angle deviation from mean signature.
     """
-    arr = np.asarray(hypercube, dtype=np.float32)
-    if arr.ndim == 3 and arr.shape[0] < arr.shape[1] and arr.shape[0] < arr.shape[2]:
-        arr = np.transpose(arr, (1, 2, 0))
+    arr = _as_hwb(hypercube, layout=layout)
 
     # 1. Spatial Misalignment (pixels)
     if len(reprojection_errors_px) > 0:

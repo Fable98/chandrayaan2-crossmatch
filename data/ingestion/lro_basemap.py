@@ -24,6 +24,27 @@ import cv2
 logger = logging.getLogger("data.ingestion.lro_basemap")
 
 
+def _normalize_basemap_dtype(raw: np.ndarray) -> np.ndarray:
+    """Normalize a cached basemap raster to float32 [0, 1] BY DTYPE.
+
+    The old `max() > 1.0 -> /255` rule silently corrupted anything that was
+    not uint8: a uint16 mosaic (max ~30000) collapsed to ~117x overflow, and
+    float mosaics outside [0, 1] were mis-scaled. Branch on dtype instead:
+    uint8 -> /255, uint16 -> /65535, float -> clip (assumed [0, 1] storage).
+    """
+    if raw.dtype == np.uint8:
+        return (raw.astype(np.float32) / 255.0).astype(np.float32)
+    if raw.dtype == np.uint16:
+        return (raw.astype(np.float32) / 65535.0).astype(np.float32)
+    arr = raw.astype(np.float32)
+    if np.nanmax(arr) > 1.0 or np.nanmin(arr) < 0.0:
+        logger.warning(
+            "Float basemap outside [0, 1] (range %.3g..%.3g); clipping, not rescaling.",
+            float(np.nanmin(arr)), float(np.nanmax(arr)),
+        )
+    return np.clip(arr, 0.0, 1.0).astype(np.float32)
+
+
 @dataclass
 class LROProductMetadata:
     product_id: str
@@ -301,9 +322,7 @@ def download_or_fetch_lro_basemap(
         meta = parse_lro_pds4_label(xml_target)
         raw = cv2.imread(str(img_target), cv2.IMREAD_UNCHANGED)
         if raw is not None:
-            arr = raw.astype(np.float32)
-            if arr.max() > 1.0:
-                arr = arr / 255.0
+            arr = _normalize_basemap_dtype(raw)
             meta["image_path"] = str(img_target)
             meta["label_path"] = str(xml_target)
             return arr, meta
@@ -353,9 +372,7 @@ def download_or_fetch_lro_basemap(
     if raw is None:
         raw = np.full((512, 512), 128, dtype=np.uint8)
 
-    arr = raw.astype(np.float32)
-    if arr.max() > 1.0:
-        arr = arr / 255.0
+    arr = _normalize_basemap_dtype(raw)
 
     meta["image_path"] = str(img_target)
     meta["label_path"] = str(xml_target)

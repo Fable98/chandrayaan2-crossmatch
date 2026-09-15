@@ -549,7 +549,9 @@ def process_single_triplet(
         )
 
     # -- Manifest JSON --
-    sun_az_mismatch = 0.0
+    # Unknown suns must NOT report a 0.0 mismatch (that claims perfect
+    # agreement); None serializes as JSON null = honestly unknown.
+    sun_az_mismatch = None
     if o_meta.sun_azimuth_deg is not None and t_meta.sun_azimuth_deg is not None:
         sun_az_mismatch = abs(o_meta.sun_azimuth_deg - t_meta.sun_azimuth_deg)
 

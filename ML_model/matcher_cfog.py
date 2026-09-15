@@ -20,8 +20,9 @@ Implements scientifically defensible cross-sensor alignment:
 """
 
 from __future__ import annotations
-
 import os
+
+import hashlib
 import json
 import math
 import shutil
@@ -99,6 +100,27 @@ except Exception:
         SUN_ANGLE_INVARIANCE_ENABLED = False
         ADAPTIVE_ILLUMINATION_NORMALIZATION_ENABLED = False
         EXPERIMENTAL_STACK_ENABLED_BY_DEFAULT = False
+
+
+# OpenCV's RNG is process-global: seed it ONCE here so single-threaded runs
+# are reproducible without every match_images_cfog call resetting the stream
+# to a constant (the old per-call setRNGSeed(42) lock-stepped ThreadPoolExecutor
+# tiles onto identical RANSAC draws). Per-pair decorrelation happens per call.
+try:
+    cv2.setRNGSeed(int(SEED))
+except Exception:
+    pass
+
+
+def _pair_rng_seed(img_path1, img_path2, *, salt: str = "cfog-ransac") -> int:
+    """Deterministic per-pair seed: SEED ^ hash(pair).
+
+    Stable across runs for the same pair, distinct across pairs/tiles, so
+    parallel tiles never share identical RANSAC streams.
+    """
+    tag = f"{salt}|{SEED}|{img_path1}|{img_path2}".encode("utf-8", "ignore")
+    digest = hashlib.sha256(tag).digest()
+    return int.from_bytes(digest[:8], "little") % (2 ** 31 - 1)
 
 logger = logging.getLogger("ML_model.matcher_cfog")
 
@@ -216,9 +238,10 @@ def load_as_float_and_color(path: str | Path) -> Tuple[np.ndarray, np.ndarray, D
             raster_meta["count"] = src.count
 
             if src.count > 3:
-                # Hyperspectral cube (e.g. IIRS): Spectral feature engineering (PC1 + band ratio)
+                # Hyperspectral cube (e.g. IIRS): Spectral feature engineering (PC1 + band ratio).
+                # rasterio always yields (B, H, W): declared explicitly (never "auto"-guessed).
                 bands = src.read().astype(np.float32)
-                gray = enhance_iirs_structural_features(bands)
+                gray = enhance_iirs_structural_features(bands, layout="bhw")
             elif src.count >= 3:
                 rgb = np.dstack([src.read(i) for i in (1, 2, 3)]).astype(np.float32)
                 gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
@@ -243,7 +266,8 @@ def load_as_float_and_color(path: str | Path) -> Tuple[np.ndarray, np.ndarray, D
         raise ValueError(f"Could not read image: {path_str}")
 
     if raw.ndim == 3 and raw.shape[2] > 3:
-        gray = enhance_iirs_structural_features(raw)
+        # cv2 yields (H, W, B): declared explicitly (never "auto"-guessed).
+        gray = enhance_iirs_structural_features(raw, layout="hwb")
         color = raw[:, :, :3].copy()
     elif raw.ndim == 3 and raw.shape[2] == 3:
         gray = cv2.cvtColor(raw, cv2.COLOR_BGR2GRAY).astype(np.float32)
@@ -753,6 +777,11 @@ def apply_dem_relief_compensation(
     Applies simplified local DEM-based relief displacement compensation.
     Corrects parallax displacement caused by terrain elevation under off-nadir viewing.
     Note: Labeled honestly as relief displacement compensation, NOT full sensor-model ray-tracing.
+
+    Azimuth convention (unified 2026-09-15 with geometry.dem_ray_intersection
+    and compute_dem_ray_shift_correction below): compass-style degrees
+    clockwise from north (0=N, 90=E). In y-down pixel coordinates the unit
+    shift direction is (sin(psi), -cos(psi)).
     """
     if dem is None or emission_deg is None or abs(emission_deg) < 0.5:
         return img.copy(), {"enabled": False, "method": None, "reason": "No DEM or nadir viewing"}
@@ -776,8 +805,8 @@ def apply_dem_relief_compensation(
     psi_rad = np.radians(azimuth_deg)
 
     scale = float(np.tan(e_rad) / max(gsd_m, 1e-3))
-    dx = (dem_rel * (scale * np.cos(psi_rad))).astype(np.float32)
-    dy = (dem_rel * (scale * np.sin(psi_rad))).astype(np.float32)
+    dx = (dem_rel * (scale * np.sin(psi_rad))).astype(np.float32)
+    dy = (dem_rel * (scale * -np.cos(psi_rad))).astype(np.float32)
 
     x_coords, y_coords = np.meshgrid(np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32))
     map_x = (x_coords + dx).astype(np.float32)
@@ -870,6 +899,7 @@ def compute_dem_ray_shift_correction(
         dx = dz * scale * float(np.sin(p_rad))
         dy = dz * scale * float(-np.cos(p_rad))
         corrected = np.column_stack([pts[:, 0] + dx, pts[:, 1] + dy])
+        shift_mag = np.hypot(dx, dy) if dz.size else np.zeros(0)
         return corrected.astype(np.float64), {
             "enabled": True,
             "method": "dem_los_ray_shift",
@@ -877,7 +907,11 @@ def compute_dem_ray_shift_correction(
             "look_azimuth_deg": phi,
             "gsd_m": gsd,
             "mean_relief_m": float(np.mean(np.abs(dz))) if dz.size else 0.0,
-            "mean_shift_px": float(np.mean(np.hypot(dx, dy))) if dz.size else 0.0,
+            "mean_shift_px": float(np.mean(shift_mag)) if dz.size else 0.0,
+            # The Step-9 TPS-fallback gate reads max_shift_px (a mean here
+            # would let spiky relief through); p95/p99 accompany for audit.
+            "max_shift_px": float(np.max(shift_mag)) if dz.size else 0.0,
+            "p95_shift_px": float(np.percentile(shift_mag, 95.0)) if dz.size else 0.0,
         }
     except Exception as exc:
         logger.warning("DEM ray-shift failed (%s); disabled honestly.", exc)
@@ -2873,6 +2907,7 @@ def match_images_cfog(
     enable_native_polish: bool = True,
     finest_scale_only: bool = False,
     enable_illumination_normalization: bool = False,
+    enforce_q5_safety: bool = True,
 ) -> Dict[str, Any]:
     """
     Executes the primary cross-sensor registration pipeline:
@@ -2904,8 +2939,13 @@ def match_images_cfog(
     # fit RMSE by ~+-0.5px run to run (measured 003: 0.60/1.29 across runs).
     # Seeding changes nothing about expected quality; it makes published
     # numbers reproducible for evaluators re-running the pipeline.
+    # Per-pair stream (SEED ^ hash(pair)): reproducible per pair, distinct
+    # across pairs — unlike the old per-call setRNGSeed(42), parallel tiles no
+    # longer draw identical RANSAC samples. NOTE: cv2's RNG is process-global,
+    # so concurrent threads interleave draws; threaded runs are decorrelated
+    # but not bit-reproducible, single-threaded runs are.
     try:
-        cv2.setRNGSeed(42)
+        cv2.setRNGSeed(_pair_rng_seed(img_path1, img_path2))
     except Exception:
         pass
 
@@ -3042,6 +3082,11 @@ def match_images_cfog(
     # inverted-direction block below and the main-path metrics call see it.
     # (Fixes UnboundLocalError on every inverted/multimodal call.)
     metric_gsd: Optional[float] = working_gsd if scale_estimation_method == "pds4_metadata" else None
+    # NaN-safe GSD for GeoTIFF geotransform tags (relative grid when unknown).
+    # Hoisted here: the inverted-IIRS block (~line 3527) writes a GeoTIFF long
+    # before the old definition site; without this the NameError was swallowed
+    # by `except: pass` and the product silently lost its georeferencing.
+    tag_gsd = working_gsd if np.isfinite(working_gsd) else 1.0
 
     # 3.5. Content-Based Overlap Recovery Setup
     content_overlap_info: Optional[Dict[str, Any]] = None
@@ -3277,6 +3322,7 @@ def match_images_cfog(
             experimental_stack=experimental_stack,
             allow_synthetic_reference=allow_synthetic_reference,
             enable_illumination_normalization=enable_illumination_normalization,
+            enforce_q5_safety=enforce_q5_safety,
         )
 
         if inv_temp_dir and inv_temp_dir.exists():
@@ -3523,8 +3569,10 @@ def match_images_cfog(
                 else:
                     dst.write(warped_source, 1)
             written_tif = True
-        except Exception:
-            pass
+        except Exception as exc:
+            # Never swallow: silent loss of the georeferenced product hid the
+            # tag_gsd NameError on this path for months. PNG fallback below.
+            logger.warning("Inverted-path GeoTIFF write failed (%s); PNG fallback only.", exc)
         if not written_tif:
             cv2.imwrite(str(tif_path), warped_source)
 
@@ -4593,7 +4641,8 @@ def match_images_cfog(
 
     # NOTE: azimuth for DEM-aware fitting must be sensor line-of-sight azimuth,
     # never sun azimuth (see relief-compensation fix above). LOS azimuth is
-    # currently unavailable, so pass None and let the helper use its default.
+    # currently unavailable, so pass None: ransac_dem_aware_fit then disables
+    # relief correction honestly instead of shifting in a guessed direction.
     em1 = meta1.emission_deg if meta1.emission_deg is not None else 0.0
     if dem_arr is not None and abs(em1) > 1e-2:
         H_final, inlier_mask, _ = ransac_dem_aware_fit(
@@ -4639,6 +4688,9 @@ def match_images_cfog(
     # If DEM is present and sensor has non-zero emission, check if DEM-aware RANSAC
     # preserves crater-wall and relief correspondences that planar RANSAC rejected.
     dem_ransac_applied = False
+    dem_ransac_frame = "raw_source_to_dst"
+    dem_relief_max_shift_px = 0.0
+    dem_raw_frame_rmse_px = None
     if dem_arr is not None and len(pts1_arr) >= 4:
         try:
             _em = float(meta1.emission_angle_deg) if (meta1 and meta1.emission_angle_deg is not None) else 0.0
@@ -4654,6 +4706,18 @@ def match_images_cfog(
                     if tx_check_dem.get("is_valid"):
                         H_final, inlier_mask = H_dem, mask_dem.reshape(-1, 1).astype(np.uint8)
                         dem_ransac_applied = True
+                        # Frame contract: H_dem maps relief-corrected source -> dst
+                        # (see geometry.ransac_dem_aware_fit). Surfaced so the
+                        # adopted homography is never silently misread as raw->dst.
+                        try:
+                            dem_ransac_frame = str(dem_fit_info.get("frame", "relief_corrected_source_to_dst"))
+                            dem_relief_max_shift_px = float(dem_fit_info.get("relief_max_shift_px", 0.0) or 0.0)
+                            _rr = dem_fit_info.get("raw_frame_rmse_px")
+                            # JSON-safe: degenerate raw-frame error emits None, never inf.
+                            dem_raw_frame_rmse_px = (None if _rr is None or not np.isfinite(float(_rr))
+                                                     else float(_rr))
+                        except Exception:
+                            pass
                         logger.info("DEM-aware RANSAC adopted (%d inliers vs %d planar).", count_dem, count_curr)
         except Exception as exc:
             logger.warning("DEM-aware RANSAC check failed (%s); retaining standard solution.", exc)
@@ -4708,9 +4772,8 @@ def match_images_cfog(
 
     # Effective GSD for metric reporting: None in CV-fallback mode so that
     # absolute RMSE in meters is reported as unavailable (relative units only).
-    metric_gsd: Optional[float] = working_gsd if scale_estimation_method == "pds4_metadata" else None
-    # NaN-safe GSD for GeoTIFF geotransform tags (relative grid when unknown).
-    tag_gsd = working_gsd if np.isfinite(working_gsd) else 1.0
+    # (metric_gsd/tag_gsd hoisted to section 3; re-asserted here, not redefined.)
+    metric_gsd = working_gsd if scale_estimation_method == "pds4_metadata" else None
 
     # QUALITY GATE 3: Sanity Check Transformation Conditioning
     # Include inlier fit RMSE so excessive residuals fail here, not silently.
@@ -5111,6 +5174,9 @@ def match_images_cfog(
         "model": dem_model,
         "dem_available": bool(dem_arr is not None),
         "dem_ransac_applied": bool(dem_ransac_applied),
+        "dem_ransac_frame": dem_ransac_frame,
+        "dem_relief_max_shift_px": float(dem_relief_max_shift_px),
+        "dem_raw_frame_rmse_px": dem_raw_frame_rmse_px,
         "slope_residual_correlation": slope_residual_correlation,
         "relief_strain_detected": bool(relief_strain_info.get("strain_detected", False)),
         "relief_strain_ratio": float(relief_strain_info.get("strain_ratio", 1.0)),
@@ -5181,14 +5247,22 @@ def match_images_cfog(
     # Abort rather than force a bad matrix when consensus is weak or
     # out-of-sample error is large. Thresholds per SIH spec:
     # inlier_ratio < 0.3 or held_out_rmse > 2.5 px -> registration_failed.
+    # Inlier indices for the held-out gate below (always defined; the gate
+    # short-circuits on `_q5_held is None` first).
     try:
-        if inlier_mask is not None and H_final is not None and len(pts1_arr) >= 4:
-            inl_idx = np.where(inlier_mask.ravel() == 1)[0]
-            if len(inl_idx) >= 4:
-                err = calculate_reprojection_errors(pts1_arr[inl_idx], pts2_arr[inl_idx], H_final)
-                _q5_ratio = float(np.count_nonzero(err < 3.0) / max(1, len(inl_idx)))
-            else:
-                _q5_ratio = float(metrics.get("inlier_ratio", 0.0) or 0.0)
+        if inlier_mask is not None:
+            inl_idx = np.where(np.asarray(inlier_mask).ravel() == 1)[0]
+        else:
+            inl_idx = np.empty(0, dtype=int)
+    except Exception:
+        inl_idx = np.empty(0, dtype=int)
+    try:
+        # Inlier ratio over ALL correspondences (cf. master_pipeline.py Q5).
+        # Scoring only the inliers against the H they voted for is a
+        # tautology that returns ~1.0 even for garbage homographies.
+        if H_final is not None and len(pts1_arr) >= 4 and len(pts1_arr) == len(pts2_arr):
+            err = calculate_reprojection_errors(pts1_arr, pts2_arr, H_final)
+            _q5_ratio = float(np.count_nonzero(err < 3.0) / max(1, len(err)))
         else:
             _q5_ratio = float(metrics.get("inlier_ratio", 0.0) or 0.0)
     except Exception:
@@ -5203,7 +5277,8 @@ def match_images_cfog(
         _q5_reasons.append(f"inlier_ratio {_q5_ratio:.3f} < 0.30 (weak consensus)")
     if _q5_held is not None and len(inl_idx) >= 20 and (_q5_held > 3.0 or (_q5_held > 2.5 and float(metrics.get("fit_rmse_px", 0.0) or 0.0) > 1.5)):
         _q5_reasons.append(f"held_out_rmse {_q5_held:.3f}px > 2.50px (poor generalization)")
-    if _q5_reasons:
+    metrics["inlier_ratio"] = round(float(_q5_ratio), 4)
+    if enforce_q5_safety and _q5_reasons:
         logger.warning("Quality Gate 5 (safety) rejected: %s. Aborting without forced matrix.", "; ".join(_q5_reasons))
         return {
             "status": "registration_failed",
@@ -5224,6 +5299,9 @@ def match_images_cfog(
                 "estimated_scale_ratio": estimated_scale_ratio,
             },
         }
+    elif _q5_reasons:
+        logger.info("Quality Gate 5 advisory (enforce_q5_safety=False): %s.", "; ".join(_q5_reasons))
+        metrics["q5_safety_advisory"] = list(_q5_reasons)
 
     # 10. Generate Output Products
     # A. Warped source image into reference space via Piecewise Affine / TPS
@@ -5274,8 +5352,8 @@ def match_images_cfog(
             else:
                 dst.write(warped_source, 1)
         written_tif = True
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Main-path GeoTIFF write failed (%s); PNG fallback only.", exc)
 
     if not written_tif:
         cv2.imwrite(str(tif_path), warped_source)

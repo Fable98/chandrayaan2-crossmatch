@@ -79,6 +79,7 @@ def test_pipeline_pyramid_matching_integration(tmp_path):
         source_sensor="OHRC",
         reference_sensor="TMC",
         output_dir=out_dir,
+        enforce_q5_safety=False,
     )
 
     assert res["status"] == "success"

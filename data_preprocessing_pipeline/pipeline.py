@@ -17,6 +17,9 @@ from typing import Optional, Tuple, Dict, Any
 
 import numpy as np
 import cv2
+import logging
+
+logger = logging.getLogger("data_preprocessing_pipeline.pipeline")
 
 # Add parent directory for lunar_pipeline imports if needed
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -37,8 +40,11 @@ def load_raw_lunar_image(path: Path | str) -> Tuple[np.ndarray, Dict[str, Any]]:
         "gsd_m": 5.0,
     }
 
-    # Infer sensor from name
+    # Infer sensor from name. NOTE: bare `"iir" in name` misfires on paths like
+    # ".../required/..." — token-boundary match (cf. lunar_pipeline/models).
+    import re as _re
     name_lower = p.name.lower()
+    _iir_token = _re.search(r"(?<![a-z0-9])iirs?(?![a-z0-9])", name_lower)
     if "ohr" in name_lower:
         metadata["sensor"] = "OHRC"
         metadata["gsd_m"] = 0.25
@@ -47,7 +53,7 @@ def load_raw_lunar_image(path: Path | str) -> Tuple[np.ndarray, Dict[str, Any]]:
         metadata["sensor"] = "TMC-2"
         metadata["gsd_m"] = 5.0
         metadata["emission_deg"] = 12.0
-    elif "iir" in name_lower:
+    elif _iir_token:
         metadata["sensor"] = "IIRS"
         metadata["gsd_m"] = 70.0
         metadata["emission_deg"] = 0.0
@@ -76,7 +82,7 @@ def load_raw_lunar_image(path: Path | str) -> Tuple[np.ndarray, Dict[str, Any]]:
                 bands = src.read().astype(np.float32)
                 try:
                     from spectral import enhance_iirs_structural_features
-                    arr = enhance_iirs_structural_features(bands)
+                    arr = enhance_iirs_structural_features(bands, layout="bhw")
                 except Exception:
                     arr = np.mean(bands, axis=0)
             elif src.count >= 3:
@@ -108,7 +114,7 @@ def load_raw_lunar_image(path: Path | str) -> Tuple[np.ndarray, Dict[str, Any]]:
     if raw.ndim == 3 and raw.shape[2] > 3:
         try:
             from spectral import enhance_iirs_structural_features
-            arr = enhance_iirs_structural_features(raw)
+            arr = enhance_iirs_structural_features(raw, layout="hwb")
         except Exception:
             arr = np.mean(raw.astype(np.float32), axis=2)
     elif raw.ndim == 3 and raw.shape[2] == 3:
@@ -128,6 +134,50 @@ def load_raw_lunar_image(path: Path | str) -> Tuple[np.ndarray, Dict[str, Any]]:
     return arr.astype(np.float32), metadata
 
 
+def load_dem_elevation(path: Path | str) -> Tuple[np.ndarray, Dict[str, Any]]:
+    """Loads a DEM raster PRESERVING ELEVATION METERS (never normalized).
+
+    load_raw_lunar_image() min-max normalizes to [0, 1] for optical matching —
+    applying that to a DEM destroys meter units and collapses relief shifts
+    ~1000x. DEM arrays stay raw float32 meters here. Values outside the lunar
+    plausible band [-5000, 5000] m (median check) emit a provenance warning
+    but are kept: deep basins/peaks can legitimately exceed it, and rescaling
+    would be the corruption.
+    """
+    p = Path(path)
+    meta: Dict[str, Any] = {"file_name": p.name, "units": "meters", "normalized": False}
+    arr: Optional[np.ndarray] = None
+    try:
+        import rasterio
+        with rasterio.open(str(p)) as src:
+            band = src.read(1)
+            arr = np.asarray(band, dtype=np.float32)
+            meta["crs"] = str(src.crs) if src.crs else None
+            meta["transform"] = list(src.transform) if src.transform else None
+    except Exception:
+        arr = None
+    if arr is None:
+        raw = cv2.imread(str(p), cv2.IMREAD_UNCHANGED)
+        if raw is None:
+            raise FileNotFoundError(f"DEM file not found or unreadable: {p}")
+        arr = np.asarray(raw, dtype=np.float32)
+        if arr.ndim == 3:
+            arr = np.mean(arr, axis=2).astype(np.float32)
+    finite = arr[np.isfinite(arr)]
+    if finite.size:
+        med = float(np.median(finite))
+        meta["median_m"] = med
+        meta["min_m"] = float(np.min(finite))
+        meta["max_m"] = float(np.max(finite))
+        if not (-5000.0 <= med <= 5000.0):
+            logger.warning(
+                "DEM %s median elevation %.1f m outside plausible lunar band "
+                "[-5000, 5000] m; keeping raw meters (check vertical datum).",
+                p.name, med,
+            )
+    return arr.astype(np.float32), meta
+
+
 def apply_dem_relief_compensation(
     image: np.ndarray,
     dem: Optional[np.ndarray] = None,
@@ -141,6 +191,10 @@ def apply_dem_relief_compensation(
     
     NOTE: This is local DEM relief displacement compensation. It is not equivalent to a
     full photogrammetric rigorous sensor-model ray-tracing orthorectifier.
+
+    Azimuth convention: compass-style degrees clockwise from north (0=N, 90=E),
+    matching ML_model/geometry.dem_ray_intersection. In y-down pixel
+    coordinates the unit shift direction is (sin(psi), -cos(psi)).
     """
     h, w = image.shape[:2]
     if dem is None or abs(emission_deg) < 1e-3:
@@ -168,8 +222,8 @@ def apply_dem_relief_compensation(
         e_rad = np.radians(emission_deg)
         psi_rad = np.radians(azimuth_deg)
         scale = float(np.tan(e_rad) / max(gsd_m, 1e-3))
-        dx = (dem_rel * (scale * np.cos(psi_rad))).astype(np.float32)
-        dy = (dem_rel * (scale * np.sin(psi_rad))).astype(np.float32)
+        dx = (dem_rel * (scale * np.sin(psi_rad))).astype(np.float32)
+        dy = (dem_rel * (scale * -np.cos(psi_rad))).astype(np.float32)
         x_coords, y_coords = np.meshgrid(
             np.arange(w, dtype=np.float32), np.arange(h, dtype=np.float32)
         )
@@ -207,7 +261,7 @@ def export_registered_geotiff(
         import rasterio
         from rasterio.transform import from_origin
 
-        h, w = ortho_arr.shape[:2]
+        h, w = arr.shape[:2]
         transform = from_origin(0.0, float(h), 1.0, 1.0)
         profile = {
             "driver": "GTiff",
@@ -223,8 +277,9 @@ def export_registered_geotiff(
         with rasterio.open(str(tif_path), "w", **profile) as dst:
             dst.write(u8, 1)
         written = True
-    except Exception:
-        pass
+    except Exception as exc:
+        # Never swallow: a failed GeoTIFF must be visible, PNG still written below.
+        logger.warning("GeoTIFF export failed for %s (%s); PNG fallback only.", out_p, exc)
 
     # Also save standard image output for web visualization
     img_out = out_p.with_suffix(".png")
@@ -257,7 +312,9 @@ def process_and_orthorectify(
 
     dem_arr = None
     if dem_path and Path(dem_path).exists():
-        dem_arr, _ = load_raw_lunar_image(dem_path)
+        # Meters-preserving DEM load: load_raw_lunar_image() would normalize
+        # to [0, 1] and destroy elevation units (relief shifts collapse ~1000x).
+        dem_arr, _ = load_dem_elevation(dem_path)
 
     ortho = orthorectify_image_with_dem(
         arr,

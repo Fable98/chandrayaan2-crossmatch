@@ -105,8 +105,16 @@ def gradient_orientation(band: np.ndarray) -> np.ndarray:
     return np.stack([np.cos(ang), np.sin(ang)], axis=0).astype(np.float32)
 
 
-def census_transform(band: np.ndarray, radius: int = 2) -> np.ndarray:
-    """Census bitstring packed into float32 in [0, 1] for GeoTIFF convenience."""
+def census_transform(band: np.ndarray, radius: int = 1) -> np.ndarray:
+    """Census bitstring as raw uint32 codes (1, H, W).
+
+    The old build packed 24-bit codes (radius=2) into [0, 1] float32: code
+    spacing 1/2^24 sits BELOW float32 eps near 1.0, so adjacent bitstrings
+    collided and Hamming structure was destroyed for bright codes. Raw uint32
+    survives float32 GeoTIFF storage exactly (all values < 2^24), and the
+    default radius=1 (8-bit) keeps descriptors compact. Callers needing the
+    legacy float preview can min-max normalize themselves (order-preserving).
+    """
     x = _normalize01(band)
     pad = np.pad(x, radius, mode="edge")
     h, w = x.shape
@@ -118,14 +126,13 @@ def census_transform(band: np.ndarray, radius: int = 2) -> np.ndarray:
             if dx == 0 and dy == 0:
                 continue
             neigh = pad[radius + dy : radius + dy + h, radius + dx : radius + dx + w]
-            bits |= (neigh >= center).astype(np.uint32) << k
+            bits |= (neigh >= center).astype(np.uint32) << np.uint32(k)
             k += 1
             if k >= 32:
                 break
         if k >= 32:
             break
-    max_val = np.float32((1 << k) - 1) if k > 0 else 1.0
-    return (bits.astype(np.float32) / max_val)[np.newaxis, ...]
+    return bits[np.newaxis, ...]
 
 
 def lbp(band: np.ndarray) -> np.ndarray:
@@ -139,24 +146,59 @@ def lbp(band: np.ndarray) -> np.ndarray:
     return (codes.astype(np.float32) / 255.0)[np.newaxis, ...]
 
 
-def phase_congruency_proxy(band: np.ndarray) -> np.ndarray:
+def phase_congruency_proxy(band: np.ndarray, num_scales: int = 3, num_orientations: int = 4) -> np.ndarray:
     """
-    Lightweight phase-congruency proxy: local energy / (sum of amplitudes)
-    via a few log-scaled DoG bandpass filters. Not Kovesi's full PC.
+    Simplified Kovesi phase congruency via an FFT log-Gabor quadrature bank.
+
+    PC_o = |sum_s R_{s,o}| / (sum_s |R_{s,o}| + eps) per orientation, summed
+    over orientations: local Fourier energy over total amplitude. This is
+    genuine phase alignment (complex even/odd responses), NOT the deleted
+    predecessor which fed identical magnitudes into numerator and denominator
+    (num == den -> constant ~1.0 everywhere, labeled "phase congruency").
+
+    Simplifications vs full Kovesi: no noise-floor threshold T, no
+    frequency-spread weighting W. Documented as a proxy; for the full
+    treatment see ML_model/matcher_cfog.compute_phase_congruency.
     """
-    x = _normalize01(band)
-    energies = []
-    amps = []
-    for sigma in (1.0, 2.0, 4.0, 8.0):
-        blur = cv2.GaussianBlur(x, (0, 0), sigma)
-        bandpass = x - blur
-        energies.append(np.abs(bandpass))
-        amps.append(np.abs(bandpass))
-    num = np.sum(energies, axis=0)
-    den = np.sum(amps, axis=0) + EPS
-    pc = num / den
-    pc = np.clip(pc, 0, 1)
-    return pc.astype(np.float32)[np.newaxis, ...]
+    x = _normalize01(band).astype(np.float64)
+    h, w = x.shape
+    F = np.fft.fft2(x)
+    fy = np.fft.fftfreq(h)[:, None]
+    fx = np.fft.fftfreq(w)[None, :]
+    radius = np.sqrt(fx * fx + fy * fy)
+    radius[0, 0] = 1.0  # avoid log(0); DC killed explicitly below
+    theta = np.arctan2(fy, fx)
+
+    min_wavelength = 3.0
+    mult = 2.0
+    sigma_f = 0.55
+    sigma_theta = float(np.pi / num_orientations / 1.5)
+
+    energy_total = np.zeros((h, w), dtype=np.float64)
+    amp_total = np.zeros((h, w), dtype=np.float64)
+    for o in range(num_orientations):
+        angle = o * np.pi / num_orientations
+        dtheta = np.arctan2(np.sin(theta - angle), np.cos(theta - angle))
+        spread = np.exp(-(dtheta * dtheta) / (2.0 * sigma_theta * sigma_theta))
+        sum_even = np.zeros((h, w), dtype=np.float64)
+        sum_odd = np.zeros((h, w), dtype=np.float64)
+        sum_an = np.zeros((h, w), dtype=np.float64)
+        for s in range(num_scales):
+            fo = 1.0 / (min_wavelength * mult ** s)
+            log_gabor = np.exp(
+                -(np.log(radius / fo) ** 2) / (2.0 * math.log(sigma_f) ** 2)
+            )
+            log_gabor[0, 0] = 0.0
+            resp = np.fft.ifft2(F * (log_gabor * spread))
+            even, odd = resp.real, resp.imag
+            an = np.sqrt(even * even + odd * odd)
+            sum_even += even
+            sum_odd += odd
+            sum_an += an
+        energy_total += np.sqrt(sum_even * sum_even + sum_odd * sum_odd)
+        amp_total += sum_an
+    pc = energy_total / (amp_total + EPS)
+    return np.clip(pc, 0.0, 1.0).astype(np.float32)[np.newaxis, ...]
 
 
 INVARIANT_FNS = {

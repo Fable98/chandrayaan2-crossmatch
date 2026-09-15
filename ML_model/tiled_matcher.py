@@ -140,7 +140,12 @@ def match_images_tiled(
                 ))
                 tile_id += 1
 
-    # Execute tile matching in parallel using ThreadPoolExecutor
+    # Execute tile matching in parallel using ThreadPoolExecutor.
+    # RNG honesty: cv2's RNG is process-global and shared across these threads,
+    # so bit-reproducibility is NOT claimed for threaded runs. Decorrelation IS
+    # guaranteed: match_images_cfog seeds SEED ^ hash(pair) per call and every
+    # tile writes distinct tile_{id} paths, so tiles never lock-step onto
+    # identical RANSAC draws (the old per-call setRNGSeed(42) did exactly that).
     all_stitched_matches = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [

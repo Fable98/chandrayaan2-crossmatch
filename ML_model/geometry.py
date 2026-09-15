@@ -44,21 +44,27 @@ def dem_ray_intersection(
     the sensor LOS azimuth. This is NOT a rigorous orbital sensor-model
     ray-trace (no intrinsics/extrinsics, no iterative ray-march against a
     geodetically registered DEM). Pass sensor LOS azimuth — never sun azimuth.
+
+    Azimuth convention (unified 2026-09-15 with
+    matcher_cfog.compute_dem_ray_shift_correction and
+    matcher_cfog.apply_dem_relief_compensation): compass-style degrees
+    clockwise from north (0=N, 90=E), matching sun_azimuth_deg /
+    sensor_los_azimuth_deg metadata. In y-down pixel coordinates the unit
+    shift direction is (sin(psi), -cos(psi)).
     """
     pts = np.asarray(pixel_coords, dtype=np.float64)
     if len(pts) == 0:
         return np.zeros((0, 3)), np.zeros((0, 2))
+    if azimuth_deg is None:
+        raise ValueError(
+            "dem_ray_intersection: azimuth_deg is required (compass deg clockwise "
+            "from north). Pass sensor LOS azimuth; never silently default, or the "
+            "relief shift is applied in a hallucinated direction."
+        )
 
     h, w = dem.shape[:2]
     e_rad = math.radians(float(emission_deg))
     psi_rad = math.radians(float(azimuth_deg))
-
-    # Ray unit direction vector in local topocentric system:
-    # Z is pointing upward normal to datum; X east; Y north
-    # Off-nadir ray points downward towards surface
-    dir_x = math.sin(e_rad) * math.cos(psi_rad)
-    dir_y = math.sin(e_rad) * math.sin(psi_rad)
-    dir_z = -math.cos(e_rad)
 
     # Center origin of coordinate frame at image center
     cx, cy = w / 2.0, h / 2.0
@@ -102,10 +108,12 @@ def dem_ray_intersection(
         current_elev = sample_elevation(x_px, y_px)
         delta_elev = current_elev - mean_dem
 
-        # Relief parallax displacement: dx = dz * tan(emission) * cos(azimuth) / gsd
+        # Relief parallax displacement (compass azimuth in y-down pixels):
+        # dx = dz * tan(emission) * sin(azimuth) / gsd
+        # dy = dz * tan(emission) * (-cos(azimuth)) / gsd
         scale = math.tan(e_rad) / max(gsd_m, 1e-4)
-        target_dx = delta_elev * (scale * math.cos(psi_rad))
-        target_dy = delta_elev * (scale * math.sin(psi_rad))
+        target_dx = delta_elev * (scale * math.sin(psi_rad))
+        target_dy = delta_elev * (scale * -math.cos(psi_rad))
 
         new_x = pts[:, 0] + target_dx
         new_y = pts[:, 1] + target_dy
@@ -117,6 +125,8 @@ def dem_ray_intersection(
             break
 
     final_elev = sample_elevation(x_px, y_px)
+    # NOTE: Y_m is pixel-frame (south-positive), not ENU north — no consumer
+    # currently uses coords_3d, but do not interpret column 1 as northing.
     X_m = (x_px - cx) * gsd_m
     Y_m = (y_px - cy) * gsd_m
     Z_m = final_elev
@@ -249,7 +259,14 @@ def warp_piecewise_affine(
                 ones = np.ones_like(grid_x)
                 pts_h = np.stack([grid_x, grid_y, ones], axis=-1)  # (th, tw, 3)
                 mapped_h = pts_h @ inv_H.T
-                z = np.maximum(np.abs(mapped_h[:, :, 2:3]), 1e-12)
+                # No abs() sign-flip at the plane: behind-plane pixels keep
+                # their sign (copysign) so they sample far-away border instead
+                # of mirroring into deceptively valid image content.
+                z = np.where(
+                    np.abs(mapped_h[:, :, 2:3]) < 1e-12,
+                    np.copysign(1e-12, mapped_h[:, :, 2:3]),
+                    mapped_h[:, :, 2:3],
+                )
                 map_x = (mapped_h[:, :, 0:1] / z).astype(np.float32)
                 map_y = (mapped_h[:, :, 1:2] / z).astype(np.float32)
 
@@ -381,6 +398,72 @@ def warp_thin_plate_splines(
 
 
 # ---------------------------------------------------------------------------
+# 3b. Hartley-Normalized Minimal DLT Solver
+# ---------------------------------------------------------------------------
+
+def _hartley_normalize(pts: np.ndarray) -> np.ndarray:
+    """Similarity T mapping points to zero mean, mean distance sqrt(2)."""
+    pts = np.asarray(pts, dtype=np.float64)
+    mean = pts.mean(axis=0)
+    mean_dist = float(np.mean(np.hypot(*(pts - mean).T)))
+    s = math.sqrt(2.0) / mean_dist if mean_dist > 1e-12 else 1.0
+    return np.array([[s, 0.0, -s * mean[0]], [0.0, s, -s * mean[1]], [0.0, 0.0, 1.0]])
+
+
+def _dlt_homography_hartley(
+    src: np.ndarray,
+    dst: np.ndarray,
+    min_triangle_area: float = 1e-4,
+    sample_reproj_tol_px: float = 1.0,
+) -> Optional[np.ndarray]:
+    """Exact 4-point homography via Hartley-normalized DLT (SVD).
+
+    Returns None for degenerate samples instead of a garbage matrix. Checks:
+    - sample geometry: every omit-one triangle must span nonzero area in
+      Hartley-normalized coordinates (rejects collinear/coincident samples).
+      NOTE: an SVD null-space ratio was tried as the discriminator and
+      REJECTED — for exact 4-point data the design matrix is rank-deficient
+      by construction, and s[-1]/s[-2] measured 0.16 on clean similarity
+      data vs 0.017 on collinear data (inverted signal).
+    - normalized determinant (area collapse after H[2,2] == 1 normalization).
+    - self-consistency: the exact fit must reproduce its own 4 samples.
+    """
+    s = np.asarray(src, dtype=np.float64).reshape(-1, 2)
+    d = np.asarray(dst, dtype=np.float64).reshape(-1, 2)
+    if len(s) != 4 or len(d) != 4:
+        return None
+    try:
+        T1, T2 = _hartley_normalize(s), _hartley_normalize(d)
+        s_h = np.hstack([s, np.ones((4, 1))])
+        sn = (T1 @ s_h.T).T[:, :2]
+        dn = (T2 @ np.hstack([d, np.ones((4, 1))]).T).T[:, :2]
+        for pts in (sn, dn):
+            for skip in range(4):
+                (x1, y1), (x2, y2), (x3, y3) = np.delete(pts, skip, axis=0)
+                if abs((x2 - x1) * (y3 - y1) - (x3 - x1) * (y2 - y1)) / 2.0 <= min_triangle_area:
+                    return None  # collinear/coincident sample
+        A = []
+        for (x, y), (xp, yp) in zip(sn, dn):
+            A.append([-x, -y, -1.0, 0.0, 0.0, 0.0, xp * x, xp * y, xp])
+            A.append([0.0, 0.0, 0.0, -x, -y, -1.0, yp * x, yp * y, yp])
+        _, _, Vt = np.linalg.svd(np.asarray(A, dtype=np.float64))
+        H = np.linalg.inv(T2) @ Vt[-1].reshape(3, 3) @ T1
+        if abs(H[2, 2]) < 1e-12:
+            return None
+        H = H / H[2, 2]
+        if abs(np.linalg.det(H)) < 1e-8:
+            return None
+        proj = (H @ s_h.T).T
+        if np.any(np.abs(proj[:, 2]) < 1e-12):
+            return None
+        if float(np.max(np.linalg.norm(proj[:, :2] / proj[:, 2:3] - d, axis=1))) > sample_reproj_tol_px:
+            return None
+        return H
+    except Exception:
+        return None
+
+
+# ---------------------------------------------------------------------------
 # 4. DEM-Aware RANSAC Model Fitting
 # ---------------------------------------------------------------------------
 
@@ -397,9 +480,19 @@ def ransac_dem_aware_fit(
 ) -> Tuple[Optional[np.ndarray], np.ndarray, Dict[str, Any]]:
     """
     Robust RANSAC estimator that incorporates terrain relief correction into the error metric.
-    
+
     Instead of penalizing correspondences on steep crater walls as outliers due to planar
     parallax discrepancy, the error metric projects candidates through the DEM ray-intersection.
+
+    FRAME CONTRACT (wrong-frame fix 2026-09-15): the returned H maps
+    RELIEF-CORRECTED source points (raw + info["relief_correction_field_px"])
+    to destination points — NOT raw source points. A single matrix cannot
+    represent the per-point relief field, so no raw-frame H is returned;
+    instead info["frame"] = "relief_corrected_source_to_dst" and
+    info["raw_frame_rmse_px"] quantifies the error of misusing H on raw
+    points. Downstream consumers must either add the correction field before
+    applying H, or treat H as a corrected-frame approximation (see
+    info["relief_max_shift_px"] for the approximation bound).
     """
     pts1 = np.asarray(src_pts, dtype=np.float64)
     pts2 = np.asarray(dst_pts, dtype=np.float64)
@@ -411,38 +504,63 @@ def ransac_dem_aware_fit(
     rng = np.random.RandomState(random_seed)
 
     # 1. Precompute DEM relief displacement vectors if DEM is present
-    if dem is not None and abs(emission_deg) > 1e-2 and dem.ndim == 2:
-        _, relief_dxdy = dem_ray_intersection(
-            pts1, dem, emission_deg=emission_deg, azimuth_deg=azimuth_deg, gsd_m=gsd_m
-        )
-        # Correct source points by relief displacement before planar model fitting
-        corrected_pts1 = pts1 + relief_dxdy
+    relief_dxdy = np.zeros_like(pts1)
+    relief_enabled = False
+    relief_reason = "dem_unavailable"
+    if dem is None or not isinstance(dem, np.ndarray) or dem.ndim != 2:
+        relief_reason = "dem_unavailable"
+    elif abs(float(emission_deg) if emission_deg is not None else 0.0) <= 1e-2:
+        relief_reason = "nadir_or_emission_unavailable"
+    elif azimuth_deg is None:
+        # Sensor LOS azimuth genuinely unknown: a guessed direction moves every
+        # pixel the wrong way on 3 of 4 quadrants. Disabled is honest (and this
+        # previously crashed with TypeError inside dem_ray_intersection).
+        relief_reason = "los_azimuth_unavailable"
     else:
-        corrected_pts1 = pts1.copy()
+        try:
+            _, relief_dxdy = dem_ray_intersection(
+                pts1, dem, emission_deg=emission_deg, azimuth_deg=azimuth_deg, gsd_m=gsd_m
+            )
+            relief_enabled = True
+            relief_reason = "relief_compensated"
+        except Exception as exc:
+            logger.warning("DEM relief correction failed (%s); fitting uncorrected.", exc)
+            relief_dxdy = np.zeros_like(pts1)
+            relief_reason = f"ray_shift_failed: {exc}"
+    corrected_pts1 = pts1 + relief_dxdy if relief_enabled else pts1.copy()
 
     best_inliers = np.zeros(n, dtype=bool)
     best_H = None
     best_count = 0
 
-    # Standard RANSAC on relief-compensated space
+    # Standard RANSAC on relief-compensated space, with a Hartley-normalized
+    # DLT minimal solver: the old unnormalized getPerspectiveTransform +
+    # scale-dependent det<1e-5 check admitted near-degenerate samples (e.g.
+    # near-collinear crater-wall points) whose garbage H then won consensus.
     for _ in range(max_iters):
         sample_idx = rng.choice(n, 4, replace=False)
         s1 = corrected_pts1[sample_idx]
         s2 = pts2[sample_idx]
 
         try:
-            H_candidate = cv2.getPerspectiveTransform(s1.astype(np.float32), s2.astype(np.float32))
-            if abs(np.linalg.det(H_candidate)) < 1e-5:
+            H_candidate = _dlt_homography_hartley(s1, s2)
+            if H_candidate is None:
                 continue
 
-            # Project all points
+            # Project all points (no abs() sign-flip: behind-plane points are
+            # rejected with inf error, never mirrored into false inliers).
             ones = np.ones((n, 1), dtype=np.float64)
             p1_h = np.hstack([corrected_pts1, ones])
-            proj = (H_candidate.astype(np.float64) @ p1_h.T).T
-            z = np.where(np.abs(proj[:, 2:3]) < 1e-12, 1e-12, proj[:, 2:3])
-            proj_2d = proj[:, :2] / z
+            proj = (H_candidate @ p1_h.T).T
+            _z = proj[:, 2:3]
+            _behind = (_z.ravel() <= 1e-12)
+            _z_safe = np.where(np.abs(_z) < 1e-12, np.copysign(1e-12, _z), _z)
+            proj_2d = proj[:, :2] / _z_safe
 
             errors = np.linalg.norm(proj_2d - pts2, axis=1)
+            if np.any(_behind):
+                errors = np.where(_behind, np.inf, errors)
+            inliers = errors < reproj_thresh_px
             inliers = errors < reproj_thresh_px
             count = int(np.sum(inliers))
 
@@ -478,13 +596,40 @@ def ransac_dem_aware_fit(
     logger.info(
         "DEM-aware RANSAC completed: %d/%d inliers (%.1f%%), relief compensated: %s",
         final_count, n, (final_count / max(1, n)) * 100,
-        bool(dem is not None and abs(emission_deg) > 1e-2)
+        relief_enabled
     )
+
+    shift_mag = np.hypot(relief_dxdy[:, 0], relief_dxdy[:, 1]) if relief_enabled else np.zeros(n)
+    # Honest frame-gap quantification: error of applying the corrected-frame H
+    # to RAW source points (what happens if a consumer ignores the frame tag).
+    raw_frame_rmse = None
+    if best_H is not None:
+        try:
+            with np.errstate(all="ignore"):
+                _raw_h = np.hstack([pts1, np.ones((n, 1))])
+                _proj = (np.asarray(best_H, dtype=np.float64) @ _raw_h.T).T
+                _rz = _proj[:, 2:3]
+                _rbehind = (_rz.ravel() <= 1e-12)
+                _rz_safe = np.where(np.abs(_rz) < 1e-12, np.copysign(1e-12, _rz), _rz)
+                _rerr = np.sqrt(np.sum(((_proj[:, :2] / _rz_safe) - pts2) ** 2, axis=1))
+                if np.any(_rbehind):
+                    _rerr = np.where(_rbehind, np.inf, _rerr)
+                _rmse = float(np.sqrt(np.mean(_rerr ** 2)))
+                raw_frame_rmse = _rmse if np.isfinite(_rmse) else None
+        except Exception:
+            raw_frame_rmse = None
 
     return best_H, final_inlier_mask, {
         "inlier_count": final_count,
         "total_points": n,
-        "dem_compensated": bool(dem is not None and abs(emission_deg) > 1e-2),
+        "dem_compensated": bool(relief_enabled),
+        "relief_reason": relief_reason,
+        # Frame contract: H maps relief-corrected source -> dst.
+        "frame": "relief_corrected_source_to_dst" if relief_enabled else "raw_source_to_dst",
+        "relief_correction_field_px": np.asarray(relief_dxdy, dtype=np.float64),
+        "relief_mean_shift_px": float(np.mean(shift_mag)),
+        "relief_max_shift_px": float(np.max(shift_mag)) if n else 0.0,
+        "raw_frame_rmse_px": raw_frame_rmse,
     }
 
 
@@ -504,11 +649,15 @@ def estimate_topographic_relief_strain(
     if n < 6 or H_global is None:
         return {"strain_detected": False, "strain_ratio": 1.0, "reason": "insufficient_points"}
 
-    # 1. Global homography reprojection error
+    # 1. Global homography reprojection error (copysign: behind-plane points
+    # inflate the error honestly instead of mirroring into small residuals).
     p1_h = np.hstack([p1, np.ones((n, 1))])
     proj = (H_global.astype(np.float64) @ p1_h.T).T
-    z = np.where(np.abs(proj[:, 2:3]) < 1e-12, 1e-12, proj[:, 2:3])
-    global_err = np.linalg.norm(proj[:, :2] / z - p2, axis=1)
+    z = proj[:, 2:3]
+    with np.errstate(all="ignore"):
+        z = np.where(np.abs(z) < 1e-12, np.copysign(1e-12, z), z)
+        global_err = np.linalg.norm(proj[:, :2] / z - p2, axis=1)
+        global_err = np.where(np.isfinite(global_err), global_err, 1e6)
     rmse_global = float(np.sqrt(np.mean(global_err ** 2)))
 
     # 2. Local piecewise affine / k-NN error

@@ -68,11 +68,18 @@ def calculate_reprojection_errors(
     projected = (H_mat @ src_h.T).T
 
     z = projected[:, 2:3]
-    # Guard against division by zero
-    z_safe = np.where(np.abs(z) < 1e-12, 1e-12, z)
+    # No abs() sign-flip: points on/behind the plane (z <= eps) are REJECTED
+    # with +inf error — correctly excluded from sub-threshold counts — instead
+    # of being mirrored to deceptively small errors. Sign is preserved for
+    # finite z via copysign so near-plane points project far away, not flipped.
+    eps = 1e-12
+    behind = (z.ravel() <= eps)
+    z_safe = np.where(np.abs(z) < eps, np.copysign(eps, z), z)
     projected_2d = projected[:, :2] / z_safe
 
     errors = np.linalg.norm(projected_2d - dst, axis=1)
+    if np.any(behind):
+        errors = np.where(behind, np.inf, errors)
     return errors
 
 
@@ -477,7 +484,9 @@ def calculate_psnr_over_overlap(
 ) -> Optional[float]:
     """
     Computes Peak Signal-to-Noise Ratio (PSNR) in decibels (dB) across the valid overlap region.
-    Returns float("inf") if the images are identical with zero MSE.
+    Returns None when MSE is zero (identical images): +inf is not JSON-safe
+    (serializes as non-standard `Infinity`) and None is this module's
+    established "unavailable" sentinel.
     """
     def _to_2d(img: np.ndarray) -> np.ndarray:
         arr = np.asarray(img, dtype=np.float64)
@@ -508,7 +517,7 @@ def calculate_psnr_over_overlap(
     diff = w_vals - r_vals
     mse = float(np.mean(diff ** 2))
     if mse <= 1e-12:
-        return float("inf")
+        return None
 
     data_range = float(np.ptp(r_vals))
     if data_range <= 1e-6:
@@ -516,12 +525,13 @@ def calculate_psnr_over_overlap(
 
     if HAS_SKIMAGE and _skimage_psnr is not None and np.all(mask):
         try:
-            return round(float(_skimage_psnr(r_crop, w_crop, data_range=data_range)), 4)
+            _psnr = float(_skimage_psnr(r_crop, w_crop, data_range=data_range))
+            return round(_psnr, 4) if np.isfinite(_psnr) else None
         except Exception:
             pass
 
     psnr_val = 10.0 * np.log10((data_range ** 2) / mse)
-    return round(float(psnr_val), 4)
+    return round(float(psnr_val), 4) if np.isfinite(psnr_val) else None
 
 
 def calculate_ssim_over_overlap(
@@ -929,10 +939,19 @@ def compute_canonical_metrics(
     Ensures that matcher outputs, API responses, and evaluation reports use identical math.
     """
     raw_count = int(len(src_pts_raw))
-    if inlier_mask is not None and len(inlier_mask) == raw_count:
-        inlier_indices = np.where(inlier_mask.ravel() == 1)[0]
-    else:
+    if inlier_mask is None:
         inlier_indices = np.arange(raw_count)
+    elif len(inlier_mask) == raw_count:
+        inlier_indices = np.where(np.asarray(inlier_mask).ravel() == 1)[0]
+    else:
+        # Fail closed: a mask that does not align with the correspondences
+        # must never silently inflate the inlier ratio to 1.0.
+        logger.warning(
+            "compute_canonical_metrics: inlier_mask length %d != %d correspondences; "
+            "treating as zero inliers (fail-closed).",
+            len(inlier_mask), raw_count,
+        )
+        inlier_indices = np.empty(0, dtype=int)
 
     inlier_count = int(len(inlier_indices))
     inlier_ratio = float(inlier_count / max(1, raw_count))
@@ -1002,16 +1021,28 @@ def compute_canonical_metrics(
     inliers_src = src_pts_raw[inlier_indices]
     inliers_dst = dst_pts_raw[inlier_indices]
 
-    # In-sample Fit errors
-    fit_errors = calculate_reprojection_errors(inliers_src, inliers_dst, H)
-    fit_rmse = float(np.sqrt(np.mean(fit_errors**2))) if len(fit_errors) > 0 else 0.0
-    mean_err = float(np.mean(fit_errors)) if len(fit_errors) > 0 else 0.0
-    median_err = float(np.median(fit_errors)) if len(fit_errors) > 0 else 0.0
-    max_err = float(np.max(fit_errors)) if len(fit_errors) > 0 else 0.0
+    # In-sample Fit errors (inf marks behind-plane points rejected by the
+    # copysign guard in calculate_reprojection_errors; comparisons below are
+    # inf-safe: inf < thr is False, so rejected points never inflate counts).
+    with np.errstate(all="ignore"):
+        fit_errors = calculate_reprojection_errors(inliers_src, inliers_dst, H)
+        fit_rmse = float(np.sqrt(np.mean(fit_errors**2))) if len(fit_errors) > 0 else 0.0
+        mean_err = float(np.mean(fit_errors)) if len(fit_errors) > 0 else 0.0
+        median_err = float(np.median(fit_errors)) if len(fit_errors) > 0 else 0.0
+        max_err = float(np.max(fit_errors)) if len(fit_errors) > 0 else 0.0
 
     frac_1 = float(np.mean(fit_errors < 1.0)) if len(fit_errors) > 0 else 0.0
     frac_05 = float(np.mean(fit_errors < 0.5)) if len(fit_errors) > 0 else 0.0
     frac_025 = float(np.mean(fit_errors < 0.25)) if len(fit_errors) > 0 else 0.0
+
+    # Raw (possibly inf) fit RMSE feeds conditioning gates below; the JSON
+    # outputs use None ("unavailable" sentinel, same as the empty path) so a
+    # degenerate H can never emit non-standard `Infinity` floats.
+    _fit_raw = fit_rmse
+    fit_rmse = float(fit_rmse) if np.isfinite(fit_rmse) else None
+    mean_err = float(mean_err) if np.isfinite(mean_err) else None
+    median_err = float(median_err) if np.isfinite(median_err) else None
+    max_err = float(max_err) if np.isfinite(max_err) else None
 
     # Held-Out Inlier Correspondence Validation
     # To eliminate H-conditioning circularity, evaluate strictly on independent anchor inliers if >= 8 points
@@ -1044,8 +1075,9 @@ def compute_canonical_metrics(
     dist_metrics["coverage_relative_to_inlier_count"] = coverage_relative
     dist_metrics["adaptive_uniformity_score"] = adaptive_uniformity
 
-    # Transform Quality (include fit RMSE so excessive residuals invalidate the transform)
-    tx_quality = verify_transformation_quality(H, image_shape, fit_rmse_px=fit_rmse)
+    # Transform Quality (include fit RMSE so excessive residuals invalidate the transform).
+    # Raw (possibly inf) value: an inf fit must FAIL the gate, never be skipped as None.
+    tx_quality = verify_transformation_quality(H, image_shape, fit_rmse_px=_fit_raw)
 
     # Quality Tier Classification with explicit documented thresholds
     coverage = dist_metrics["coverage"]
@@ -1068,13 +1100,13 @@ def compute_canonical_metrics(
             raw_abs = calculate_absolute_rmse_meters(
                 (inliers_src, inliers_dst, H), gsd_m, dem_data=dem_data
             )
-            abs_rmse_m = float(raw_abs) if raw_abs is not None else None
+            abs_rmse_m = float(raw_abs) if (raw_abs is not None and np.isfinite(raw_abs)) else None
         except Exception as e:
             logger.warning(f"Failed to calculate absolute_rmse_m: {e}")
             abs_rmse_m = None
             # Fallback: convert pixel RMSE to meters using GSD
             try:
-                if len(fit_errors) > 0 and gsd_m is not None:
+                if len(fit_errors) > 0 and gsd_m is not None and fit_rmse is not None:
                     abs_rmse_m = float(fit_rmse) * float(gsd_m)
             except Exception:
                 abs_rmse_m = None
@@ -1146,6 +1178,7 @@ def compute_canonical_metrics(
     _held_out = val_results["validation_rmse_px"]
 
     # EPIC 3 traffic light (never overrides Task-5 honest-failure veto upstream).
+    # Raw fit (possibly inf) labels correctly; inf is comparison-safe here.
     try:
         _tl = calculate_traffic_light({
             "held_out_rmse": _held_out,
@@ -1153,7 +1186,7 @@ def compute_canonical_metrics(
             "ssim": ssim_val,
             "inlier_ratio": float(inlier_ratio),
             "inlier_count": int(inlier_count),
-            "fit_rmse_px": float(fit_rmse),
+            "fit_rmse_px": float(_fit_raw),
         })
     except Exception:
         _tl = {"ssim_score": float(ssim_inliers) if 'ssim_inliers' in dir() else 0.0,
@@ -1171,15 +1204,20 @@ def compute_canonical_metrics(
     if _color_out not in ("GREEN", "YELLOW", "RED"):
         _color_out = "YELLOW"
 
+    def _r4(x):
+        # JSON-safe rounding: non-finite fit statistics emit None, never inf.
+        # fit_rmse/mean/median/max were sanitized to None above when degenerate.
+        return round(float(x), 4) if x is not None and np.isfinite(x) else None
+
     return {
         "match_count": raw_count,
         "inlier_count": inlier_count,
         "inlier_ratio": round(inlier_ratio, 4),
-        "fit_rmse_px": round(fit_rmse, 4),
-        "fit_rmse_insample_px": round(fit_rmse, 4),
-        "fit_rmse_insample": round(fit_rmse, 4),
+        "fit_rmse_px": _r4(fit_rmse),
+        "fit_rmse_insample_px": _r4(fit_rmse),
+        "fit_rmse_insample": _r4(fit_rmse),
         # SIH Task 4 strict 5-key contract.
-        "in_sample_rmse": round(fit_rmse, 4),
+        "in_sample_rmse": _r4(fit_rmse),
         "held_out_rmse": _held_out,
         "uniformity_score": dist_metrics["uniformity_score"],
         "cyclic_rmse": _cyclic_rmse,
@@ -1197,13 +1235,13 @@ def compute_canonical_metrics(
         "quality_tier": quality_tier,
         "confidence_tier": quality_tier,
         "tier": tier_short,
-        "mean_reprojection_error_px": round(mean_err, 4),
-        "median_reprojection_error_px": round(median_err, 4),
-        "max_reprojection_error_px": round(max_err, 4),
+        "mean_reprojection_error_px": _r4(mean_err),
+        "median_reprojection_error_px": _r4(median_err),
+        "max_reprojection_error_px": _r4(max_err),
         "fraction_below_1px": round(frac_1, 4),
         "fraction_below_0_5px": round(frac_05, 4),
         "fraction_below_0_25px": round(frac_025, 4),
-        "sub_pixel_accurate": bool(fit_rmse < 1.0 and val_rmse is not None and val_rmse < 1.0),
+        "sub_pixel_accurate": bool(fit_rmse is not None and fit_rmse < 1.0 and val_rmse is not None and val_rmse < 1.0),
         "sub_pixel_accurate_note": "Requires both in-sample fit_rmse < 1.0px and held-out validation_rmse < 1.0px; never claimed on in-sample alone.",
         "fit_rmse_is_in_sample": True,
         "fit_rmse_note": "In-sample RMSE on RANSAC inliers; see held_out_validation_rmse_px for out-of-sample error.",
@@ -1348,9 +1386,16 @@ def compute_triplet_consistency(
         ones = np.ones((len(pts), 1), dtype=np.float64)
         h_pts = np.hstack([pts, ones])
         proj = (H.astype(np.float64) @ h_pts.T).T
-        proj[:, 0] /= (proj[:, 2] + 1e-12)
-        proj[:, 1] /= (proj[:, 2] + 1e-12)
-        return proj[:, :2]
+        # No sign-flip at the plane: z <= eps rows are behind the camera and
+        # must poison the cycle honestly (+inf) instead of mirroring to small
+        # errors. The evaluate_* wrapper maps non-finite cycles to None.
+        z = proj[:, 2:3]
+        behind = (z.ravel() <= 1e-12)
+        z_safe = np.where(np.abs(z) < 1e-12, np.copysign(1e-12, z), z)
+        out = proj[:, :2] / z_safe
+        if np.any(behind):
+            out = np.where(behind[:, None], np.inf, out)
+        return out
 
     try:
         pts_B = transform_points(H_AB, pts_A)

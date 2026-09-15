@@ -34,6 +34,7 @@ def test_guided_densification_expands_inliers_and_evaluates_held_out(tmp_path):
         reference_sensor="TMC",
         output_dir=tmp_path / "guided_out",
         enable_guided_densification=True,
+        enforce_q5_safety=False,
     )
 
     assert res_guided["status"] == "success"
@@ -66,6 +67,7 @@ def test_guided_densification_can_be_disabled(tmp_path):
         reference_sensor="TMC",
         output_dir=tmp_path / "baseline_out",
         enable_guided_densification=False,
+        enforce_q5_safety=False,
     )
 
     assert res_baseline["status"] == "success"

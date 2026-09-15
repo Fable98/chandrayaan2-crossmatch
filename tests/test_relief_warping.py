@@ -144,7 +144,15 @@ def test_pipeline_topographic_relief_metrics(tmp_path):
         output_dir=out_dir,
     )
 
-    assert res["status"] == "success"
+    # Region 001 OHRC->TMC yields only ~7/75 RANSAC inliers (weak consensus).
+    # Since the Phase 1.1 Q5 fix, the inlier ratio is scored over ALL
+    # correspondences (the old inliers-only score was a ~=1.0 tautology), so
+    # this pair honestly reports registration_failed instead of a forced
+    # "success". The audit-trail contract below must hold on either path.
+    assert res["status"] in ("success", "registration_failed")
+    if res["status"] == "registration_failed":
+        assert res["homography"] is None, "no forced matrix on Q5 rejection"
+        assert res.get("diagnostics", {}).get("inlier_ratio", 1.0) < 0.3
     metrics = res["metrics"]
     assert metrics is not None
     assert "topographic_relief" in metrics

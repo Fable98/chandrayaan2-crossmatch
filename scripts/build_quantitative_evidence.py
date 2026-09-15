@@ -163,7 +163,7 @@ def _cube_ablation(cube_root: Path) -> dict[str, Any]:
         mean_map = np.mean(cube_hwb, axis=2).astype(np.float32)
         mean_map -= mean_map.min()
         mean_map /= max(float(mean_map.max()), 1e-8)
-        enhanced = enhance_iirs_structural_features(cube_hwb)
+        enhanced = enhance_iirs_structural_features(cube_hwb, layout="hwb")
         mean_edges = cv2.Sobel(mean_map, cv2.CV_32F, 1, 0) ** 2 + cv2.Sobel(mean_map, cv2.CV_32F, 0, 1) ** 2
         enhanced_edges = cv2.Sobel(enhanced, cv2.CV_32F, 1, 0) ** 2 + cv2.Sobel(enhanced, cv2.CV_32F, 0, 1) ** 2
         rows.append({

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
@@ -77,6 +78,15 @@ SENSOR_ALIASES = {
 }
 
 
+def _has_token(blob: str, token: str) -> bool:
+    """Token-boundary substring match: alphanumerics on both sides disqualify.
+
+    A bare `"iir" in blob` misfires on paths like ".../required/..." ("requ**iir**ed").
+    Underscores/dots/dashes count as boundaries (filenames use them as separators).
+    """
+    return re.search(r"(?<![a-z0-9])" + re.escape(token) + r"s?(?![a-z0-9])", blob) is not None
+
+
 def infer_sensor(text: str | None, path_hint: str = "") -> str:
     blob_text = (text or "").lower()
     blob_path = (path_hint or "").lower()
@@ -85,7 +95,7 @@ def infer_sensor(text: str | None, path_hint: str = "") -> str:
     for blob in (blob_text, filename, blob_path):
         if not blob:
             continue
-        if "iirs" in blob or "iir" in blob or "imaging infrared" in blob:
+        if _has_token(blob, "iir") or "imaging infrared" in blob:
             return "IIRS"
         if "ohrc" in blob or "ohr" in blob or "high resolution" in blob:
             return "OHRC"

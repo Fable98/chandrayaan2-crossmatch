@@ -116,8 +116,11 @@ def run_pipeline_demo(input_dir: str | Path, output_dir: str | Path, skip_ablati
         info_ohrc = parse_pds4_or_vicar_label(ohrc_xml)
         pds4_metadata["OHRC"] = info_ohrc.to_dict()
         logger.info(
-            "Parsed OHRC PDS4 Label: GSD=%.2fm, Sun Azimuth=%.1f deg, Sun Elevation=%.1f deg",
-            info_ohrc.gsd_m, info_ohrc.sun_azimuth_deg, info_ohrc.sun_elevation_deg
+            "Parsed OHRC PDS4 Label: GSD=%s, Sun Azimuth=%s, Sun Elevation=%s [%s]",
+            f"{info_ohrc.gsd_m:.2f}m" if info_ohrc.gsd_m is not None else "unknown",
+            f"{info_ohrc.sun_azimuth_deg:.1f} deg" if info_ohrc.sun_azimuth_deg is not None else "unknown",
+            f"{info_ohrc.sun_elevation_deg:.1f} deg" if info_ohrc.sun_elevation_deg is not None else "unknown",
+            info_ohrc.geometry_status,
         )
     else:
         logger.warning("OHRC XML label not found at %s. Using default optical sensor specs.", ohrc_xml)
@@ -126,8 +129,11 @@ def run_pipeline_demo(input_dir: str | Path, output_dir: str | Path, skip_ablati
         info_tmc = parse_pds4_or_vicar_label(tmc_xml)
         pds4_metadata["TMC-2"] = info_tmc.to_dict()
         logger.info(
-            "Parsed TMC-2 PDS4 Label: GSD=%.2fm, Sun Azimuth=%.1f deg, Sun Elevation=%.1f deg",
-            info_tmc.gsd_m, info_tmc.sun_azimuth_deg, info_tmc.sun_elevation_deg
+            "Parsed TMC-2 PDS4 Label: GSD=%s, Sun Azimuth=%s, Sun Elevation=%s [%s]",
+            f"{info_tmc.gsd_m:.2f}m" if info_tmc.gsd_m is not None else "unknown",
+            f"{info_tmc.sun_azimuth_deg:.1f} deg" if info_tmc.sun_azimuth_deg is not None else "unknown",
+            f"{info_tmc.sun_elevation_deg:.1f} deg" if info_tmc.sun_elevation_deg is not None else "unknown",
+            info_tmc.geometry_status,
         )
     else:
         logger.warning("TMC-2 XML label not found at %s. Using default optical sensor specs.", tmc_xml)

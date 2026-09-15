@@ -86,7 +86,11 @@ def warp_to_moon(
         profile["height"],
         *array_bounds(profile["height"], profile["width"], src_transform),
     )
-    dst = np.zeros((arr.shape[0], height, width), dtype=np.float32)
+    # NaN nodata (never 0): lunar shadowed mare is genuinely near-black, so a
+    # 0 fill masquerades as valid "fake shadow" pixels downstream. NaN
+    # propagates explicitly via the profile and is already masked by
+    # illumination.shadow_mask's ~finite term.
+    dst = np.full((arr.shape[0], height, width), np.nan, dtype=np.float32)
     reproject(
         source=arr,
         destination=dst,
@@ -96,7 +100,7 @@ def warp_to_moon(
         dst_crs=target_crs,
         resampling=RESAMPLE.get(resampling, Resampling.bilinear),
         src_nodata=profile.get("nodata"),
-        dst_nodata=0,
+        dst_nodata=np.nan,
     )
     out_profile = dict(profile)
     out_profile.update(
@@ -107,6 +111,7 @@ def warp_to_moon(
             "height": height,
             "count": dst.shape[0],
             "dtype": "float32",
+            "nodata": float("nan"),
         }
     )
     return dst, out_profile

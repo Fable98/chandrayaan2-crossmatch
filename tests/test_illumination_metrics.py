@@ -47,7 +47,8 @@ def _generate_synthetic_lunar_patch(shape=(128, 128), seed=42) -> np.ndarray:
 
 def test_identity_pair_ssim_psnr_nmi():
     """
-    Validates that an identical image pair yields SSIM ≈ 1.0, PSNR = inf/high, and NMI ≈ 1.0.
+    Validates that an identical image pair yields SSIM ≈ 1.0, PSNR None
+    (zero MSE is undefined, not infinite — inf is not JSON-safe), and NMI ≈ 1.0.
     """
     img = _generate_synthetic_lunar_patch()
 
@@ -55,7 +56,7 @@ def test_identity_pair_ssim_psnr_nmi():
     assert np.all(mask), "Overlap mask for identical non-zero images should be 100% valid"
 
     psnr = calculate_psnr_over_overlap(img, img, mask=mask)
-    assert psnr == float("inf") or psnr >= 99.0, f"Expected infinite or high PSNR for identity, got {psnr}"
+    assert psnr is None, f"Expected None (undefined, JSON-safe) for identical pair, got {psnr}"
 
     ssim = calculate_ssim_over_overlap(img, img, mask=mask)
     assert ssim is not None and ssim >= 0.99, f"Expected SSIM ≈ 1.0 for identity, got {ssim}"
@@ -143,7 +144,9 @@ def test_compute_canonical_metrics_with_images_and_identity_warp():
 
     assert "ssim" in metrics and metrics["ssim"] is not None
     assert metrics["ssim"] >= 0.99
-    assert "psnr" in metrics and metrics["psnr"] is not None
+    # Identity warp of an identical image has zero MSE: PSNR is undefined and
+    # reports None (JSON-safe), never inf.
+    assert "psnr" in metrics and metrics["psnr"] is None
     assert "nmi" in metrics and metrics["nmi"] is not None
     assert metrics["nmi"] >= 0.99
     assert "composite_quality_score" in metrics

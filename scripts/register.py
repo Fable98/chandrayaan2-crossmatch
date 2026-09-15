@@ -355,7 +355,7 @@ def register_composed_ohrc_to_iirs(
         except Exception:
             _cube = None
         if _cube is not None:
-            _sam = compute_sam_angle_map(_cube)
+            _sam = compute_sam_angle_map(_cube, layout="bhw")
             _bh, _bw = blend.shape[:2]
             if _sam.shape[:2] != (_bh, _bw):
                 _sam = cv2.resize(_sam.astype(np.float32), (_bw, _bh), interpolation=cv2.INTER_LINEAR)
