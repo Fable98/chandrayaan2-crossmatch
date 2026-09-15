@@ -58,6 +58,34 @@ FROZEN_10_FEATURES = [
 TMP_MODEL_PATH = Path("/tmp/ai_verifier_registration_eval.pkl")
 
 
+def get_cached_model_path(features: List[str], seed: int, train_groups: List[str]) -> Path:
+    """Compute deterministic SHA-256 hash for temporary evaluation model cache."""
+    import hashlib
+    key = f"{','.join(features)}:{seed}:{','.join(sorted(train_groups))}"
+    h = hashlib.sha256(key.encode("utf-8")).hexdigest()[:12]
+    return Path(f"/tmp/ai_verifier_reg_eval_{h}.pkl")
+
+
+def compute_mcnemar_test(arm1_succ: List[bool], arm2_succ: List[bool]) -> Dict[str, Any]:
+    """Compute exact McNemar test on paired binary registration outcomes."""
+    b = sum(1 for s1, s2 in zip(arm1_succ, arm2_succ) if s1 and not s2)
+    c = sum(1 for s1, s2 in zip(arm1_succ, arm2_succ) if not s1 and s2)
+    n_disc = b + c
+    if n_disc == 0:
+        return {"p_value": 1.0, "b": 0, "c": 0, "n_discordant": 0, "method": "identical"}
+    try:
+        from scipy.stats import binomtest
+        res = binomtest(min(b, c), n_disc, 0.5, alternative="two-sided")
+        p_val = float(res.pvalue)
+        method = "exact_binomial"
+    except Exception:
+        from scipy.stats import chi2
+        stat = (abs(b - c) - 1.0) ** 2 / max(1, n_disc)
+        p_val = float(chi2.sf(stat, df=1))
+        method = "continuity_corrected_chi2"
+    return {"p_value": p_val, "b": b, "c": c, "n_discordant": n_disc, "method": method}
+
+
 def compute_corner_error(H_est: np.ndarray | None, H_gt: np.ndarray, w: float = 512.0, h: float = 512.0) -> float:
     """Evaluate geometric displacement error against H_gt at image corners."""
     if H_est is None or not np.all(np.isfinite(H_est)):
@@ -115,9 +143,10 @@ def get_heldout_split(seed: int = SEED) -> Tuple[List[str], List[str]]:
 
 
 def get_or_train_rf_model(train_groups: List[str]) -> Any:
-    """Ensure RF model is trained strictly on the 54 training groups."""
-    if TMP_MODEL_PATH.exists():
-        bundle = joblib.load(TMP_MODEL_PATH)
+    """Ensure RF model is trained strictly on the 54 training groups with hashed cache."""
+    cache_path = get_cached_model_path(FROZEN_10_FEATURES, SEED, train_groups)
+    if cache_path.exists():
+        bundle = joblib.load(cache_path)
         return bundle["model"]
 
     json_path = REPO_ROOT / "ML_model/ground_truth_matches.json"
@@ -148,8 +177,8 @@ def get_or_train_rf_model(train_groups: List[str]) -> Any:
 
     clf = RandomForestClassifier(n_estimators=100, class_weight="balanced", random_state=SEED, n_jobs=-1)
     clf.fit(np.asarray(X_rows, dtype=np.float64), np.asarray(y_rows, dtype=np.int64))
-    TMP_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump({"model": clf, "feature_names": FROZEN_10_FEATURES, "n_train": len(X_rows)}, TMP_MODEL_PATH)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump({"model": clf, "feature_names": FROZEN_10_FEATURES, "n_train": len(X_rows)}, cache_path)
     return clf
 
 
@@ -157,6 +186,14 @@ def run_heldout_evaluation(rng_seeds: List[int] = [42]):
     train_groups, test_groups = get_heldout_split()
     xs_test_groups = [g for g in test_groups if "cross_sensor" in g]
     ss_test_groups = [g for g in test_groups if "same_sensor" in g]
+
+    # Persist split for auditability
+    eval_dir = REPO_ROOT / "evaluation"
+    eval_dir.mkdir(parents=True, exist_ok=True)
+    with open(eval_dir / "train_groups.json", "w") as f:
+        json.dump(train_groups, f, indent=2)
+    with open(eval_dir / "test_groups.json", "w") as f:
+        json.dump(test_groups, f, indent=2)
 
     print("================================================================================")
     print("PHASE 6: HELDOUT VALIDATION — SCALE-ADAPTIVE PATCH SUPPORT (HALF_P=16)")
@@ -170,7 +207,8 @@ def run_heldout_evaluation(rng_seeds: List[int] = [42]):
 
     # Load frozen RF model
     rf_model = get_or_train_rf_model(train_groups)
-    print(f"Frozen RF Model loaded from: {TMP_MODEL_PATH}")
+    cache_path = get_cached_model_path(FROZEN_10_FEATURES, SEED, train_groups)
+    print(f"Frozen RF Model loaded from: {cache_path}")
     print(f"Production model untouched: {REPO_ROOT / 'ML_model/ai_verifier_model.pkl'}\n")
 
     triplets_dir = REPO_ROOT / "data_preprocessing_pipeline/processed_triplets"
@@ -181,18 +219,25 @@ def run_heldout_evaluation(rng_seeds: List[int] = [42]):
             if p.exists():
                 image_paths.append(p)
 
-    # Generate both arms under deterministic scene generator
-    # Arm A: half_p = 8
-    # Arm B: half_p = 16
-    scenes_a = []
-    rng_a = np.random.default_rng(SEED)
+    # 1. Pre-generate H_gt and ground-truth metadata once with paired RNG (so both arms evaluate on identical scenes)
+    scenes_master = []
+    rng_master = np.random.default_rng(SEED)
     for p in image_paths:
-        generate_matches_for_image(p, rng_a, scene_sink=scenes_a, half_p=8)
+        generate_matches_for_image(p, rng_master, scene_sink=scenes_master, half_p=8)
 
-    scenes_b = []
-    rng_b = np.random.default_rng(SEED)
-    for p in image_paths:
-        generate_matches_for_image(p, rng_b, scene_sink=scenes_b, half_p=16)
+    h_gt_lookup = {}
+    target_shape_lookup = {}
+    for sc in scenes_master:
+        grp = f"{sc['region']}:{sc['source_image']}::{sc['target_image']}"
+        h_gt_lookup[grp] = sc["H_gt"]
+        sh = sc.get("target_shape")
+        if sh is None:
+            try:
+                probe = cv2.imread(str(sc.get("target_path", p)), cv2.IMREAD_GRAYSCALE)
+                sh = probe.shape[:2] if probe is not None else (512, 512)
+            except Exception:
+                sh = (512, 512)
+        target_shape_lookup[grp] = sh
 
     # Re-run generator to get matches per scene
     matches_a_by_group = {}
@@ -212,12 +257,6 @@ def run_heldout_evaluation(rng_seeds: List[int] = [42]):
             grp = f"{m['region']}:{m['source_image']}::{m['target_image']}"
             if grp in test_groups:
                 matches_b_by_group.setdefault(grp, []).append(m)
-
-    # Build H_gt lookup
-    h_gt_lookup = {}
-    for sc in scenes_a:
-        grp = f"{sc['region']}:{sc['source_image']}::{sc['target_image']}"
-        h_gt_lookup[grp] = sc["H_gt"]
 
     # 1. Candidate-Generation Metrics on Cross-Sensor Held-Out Groups
     print("--------------------------------------------------------------------------------")
@@ -333,10 +372,11 @@ def run_heldout_evaluation(rng_seeds: List[int] = [42]):
 
                 # Run AI-weighted RANSAC (the standard production pipeline)
                 w_ai = np.asarray(rf_probs, dtype=np.float64)
+                t_shape = target_shape_lookup.get(grp, (512, 512))
                 H_est, mask, _ = estimate_weighted_homography(
                     pts1, pts2, w_ai,
                     ransac_reproj_threshold=5.0,
-                    image_shape=(512, 512),
+                    image_shape=t_shape,
                     rng_seed=seed_val,
                     n_iters=2000,
                 )
@@ -353,7 +393,7 @@ def run_heldout_evaluation(rng_seeds: List[int] = [42]):
                     n_inl = len(idx)
                     errs = calculate_reprojection_errors(pts1[idx], pts2[idx], H_est)
                     rmse = float(np.sqrt(np.mean(errs ** 2))) if len(errs) else float("nan")
-                    c_err = compute_corner_error(H_est, H_gt)
+                    c_err = compute_corner_error(H_est, H_gt, w=float(t_shape[1]), h=float(t_shape[0]))
 
                     tp = int(np.sum(gt_labels[idx] == 1))
                     fp = int(np.sum(gt_labels[idx] == 0))
@@ -442,7 +482,8 @@ def run_heldout_evaluation(rng_seeds: List[int] = [42]):
     n_improved = 0
     n_worsened = 0
     n_unchanged = 0
-    err_diffs = []
+    finite_err_diffs = []
+    diag_penalty = math.hypot(512.0, 512.0)
 
     for rb, rp in zip(xs_b, xs_p):
         cb = rb["res"]["corner_err"]
@@ -453,7 +494,7 @@ def run_heldout_evaluation(rng_seeds: List[int] = [42]):
         # Delta error: baseline error - patch32 error (positive = improvement)
         if np.isfinite(cb) and np.isfinite(cp):
             delta = cb - cp
-            err_diffs.append(delta)
+            finite_err_diffs.append(delta)
             if abs(delta) < 0.1:
                 status = "UNCHANGED"
                 n_unchanged += 1
@@ -466,11 +507,9 @@ def run_heldout_evaluation(rng_seeds: List[int] = [42]):
         elif not np.isfinite(cb) and np.isfinite(cp):
             status = "IMPROVED (Recovered)"
             n_improved += 1
-            err_diffs.append(50.0)
         elif np.isfinite(cb) and not np.isfinite(cp):
             status = "WORSENED (Failed)"
             n_worsened += 1
-            err_diffs.append(-50.0)
         else:
             status = "BOTH FAILED"
             n_unchanged += 1
@@ -482,21 +521,57 @@ def run_heldout_evaluation(rng_seeds: List[int] = [42]):
 
     print("-" * 108)
     print(f"Paired Summary: {n_improved} cases improved, {n_worsened} worsened, {n_unchanged} unchanged.")
-    if err_diffs:
-        med_imp = float(np.median(err_diffs))
-        mean_imp = float(np.mean(err_diffs))
-        print(f"Median Paired Improvement (Baseline Error - Patch32 Error): {med_imp:+.3f} px")
-        print(f"Mean Paired Improvement:                                    {mean_imp:+.3f} px")
+    if finite_err_diffs:
+        med_imp = float(np.median(finite_err_diffs))
+        mean_imp = float(np.mean(finite_err_diffs))
+        print(f"Median Paired Improvement (Finite Pairs Only): {med_imp:+.3f} px")
+        print(f"Mean Paired Improvement (Finite Pairs Only):   {mean_imp:+.3f} px")
+    else:
+        med_imp, mean_imp = 0.0, 0.0
 
-    # Wilcoxon signed-rank test
+    # Wilcoxon signed-rank test strictly on finite pairs
     p_val_wilcox = float("nan")
-    if len(err_diffs) >= 6 and any(abs(d) > 1e-3 for d in err_diffs):
+    valid_diffs = [d for d in finite_err_diffs if abs(d) > 1e-3]
+    if len(valid_diffs) >= 6:
         try:
-            stat, p_val = wilcoxon([d for d in err_diffs if abs(d) > 1e-3], alternative="greater")
+            stat, p_val = wilcoxon(valid_diffs, alternative="greater")
             p_val_wilcox = float(p_val)
-            print(f"Wilcoxon signed-rank test (H1: Patch32 error < Baseline): stat={stat:.1f}, p={p_val:.4e}")
+            print(f"Wilcoxon signed-rank test (finite pairs only, N={len(valid_diffs)}): stat={stat:.1f}, p={p_val:.4e}")
         except Exception as exc:
             print(f"Wilcoxon test note: {exc}")
+
+    # McNemar test for success rate
+    succ_base_flags = [bool(r["res"]["success"]) for r in xs_b]
+    succ_patch_flags = [bool(r["res"]["success"]) for r in xs_p]
+    mcnemar_res = compute_mcnemar_test(succ_base_flags, succ_patch_flags)
+    p_val_mcnemar = mcnemar_res["p_value"]
+    print(f"McNemar test on success rate: b={mcnemar_res['b']}, c={mcnemar_res['c']}, p={p_val_mcnemar:.4e} ({mcnemar_res['method']})")
+
+    # Side-by-side reporting: Success-rate, conditional-mean, Intent-to-Treat
+    n_xs = len(xs_b)
+    succ_rate_b = sum(succ_base_flags) / max(1, n_xs) * 100.0
+    succ_rate_p = sum(succ_patch_flags) / max(1, n_xs) * 100.0
+
+    finite_cb = [r["res"]["corner_err"] for r in xs_b if np.isfinite(r["res"]["corner_err"])]
+    finite_cp = [r["res"]["corner_err"] for r in xs_p if np.isfinite(r["res"]["corner_err"])]
+    mean_cond_b = float(np.mean(finite_cb)) if finite_cb else float("nan")
+    mean_cond_p = float(np.mean(finite_cp)) if finite_cp else float("nan")
+
+    itt_cb = [r["res"]["corner_err"] if np.isfinite(r["res"]["corner_err"]) else diag_penalty for r in xs_b]
+    itt_cp = [r["res"]["corner_err"] if np.isfinite(r["res"]["corner_err"]) else diag_penalty for r in xs_p]
+    mean_itt_b = float(np.mean(itt_cb)) if itt_cb else float("nan")
+    mean_itt_p = float(np.mean(itt_cp)) if itt_cp else float("nan")
+
+    print("\n================================================================================")
+    print("METHODOLOGY METRICS COMPARISON (SIDE-BY-SIDE: CROSS-SENSOR HELDOUT)")
+    print("================================================================================")
+    print(f"{'Metric':<35} {'Baseline (half_p=8)':>20} {'Patch 32 (half_p=16)':>22} {'Difference':>16}")
+    print("-" * 96)
+    print(f"{'Registration Success Rate':<35} {succ_rate_b:>19.1f}% {succ_rate_p:>21.1f}% {succ_rate_p - succ_rate_b:>+15.1f}%")
+    print(f"{'Conditional Mean Corner Error (px)':<35} {mean_cond_b:>20.2f} {mean_cond_p:>22.2f} {mean_cond_p - mean_cond_b:>+16.2f}")
+    print(f"{'Intent-to-Treat Mean Error (px)':<35} {mean_itt_b:>20.2f} {mean_itt_p:>22.2f} {mean_itt_p - mean_itt_b:>+16.2f}")
+    print(f"{'McNemar Test p-value':<35} {'--':>20} {p_val_mcnemar:>22.4e} {'b=' + str(mcnemar_res['b']) + ',c=' + str(mcnemar_res['c']):>16}")
+    print(f"{'Wilcoxon (finite pairs) p-value':<35} {'--':>20} {p_val_wilcox:>22.4e} {'N=' + str(len(valid_diffs)):>16}")
 
     # Generate Markdown Report Artifact
     report_md_path = REPO_ROOT / "evaluation/heldout_patch32_end_to_end_report.md"

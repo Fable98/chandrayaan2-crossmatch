@@ -30,10 +30,41 @@ sys.path.insert(0, str(REPO_ROOT / "ML_model"))
 from metrics import calculate_reprojection_errors, calculate_absolute_rmse_meters
 
 
+def _resolve_sensor_gsd(gsd_m: Optional[float], img1: Any, img2: Any) -> float:
+    """Resolve ground sampling distance (GSD in meters) from explicit value, image metadata, or sensor name."""
+    if gsd_m is not None and float(gsd_m) > 0 and float(gsd_m) != 5.0:
+        return float(gsd_m)
+    for item in (img2, img1):
+        if isinstance(item, (str, Path)):
+            p = Path(item)
+            sidecar = p.with_suffix(".json")
+            if sidecar.exists():
+                try:
+                    with open(sidecar) as f:
+                        meta = json.load(f)
+                    val = meta.get("gsd_m") or meta.get("pixel_resolution") or meta.get("working_gsd_m")
+                    if val and float(val) > 0:
+                        return float(val)
+                except Exception:
+                    pass
+            stem = p.name.upper()
+            if "OHRC" in stem:
+                return 0.25
+            if "NAC" in stem:
+                return 0.9
+            if "IIRS" in stem:
+                return 70.0
+            if "TMC" in stem:
+                return 5.0
+            if "WAC" in stem:
+                return 100.0
+    return float(gsd_m) if (gsd_m is not None and float(gsd_m) > 0) else 5.0
+
+
 def match_loftr(
     img1: np.ndarray | str | Path,
     img2: np.ndarray | str | Path,
-    gsd_m: float = 5.0,
+    gsd_m: Optional[float] = None,
     dem: Optional[np.ndarray] = None,
     ransac_thresh: float = 5.0,
 ) -> Dict[str, Any]:
@@ -42,12 +73,13 @@ def match_loftr(
     Falls back gracefully to NCC if PyTorch/Kornia is not available.
     """
     start_time = time.time()
+    effective_gsd = _resolve_sensor_gsd(gsd_m, img1, img2)
 
     if not LOFTR_AVAILABLE:
         logger.warning("PyTorch/Kornia not installed. LoFTR baseline unavailable. Falling back to NCC.")
         try:
             from baselines.ncc_matcher import match_ncc
-            res = match_ncc(img1, img2, gsd_m=gsd_m, dem=dem, ransac_thresh=ransac_thresh)
+            res = match_ncc(img1, img2, gsd_m=effective_gsd, dem=dem, ransac_thresh=ransac_thresh)
             res["method"] = "Pure LoFTR (Fallback: NCC)"
             return res
         except Exception as e:
@@ -161,7 +193,7 @@ def match_loftr(
             inliers_dst = pts2[inlier_mask]
             errors = calculate_reprojection_errors(inliers_src, inliers_dst, H)
             fit_rmse = float(np.sqrt(np.mean(errors**2)))
-            abs_rmse = calculate_absolute_rmse_meters((inliers_src, inliers_dst, H), gsd=gsd_m, dem_data=dem)
+            abs_rmse = calculate_absolute_rmse_meters((inliers_src, inliers_dst, H), gsd=effective_gsd, dem_data=dem)
             status = "success"
         else:
             fit_rmse = None
@@ -178,6 +210,7 @@ def match_loftr(
         "inlier_ratio": round(inlier_ratio, 4),
         "fit_rmse_px": round(fit_rmse, 4) if fit_rmse is not None else None,
         "absolute_rmse_m": round(abs_rmse, 4) if abs_rmse is not None else None,
+        "gsd_m": effective_gsd,
         "runtime_s": round(elapsed, 4),
         "homography": H.tolist() if H is not None else None,
     }

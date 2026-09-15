@@ -39,16 +39,24 @@ def run_ablation_study(
     reference_img: str | Path,
     dem_img: Optional[str | Path] = None,
     output_dir: str | Path = "evaluation_output/ablation",
-    gsd_m: float = 5.0,
+    gsd_m: Optional[float] = None,
+    source_sensor: str = "OHRC",
+    reference_sensor: str = "TMC-2",
 ) -> Dict[str, Any]:
     """Runs the 4-way ablation pipeline and generates formatted comparison reports."""
     out_base = Path(output_dir)
     out_base.mkdir(parents=True, exist_ok=True)
 
+    _sensor_gsds = {"OHRC": 0.25, "NAC": 0.9, "LRO_NAC": 0.9, "IIRS": 70.0, "TMC": 5.0, "TMC-2": 5.0, "LRO_WAC": 100.0}
+    if gsd_m is not None and gsd_m > 0:
+        effective_gsd = float(gsd_m)
+    else:
+        effective_gsd = _sensor_gsds.get(str(reference_sensor).upper(), 5.0)
+
     print(f"\n================================================================================")
     print(f" Chandrayaan-2 Registration Ablation Study & Baseline Benchmark")
-    print(f" Source:    {source_img}")
-    print(f" Reference: {reference_img}")
+    print(f" Source:    {source_img} ({source_sensor})")
+    print(f" Reference: {reference_img} ({reference_sensor}) [Effective GSD: {effective_gsd:.2f}m]")
     print(f" DEM:       {dem_img}")
     print(f"================================================================================\n")
 
@@ -57,13 +65,13 @@ def run_ablation_study(
     # 1. Pure SIFT Baseline
     print("Running Baseline 1: Pure SIFT...")
     dem_arr = cv2.imread(str(dem_img), cv2.IMREAD_UNCHANGED) if dem_img and Path(dem_img).exists() else None
-    res_sift = match_sift(source_img, reference_img, gsd_m=gsd_m, dem=dem_arr)
+    res_sift = match_sift(source_img, reference_img, gsd_m=effective_gsd, dem=dem_arr)
     results.append(res_sift)
     print(f"  -> SIFT: Inliers={res_sift['inlier_count']}, Ratio={res_sift['inlier_ratio']*100:.1f}%, RMSE={res_sift['fit_rmse_px']} px")
 
     # 2. Pure LoFTR Baseline
     print("Running Baseline 2: Pure LoFTR...")
-    res_loftr = match_loftr(source_img, reference_img, gsd_m=gsd_m, dem=dem_arr)
+    res_loftr = match_loftr(source_img, reference_img, gsd_m=effective_gsd, dem=dem_arr)
     results.append(res_loftr)
     print(f"  -> LoFTR: Inliers={res_loftr['inlier_count']}, Ratio={res_loftr['inlier_ratio']*100:.1f}%, RMSE={res_loftr['fit_rmse_px']} px")
 
@@ -75,8 +83,8 @@ def run_ablation_study(
         reference_img,
         dem_path=None,
         output_dir=out_base / "no_dem",
-        source_sensor="OHRC",
-        reference_sensor="TMC-2",
+        source_sensor=source_sensor,
+        reference_sensor=reference_sensor,
     )
     t_no_dem = time.time() - t0
     m_no_dem = res_no_dem.get("metrics") or {}
@@ -100,8 +108,8 @@ def run_ablation_study(
         reference_img,
         dem_path=dem_img if dem_img and Path(dem_img).exists() else None,
         output_dir=out_base / "full_pipeline",
-        source_sensor="OHRC",
-        reference_sensor="TMC-2",
+        source_sensor=source_sensor,
+        reference_sensor=reference_sensor,
     )
     t_full = time.time() - t0_full
     m_full = res_full.get("metrics") or {}
@@ -214,9 +222,35 @@ def main():
         default="evaluation_output/ablation",
         help="Output directory",
     )
+    parser.add_argument(
+        "--gsd-m",
+        type=float,
+        default=None,
+        help="Ground sampling distance in meters per pixel",
+    )
+    parser.add_argument(
+        "--source-sensor",
+        type=str,
+        default="OHRC",
+        help="Source sensor name (e.g. OHRC, TMC-2)",
+    )
+    parser.add_argument(
+        "--reference-sensor",
+        type=str,
+        default="TMC-2",
+        help="Reference sensor name (e.g. TMC-2, IIRS, LRO_NAC)",
+    )
     args = parser.parse_args()
 
-    run_ablation_study(args.source, args.reference, dem_img=args.dem, output_dir=args.output)
+    run_ablation_study(
+        args.source,
+        args.reference,
+        dem_img=args.dem,
+        output_dir=args.output,
+        gsd_m=args.gsd_m,
+        source_sensor=args.source_sensor,
+        reference_sensor=args.reference_sensor,
+    )
 
 
 if __name__ == "__main__":

@@ -56,8 +56,41 @@ FROZEN_10_FEATURES = [
 TMP_MODEL_PATH = Path("/tmp/ai_verifier_registration_eval.pkl")
 
 
-def train_fresh_temporary_rf(X_train: np.ndarray, y_train: np.ndarray, feature_names: list[str]) -> Path:
-    """Train fresh RF strictly on training groups with frozen 10-feature set."""
+def get_cached_model_path(features: list[str], seed: int, train_groups: list[str] | None = None) -> Path:
+    """Compute deterministic SHA-256 hash for temporary evaluation model cache."""
+    import hashlib
+    tg_str = ','.join(sorted(train_groups)) if train_groups else "all"
+    key = f"{','.join(features)}:{seed}:{tg_str}"
+    h = hashlib.sha256(key.encode("utf-8")).hexdigest()[:12]
+    return Path(f"/tmp/ai_verifier_reg_eval_{h}.pkl")
+
+
+def compute_mcnemar_test(arm1_succ: list[bool], arm2_succ: list[bool]) -> dict[str, Any]:
+    """Compute exact McNemar test on paired binary registration outcomes."""
+    b = sum(1 for s1, s2 in zip(arm1_succ, arm2_succ) if s1 and not s2)
+    c = sum(1 for s1, s2 in zip(arm1_succ, arm2_succ) if not s1 and s2)
+    n_disc = b + c
+    if n_disc == 0:
+        return {"p_value": 1.0, "b": 0, "c": 0, "n_discordant": 0, "method": "identical"}
+    try:
+        from scipy.stats import binomtest
+        res = binomtest(min(b, c), n_disc, 0.5, alternative="two-sided")
+        p_val = float(res.pvalue)
+        method = "exact_binomial"
+    except Exception:
+        from scipy.stats import chi2
+        stat = (abs(b - c) - 1.0) ** 2 / max(1, n_disc)
+        p_val = float(chi2.sf(stat, df=1))
+        method = "continuity_corrected_chi2"
+    return {"p_value": p_val, "b": b, "c": c, "n_discordant": n_disc, "method": method}
+
+
+def train_fresh_temporary_rf(X_train: np.ndarray, y_train: np.ndarray, feature_names: list[str], train_groups: list[str] | None = None) -> Path:
+    """Train fresh RF strictly on training groups with frozen 10-feature set and hashed cache."""
+    cache_path = get_cached_model_path(feature_names, SEED, train_groups)
+    if cache_path.exists():
+        return cache_path
+
     clf = RandomForestClassifier(
         n_estimators=100,
         class_weight="balanced",
@@ -71,9 +104,9 @@ def train_fresh_temporary_rf(X_train: np.ndarray, y_train: np.ndarray, feature_n
         "n_train": len(X_train),
         "random_state": SEED,
     }
-    TMP_MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-    joblib.dump(bundle, TMP_MODEL_PATH)
-    return TMP_MODEL_PATH
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(bundle, cache_path)
+    return cache_path
 
 
 def compute_corner_error(H_est: np.ndarray | None, H_gt: np.ndarray, w: float = 512.0, h: float = 512.0) -> float:
@@ -186,7 +219,15 @@ def run_evaluation(rng_seeds: list[int] = [SEED]):
     tr_groups = sorted(list(set(groups[tr_idx])))
     te_groups = sorted(list(set(groups[te_idx])))
 
-    # 2. Recover oracle H_gt for each group
+    # Persist split for auditability
+    eval_dir = REPO_ROOT / "evaluation"
+    eval_dir.mkdir(parents=True, exist_ok=True)
+    with open(eval_dir / "train_groups.json", "w") as f:
+        json.dump(tr_groups, f, indent=2)
+    with open(eval_dir / "test_groups.json", "w") as f:
+        json.dump(te_groups, f, indent=2)
+
+    # 2. Recover oracle H_gt and canvas shapes for each group
     triplets_dir = REPO_ROOT / "data_preprocessing_pipeline/processed_triplets"
     image_paths = []
     for reg_dir in sorted(triplets_dir.glob("region_*")):
@@ -201,16 +242,25 @@ def run_evaluation(rng_seeds: list[int] = [SEED]):
         generate_matches_for_image(p, rng, scene_sink=scenes)
 
     h_gt_lookup = {}
+    canvas_shape_lookup = {}
     for sc in scenes:
         grp = f"{sc['region']}:{sc['source_image']}::{sc['target_image']}"
         h_gt_lookup[grp] = sc["H_gt"]
+        sh = sc.get("target_shape")
+        if sh is None:
+            try:
+                probe = cv2.imread(str(sc.get("target_path", p)), cv2.IMREAD_GRAYSCALE)
+                sh = probe.shape[:2] if probe is not None else (512, 512)
+            except Exception:
+                sh = (512, 512)
+        canvas_shape_lookup[grp] = sh
 
     # 3. Train fresh RF strictly on training set
     print("Training fresh temporary RF on 54 training groups (frozen 10-feature set)...")
-    model_path = train_fresh_temporary_rf(X_10[tr_idx], y[tr_idx], FROZEN_10_FEATURES)
+    model_path = train_fresh_temporary_rf(X_10[tr_idx], y[tr_idx], FROZEN_10_FEATURES, tr_groups)
     rf_bundle = joblib.load(model_path)
     rf_model = rf_bundle["model"]
-    print(f"Temporary RF saved outside production tree: {model_path}")
+    print(f"Temporary RF loaded from: {model_path}")
 
     # Group test matches by scene group
     test_matches_by_group = {}
@@ -271,11 +321,12 @@ def run_evaluation(rng_seeds: list[int] = [SEED]):
             rf_probs = rf_model.predict_proba(np.array(feat_rows))[:, 1]
 
             # Run Method A: Standard Uniform RANSAC
+            t_shape = canvas_shape_lookup.get(grp, (512, 512))
             w_uniform = np.ones(n_cands, dtype=np.float64)
             H_base, mask_base, tag_base = estimate_weighted_homography(
                 pts1, pts2, w_uniform,
                 ransac_reproj_threshold=5.0,
-                image_shape=(512, 512),
+                image_shape=t_shape,
                 rng_seed=seed_val,
                 n_iters=2000,
             )
@@ -285,7 +336,7 @@ def run_evaluation(rng_seeds: list[int] = [SEED]):
             H_ai, mask_ai, tag_ai = estimate_weighted_homography(
                 pts1, pts2, w_ai,
                 ransac_reproj_threshold=5.0,
-                image_shape=(512, 512),
+                image_shape=t_shape,
                 rng_seed=seed_val,
                 n_iters=2000,
             )
@@ -302,7 +353,7 @@ def run_evaluation(rng_seeds: list[int] = [SEED]):
                 n_inl = len(idx)
                 errs = calculate_reprojection_errors(pts1[idx], pts2[idx], H)
                 rmse = float(np.sqrt(np.mean(errs ** 2))) if len(errs) else float("nan")
-                c_err = compute_corner_error(H, H_gt) if H_gt is not None else float("nan")
+                c_err = compute_corner_error(H, H_gt, w=float(t_shape[1]), h=float(t_shape[0])) if H_gt is not None else float("nan")
 
                 tp = int(np.sum(gt_labels[idx] == 1))
                 fp = int(np.sum(gt_labels[idx] == 0))
@@ -388,7 +439,8 @@ def run_evaluation(rng_seeds: list[int] = [SEED]):
     n_improved = 0
     n_worsened = 0
     n_unchanged = 0
-    err_diffs = []
+    finite_err_diffs = []
+    diag_penalty = math.hypot(512.0, 512.0)
 
     for r in xs_runs:
         c_base = r["base"]["corner_err"]
@@ -399,7 +451,7 @@ def run_evaluation(rng_seeds: list[int] = [SEED]):
         # Improvement: baseline error - AI error (positive = improvement)
         if np.isfinite(c_base) and np.isfinite(c_ai):
             delta = c_base - c_ai
-            err_diffs.append(delta)
+            finite_err_diffs.append(delta)
             if abs(delta) < 0.1:
                 status = "UNCHANGED"
                 n_unchanged += 1
@@ -412,11 +464,9 @@ def run_evaluation(rng_seeds: list[int] = [SEED]):
         elif not np.isfinite(c_base) and np.isfinite(c_ai):
             status = "IMPROVED (Recovered)"
             n_improved += 1
-            err_diffs.append(50.0)
         elif np.isfinite(c_base) and not np.isfinite(c_ai):
             status = "WORSENED (Failed)"
             n_worsened += 1
-            err_diffs.append(-50.0)
         else:
             status = "BOTH FAILED"
             n_unchanged += 1
@@ -428,17 +478,53 @@ def run_evaluation(rng_seeds: list[int] = [SEED]):
 
     print("-" * 105)
     print(f"Paired Summary: {n_improved} cases improved, {n_worsened} worsened, {n_unchanged} unchanged.")
-    if err_diffs:
-        print(f"Median Paired Improvement (Baseline Error - AI Error): {np.median(err_diffs):+.3f} px")
-        print(f"Mean Paired Improvement:                               {np.mean(err_diffs):+.3f} px")
+    if finite_err_diffs:
+        print(f"Median Paired Improvement (Finite Pairs Only): {np.median(finite_err_diffs):+.3f} px")
+        print(f"Mean Paired Improvement (Finite Pairs Only):   {np.mean(finite_err_diffs):+.3f} px")
 
-    # Wilcoxon signed-rank test if applicable
-    if len(err_diffs) >= 6 and any(abs(d) > 1e-3 for d in err_diffs):
+    # Wilcoxon signed-rank test strictly on finite pairs
+    p_val_wilcox = float("nan")
+    valid_diffs = [d for d in finite_err_diffs if abs(d) > 1e-3]
+    if len(valid_diffs) >= 6:
         try:
-            stat, p_val = wilcoxon([d for d in err_diffs if abs(d) > 1e-3], alternative="greater")
-            print(f"Wilcoxon signed-rank test (H1: AI error < Baseline): stat={stat:.1f}, p={p_val:.4e}")
+            stat, p_val = wilcoxon(valid_diffs, alternative="greater")
+            p_val_wilcox = float(p_val)
+            print(f"Wilcoxon signed-rank test (finite pairs only, N={len(valid_diffs)}): stat={stat:.1f}, p={p_val:.4e}")
         except Exception as exc:
             print(f"Wilcoxon test note: {exc}")
+
+    # McNemar test for success rate
+    succ_base_flags = [bool(r["base"]["success"]) for r in xs_runs]
+    succ_ai_flags = [bool(r["ai"]["success"]) for r in xs_runs]
+    mcnemar_res = compute_mcnemar_test(succ_base_flags, succ_ai_flags)
+    p_val_mcnemar = mcnemar_res["p_value"]
+    print(f"McNemar test on success rate: b={mcnemar_res['b']}, c={mcnemar_res['c']}, p={p_val_mcnemar:.4e} ({mcnemar_res['method']})")
+
+    # Side-by-side reporting: Success-rate, conditional-mean, Intent-to-Treat
+    n_xs = len(xs_runs)
+    succ_rate_b = sum(succ_base_flags) / max(1, n_xs) * 100.0
+    succ_rate_a = sum(succ_ai_flags) / max(1, n_xs) * 100.0
+
+    finite_cb = [r["base"]["corner_err"] for r in xs_runs if np.isfinite(r["base"]["corner_err"])]
+    finite_ca = [r["ai"]["corner_err"] for r in xs_runs if np.isfinite(r["ai"]["corner_err"])]
+    mean_cond_b = float(np.mean(finite_cb)) if finite_cb else float("nan")
+    mean_cond_a = float(np.mean(finite_ca)) if finite_ca else float("nan")
+
+    itt_cb = [r["base"]["corner_err"] if np.isfinite(r["base"]["corner_err"]) else diag_penalty for r in xs_runs]
+    itt_ca = [r["ai"]["corner_err"] if np.isfinite(r["ai"]["corner_err"]) else diag_penalty for r in xs_runs]
+    mean_itt_b = float(np.mean(itt_cb)) if itt_cb else float("nan")
+    mean_itt_a = float(np.mean(itt_ca)) if itt_ca else float("nan")
+
+    print("\n================================================================================")
+    print("METHODOLOGY METRICS COMPARISON (SIDE-BY-SIDE: CROSS-SENSOR HELDOUT)")
+    print("================================================================================")
+    print(f"{'Metric':<35} {'Baseline (Uniform)':>20} {'AI-Weighted':>22} {'Difference':>16}")
+    print("-" * 96)
+    print(f"{'Registration Success Rate':<35} {succ_rate_b:>19.1f}% {succ_rate_a:>21.1f}% {succ_rate_a - succ_rate_b:>+15.1f}%")
+    print(f"{'Conditional Mean Corner Error (px)':<35} {mean_cond_b:>20.2f} {mean_cond_a:>22.2f} {mean_cond_a - mean_cond_b:>+16.2f}")
+    print(f"{'Intent-to-Treat Mean Error (px)':<35} {mean_itt_b:>20.2f} {mean_itt_a:>22.2f} {mean_itt_a - mean_itt_b:>+16.2f}")
+    print(f"{'McNemar Test p-value':<35} {'--':>20} {p_val_mcnemar:>22.4e} {'b=' + str(mcnemar_res['b']) + ',c=' + str(mcnemar_res['c']):>16}")
+    print(f"{'Wilcoxon (finite pairs) p-value':<35} {'--':>20} {p_val_wilcox:>22.4e} {'N=' + str(len(valid_diffs)):>16}")
 
 if __name__ == "__main__":
     run_evaluation()

@@ -290,9 +290,18 @@ def evaluate_triplet_consistency(
             "chained": {"status": "not_computable"},
         }
     else:
+        # Determine source/canvas image shape for cycle testing (dynamic, honest)
+        canvas_shape = (512, 512)
+        try:
+            _src_probe = cv2.imread(str(image_a_path), cv2.IMREAD_GRAYSCALE)
+            if _src_probe is not None and hasattr(_src_probe, "shape") and len(_src_probe.shape) >= 2:
+                canvas_shape = _src_probe.shape[:2]
+        except Exception:
+            pass
+
         # Run closed-loop cycle consistency on complete set of 3 homographies
         cycle_rmse, cycle_mean = compute_triplet_consistency(
-            H_AB, H_BC, H_CA, image_shape=(512, 512), num_test_points=num_test_points
+            H_AB, H_BC, H_CA, image_shape=canvas_shape, num_test_points=num_test_points
         )
 
         # Build pair metrics outputs with transparent derivation tags
@@ -353,16 +362,14 @@ def evaluate_triplet_consistency(
             _cov_bc = _extract_cov(res_BC)
             _gsd_ac = None
             try:
-                for _r in (res_AB, res_BC):
-                    _m = (_r.get("metrics") or {})
-                    if _m.get("absolute_rmse_m") is not None:
-                        pass
                 _ws = (res_BC.get("working_scale") or {})
-                _gsd_ac = _ws.get("gsd_m")
+                _gsd_ac = _ws.get("gsd_m") or _ws.get("working_gsd_m")
             except Exception:
                 _gsd_ac = None
             if _gsd_ac is None:
-                _gsd_ac = 5.0
+                # Per-sensor working scale GSD: OHRC 0.25 / TMC 5.0 / NAC 0.9 / IIRS 70
+                _sensor_gsds = {"OHRC": 0.25, "NAC": 0.9, "LRO_NAC": 0.9, "IIRS": 70.0, "TMC": 5.0, "TMC-2": 5.0, "LRO_WAC": 100.0}
+                _gsd_ac = _sensor_gsds.get(str(sensor_c).upper(), 70.0 if str(sensor_c).upper() == "IIRS" else 5.0)
             composed_cov = propagate_composed_covariance_monte_carlo(
                 np.asarray(H_AB, dtype=np.float64),
                 _cov_ab,
@@ -457,13 +464,14 @@ def evaluate_triplet_consistency(
                 import rasterio
                 from rasterio.transform import from_origin
                 th, tw = target_image.shape[:2]
+                _tgt_gsd = float(_gsd_ac) if _gsd_ac else 1.0
                 tif_profile = {
                     "driver": "GTiff",
                     "height": th, "width": tw,
                     "count": 1 if registered.ndim == 2 else min(registered.shape[2], 3),
                     "dtype": "uint8",
                     "crs": "+proj=eqc +lat_ts=0 +lon_0=0 +a=1737400 +b=1737400 +units=m +no_defs +type=crs",
-                    "transform": from_origin(0, th, 1.0, 1.0),
+                    "transform": from_origin(0, th * _tgt_gsd, _tgt_gsd, _tgt_gsd) if _gsd_ac else from_origin(0, th, 1.0, 1.0),
                     "compress": "lzw",
                 }
                 with rasterio.open(str(tif_path), "w", **tif_profile) as dst:
@@ -609,7 +617,14 @@ def evaluate_triplet_consistency(
             res_basemap = {"status": "failed", "message": str(e), "metrics": None}
 
     # Extract required evaluation output metrics
-    intra_ch2_pixel_rmse = round(float(cycle_rmse), 4) if (not failed_legs and 'cycle_rmse' in locals() and cycle_rmse is not None) else None
+    # Tautological cycle leak guard: when any leg is composed, closed loop is ~0.0px by construction (identity).
+    # Gated strictly on has_composed_leg so composed triplets report honest nulls for intra-CH2 cycle error.
+    has_composed_leg = any(v == "composed" for v in derivations.values())
+    intra_ch2_pixel_rmse = (
+        round(float(cycle_rmse), 4)
+        if (not failed_legs and not has_composed_leg and 'cycle_rmse' in locals() and cycle_rmse is not None)
+        else None
+    )
 
     basemap_pixel_rmse = None
     abs_rmse_meters = None
@@ -617,7 +632,7 @@ def evaluate_triplet_consistency(
         basemap_pixel_rmse = res_basemap["metrics"].get("fit_rmse_px")
         abs_rmse_meters = res_basemap["metrics"].get("absolute_rmse_m")
 
-    # If basemap registration was not run or failed, compute absolute RMSE for intra-CH2 using GSD and DEM
+    # If basemap registration was not run or failed, compute absolute RMSE for intra-CH2 using real GSD and DEM
     if abs_rmse_meters is None and intra_ch2_pixel_rmse is not None:
         dem_arr = None
         if dem_path and Path(dem_path).exists():
@@ -625,8 +640,18 @@ def evaluate_triplet_consistency(
                 dem_arr = cv2.imread(str(dem_path), cv2.IMREAD_UNCHANGED)
             except Exception:
                 pass
+        # Cycle error is evaluated in sensor A pixel frame; resolve sensor A working/nominal GSD (OHRC 0.25m)
+        _sensor_a_gsd = None
+        try:
+            _ws_a = (res_AB.get("working_scale") or {})
+            _sensor_a_gsd = _ws_a.get("gsd_m") or _ws_a.get("working_gsd_m")
+        except Exception:
+            _sensor_a_gsd = None
+        if _sensor_a_gsd is None:
+            _nominal_map = {"OHRC": 0.25, "NAC": 0.9, "LRO_NAC": 0.9, "IIRS": 70.0, "TMC": 5.0, "TMC-2": 5.0}
+            _sensor_a_gsd = _nominal_map.get(str(sensor_a).upper(), 0.25)
         abs_rmse_meters = calculate_absolute_rmse_meters(
-            intra_ch2_pixel_rmse, gsd=5.0, dem_data=dem_arr
+            intra_ch2_pixel_rmse, gsd=_sensor_a_gsd, dem_data=dem_arr
         )
 
     evaluation_report["Intra-CH2 Pixel RMSE"] = intra_ch2_pixel_rmse

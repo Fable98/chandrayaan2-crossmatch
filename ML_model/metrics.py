@@ -119,7 +119,9 @@ def calculate_absolute_rmse_meters(
     H_mat = None
     errors_px = None
 
-    if isinstance(match_points, tuple) and len(match_points) == 3:
+    if isinstance(match_points, (int, float, np.floating, np.integer)):
+        errors_px = np.array([float(match_points)], dtype=np.float64)
+    elif isinstance(match_points, tuple) and len(match_points) == 3:
         # (src_pts, dst_pts, H)
         src, dst, H_mat = match_points
         pts1 = np.asarray(src, dtype=np.float64)
