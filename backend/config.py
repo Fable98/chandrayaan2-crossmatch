@@ -135,7 +135,9 @@ class Settings(BaseSettings):
             if cleaned and cleaned not in origins:
                 origins.append(cleaned)
         if not origins:
-            origins = ["*"]
+            # Fail closed to localhost like backend/main.py (a "*" default is
+            # invalid with allow_credentials=True and is filtered there).
+            origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
         return origins
 
 
