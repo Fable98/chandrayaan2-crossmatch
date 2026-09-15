@@ -23,15 +23,40 @@ function getInitialTheme(): Theme {
     if (typeof document !== "undefined" && document.documentElement.classList.contains("dark")) {
       return "dark";
     }
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    return stored === "dark" ? "dark" : "light";
+    if (typeof window !== "undefined") {
+      return window.localStorage.getItem(STORAGE_KEY) === "dark" ? "dark" : "light";
+    }
+    return "light";
   } catch {
     return "light";
   }
 }
 
+function applyTheme(next: Theme) {
+  document.documentElement.classList.toggle("dark", next === "dark");
+  // Keep native chrome (scrollbars, form controls) in sync with the theme.
+  document.documentElement.style.colorScheme = next;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, next);
+  } catch {
+    // ignore persistence failures
+  }
+}
+
 export default function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
+
+  // Single place that touches the DOM / storage: runs on mount and on every
+  // theme change. The toggle below stays a pure state update, which keeps it
+  // safe under StrictMode / concurrent rendering (side-effects must never
+  // live inside a state updater).
+  useEffect(() => {
+    try {
+      applyTheme(theme);
+    } catch {
+      // document unavailable (SSR) — nothing to sync
+    }
+  }, [theme]);
 
   useEffect(() => {
     try {
@@ -43,23 +68,13 @@ export default function ThemeProvider({ children }: { children: React.ReactNode 
           ? "dark"
           : "light";
       setTheme(initial);
-      document.documentElement.classList.toggle("dark", initial === "dark");
     } catch {
       // localStorage unavailable — stay on current theme
     }
   }, []);
 
   const toggle = useCallback(() => {
-    setTheme((prev) => {
-      const next: Theme = prev === "dark" ? "light" : "dark";
-      document.documentElement.classList.toggle("dark", next === "dark");
-      try {
-        window.localStorage.setItem(STORAGE_KEY, next);
-      } catch {
-        // ignore persistence failures
-      }
-      return next;
-    });
+    setTheme((prev) => (prev === "dark" ? "light" : "dark"));
   }, []);
 
   return <ThemeContext.Provider value={{ theme, toggle }}>{children}</ThemeContext.Provider>;

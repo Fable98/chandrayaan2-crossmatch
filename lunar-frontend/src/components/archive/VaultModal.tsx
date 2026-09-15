@@ -43,20 +43,20 @@ export default function VaultModal({
 
   return (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm animate-fade-in">
-      <div className="relative flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white text-slate-800 shadow-2xl">
+      <div className="relative flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] text-slate-800 dark:text-slate-200 shadow-2xl">
         {/* Header Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 bg-white px-6 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] px-6 py-4">
           <div className="flex items-center gap-3">
             <div>
               <div className="flex items-center gap-2">
-                <span className="rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#4F46E5]">
+                <span className="rounded-lg border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#4F46E5] dark:text-indigo-300">
                   Archive Vault
                 </span>
-                <span className="text-base font-bold text-slate-900">
+                <span className="text-base font-bold text-slate-900 dark:text-slate-100">
                   Lunar Cross-Match Products
                 </span>
               </div>
-              <p className="mt-0.5 text-xs text-slate-500">
+              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                 {triplets.length} validated regions · Chandrayaan-2 multi-sensor archive
               </p>
             </div>
@@ -64,7 +64,7 @@ export default function VaultModal({
 
           <button
             onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-xs text-slate-400 transition hover:bg-slate-50 hover:text-slate-700"
+            className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 text-xs text-slate-400 transition hover:bg-slate-50 dark:hover:bg-white/10 hover:text-slate-700 dark:hover:text-slate-200"
             title="Close"
           >
             ✕
@@ -72,7 +72,7 @@ export default function VaultModal({
         </div>
 
         {/* Filter & Search Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 bg-slate-50/50 px-6 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 dark:border-[#1b2029] bg-slate-50/50 dark:bg-white/5 px-6 py-3">
           {/* Filter Pills */}
           <div className="flex flex-wrap gap-2">
             <FilterButton
@@ -108,7 +108,7 @@ export default function VaultModal({
           </div>
 
           {/* Search */}
-          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs text-slate-700 focus-within:border-[#4F46E5]">
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 focus-within:border-[#4F46E5]">
             <svg className="h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
@@ -117,15 +117,15 @@ export default function VaultModal({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search regions…"
-              className="w-40 bg-transparent text-xs text-slate-800 placeholder-slate-400 focus:outline-none sm:w-56"
+              className="w-40 bg-transparent text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none sm:w-56"
             />
           </div>
         </div>
 
         {/* Vault Grid Content */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30">
+        <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30 dark:bg-white/5">
           {deleteError && (
-            <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-medium text-rose-700">
+            <div className="mb-4 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 px-4 py-2.5 text-xs font-medium text-rose-700 dark:text-rose-300">
               Delete failed: {deleteError}
             </div>
           )}
@@ -158,7 +158,7 @@ export default function VaultModal({
               return (
                 <div
                   key={t.id}
-                  className="group flex flex-col justify-between rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm transition-all hover:border-[#4F46E5]/40 hover:shadow-md"
+                  className="group flex flex-col justify-between rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-white/5 p-4 shadow-sm transition-all hover:border-[#4F46E5]/40 hover:shadow-md"
                 >
                   <div>
                     {/* Top line */}
@@ -166,17 +166,17 @@ export default function VaultModal({
                       <span className="font-mono text-[11px] text-slate-400">
                         #{String(idx + 1).padStart(2, "0")}
                       </span>
-                      <span className="rounded-md border border-indigo-100 bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-[#4F46E5]">
+                      <span className="rounded-md border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 text-[10px] font-bold text-[#4F46E5] dark:text-indigo-300">
                         {badge}
                       </span>
                     </div>
 
                     {/* Image Preview: contain-fit so non-square tiles (e.g. LRO
                         reference swaths) are never edge-cropped. */}
-                    <div className="relative aspect-square overflow-hidden rounded-xl border border-slate-100 bg-black">
+                    <div className="relative aspect-square overflow-hidden rounded-xl border border-slate-100 dark:border-[#1b2029] bg-black">
                       {filter === "lro" && failedThumbs.has(thumbUrl) ? (
                         <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 p-4 text-center">
-                          <span className="rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700">
+                          <span className="rounded-md border border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">
                             LRO reference unavailable
                           </span>
                           <span className="text-[10px] leading-relaxed text-slate-400">
@@ -213,10 +213,10 @@ export default function VaultModal({
 
                     {/* Region Metadata */}
                     <div className="mt-3">
-                      <h4 className="text-xs font-bold text-slate-900 group-hover:text-[#4F46E5] transition">
+                      <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-[#4F46E5] dark:group-hover:text-indigo-300 transition">
                         {t.id}
                       </h4>
-                      <p className="mt-0.5 text-xs text-slate-500">
+                      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                         {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km
                       </p>
                       <p className="mt-0.5 text-[11px] text-slate-400 font-mono">
@@ -226,16 +226,16 @@ export default function VaultModal({
                   </div>
 
                   {/* Actions */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
+                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-[#1b2029] flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-medium text-slate-500">
+                      <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
                         {t.dem_available ? "DEM available" : "Mono"}
                       </span>
                       <a
                         href={`${API_BASE}/api/registration/report/${t.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition-all"
+                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-700 dark:hover:text-rose-300 hover:border-rose-200 dark:hover:border-rose-900/50 transition-all"
                         title="Download ISRO Verification Report (PDF)"
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -277,7 +277,7 @@ export default function VaultModal({
                             setDeletingId(null);
                           }
                         }}
-                        className="rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-400 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition-all shadow-sm disabled:opacity-50"
+                        className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-700 dark:hover:text-rose-300 hover:border-rose-200 dark:hover:border-rose-900/50 transition-all shadow-sm disabled:opacity-50"
                       >
                         {deletingId === t.id ? "…" : "🗑"}
                       </button>
@@ -294,7 +294,7 @@ export default function VaultModal({
                 <>No regions matching "{search}".</>
               ) : filter === "lro" ? (
                 <div className="space-y-3">
-                  <p className="font-semibold text-slate-600">No external reference datasets matched current filters.</p>
+                  <p className="font-semibold text-slate-600 dark:text-slate-300">No external reference datasets matched current filters.</p>
                   <button
                     onClick={() => setFilter("all")}
                     className="rounded-xl bg-[#4F46E5] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#4338CA] transition"
@@ -310,11 +310,11 @@ export default function VaultModal({
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-slate-100 bg-white px-6 py-3 text-xs text-slate-500">
+        <div className="flex items-center justify-between border-t border-slate-100 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] px-6 py-3 text-xs text-slate-500 dark:text-slate-400">
           <span>Chandrayaan-2 Cross-Match Repository</span>
           <button
             onClick={onClose}
-            className="hover:text-slate-900 font-medium transition-colors"
+            className="hover:text-slate-900 dark:hover:text-slate-100 font-medium transition-colors"
           >
             Close ✕
           </button>
@@ -339,7 +339,7 @@ function FilterButton({
       className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
         active
           ? "bg-[#4F46E5] text-white shadow-sm"
-          : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900"
+          : "border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-slate-100"
       }`}
     >
       {label}

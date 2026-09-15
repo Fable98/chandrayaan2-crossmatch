@@ -9,7 +9,9 @@ interface Props {
 
 export default function AboutPage({ onBackToHero, onOpenConsole }: Props) {
   return (
-    <div className="min-h-screen bg-[#08080a] font-sans text-[#f0f2f5] selection:bg-[#2c2619] selection:text-[#f3df9b]">
+    <div className="dark min-h-screen bg-[#08080a] font-sans text-[#f0f2f5] selection:bg-[#2c2619] selection:text-[#f3df9b]">
+      {/* Always-dark briefing aesthetic (obsidian/gold): pinned `dark` keeps
+          shared ink/panel tokens on dark values in light workspace theme. */}
       {/* 1. Sticky Navigation Header */}
       <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-[#23211d] bg-[#08080a]/90 px-6 backdrop-blur-md md:px-12">
         <button

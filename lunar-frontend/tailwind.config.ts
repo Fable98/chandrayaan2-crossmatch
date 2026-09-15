@@ -6,14 +6,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        void: "#090b0e",
-        panel: "#0e1117",
-        "panel-raised": "#141820",
-        border: "#1b2029",
-        "border-bright": "#28303d",
-        ink: "#f0f2f5",
-        "ink-dim": "#9aa3af",
-        "ink-faint": "#5c6574",
+        // Theme-aware surface tokens: driven by CSS variables so every
+        // consumer (panels, borders, ink text) follows the `dark` class on
+        // <html> without per-component dark: duplicates. Values live in
+        // globals.css (:root = light, .dark = dark). Brand accents below
+        // stay fixed in both modes.
+        void: "rgb(var(--c-void) / <alpha-value>)",
+        panel: "rgb(var(--c-panel) / <alpha-value>)",
+        "panel-raised": "rgb(var(--c-panel-raised) / <alpha-value>)",
+        border: "rgb(var(--c-border) / <alpha-value>)",
+        "border-bright": "rgb(var(--c-border-bright) / <alpha-value>)",
+        ink: "rgb(var(--c-ink) / <alpha-value>)",
+        "ink-dim": "rgb(var(--c-ink-dim) / <alpha-value>)",
+        "ink-faint": "rgb(var(--c-ink-faint) / <alpha-value>)",
         teal: "#3fb5c9",
         "teal-dim": "#16343d",
         "teal-dark": "#2ea3b8",

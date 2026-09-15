@@ -29,7 +29,10 @@ export default function ExploreMoonHero({ onOpenConsole, onOpenAbout, onLogout, 
   }, []);
 
   return (
-    <section className="relative h-screen w-screen select-none overflow-hidden bg-[#000000] font-sans text-white">
+    <section className="dark relative h-screen w-screen select-none overflow-hidden bg-[#000000] font-sans text-white">
+      {/* Always-dark cinematic entry: the full-bleed night imagery is designed
+          for the dark palette. Pinned `dark` keeps the shared ink/panel tokens
+          on their dark values even while the workspace theme is light. */}
       {/* 1. Full-Bleed Crescent Moon & Lunar Surface Background with Subtle Parallax */}
       <div
         className="absolute inset-0 z-0 h-[106%] w-[106%] -left-[3%] -top-[3%] transition-transform duration-700 ease-out"

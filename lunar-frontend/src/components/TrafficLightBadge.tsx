@@ -17,9 +17,11 @@ export interface TrafficLightBadgeProps {
 }
 
 const STYLE: Record<TrafficLightColor, string> = {
-  GREEN: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  YELLOW: "border-amber-200 bg-amber-50 text-amber-700",
-  RED: "border-rose-200 bg-rose-50 text-rose-700",
+  GREEN:
+    "border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300",
+  YELLOW:
+    "border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300",
+  RED: "border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300",
 };
 
 const LABEL: Record<TrafficLightColor, string> = {
@@ -54,7 +56,7 @@ export default function TrafficLightBadge({
   if (!known) {
     return (
       <span
-        className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400"
+        className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-400"
         title="No objective verification available for this run"
       >
         <span className="h-1.5 w-1.5 rounded-full bg-current" />

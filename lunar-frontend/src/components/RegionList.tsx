@@ -14,7 +14,7 @@ export default function RegionList({ triplets, selectedId, onSelect }: Props) {
     <div className="flex h-full flex-col">
       <div className="border-b border-border bg-panel px-4 py-3.5 flex items-center justify-between">
         <div>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-white">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-slate-900 dark:text-white">
             Regions
           </h2>
           <p className="mt-0.5 text-2xs font-mono text-ink-faint">
@@ -37,13 +37,13 @@ export default function RegionList({ triplets, selectedId, onSelect }: Props) {
               className={`group block w-full rounded-xl p-3 text-left transition-all duration-200 ${
                 active
                   ? "bg-teal/10 border border-teal/50 shadow-[0_0_15px_rgba(63,181,201,0.15)]"
-                  : "bg-panel-raised/60 border border-white/5 hover:border-white/15 hover:bg-panel-raised"
+                  : "bg-panel-raised/60 border border-slate-300/60 dark:border-white/5 hover:border-slate-400 dark:hover:border-white/15 hover:bg-panel-raised"
               }`}
             >
               <div className="flex items-center justify-between">
                 <span
                   className={`font-mono text-xs font-medium transition-colors ${
-                    active ? "text-teal font-bold" : "text-white group-hover:text-teal"
+                    active ? "text-teal font-bold" : "text-slate-700 dark:text-white group-hover:text-teal"
                   }`}
                 >
                   {t.id}

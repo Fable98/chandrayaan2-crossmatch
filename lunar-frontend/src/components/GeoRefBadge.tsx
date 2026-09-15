@@ -8,7 +8,7 @@
 export default function GeoRefBadge({ className = "" }: { className?: string }) {
   return (
     <span
-      className={`inline-block rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700 ${className}`}
+      className={`inline-block rounded-md border border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300 ${className}`}
       title="No product bounds available: pixel coordinates only, no geographic position claimed."
     >
       no-georef

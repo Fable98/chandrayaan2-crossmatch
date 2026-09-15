@@ -94,7 +94,9 @@ export default function LoginPage({ onLoginSuccess }: Props) {
   };
 
   return (
-    <section className="relative min-h-screen w-full select-none overflow-x-hidden overflow-y-auto bg-[#000000] font-sans text-white flex flex-col justify-between">
+    <section className="dark relative min-h-screen w-full select-none overflow-x-hidden overflow-y-auto bg-[#000000] font-sans text-white flex flex-col justify-between">
+      {/* Always-dark cinematic entry (see ExploreMoonHero): pinned `dark` keeps
+          shared ink/panel tokens on dark values in light workspace theme. */}
       {/* Full-Bleed Lunar Background with Parallax */}
       <div
         className="fixed inset-0 z-0 h-[106%] w-[106%] -left-[3%] -top-[3%] transition-transform duration-700 ease-out pointer-events-none"

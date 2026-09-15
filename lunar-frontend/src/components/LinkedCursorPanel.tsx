@@ -140,7 +140,7 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
       </div>
 
       {notice && points.length === 0 && (
-        <div className="mx-5 mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2.5 font-mono text-[11px] leading-relaxed text-amber-800">
+        <div className="mx-5 mt-4 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 px-4 py-2.5 font-mono text-[11px] leading-relaxed text-amber-800 dark:text-amber-200">
           <span className="font-black uppercase tracking-wider">No correspondence dots: </span>
           {notice}
         </div>
@@ -175,7 +175,7 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
                 ? `${(activeMatch.confidence * 100).toFixed(0)}% conf`
                 : "—"}
             </span>
-            <span className="font-mono text-[9px] uppercase tracking-widest text-[#6b665f]">
+            <span className="font-mono text-[9px] uppercase tracking-widest text-ink-faint">
               {activeMatch ? `Match #${activeIdx! + 1}` : "Select Point"}
             </span>
           </div>
@@ -236,8 +236,8 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
                     isSelected
                       ? "border border-teal bg-teal/20 text-teal font-bold shadow-[0_0_12px_rgba(63,181,201,0.4)] scale-105"
                       : isHovered
-                      ? "border border-teal/50 bg-teal/10 text-teal-light"
-                      : "border border-white/10 bg-panel-raised/80 text-ink-dim hover:border-white/20 hover:text-white"
+                      ? "border border-teal/50 bg-teal/10 text-teal"
+                      : "border border-slate-300/70 dark:border-white/10 bg-panel-raised/80 text-ink-dim hover:border-slate-400 dark:hover:border-white/20 hover:text-slate-900 dark:hover:text-white"
                   }`}
                 >
                   <span className="h-1.5 w-1.5 rounded-full bg-teal" />
@@ -271,10 +271,10 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
         {!clickNotice && activeMatch !== null && (
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span>
-              <span className="text-white font-semibold">Match #{activeIdx! + 1}: </span>
-              <span className="text-white/80">ohrc_px</span>=(
-              <span className="text-white font-bold">{activeMatch.ohrc_px[0].toFixed(1)}</span>,{" "}
-              <span className="text-white font-bold">{activeMatch.ohrc_px[1].toFixed(1)}</span>)
+              <span className="text-slate-900 dark:text-white font-semibold">Match #{activeIdx! + 1}: </span>
+              <span className="text-slate-600 dark:text-white/80">ohrc_px</span>=(
+              <span className="text-slate-900 dark:text-white font-bold">{activeMatch.ohrc_px[0].toFixed(1)}</span>,{" "}
+              <span className="text-slate-900 dark:text-white font-bold">{activeMatch.ohrc_px[1].toFixed(1)}</span>)
               {" → "}
               <span className="text-teal">tmc_px</span>=(
               <span className="text-teal font-bold">{activeMatch.tmc_px[0].toFixed(1)}</span>,{" "}

@@ -48,11 +48,11 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=localStorage.getItem('chandrayaan-theme');if(t==='dark'){document.documentElement.classList.add('dark')}}catch(e){}})()`,
+            __html: `(function(){try{var t=localStorage.getItem('chandrayaan-theme');var d=t==='dark';if(d){document.documentElement.classList.add('dark')}document.documentElement.style.colorScheme=d?'dark':'light'}catch(e){}})()`,
           }}
         />
       </head>
-      <body className="bg-[#070d14] text-[#f0f4f5] font-sans antialiased">
+      <body className="bg-[#f4f6fb] text-slate-800 dark:bg-[#070d14] dark:text-[#f0f4f5] font-sans antialiased">
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

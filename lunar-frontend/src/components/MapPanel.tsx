@@ -40,7 +40,7 @@ export default function MapPanel({ triplet, iirsOverlay }: Props) {
   };
 
   return (
-    <div className="relative z-0 h-[460px] w-full overflow-hidden rounded-xl bg-[#090b0e]">
+    <div className="relative z-0 h-[460px] w-full overflow-hidden rounded-xl bg-[#dfe4ec] dark:bg-[#090b0e]">
       <MapContainer
         center={center}
         zoom={13}
@@ -71,7 +71,7 @@ export default function MapPanel({ triplet, iirsOverlay }: Props) {
 
       {activeLayers.size === 0 && (
         <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-panel/90 px-5 py-3 text-center shadow-2xl backdrop-blur-md">
-          <p className="text-xs font-medium text-white">
+          <p className="text-xs font-medium text-ink">
             The <span className="text-teal font-semibold">teal box</span> is the shared OHRC/TMC/IIRS footprint.
           </p>
           <p className="mt-1 text-2xs font-mono text-ink-faint">
@@ -120,10 +120,10 @@ function LayerToggle({
       disabled={disabled}
       className={`flex items-center justify-between gap-3 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
         disabled
-          ? "cursor-not-allowed border border-white/5 text-ink-faint/50"
+          ? "cursor-not-allowed border border-slate-300/70 dark:border-white/5 text-ink-faint/50"
           : checked
           ? "bg-teal text-black font-semibold shadow-[0_0_15px_rgba(63,181,201,0.4)] hover:bg-[#52cde3]"
-          : "border border-white/10 bg-white/5 text-ink-dim hover:border-white/20 hover:text-white"
+          : "border border-slate-300/70 dark:border-white/10 bg-white dark:bg-white/5 text-ink-dim hover:border-slate-400 dark:hover:border-white/20 hover:text-slate-900 dark:hover:text-white"
       }`}
     >
       <span>{label}</span>
