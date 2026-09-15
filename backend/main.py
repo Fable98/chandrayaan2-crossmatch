@@ -27,6 +27,12 @@ if "config" in sys.modules and not hasattr(sys.modules["config"], "settings"):
 if "data" in sys.modules and not hasattr(sys.modules["data"], "loader"):
     sys.modules.pop("data", None)
 
+# ML engine path, resolved once at import (the /register handler used to
+# re-insert this per request; sys.path.insert is idempotent-guarded here).
+_ML_MODEL_DIR = str(REPO_ROOT / "ML_model")
+if _ML_MODEL_DIR not in sys.path:
+    sys.path.insert(0, _ML_MODEL_DIR)
+
 from utils.logger import setup_logging
 setup_logging()
 logger = logging.getLogger("backend.main")
@@ -208,10 +214,6 @@ async def register_images(
     - Safety checks: auth, extension allowlist, streamed size cap, traversal-safe
       names, and robust multi-band reading — for source, reference, AND DEM.
     """
-    import sys
-    from pathlib import Path
-
-    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ML_model"))
     from matcher_cfog import match_images_cfog, load_as_float_and_color
 
     # Validate extensions BEFORE touching disk: rejected uploads must never

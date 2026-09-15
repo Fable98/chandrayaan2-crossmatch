@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   backend:
     build:
@@ -11,24 +9,37 @@ services:
     environment:
       - PORT=8000
       - GLOBAL_SEED=42
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-}
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 15s
+    volumes:
+      - dynamic_runs:/app/data_preprocessing_pipeline/dynamic_runs
 
   frontend:
     build:
       context: ./lunar-frontend
       dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* vars are baked at Next.js build time; the old
+        # NEXT_PUBLIC_API_URL runtime-only name was never read by the app
+        # (code reads NEXT_PUBLIC_API_BASE_URL in lib/api.ts and
+        # app/images/[...slug]/route.ts).
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
     container_name: sih26166-frontend
     ports:
       - "3000:3000"
     environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+      - API_BASE_INTERNAL=http://backend:8000
     depends_on:
       backend:
-        condition: service_started
+        condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  dynamic_runs:

@@ -3,7 +3,10 @@ services:
     name: chandrayaan2-backend
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT --proxy-headers
+    # Backend only; the frontend deploys separately (see ALLOWED_ORIGINS
+    # Vercel URL below and lunar-frontend/Dockerfile for self-host).
+    healthCheckPath: /health
     envVars:
       - key: PYTHON_VERSION
         value: 3.14.0
