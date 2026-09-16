@@ -120,6 +120,10 @@ class Settings(BaseSettings):
     )
     MAX_INGEST_FILES: int = Field(default=10, description="Max files per ingest upload batch")
     DYNAMIC_RUNS_TTL_HOURS: int = Field(default=24, description="Age after which dynamic_runs are purged")
+    JOB_TTL_HOURS: int = Field(
+        default=168,
+        description="Age after which finished job records are purged from job_store (default 7 days)",
+    )
 
     def require_jwt_secret(self) -> str:
         """Return the configured secret or raise (fail closed, no fallback)."""
@@ -175,12 +179,16 @@ try:
         get_sensor_gsd,
     )
 except Exception:
+    # Mirror of ML_model.config canonical values (OHRC 0.25 / TMC-2 5.0 /
+    # IIRS 70.0 / LRO NAC 0.9, plus TMC2/NAC aliases). Only used when the ML
+    # package is unimportable; ML_model.config is authoritative.
     OHRC_GSD = 0.25
     TMC_GSD = 5.0
-    IIRS_GSD = 80.0
-    LRO_NAC_GSD = 0.5
+    IIRS_GSD = 70.0
+    LRO_NAC_GSD = 0.9
     SEED = 42
-    SENSOR_GSD_MAP = {"OHRC": 0.25, "TMC": 5.0, "TMC-2": 5.0, "IIRS": 80.0, "LRO_NAC": 0.5}
+    SENSOR_GSD_MAP = {"OHRC": 0.25, "TMC": 5.0, "TMC-2": 5.0, "TMC2": 5.0,
+                      "IIRS": 70.0, "LRO_NAC": 0.9, "LRO-NAC": 0.9, "NAC": 0.9}
     def get_seed() -> int:
         return SEED
     def get_sensor_gsd(s: str, f: float = 1.0) -> float:

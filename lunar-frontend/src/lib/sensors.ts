@@ -19,9 +19,9 @@ export interface SensorSpec {
  * Distinct from live per-region metadata returned by the backend contract.
  * - OHRC: 0.25 m/px (ISRO High Resolution Camera nadir)
  * - TMC-2: 5.0 m/px (ISRO Terrain Mapping Camera nominal; 4–5m orbital range)
- * - IIRS: 80.0 m/px (ISRO Imaging Infrared Spectrometer nominal)
+ * - IIRS: 70.0 m/px (canonical stack nominal, aligned with ML_model SENSOR_GSD_MAP)
  * - DEM: 5.0 m/px (TMC stereo DEM resolution)
- * - LRO NAC: 0.914 m/px (NASA LRO Narrow Angle Camera nominal at 50km)
+ * - LRO NAC: 0.9 m/px (canonical stack nominal, aligned with ML_model SENSOR_GSD_MAP)
  */
 export const SENSOR_META: Record<SensorKind, SensorSpec> = {
   ohrc: {
@@ -36,7 +36,7 @@ export const SENSOR_META: Record<SensorKind, SensorSpec> = {
   },
   iirs: {
     label: "IIRS",
-    gsdM: 80.0, // spec constant
+    gsdM: 70.0, // canonical stack constant (OHRC 0.25 / TMC-2 5.0 / IIRS 70 / NAC 0.9)
     unit: "m/px",
   },
   dem: {
@@ -46,7 +46,7 @@ export const SENSOR_META: Record<SensorKind, SensorSpec> = {
   },
   lro_nac: {
     label: "NASA LRO NAC",
-    gsdM: 0.914, // spec constant
+    gsdM: 0.9, // canonical stack constant (matches ML_model SENSOR_GSD_MAP)
     unit: "m/px",
   },
 };
@@ -252,7 +252,7 @@ export function checkerboardTag(triplet: TripletSummary | null | undefined, isLr
  * RegistrationLauncher select options. Region-independent picker labels use
  * spec-nominal GSDs (live per-region values apply at render sites that have
  * a triplet in scope). Note: legacy labels read "4.0 m/px" (TMC) and
- * "69 m/px" (IIRS); spec nominals are 5.0 / 80.0 — the old strings tracked
+ * "69 m/px" (IIRS); spec nominals are 5.0 / 70.0 — the old strings tracked
  * single-region live values, which is exactly the drift this module ends.
  */
 export const SENSOR_OPTIONS: { value: "OHRC" | "TMC" | "IIRS" | "LRO_NAC"; label: string }[] = [

@@ -40,6 +40,14 @@ COPY data/ data/
 COPY data_preprocessing_pipeline/processed_triplets/ data_preprocessing_pipeline/processed_triplets/
 COPY run_demo.py .
 
+# Non-root runtime (Phase 0.1/Phase 6): the writable trees (dynamic run
+# outputs, reports, uploads staging) are created here and chown'd so the
+# named-volume mounts in docker-compose.yml stay writable as appuser.
+RUN useradd --create-home --uid 10001 appuser \
+    && mkdir -p /app/data_preprocessing_pipeline/dynamic_runs /app/reports /app/backend/data \
+    && chown -R appuser:appuser /app
+USER appuser
+
 EXPOSE 8000
 
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=20s \

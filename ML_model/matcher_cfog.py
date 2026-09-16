@@ -173,6 +173,11 @@ def sanitize_for_json(obj: Any) -> Any:
     Floats use plain ``float()`` (full repr precision, >= 4 decimals
     retained). Only the ``confidence`` score may be rounded by the caller;
     coordinates must never be rounded here.
+
+    Non-finite floats (inf/nan) become None: ``json.dump`` would otherwise
+    emit ``Infinity``/``NaN`` tokens that are invalid strict JSON and break
+    downstream parsers. Failure paths should ALSO emit None explicitly (see
+    metrics.verify_transformation_quality); this is the backstop.
     """
     if isinstance(obj, dict):
         return {str(k): sanitize_for_json(v) for k, v in obj.items()}
@@ -181,7 +186,10 @@ def sanitize_for_json(obj: Any) -> Any:
     if isinstance(obj, np.ndarray):
         return [sanitize_for_json(v) for v in obj.tolist()]
     if isinstance(obj, np.floating):
-        return float(obj)
+        f = float(obj)
+        return f if np.isfinite(f) else None
+    if isinstance(obj, float):
+        return obj if np.isfinite(obj) else None
     if isinstance(obj, np.integer):
         return int(obj)
     if isinstance(obj, np.bool_):
@@ -1532,9 +1540,16 @@ def detect_blob_centroids(image: np.ndarray, min_area: int = 3) -> np.ndarray:
     return np.asarray(found, dtype=np.float32).reshape(-1, 2)
 
 
-_GOA_SR_CACHE: Dict[Tuple[int, Tuple[int, ...], str], Tuple[Any, Any, Any, Any, Any]] = {}
+# NOTE: entries hold a STRONG reference to the keyed array and every hit is
+# validated with `is`. Bare id() keys are unsound here: the hot loops pass
+# short-lived slice views (freed each iteration), and CPython immediately
+# recycles their ids for the next view — a shape/dtype-only check then serves
+# the previous iteration's gradients (observed as 98/101/95-candidate flips
+# across identical back-to-back calls). The strong ref keeps the id alive and
+# unambiguous; bounded order lists cap memory.
+_GOA_SR_CACHE: Dict[Tuple[int, Tuple[int, ...], str], Tuple[Any, Any, Any, Any, Any, Any]] = {}
 _GOA_SR_ORDER_LIST: List[Tuple[int, Tuple[int, ...], str]] = []
-_GOA_TMPL_CACHE: Dict[Tuple[int, Tuple[int, ...], str], Tuple[Any, Any, Any]] = {}
+_GOA_TMPL_CACHE: Dict[Tuple[int, Tuple[int, ...], str], Tuple[Any, Any, Any, Any]] = {}
 _GOA_TMPL_ORDER: List[Tuple[int, Tuple[int, ...], str]] = []
 
 
@@ -1543,8 +1558,8 @@ def _goa_search_grads_cached(orig: np.ndarray, sr_f: np.ndarray) -> Tuple[Any, A
 
     find_best_correspondence_unified is called per-template on the SAME
     search_region: without this, Sobel + u2/v2/m2 rebuild per candidate.
-    Keyed by id() of the caller's array (held alive by the caller during
-    the loop), with shape/dtype validation against the converted view.
+    Identity-validated id() key (see note above): safe for caller-held
+    arrays AND short-lived views alike.
     """
     try:
         key = (id(orig), tuple(np.shape(orig)), str(getattr(orig, "dtype", "")))
@@ -1552,8 +1567,8 @@ def _goa_search_grads_cached(orig: np.ndarray, sr_f: np.ndarray) -> Tuple[Any, A
         key = None
     if key is not None:
         hit = _GOA_SR_CACHE.get(key)
-        if hit is not None:
-            return hit
+        if hit is not None and hit[0] is orig:
+            return hit[1], hit[2], hit[3], hit[4], hit[5]
     gx2 = cv2.Sobel(sr_f, cv2.CV_32F, 1, 0, ksize=3)
     gy2 = cv2.Sobel(sr_f, cv2.CV_32F, 0, 1, ksize=3)
     m2 = np.sqrt(gx2 * gx2 + gy2 * gy2) + 1e-4
@@ -1561,7 +1576,7 @@ def _goa_search_grads_cached(orig: np.ndarray, sr_f: np.ndarray) -> Tuple[Any, A
     v2 = (2.0 * gx2 * gy2) / m2
     out = (gx2, gy2, m2, u2, v2)
     if key is not None:
-        _GOA_SR_CACHE[key] = out
+        _GOA_SR_CACHE[key] = (orig, gx2, gy2, m2, u2, v2)
         _GOA_SR_ORDER_LIST.append(key)
         while len(_GOA_SR_ORDER_LIST) > 8:
             _GOA_SR_CACHE.pop(_GOA_SR_ORDER_LIST.pop(0), None)
@@ -1569,15 +1584,15 @@ def _goa_search_grads_cached(orig: np.ndarray, sr_f: np.ndarray) -> Tuple[Any, A
 
 
 def _goa_tmpl_grads_cached(orig: np.ndarray, tmpl_f: np.ndarray) -> Tuple[Any, Any, Any]:
-    """Cached (u1, v1, m1) per template object (repeat candidates)."""
+    """Cached (u1, v1, m1) per template object (identity-validated; see above)."""
     try:
         key = (id(orig), tuple(np.shape(orig)), str(getattr(orig, "dtype", "")))
     except Exception:
         key = None
     if key is not None:
         hit = _GOA_TMPL_CACHE.get(key)
-        if hit is not None:
-            return hit
+        if hit is not None and hit[0] is orig:
+            return hit[1], hit[2], hit[3]
     gx1 = cv2.Sobel(tmpl_f, cv2.CV_32F, 1, 0, ksize=3)
     gy1 = cv2.Sobel(tmpl_f, cv2.CV_32F, 0, 1, ksize=3)
     m1 = np.sqrt(gx1 * gx1 + gy1 * gy1) + 1e-4
@@ -1585,7 +1600,7 @@ def _goa_tmpl_grads_cached(orig: np.ndarray, tmpl_f: np.ndarray) -> Tuple[Any, A
     v1 = (2.0 * gx1 * gy1) / m1
     out = (u1, v1, m1)
     if key is not None:
-        _GOA_TMPL_CACHE[key] = out
+        _GOA_TMPL_CACHE[key] = (orig, u1, v1, m1)
         _GOA_TMPL_ORDER.append(key)
         while len(_GOA_TMPL_ORDER) > 64:
             _GOA_TMPL_CACHE.pop(_GOA_TMPL_ORDER.pop(0), None)
@@ -1867,14 +1882,35 @@ def estimate_blob_scale(feat: np.ndarray, x: float, y: float,
     return best_s
 
 
-_BLOB_PYR_CACHE: Dict[Tuple[int, Tuple[int, ...], str, Tuple[float, ...]], List[Any]] = {}
-_BLOB_PYR_ORDER: List[Tuple[int, Tuple[int, ...], str, Tuple[float, ...]]] = []
+_BLOB_PYR_CACHE: Dict[Any, List[Any]] = {}
+_BLOB_PYR_ORDER: List[Any] = []
+
+
+def _blob_fingerprint(img: np.ndarray) -> Tuple[Any, ...]:
+    """O(n) content fingerprint (two reductions) validating a cached pyramid.
+
+    Bare id() keys are unsound for full-frame images (see GOA note above),
+    and holding strong refs to 8 gigapixel frames is unacceptable, so the
+    blob cache is keyed by shape/dtype/sigmas plus this fingerprint. Two
+    cheap reductions cost far less than the 5 full-frame GaussianBlurs +
+    Laplacians they guard. Collisions across distinct same-shaped images are
+    practically impossible (exact float64 mean+std plus 3 sample pixels).
+    """
+    try:
+        a = np.asarray(img)
+        flat0 = float(a.flat[0]) if a.size else 0.0
+        flatN = float(a.flat[-1]) if a.size else 0.0
+        mid = float(a.ravel()[a.size // 2]) if a.size else 0.0
+        return (tuple(a.shape), str(a.dtype), float(np.mean(a)), float(np.std(a)),
+                flat0, mid, flatN)
+    except Exception:
+        return (None,)
 
 
 def _blob_laplacian_pyramid(img: np.ndarray, sigmas: Tuple[float, ...]) -> List[Any]:
     """Build (or reuse) the cached Laplacian pyramid for one image object."""
     try:
-        key = (id(img), tuple(img.shape), str(img.dtype), tuple(sigmas))
+        key = (_blob_fingerprint(img), tuple(sigmas))
     except Exception:
         key = None
     if key is not None and key in _BLOB_PYR_CACHE:
@@ -1882,14 +1918,15 @@ def _blob_laplacian_pyramid(img: np.ndarray, sigmas: Tuple[float, ...]) -> List[
         if len(cached) == len(sigmas):
             return cached
     laps: List[Any] = []
+    arr = np.asarray(img, dtype=np.float32)
     for s in sigmas:
         ksize = int(6 * s + 1) | 1
         if ksize < 3:
             laps.append(None)
             continue
-        blur = cv2.GaussianBlur(img, (ksize, ksize), float(s))
+        blur = cv2.GaussianBlur(arr, (ksize, ksize), float(s))
         laps.append(cv2.Laplacian(blur, cv2.CV_32F))
-    if key is not None:
+    if key is not None and key[0] != (None,):
         _BLOB_PYR_CACHE[key] = laps
         _BLOB_PYR_ORDER.append(key)
         while len(_BLOB_PYR_ORDER) > 8:
@@ -1900,6 +1937,22 @@ def _blob_laplacian_pyramid(img: np.ndarray, sigmas: Tuple[float, ...]) -> List[
 
 def clear_blob_scale_cache() -> None:
     """Drop cached Laplacian pyramids (call between unrelated pairs)."""
+    _BLOB_PYR_CACHE.clear()
+    _BLOB_PYR_ORDER.clear()
+
+
+def clear_perf_caches() -> None:
+    """Drop ALL perf caches (identity-validated GOA grads + blob pyramids).
+
+    Every cache is self-validating (strong-ref identity / content fingerprint),
+    so cross-call staleness is impossible by construction; this reset exists
+    as defense-in-depth and to release full-frame pyramid memory between pairs.
+    Safe to call at any time (caches are pure memoizations).
+    """
+    _GOA_SR_CACHE.clear()
+    _GOA_SR_ORDER_LIST.clear()
+    _GOA_TMPL_CACHE.clear()
+    _GOA_TMPL_ORDER.clear()
     _BLOB_PYR_CACHE.clear()
     _BLOB_PYR_ORDER.clear()
 
@@ -3103,13 +3156,17 @@ def match_images_cfog(
     # fit RMSE by ~+-0.5px run to run (measured 003: 0.60/1.29 across runs).
     # Seeding changes nothing about expected quality; it makes published
     # numbers reproducible for evaluators re-running the pipeline.
-    # Per-pair stream (SEED ^ hash(pair)): reproducible per pair, distinct
-    # across pairs — unlike the old per-call setRNGSeed(42), parallel tiles no
-    # longer draw identical RANSAC samples. NOTE: cv2's RNG is process-global,
-    # so concurrent threads interleave draws; threaded runs are decorrelated
-    # but not bit-reproducible, single-threaded runs are.
+    # The seed is CONTENT-derived (set after image load below), never
+    # path-derived: the same pixels must yield the same draws regardless of
+    # tmpdir/output location (path seeding made results a function of
+    # directory names and flipped gate-boundary cases between runs).
+    # NOTE: cv2's RNG is process-global, so concurrent threads interleave
+    # draws; threaded runs are decorrelated but not bit-reproducible,
+    # single-threaded runs are.
+    # Per-pair perf-cache reset (see clear_perf_caches): id-keyed GOA/blob
+    # caches are only valid while the owning arrays are alive.
     try:
-        cv2.setRNGSeed(_pair_rng_seed(img_path1, img_path2))
+        clear_perf_caches()
     except Exception:
         pass
 
@@ -3149,6 +3206,15 @@ def match_images_cfog(
     # 2. Load images (needed by the CV fallback when metadata is missing)
     raw1_gray, raw1_color, raster_meta1 = load_as_float_and_color(img_path1)
     raw2_gray, raw2_color, raster_meta2 = load_as_float_and_color(img_path2)
+
+    # Content-derived RANSAC seed: same pixels -> same stream, wherever the
+    # files live. Placed here (not at entry) so paths never enter the seed.
+    # Nothing above consumes cv2's RNG (metadata/overlap/scale-fallback are
+    # deterministic transforms), so reseeding here loses no isolation.
+    try:
+        cv2.setRNGSeed(_pair_rng_seed(raw1_gray, raw2_gray))
+    except Exception:
+        pass
 
     dem_arr = None
     if dem_array is not None:

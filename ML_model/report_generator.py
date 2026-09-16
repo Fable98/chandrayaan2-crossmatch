@@ -48,8 +48,11 @@ except Exception:
     try:
         from config import SENSOR_GSD_MAP, SEED
     except Exception:
+        # Last-resort mirror of ML_model.config canonicals (IIRS 70.0 /
+        # LRO NAC 0.9, Phase 6); ML_model.config is authoritative.
         SEED = 42
-        SENSOR_GSD_MAP = {"OHRC": 0.25, "TMC": 5.0, "TMC-2": 5.0, "IIRS": 80.0, "LRO_NAC": 0.5}
+        SENSOR_GSD_MAP = {"OHRC": 0.25, "TMC": 5.0, "TMC-2": 5.0, "TMC2": 5.0,
+                          "IIRS": 70.0, "LRO_NAC": 0.9, "LRO-NAC": 0.9, "NAC": 0.9}
 
 SENSOR_GSD = SENSOR_GSD_MAP
 

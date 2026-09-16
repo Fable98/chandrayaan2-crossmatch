@@ -1,0 +1,27 @@
+# paths.yaml — Central repository layout map (Phase 6 hygiene).
+#
+# Canonical directory names in ONE place so scripts stop hardcoding sibling
+# paths. Python entry points should resolve via utils/paths.py (REPO_ROOT +
+# helpers below) instead of ad-hoc `Path(__file__).parent.parent` chains.
+# All paths are relative to the repository root unless noted otherwise.
+
+repo_markers: ["pyproject.toml", ".git", "requirements.in", "paths.yaml"]
+
+dirs:
+  backend: "backend"
+  ml_model: "ML_model"
+  evaluation: "evaluation"
+  evaluation_output: "evaluation_output"
+  data_pipeline: "data_preprocessing_pipeline"
+  processed_triplets: "data_preprocessing_pipeline/processed_triplets"
+  lunar_frontend: "lunar-frontend"
+  scripts: "scripts"
+  utils: "utils"
+  tests: "tests"
+  reports: "reports"
+  dynamic_runs: "data_preprocessing_pipeline/dynamic_runs"
+
+files:
+  ground_truth_matches: "ML_model/ground_truth_matches.json"
+  evaluation_summary: "evaluation_output/evaluation_summary.json"
+  openapi_spec: "backend/openapi.json"

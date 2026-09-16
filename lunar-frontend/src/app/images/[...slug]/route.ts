@@ -20,6 +20,12 @@ export async function GET(
   const relativePath = slugParts.join("/");
   const publicDir = path.join(process.cwd(), "public", "images");
 
+  // Browsers cannot render TIFF: transparently serve the PNG preview for
+  // .tif/.tiff requests, both for static files and the backend proxy below.
+  // Only a trailing extension is rewritten ("a.tif" -> "a.png"); names like
+  // "a.tif.png" pass through untouched. The 404 message keeps the original.
+  const lookupPath = relativePath.replace(/\.tiff?$/i, ".png");
+
   // Resolve-then-contain: path.join alone normalizes "a/../../etc/passwd"
   // OUTSIDE publicDir, and the old existsSync gate would have served it.
   // Every candidate must resolve inside publicDir or it is skipped.
@@ -32,13 +38,13 @@ export async function GET(
 
   // Candidates to look up in public/images
   const rawCandidates = [
-    relativePath,
-    `${relativePath}.png`,
-    relativePath.replace(/\.png$/, ""),
+    lookupPath,
+    `${lookupPath}.png`,
+    lookupPath.replace(/\.png$/, ""),
   ];
 
   // Specific fallback mappings
-  if (slugParts[0] === "iirs" && relativePath.includes("iirs_overlay")) {
+  if (slugParts[0] === "iirs" && lookupPath.includes("iirs_overlay")) {
     rawCandidates.push(
       path.join("iirs", "iirs_overlay.png"),
       path.join("iirs", "iirs_512.png")
@@ -82,9 +88,10 @@ export async function GET(
     const backendBase = (
       process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
     ).replace(/\/$/, "");
-    // Preserve sub-path + extension exactly as requested.
-    const hasExt = /\.(png|jpe?g|json)$/i.test(relativePath);
-    const backendPath = `/images/${relativePath}${hasExt ? "" : ".png"}`;
+    // Preserve sub-path + extension exactly as requested (lookupPath already
+    // maps .tif/.tiff to the .png preview above).
+    const hasExt = /\.(png|jpe?g|json)$/i.test(lookupPath);
+    const backendPath = `/images/${lookupPath}${hasExt ? "" : ".png"}`;
     const upstream = await fetch(`${backendBase}${backendPath}`, {
       // Thumbnails are idempotent; keep the vault snappy.
       signal: AbortSignal.timeout(10000),

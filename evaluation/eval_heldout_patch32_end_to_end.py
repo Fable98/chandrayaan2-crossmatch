@@ -20,7 +20,6 @@ import numpy as np
 import cv2
 from scipy.stats import wilcoxon
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GroupShuffleSplit
 import joblib
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -133,13 +132,13 @@ def get_heldout_split(seed: int = SEED) -> Tuple[List[str], List[str]]:
     groups = np.asarray(groups_rows, dtype=object)
     y = np.asarray(y_rows, dtype=np.int64)
 
-    gss = GroupShuffleSplit(n_splits=10, test_size=0.25, random_state=seed)
-    for tr_i, te_i in gss.split(groups, y, groups=groups):
-        if len(np.unique(y[tr_i])) >= 2 and len(np.unique(y[te_i])) >= 2:
-            selected_split = (tr_i, te_i)
-            break
-    tr_idx, te_idx = selected_split
-    return sorted(list(set(groups[tr_idx]))), sorted(list(set(groups[te_idx])))
+    # Phase 6: shared splitter (evaluation/splits.py). Script-dir import works
+    # when run as `python evaluation/...`; package import covers repo-root cwd.
+    try:
+        from splits import grouped_train_test_split
+    except ImportError:
+        from evaluation.splits import grouped_train_test_split
+    return grouped_train_test_split(groups, y, seed=seed)
 
 
 def get_or_train_rf_model(train_groups: List[str]) -> Any:

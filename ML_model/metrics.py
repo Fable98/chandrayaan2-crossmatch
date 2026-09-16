@@ -387,7 +387,9 @@ def verify_transformation_quality(
             "is_valid": False,
             "reason": f"Invalid transformation shape {H_mat.shape}",
             "determinant": 0.0,
-            "condition_number": float("inf"),
+            # None, not inf: inf is not JSON-safe (Phase 6); is_valid=False
+            # already signals the failure, and sanitize_for_json backstops.
+            "condition_number": None,
         }
 
     try:
@@ -439,7 +441,7 @@ def verify_transformation_quality(
             "is_valid": False,
             "reason": f"Decomposition error: {str(e)}",
             "determinant": 0.0,
-            "condition_number": float("inf"),
+            "condition_number": None,  # None, not inf: JSON-safe (Phase 6)
         }
 
 

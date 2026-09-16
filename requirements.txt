@@ -1,3 +1,5 @@
+# GENERATED from requirements.in — do not hand-edit pins here.
+# Regenerate (needs PyPI): pip-compile --generate-hashes --output-file=requirements.txt requirements.in
 fastapi==0.115.5
 uvicorn[standard]==0.32.1
 gunicorn==26.2.0
@@ -28,5 +30,5 @@ reportlab==5.0.1
 pyproj==3.8.0
 shapely==2.1.2
 geopandas==1.1.4
-tqdm==4.70.1
+tqdm==4.67.3  # verified-local build; see requirements.in
 pyyaml==6.0.3

@@ -11,19 +11,25 @@ from __future__ import annotations
 import os
 from typing import Dict
 
-# Ground Sampling Distance (GSD) in meters per pixel
+# Ground Sampling Distance (GSD) in meters per pixel.
+# Canonical stack values (Phases 2/4): OHRC 0.25 / TMC-2 5.0 / IIRS 70.0 /
+# LRO NAC 0.9. NOTE: IIRS was 80.0 and LRO_NAC 0.5 before Phase 6 — both stale
+# (the evaluator, frontend spec table, and audit all standardize on 70/0.9).
 OHRC_GSD: float = 0.25
 TMC_GSD: float = 5.0
-IIRS_GSD: float = 80.0
-LRO_NAC_GSD: float = 0.5
+IIRS_GSD: float = 70.0
+LRO_NAC_GSD: float = 0.9
 
 # Canonical map of sensor names to nominal ground sampling distance (meters/pixel)
 SENSOR_GSD_MAP: Dict[str, float] = {
     "OHRC": OHRC_GSD,
     "TMC": TMC_GSD,
     "TMC-2": TMC_GSD,
+    "TMC2": TMC_GSD,  # alias: hyphen-less form seen in filenames/APIs
     "IIRS": IIRS_GSD,
     "LRO_NAC": LRO_NAC_GSD,
+    "LRO-NAC": LRO_NAC_GSD,  # alias
+    "NAC": LRO_NAC_GSD,  # alias
 }
 
 # Global random seed for stochastic sampling (e.g. RANSAC, hold-out splits)
@@ -36,11 +42,21 @@ def get_seed() -> int:
 
 
 def get_sensor_gsd(sensor_name: str, fallback: float = 1.0) -> float:
-    """Return the canonical nominal GSD in meters/pixel for the given sensor name."""
+    """Return the canonical nominal GSD in meters/pixel for the given sensor name.
+
+    Accepts hyphen/underscore/space/case variants ("tmc2", "TMC-2", "lro nac")
+    via the alias keys above plus a separator-stripped second chance.
+    """
     if not sensor_name:
         return fallback
     clean = str(sensor_name).strip().upper()
-    return SENSOR_GSD_MAP.get(clean, fallback)
+    if clean in SENSOR_GSD_MAP:
+        return SENSOR_GSD_MAP[clean]
+    squashed = clean.replace("-", "").replace("_", "").replace(" ", "")
+    for key, gsd in SENSOR_GSD_MAP.items():
+        if key.replace("-", "").replace("_", "") == squashed:
+            return gsd
+    return fallback
 
 
 # ===========================================================================

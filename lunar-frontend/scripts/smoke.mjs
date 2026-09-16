@@ -14,11 +14,12 @@
  * node type-stripping can import them directly.
  */
 
-import { describe, it } from "node:test";
+import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync, existsSync, readdirSync, statSync } from "fs";
+import { readFileSync, existsSync, readdirSync, statSync, writeFileSync, rmSync, mkdirSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { createServer } from "http";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = join(ROOT, "src");
@@ -187,7 +188,7 @@ describe("phase 4 hardening", () => {
     assert.equal(sensors.normalizeSensorId("LRO_NAC"), "lro_nac");
     assert.equal(sensors.normalizeSensorId("FUTURE-X"), "unknown");
     assert.ok(sensors.sensorFilterLabel("tmc").includes("5"), "TMC label must track the 5.0 spec, not a 4m string");
-    assert.ok(sensors.sensorFilterLabel("iirs").includes("80"), "IIRS label must track the 80.0 spec, not a 70m string");
+    assert.ok(sensors.sensorFilterLabel("iirs").includes("70"), "IIRS label must track the 70.0 canonical stack nominal, not a stray string");
   });
 
   it("IngestPage poll is bounded with backoff", () => {
@@ -215,5 +216,127 @@ describe("phase 4 hardening", () => {
     assert.ok(text.includes("status: 502"), "upstream-down must be 502, not 404");
     assert.ok(text.includes("promises as fs"), "must use async fs/promises, not sync fs");
     assert.ok(!text.includes("fs.existsSync") && !text.includes("fs.readFileSync") && !text.includes("fs.statSync"), "no sync fs calls on the hot path");
+  });
+});
+
+describe("phase 6 image proxy (live route)", () => {
+  // Invoke the real GET handler: traversal/404-vs-502/TIFF/timeout/cache.
+  // TS is transpiled with the repo's own typescript (same trick as tsimport).
+  let route;
+  let prevCwd;
+  let routeTmpDir = null;
+  const DEAD_BASE = "http://127.0.0.1:9";
+  const PROBE = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64"
+  );
+
+  before(async () => {
+    const { createRequire } = await import("module");
+    const { mkdtempSync, writeFileSync: writeTmp } = await import("fs");
+    const { tmpdir } = await import("os");
+    const { pathToFileURL } = await import("url");
+    const require = createRequire(join(ROOT, "package.json"));
+    const ts = require("typescript");
+    const src = readFileSync(join(SRC, "app", "images", "[...slug]", "route.ts"), "utf-8");
+    const { outputText, diagnostics } = ts.transpileModule(src, {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2020,
+        esModuleInterop: true, // route.ts uses `import path from "path"`
+      },
+      fileName: "route.ts",
+    });
+    const errors = (diagnostics || []).filter((d) => d.category === ts.DiagnosticCategory.Error);
+    assert.equal(errors.length, 0, "route.ts must stay in the erasable-syntax subset");
+    // Transpile INSIDE the project tree (not os.tmpdir): the CJS output does
+    // require("next/server"), which resolves via lunar-frontend/node_modules.
+    const scratch = join(ROOT, "scripts", ".proxy-smoke-tmp");
+    mkdirSync(scratch, { recursive: true });
+    routeTmpDir = scratch;
+    writeTmp(join(scratch, "route.js"), outputText);
+    route = await import(pathToFileURL(join(scratch, "route.js")).href);
+    // NOTE: no `import "next/server"` here — its ESM subpath has no plain-node
+    // export condition. The CJS route bundle requires it fine, and GET never
+    // touches the request object, so a standard Request suffices.
+    // The handler resolves public/ against process.cwd().
+    prevCwd = process.cwd();
+    process.chdir(ROOT);
+    mkdirSync(join(ROOT, "public", "images"), { recursive: true });
+  });
+
+  after(() => {
+    process.chdir(prevCwd);
+    process.env.NEXT_PUBLIC_API_BASE_URL = DEAD_BASE;
+    if (routeTmpDir) rmSync(routeTmpDir, { recursive: true, force: true });
+  });
+
+  const get = (slug) =>
+    route.GET(new Request("http://test.local/images/x"), { params: { slug } });
+
+  it("traversal/dot/null-byte slugs 404 before touching the filesystem", async () => {
+    for (const slug of [["..", "etc", "passwd"], [".", "x"], ["a\0b"], [".."]]) {
+      const res = await get(slug);
+      assert.equal(res.status, 404, JSON.stringify(slug));
+    }
+    assert.equal((await get([])).status, 404);
+  });
+
+  it("missing tile with dead backend is 502, not 404", async () => {
+    process.env.NEXT_PUBLIC_API_BASE_URL = DEAD_BASE;
+    const res = await get(["__p6_definitely_missing_xyz"]);
+    assert.equal(res.status, 502);
+    assert.match(await res.text(), /unavailable/i);
+  });
+
+  it("backend 404 stays 404; backend bytes proxy with short cache", async () => {
+    const server = createServer((req, res) => {
+      // Extensionless slugs arrive with .png appended (see route backendPath).
+      if (req.url === "/images/gone.png") {
+        res.writeHead(404, { "content-type": "text/plain" });
+        res.end("nope");
+      } else {
+        res.writeHead(200, { "content-type": "image/png" });
+        res.end(PROBE);
+      }
+    });
+    await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+    process.env.NEXT_PUBLIC_API_BASE_URL = `http://127.0.0.1:${server.address().port}`;
+    try {
+      const r404 = await get(["gone"]);
+      assert.equal(r404.status, 404);
+      const r200 = await get(["live", "tile"]);
+      assert.equal(r200.status, 200);
+      assert.equal(r200.headers.get("content-type"), "image/png");
+      assert.match(r200.headers.get("cache-control") ?? "", /max-age=300/);
+      assert.deepEqual(Buffer.from(await r200.arrayBuffer()), PROBE);
+    } finally {
+      process.env.NEXT_PUBLIC_API_BASE_URL = DEAD_BASE;
+      server.close();
+    }
+  });
+
+  it("static file wins with long cache; .tif serves the .png preview", async () => {
+    const probePath = join(ROOT, "public", "images", "__p6_probe.png");
+    writeFileSync(probePath, PROBE);
+    try {
+      const res = await get(["__p6_probe"]);
+      assert.equal(res.status, 200);
+      assert.equal(res.headers.get("content-type"), "image/png");
+      assert.match(res.headers.get("cache-control") ?? "", /max-age=86400/);
+      assert.deepEqual(Buffer.from(await res.arrayBuffer()), PROBE);
+      const tif = await get(["__p6_probe.tif"]);
+      assert.equal(tif.status, 200, ".tif must rewrite to the .png preview");
+      assert.equal(tif.headers.get("content-type"), "image/png");
+      const tiff = await get(["__p6_probe.tiff"]);
+      assert.equal(tiff.status, 200, ".tiff must rewrite too");
+    } finally {
+      rmSync(probePath, { force: true });
+    }
+  });
+
+  it("proxy fetch carries a timeout budget", () => {
+    const text = readFileSync(join(SRC, "app", "images", "[...slug]", "route.ts"), "utf-8");
+    assert.ok(text.includes("AbortSignal.timeout(10000)"), "upstream fetch must time out, never hang the vault");
   });
 });

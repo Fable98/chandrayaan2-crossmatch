@@ -1,3 +1,8 @@
+# requirements.lock — transitive closure for requirements.in (Phase 6).
+# Regenerate with hashes on a networked machine:
+#   pip-compile --generate-hashes --output-file=requirements.lock requirements.in
+# Offline repair 2026-09-16: geopandas/pyogrio/pyproj/reportlab/shapely appended
+# from the locally verified env; tqdm aligned to the verified 4.67.3 build.
 absl-py==2.4.0
 affine==3.0.1
 aiofiles==25.1.0
@@ -27,15 +32,16 @@ filelock==3.29.0
 flatbuffers==25.12.19
 fonttools==4.61.1
 fsspec==2026.3.0
+geopandas==1.1.4
 google-ai-generativelanguage==0.6.15
 google-api-core==2.25.2
 google-api-python-client==2.194.0
-google-auth==2.49.2
 google-auth-httplib2==0.3.1
+google-auth==2.49.2
 google-generativeai==0.8.6
 googleapis-common-protos==1.74.0
-grpcio==1.80.0
 grpcio-status==1.71.2
+grpcio==1.80.0
 gunicorn==26.2.0
 h11==0.16.0
 h2==4.3.0
@@ -70,15 +76,15 @@ narwhals==2.26.0
 networkx==3.6.1
 numpy==2.3.5
 opencv-contrib-python==4.13.0.92
-opencv-python==4.13.0.92
 opencv-python-headless==5.0.0.93
+opencv-python==4.13.0.92
 packaging==25.0
 pandas==3.0.1
 passlib==1.7.4
 pillow==12.0.0
 pluggy==1.6.0
-polars==1.40.1
 polars-runtime-32==1.40.1
+polars==1.40.1
 postgrest==2.28.3
 prometheus_client==0.25.0
 propcache==0.4.1
@@ -89,18 +95,20 @@ psycopg2-binary==2.9.11
 pyasn1==0.6.3
 pyasn1_modules==0.4.2
 pycparser==3.0
-pydantic==2.12.5
 pydantic-settings==2.13.1
+pydantic==2.12.5
 pydantic_core==2.41.5
 pydyf==0.12.1
 Pygments==2.20.0
 pyiceberg==0.11.1
 PyJWT==2.12.1
+pyogrio==0.13.0
 pyparsing==3.2.5
 pyphen==0.18.1
+pyproj==3.8.0
 pyroaring==1.0.4
-pytest==9.1.1
 pytest-asyncio==1.4.0
+pytest==9.1.1
 python-dateutil==2.9.0.post0
 python-docx==1.2.0
 python-dotenv==1.2.2
@@ -111,6 +119,7 @@ PyYAML==6.0.3
 rasterio==1.5.1
 realtime==2.28.3
 redis==8.0.1
+reportlab==5.0.1
 requests==2.33.1
 rich==14.3.4
 rsa==4.9.1
@@ -119,6 +128,7 @@ scikit-image==0.26.0
 scikit-learn==1.9.0
 scipy==1.17.1
 setuptools==81.0.0
+shapely==2.1.2
 six==1.17.0
 slowapi==0.1.10
 sounddevice==0.5.5
@@ -128,9 +138,9 @@ storage3==2.28.3
 StrEnum==0.4.15
 strictyaml==1.7.3
 structlog==26.1.0
-supabase==2.28.3
 supabase-auth==2.28.3
 supabase-functions==2.28.3
+supabase==2.28.3
 sympy==1.14.0
 tenacity==9.1.4
 threadpoolctl==3.6.0
@@ -142,8 +152,8 @@ torchvision==0.26.0
 tqdm==4.67.3
 typing-inspection==0.4.2
 typing_extensions==4.15.0
-ultralytics==8.4.41
 ultralytics-thop==2.0.18
+ultralytics==8.4.41
 uritemplate==4.2.0
 urllib3==2.6.3
 uvicorn==0.32.1

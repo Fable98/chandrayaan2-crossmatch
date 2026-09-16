@@ -18,7 +18,6 @@ import numpy as np
 import cv2
 from scipy.stats import wilcoxon
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import GroupShuffleSplit
 import joblib
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -209,23 +208,17 @@ def run_evaluation(rng_seeds: list[int] = [SEED]):
     # 10 features: 9 base + disp_consistency (col 9)
     X_10 = X_all[:, :10]
 
-    gss = GroupShuffleSplit(n_splits=10, test_size=0.25, random_state=SEED)
-    for tr_i, te_i in gss.split(X_10, y, groups=groups):
-        if len(np.unique(y[tr_i])) >= 2 and len(np.unique(y[te_i])) >= 2:
-            selected_split = (tr_i, te_i)
-            break
-
-    tr_idx, te_idx = selected_split
-    tr_groups = sorted(list(set(groups[tr_idx])))
-    te_groups = sorted(list(set(groups[te_idx])))
+    # Phase 6: shared splitter (evaluation/splits.py) — identical budget and
+    # both-classes guard to the inline block it replaces.
+    try:
+        from splits import grouped_train_test_split, persist_group_splits
+    except ImportError:
+        from evaluation.splits import grouped_train_test_split, persist_group_splits
+    tr_groups, te_groups = grouped_train_test_split(groups, y, X_10, seed=SEED)
 
     # Persist split for auditability
     eval_dir = REPO_ROOT / "evaluation"
-    eval_dir.mkdir(parents=True, exist_ok=True)
-    with open(eval_dir / "train_groups.json", "w") as f:
-        json.dump(tr_groups, f, indent=2)
-    with open(eval_dir / "test_groups.json", "w") as f:
-        json.dump(te_groups, f, indent=2)
+    persist_group_splits(eval_dir, tr_groups, te_groups)
 
     # 2. Recover oracle H_gt and canvas shapes for each group
     triplets_dir = REPO_ROOT / "data_preprocessing_pipeline/processed_triplets"

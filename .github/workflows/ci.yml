@@ -6,10 +6,22 @@ on:
   pull_request:
     branches: [ main, master ]
 
+# Phase 6: superseded runs never block the queue behind stale commits.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Test-only JWT secret (same value as backend/test_*.py). NEVER a real secret:
+# the server refuses to boot without a 32+ char value, and tests need one.
+env:
+  JWT_SECRET_KEY: test-only-jwt-secret-that-is-long-enough-for-the-32-char-minimum-0123456789
+  GLOBAL_SEED: 42
+
 jobs:
   backend-test:
     name: Backend Pytest Suite
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -38,20 +50,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          # Pinned: unpinned httpx/pytest drift reds the tree without any code
-          # change (a httpx major bump breaks starlette TestClient). These pins
-          # match the locally verified environment.
+          # Test-only pins mirror requirements.in (single source). pytest-timeout
+          # is deliberately absent: suite timeouts use coreutils `timeout` below.
           pip install "pytest==9.1.1" "pytest-asyncio==1.4.0" "httpx==0.28.1"
 
-      - name: Run Pytest suite
-        env:
-          GLOBAL_SEED: 42
+      - name: Run Pytest suite (not live)
         run: |
-          pytest -v
+          timeout 600s python -m pytest tests/ backend/ -m "not live" -q
 
-  frontend-build:
-    name: Frontend Next.js Build
+  frontend-checks:
+    name: Frontend typecheck/smoke/contract/build
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -68,6 +78,56 @@ jobs:
         run: |
           npm --prefix lunar-frontend ci
 
+      - name: Typecheck
+        run: |
+          npm --prefix lunar-frontend run typecheck
+
+      - name: Smoke (incl. live image-proxy route tests)
+        run: |
+          npm --prefix lunar-frontend run smoke
+
+      - name: Generated API contract check
+        run: |
+          npm --prefix lunar-frontend run gen:api:check
+
       - name: Build Next.js console
         run: |
           npm --prefix lunar-frontend run build
+
+  compose-config:
+    name: Compose config validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate compose file
+        run: |
+          docker compose config --quiet
+          docker compose config | grep -q "service_healthy"
+
+  docker-build:
+    name: Backend docker build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Full dependency install (torch, GDAL, rasterio): slow on cold cache,
+      # hence the job-level 20-minute budget. No push — build check only.
+      - name: Build backend image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          tags: chandrayaan2-backend:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

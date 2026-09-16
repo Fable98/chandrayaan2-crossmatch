@@ -23,7 +23,23 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger("backend.job_store")
 
 LOG_CAP = 200
-JOB_TTL_SECONDS = 7 * 24 * 3600
+
+
+def _job_ttl_seconds() -> int:
+    """Job-record TTL in seconds from settings (JOB_TTL_HOURS, default 7d).
+
+    Centralized in backend/config.py with env override (Phase 6); the literal
+    below is the last-resort fallback when settings are unimportable.
+    """
+    try:
+        from config import settings  # type: ignore[import-not-found]
+
+        return int(getattr(settings, "JOB_TTL_HOURS", 168)) * 3600
+    except Exception:
+        return 7 * 24 * 3600
+
+
+JOB_TTL_SECONDS = _job_ttl_seconds()
 
 
 def _now() -> str:
@@ -146,8 +162,8 @@ class RedisJobStore:
         self.client.delete(self._logs_key(job_id))
         for line in job.get("logs", [])[-LOG_CAP:]:
             self.client.rpush(self._logs_key(job_id), line)
-        self.client.expire(self._key(job_id), JOB_TTL_SECONDS)
-        self.client.expire(self._logs_key(job_id), JOB_TTL_SECONDS)
+        self.client.expire(self._key(job_id), _job_ttl_seconds())
+        self.client.expire(self._logs_key(job_id), _job_ttl_seconds())
 
     def update(self, job_id: str, fields: Dict[str, Any]) -> None:
         fields = {k: v for k, v in fields.items() if k != "logs"}
@@ -156,7 +172,7 @@ class RedisJobStore:
         payload = {k: self._encode_value(k, v)
                    for k, v in fields.items()}
         self.client.hset(self._key(job_id), mapping=payload)
-        self.client.expire(self._key(job_id), JOB_TTL_SECONDS)
+        self.client.expire(self._key(job_id), _job_ttl_seconds())
 
     def get(self, job_id: str) -> Optional[Dict[str, Any]]:
         try:
@@ -169,7 +185,7 @@ class RedisJobStore:
         try:
             self.client.rpush(self._logs_key(job_id), f"[{_now()}] {line}")
             self.client.ltrim(self._logs_key(job_id), -cap, -1)
-            self.client.expire(self._logs_key(job_id), JOB_TTL_SECONDS)
+            self.client.expire(self._logs_key(job_id), _job_ttl_seconds())
         except Exception:
             pass
 

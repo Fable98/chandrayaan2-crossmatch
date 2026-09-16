@@ -1,0 +1,50 @@
+# requirements.in — SINGLE SOURCE for Python dependency pins (Phase 6).
+#
+# requirements.txt and requirements.lock are GENERATED from this file:
+#   pip-compile --generate-hashes --output-file=requirements.txt requirements.in
+#   pip-compile --generate-hashes --output-file=requirements.lock requirements.in
+# (needs PyPI access; run on a networked machine or in CI, never hand-edit
+# the generated files except for the offline lock-repair documented below.)
+#
+# Python floor is 3.14 (Dockerfile + CI): the 2026-era pins below ship no
+# 3.11/3.12 wheels. Do not downgrade without re-resolving everything.
+
+fastapi==0.115.5
+uvicorn[standard]==0.32.1
+gunicorn==26.2.0
+pydantic==2.12.5
+pydantic-settings==2.13.1
+python-multipart==0.0.26
+numpy==2.3.5
+opencv-python-headless==5.0.0.93
+torch==2.11.0
+kornia==0.8.3
+tifffile==2026.8.23
+rasterio==1.5.1
+Pillow==12.0.0
+python-jose[cryptography]==3.5.0
+passlib[bcrypt]==1.7.4
+bcrypt==5.0.0
+slowapi==0.1.10
+redis==8.0.1
+SQLAlchemy==2.0.48
+matplotlib==3.10.8
+scikit-image==0.26.0
+scikit-learn==1.9.0
+scipy==1.17.1
+reportlab==5.0.1
+# Ingest pipeline geo stack (backend subprocess needs these at runtime)
+pyproj==3.8.0
+shapely==2.1.2
+geopandas==1.1.4
+# Verified-local tqdm (4.70.1 was never installed/tested anywhere; the green
+# tree runs 4.67.3, so the source pins the verified build)
+tqdm==4.67.3
+pyyaml==6.0.3
+# --- TEST-ONLY pins (not shipped in the prod image) ---
+# Installed explicitly by CI (.github/workflows/ci.yml) and recorded in
+# requirements.lock for audit. Kept here so there is exactly one place where
+# a version number is chosen.
+pytest==9.1.1
+pytest-asyncio==1.4.0
+httpx==0.28.1
