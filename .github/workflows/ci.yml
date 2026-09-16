@@ -37,6 +37,15 @@ jobs:
           python-version: "3.14"
           cache: "pip"
 
+      # Contract test test_generated_ts_contract_matches_openapi shells out
+      # to `node scripts/gen-openapi.mjs --check` and SKIPS when node is
+      # missing — pin Node here so the API-contract gate can never
+      # silently skip on a runner image without node on PATH.
+      - name: Set up Node.js 20 (contract test only)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
       - name: Install system dependencies
         run: |
           sudo apt-get update
@@ -59,7 +68,7 @@ jobs:
           timeout 600s python -m pytest tests/ backend/ -m "not live" -q
 
   frontend-checks:
-    name: Frontend typecheck/smoke/contract/build
+    name: Frontend typecheck/smoke/build
     runs-on: ubuntu-latest
     timeout-minutes: 20
 
@@ -86,9 +95,13 @@ jobs:
         run: |
           npm --prefix lunar-frontend run smoke
 
-      - name: Generated API contract check
-        run: |
-          npm --prefix lunar-frontend run gen:api:check
+      # NOTE: no `gen:api:check` here. That script defaults to fetching
+      # http://localhost:8000/openapi.json, but this job never starts a
+      # backend, so the live fetch fails with `fetch failed` (exit 2) and
+      # reds the job. The generated-contract gate already runs where it can
+      # pass without a server: tests/test_frontend_contract.py dumps
+      # app.openapi() to a temp OPENAPI_FILE and runs the same
+      # gen-openapi.mjs --check offline inside the backend-test job above.
 
       - name: Build Next.js console
         run: |
