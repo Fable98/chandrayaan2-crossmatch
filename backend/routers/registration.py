@@ -232,7 +232,9 @@ def _run_registration_pipeline(job_id: str, request: RegistrationRequest) -> Non
                     from report_generator import ISROReportGenerator
                 except ImportError:
                     from ML_model.report_generator import ISROReportGenerator  # type: ignore
-                generator = ISROReportGenerator(output_dir="reports/")
+                reports_dir = REPO_ROOT / "reports"
+                os.makedirs(reports_dir, exist_ok=True)
+                generator = ISROReportGenerator(output_dir=str(reports_dir) + "/")
                 pdf_path = generator.generate_report(
                     metadata={},
                     metrics={
@@ -673,8 +675,9 @@ async def download_report(job_id: str) -> FileResponse:
                 from report_generator import ISROReportGenerator
             except ImportError:
                 from ML_model.report_generator import ISROReportGenerator
-            os.makedirs("reports", exist_ok=True)
-            generator = ISROReportGenerator(output_dir="reports/")
+            reports_dir = REPO_ROOT / "reports"
+            os.makedirs(reports_dir, exist_ok=True)
+            generator = ISROReportGenerator(output_dir=str(reports_dir) + "/")
             metrics_dict = result.get("metrics") or {}
             ref_pts = result.get("filtered_ref_pts") or []
             src_pts = result.get("filtered_src_pts") or []
@@ -719,13 +722,13 @@ async def download_report(job_id: str) -> FileResponse:
         raise HTTPException(status_code=404, detail=f"Report not ready for job {job_id}")
 
     # Step 12: report must live under the reports root (no absolute-path escape
-    # via a crafted job result).
+    # via a crafted job result). Root is repo-absolute (cwd-independent).
     try:
         from uploads import check_file_response_allowed
     except ImportError:  # pragma: no cover
         from backend.uploads import check_file_response_allowed  # type: ignore
     real = check_file_response_allowed(
-        pdf_path, [Path.cwd() / "reports", Path("reports")], {".pdf"})
+        pdf_path, [REPO_ROOT / "reports"], {".pdf"})
     return FileResponse(
         path=str(real),
         media_type="application/pdf",

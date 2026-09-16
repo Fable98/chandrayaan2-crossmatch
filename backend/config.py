@@ -34,12 +34,17 @@ class Settings(BaseSettings):
     # CORS configuration
     # Comma-separated list of allowed origins, e.g. "https://lunar-frontend.onrender.com,http://localhost:3000"
     ALLOWED_ORIGINS: str = Field(
-        default="*",
+        default="http://localhost:3000,http://127.0.0.1:3000",
         description="Comma-separated allowed CORS origins (e.g. https://my-site.onrender.com,http://localhost:3000)",
     )
     CORS_ORIGIN: Optional[str] = Field(
         default=None,
         description="Legacy single origin fallback",
+    )
+    CORS_ORIGIN_REGEX: Optional[str] = Field(
+        default=None,
+        description="Optional regex for dynamic origins (e.g. Vercel previews: "
+        r"'https://.*\.vercel\.app'). Unset by default — allowlist only.",
     )
 
     # Supabase / PostgreSQL configuration (optional — JSON flat files remain primary data store)
@@ -89,6 +94,7 @@ class Settings(BaseSettings):
     # Step 12 hardening knobs
     BCRYPT_ROUNDS: int = Field(default=12, description="bcrypt cost factor for password hashing")
     AUTH_RATE_LIMIT: str = Field(default="10/minute", description="SlowAPI limit for /auth/* routes")
+    REGISTER_RATE_LIMIT: str = Field(default="20/minute", description="SlowAPI limit for POST /register (heavy CFOG job)")
     AUTH_LOCKOUT_ATTEMPTS: int = Field(default=5, description="Failed logins before temporary lockout")
     AUTH_LOCKOUT_MINUTES: int = Field(default=15, description="Lockout duration in minutes")
     USERS_DATABASE_URL: Optional[str] = Field(
@@ -112,6 +118,7 @@ class Settings(BaseSettings):
         description="Total batch cap in MB for one ingest upload (a full "
         "OHRC+TMC-2+IIRS triplet is ~1.7GB).",
     )
+    MAX_INGEST_FILES: int = Field(default=10, description="Max files per ingest upload batch")
     DYNAMIC_RUNS_TTL_HOURS: int = Field(default=24, description="Age after which dynamic_runs are purged")
 
     def require_jwt_secret(self) -> str:
@@ -126,13 +133,20 @@ class Settings(BaseSettings):
 
     @property
     def cors_origins_list(self) -> List[str]:
-        """Parse comma-separated ALLOWED_ORIGINS into a sanitized list of origins."""
+        """Parse comma-separated ALLOWED_ORIGINS into a sanitized list of origins.
+
+        Single CORS source of truth (backend/main.py consumes this).
+        A "*" entry is invalid with allow_credentials=True so it is dropped;
+        when nothing valid remains we fail closed to localhost.
+        """
         origins: List[str] = []
         if self.ALLOWED_ORIGINS:
-            origins.extend([o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip()])
+            origins.extend(
+                [o.strip() for o in self.ALLOWED_ORIGINS.split(",") if o.strip() and o.strip() != "*"]
+            )
         if self.CORS_ORIGIN:
             cleaned = self.CORS_ORIGIN.strip()
-            if cleaned and cleaned not in origins:
+            if cleaned and cleaned != "*" and cleaned not in origins:
                 origins.append(cleaned)
         if not origins:
             # Fail closed to localhost like backend/main.py (a "*" default is

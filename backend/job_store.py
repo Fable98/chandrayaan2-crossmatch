@@ -86,6 +86,11 @@ class MemoryJobStore:
 class RedisJobStore:
     """Redis-hash job store with TTL. Raises on construction if unreachable."""
 
+    # Structured fields are JSON-encoded on write and JSON-decoded on read
+    # (previously only "result" round-tripped; "error" dicts degraded to
+    # str(dict) and came back as opaque strings).
+    _JSON_FIELDS = frozenset({"result", "error"})
+
     def __init__(self, url: str) -> None:
         import redis
 
@@ -99,11 +104,33 @@ class RedisJobStore:
     def _logs_key(self, job_id: str) -> str:
         return f"job:{job_id}:logs"
 
+    @classmethod
+    def _encode_value(cls, key: str, value: Any) -> str:
+        if value is None:
+            return ""
+        if key in cls._JSON_FIELDS:
+            try:
+                return json.dumps(value)
+            except (TypeError, ValueError):
+                return str(value)
+        return str(value)
+
+    @classmethod
+    def _decode_value(cls, key: str, raw: str) -> Any:
+        if key in cls._JSON_FIELDS:
+            if raw == "":
+                return None
+            try:
+                return json.loads(raw)
+            except (TypeError, ValueError):
+                return raw
+        return raw
+
     def _load(self, job_id: str) -> Optional[Dict[str, Any]]:
         raw = self.client.hgetall(self._key(job_id))
         if not raw:
             return None
-        job = {k: (json.loads(v) if k in ("result",) else v) for k, v in raw.items()}
+        job = {k: self._decode_value(k, v) for k, v in raw.items()}
         try:
             job["progress"] = float(job.get("progress", 0.0))
         except Exception:
@@ -113,7 +140,7 @@ class RedisJobStore:
         return job
 
     def create(self, job_id: str, job: Dict[str, Any]) -> None:
-        payload = {k: (json.dumps(v) if k == "result" else str(v) if v is not None else "")
+        payload = {k: self._encode_value(k, v)
                    for k, v in job.items() if k != "logs"}
         self.client.hset(self._key(job_id), mapping=payload)
         self.client.delete(self._logs_key(job_id))
@@ -126,7 +153,7 @@ class RedisJobStore:
         fields = {k: v for k, v in fields.items() if k != "logs"}
         if not fields:
             return
-        payload = {k: (json.dumps(v) if k == "result" else str(v) if v is not None else "")
+        payload = {k: self._encode_value(k, v)
                    for k, v in fields.items()}
         self.client.hset(self._key(job_id), mapping=payload)
         self.client.expire(self._key(job_id), JOB_TTL_SECONDS)
@@ -160,34 +187,53 @@ class RedisJobStore:
 # 2. SQLAlchemy DB backend
 # ---------------------------------------------------------------------------
 
+# Module-level Base/Job: defining the declarative model inside __init__ rebuilt
+# the "jobs" table on every DbJobStore() (SAWarning: table already defined)
+# and leaked duplicate metadata. One definition, reused by all instances.
+try:
+    from sqlalchemy import JSON as _SA_JSON
+    from sqlalchemy import Column as _SA_Column
+    from sqlalchemy import DateTime as _SA_DateTime
+    from sqlalchemy import Float as _SA_Float
+    from sqlalchemy import String as _SA_String
+    from sqlalchemy import Text as _SA_Text
+    from sqlalchemy import func as _SA_func
+    from sqlalchemy.orm import declarative_base as _sa_declarative_base
+
+    _JobsBase = _sa_declarative_base()
+
+    class JobRow(_JobsBase):  # type: ignore[valid-type,misc]
+        __tablename__ = "jobs"
+        id = _SA_Column(_SA_String, primary_key=True)
+        type = _SA_Column(_SA_String, default="")
+        status = _SA_Column(_SA_String, default="")
+        progress = _SA_Column(_SA_Float, default=0.0)
+        current_phase = _SA_Column(_SA_String, default="")
+        result = _SA_Column(_SA_JSON, nullable=True)
+        error = _SA_Column(_SA_Text, nullable=True)
+        logs = _SA_Column(_SA_JSON, default=list)
+        updated_at = _SA_Column(_SA_DateTime(timezone=True), server_default=_SA_func.now(),
+                                onupdate=_SA_func.now())
+except Exception:  # pragma: no cover - SQLAlchemy missing
+    _JobsBase = None  # type: ignore[assignment]
+    JobRow = None  # type: ignore[assignment]
+
+
 class DbJobStore:
     """SQL table job store (Postgres via DATABASE_URL, sqlite for tests)."""
 
     def __init__(self, url: str) -> None:
-        from sqlalchemy import JSON, Column, DateTime, Float, String, Text, create_engine, func
-        from sqlalchemy.orm import declarative_base, sessionmaker
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
 
+        if _JobsBase is None or JobRow is None:
+            raise RuntimeError("SQLAlchemy is required for DbJobStore")
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql://", 1)
         connect_args = {"check_same_thread": False} if url.startswith("sqlite") else {}
         self._engine = create_engine(url, pool_pre_ping=True, connect_args=connect_args)
-        Base = declarative_base()
-
-        class Job(Base):  # type: ignore[valid-type,misc]
-            __tablename__ = "jobs"
-            id = Column(String, primary_key=True)
-            type = Column(String, default="")
-            status = Column(String, default="")
-            progress = Column(Float, default=0.0)
-            current_phase = Column(String, default="")
-            result = Column(JSON, nullable=True)
-            error = Column(Text, nullable=True)
-            logs = Column(JSON, default=list)
-            updated_at = Column(DateTime(timezone=True), server_default=func.now(),
-                                onupdate=func.now())
-
-        self._Job = Job
-        Base.metadata.create_all(self._engine)
+        self._Job = JobRow
+        _JobsBase.metadata.create_all(self._engine)
         self._Session = sessionmaker(bind=self._engine, expire_on_commit=False)
         self._lock = threading.Lock()
 

@@ -48,11 +48,43 @@ router = APIRouter()
 
 # Step 12: hard caps so one upload cannot fill the disk or exhaust memory.
 # Sized for real PRADAN triplets (OHRC+TMC-2+IIRS ~1.7GB); tunable via
-# MAX_INGEST_FILE_MB / MAX_INGEST_TOTAL_MB env without redeploying code.
-MAX_INGEST_FILES = 10
-# Legacy module constant kept for import compatibility; the live value is
+# MAX_INGEST_FILE_MB / MAX_INGEST_TOTAL_MB / MAX_INGEST_FILES env without
+# redeploying code. Live limits are read from settings per request
+# (max_ingest_file_bytes()/max_ingest_total_bytes()/max_ingest_files());
+# the module constants below are import-compat aliases only — do not branch
+# new logic on them.
+def max_ingest_files() -> int:
+    try:
+        from config import settings as _settings  # type: ignore[import-not-found]
+
+        return int(getattr(_settings, "MAX_INGEST_FILES", 10))
+    except Exception:
+        try:
+            from backend.config import settings as _settings2  # type: ignore
+
+            return int(getattr(_settings2, "MAX_INGEST_FILES", 10))
+        except Exception:
+            return 10
+
+
+def _settings_default(name: str, fallback: int) -> int:
+    """Read an int knob from settings at import time (fallback when unset)."""
+    try:
+        from config import settings as _settings  # type: ignore[import-not-found]
+
+        return int(getattr(_settings, name, fallback))
+    except Exception:
+        return fallback
+
+
+# Import-compat aliases — resolved from settings (MAX_INGEST_* env), NOT
+# hardcoded. Live per-request code must call max_ingest_files() /
+# max_ingest_file_bytes() / max_ingest_total_bytes() instead so a container
+# restart picks up env changes without a code edit.
+MAX_INGEST_FILES = _settings_default("MAX_INGEST_FILES", 10)
+# Legacy total-batch alias kept for import compatibility; the live value is
 # max_ingest_total_bytes() (env-driven). Do not read this directly.
-MAX_INGEST_TOTAL_BYTES = 3072 * 1024 * 1024
+MAX_INGEST_TOTAL_BYTES = _settings_default("MAX_INGEST_TOTAL_MB", 3072) * 1024 * 1024
 
 # ---------------------------------------------------------------------------
 # In-memory job store (suitable for single-server local/preview tool)
@@ -306,9 +338,10 @@ async def upload_and_ingest(
     and spawns the ingest subprocess, so anonymous uploads are refused.
     Status/results/jobs reads stay public.
     """
-    if len(files) > MAX_INGEST_FILES:
+    max_files = max_ingest_files()
+    if len(files) > max_files:
         raise HTTPException(
-            status_code=413, detail=f"Too many files (max {MAX_INGEST_FILES})."
+            status_code=413, detail=f"Too many files (max {max_files})."
         )
     job_id = str(uuid.uuid4())[:8]
     upload_dir = _UPLOAD_ROOT / job_id

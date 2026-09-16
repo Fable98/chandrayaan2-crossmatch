@@ -74,23 +74,9 @@ import cv2
 # Configuration
 # ---------------------------------------------------------------------------
 
-CORS_ORIGIN: str = os.environ.get("CORS_ORIGIN", "http://localhost:3000")
-ALLOWED_ORIGINS: str = os.environ.get(
-    "ALLOWED_ORIGINS",
-    f"{CORS_ORIGIN},http://localhost:3000,http://127.0.0.1:3000",
-)
-
-allowed_origins_list: list[str] = [
-    origin.strip()
-    for origin in ALLOWED_ORIGINS.split(",")
-    if origin.strip() and origin.strip() != "*"
-]
-if not allowed_origins_list:
-    allowed_origins_list = [
-        CORS_ORIGIN,
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-    ]
+# Single CORS source of truth: settings.cors_origins_list (fail-closed to
+# localhost, "*" filtered because it is invalid with allow_credentials=True).
+allowed_origins_list: list[str] = list(settings.cors_origins_list)
 
 
 # ---------------------------------------------------------------------------
@@ -100,7 +86,8 @@ if not allowed_origins_list:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Load all data into memory before the app starts accepting requests."""
-    loader.load_all()
+    # loader.load_all() is synchronous disk I/O — keep it off the event loop.
+    await run_in_threadpool(loader.load_all)
     # Step 12: fail-closed secret check + purge stale compute runs on boot.
     try:
         settings.require_jwt_secret()
@@ -128,12 +115,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — use explicit origins with credentials and allow Vercel preview deployments.
-# A wildcard origin is invalid for credentialed browser requests.
+# CORS — explicit origins with credentials. A wildcard origin is invalid
+# for credentialed browser requests. Both knobs come from the single source
+# of truth (settings): the allowlist plus an optional preview-deploy regex.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins_list,
-    allow_origin_regex=r"https://.*\.vercel\.app",
+    allow_origin_regex=settings.CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -143,6 +131,14 @@ app.add_middleware(
 limiter = get_limiter()
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+def _register_limit() -> str:
+    """Dynamic SlowAPI limit for POST /register (heavy CFOG job)."""
+    try:
+        return str(getattr(settings, "REGISTER_RATE_LIMIT", "20/minute"))
+    except Exception:
+        return "20/minute"
 
 
 @app.middleware("http")
@@ -193,7 +189,9 @@ app.mount("/dynamic_runs", StaticFiles(directory=dynamic_runs_dir), name="dynami
 
 
 @app.post("/register", response_model=RegisterResponse, tags=["registration"])
+@limiter.limit(_register_limit)
 async def register_images(
+    request: Request,
     source_file: UploadFile = File(...),
     reference_file: UploadFile = File(...),
     dem_file: Optional[UploadFile] = File(None),
@@ -204,15 +202,12 @@ async def register_images(
 ):
     """
     Dynamically register an uploaded source image against an uploaded reference image.
-    Requires a valid Bearer token (Step 12).
+    Requires a valid Bearer token (Step 12). Rate-limited (REGISTER_RATE_LIMIT)
+    because the CFOG job holds a worker for ~6-8s; heavy CV stays in a
+    threadpool so the event loop serves concurrent dashboard polls.
 
-    Features:
-    - 2D Phase Congruency & CFOG structural matching (illumination-robust structural representation).
-    - DEM-based relief displacement compensation (when DEM elevation is provided).
-    - Multi-scale patch Phase Correlation with empirically benchmarked sub-pixel refinement.
-    - Common physical-GSD normalization across multi-resolution sensor pairs.
-    - Safety checks: auth, extension allowlist, streamed size cap, traversal-safe
-      names, and robust multi-band reading — for source, reference, AND DEM.
+    The run is pre-registered in the shared job_store (PENDING → RUNNING) so
+    GET /api/registration/status/{run_id} polls during the job, not just after.
     """
     from matcher_cfog import match_images_cfog, load_as_float_and_color
 
@@ -234,6 +229,21 @@ async def register_images(
     run_id = str(uuid.uuid4())
     run_dir = Path(loader.DATA_DIR) / "dynamic_runs" / run_id
     run_dir.mkdir(parents=True, exist_ok=True)
+
+    # Pre-register the job so /api/registration/status/{run_id} is pollable
+    # DURING the 6-8s CFOG run (BackgroundTasks-style observability without
+    # changing the synchronous response contract the frontend expects).
+    if registration_router is not None:
+        try:
+            registration_router.job_manager.create_job(run_id, "registration")
+            registration_router.job_manager.update_job(
+                run_id,
+                status=registration_router.JobStatus.RUNNING,
+                progress=5.0,
+                current_phase="Uploaded — queued CFOG",
+            )
+        except Exception as _pre_exc:
+            logger.warning("Could not pre-register run %s: %s", run_id, _pre_exc)
 
     # Fixed server-side stems: only the allowlisted extension is reused, so
     # client filenames (and any '..') never reach the filesystem.
@@ -257,6 +267,17 @@ async def register_images(
     except HTTPException:
         # Rejected uploads leave no residue (empty run dirs are removed too).
         shutil.rmtree(run_dir, ignore_errors=True)
+        if registration_router is not None:
+            try:
+                registration_router.job_manager.update_job(
+                    run_id,
+                    status=registration_router.JobStatus.FAILED,
+                    progress=0.0,
+                    current_phase="Failed",
+                    error="Upload rejected (size/type gate)",
+                )
+            except Exception:
+                pass
         raise
 
     for file_obj, path in [(source_file, source_path), (reference_file, ref_path)]:
@@ -266,6 +287,16 @@ async def register_images(
         try:
             await run_in_threadpool(load_as_float_and_color, path)
         except Exception:
+            if registration_router is not None:
+                try:
+                    registration_router.job_manager.update_job(
+                        run_id,
+                        status=registration_router.JobStatus.FAILED,
+                        current_phase="Failed",
+                        error=f"Could not read image file: {filename}",
+                    )
+                except Exception:
+                    pass
             raise HTTPException(
                 status_code=400,
                 detail=f"Could not read image file: {filename}",
@@ -274,6 +305,16 @@ async def register_images(
         try:
             await run_in_threadpool(load_as_float_and_color, dem_path)
         except Exception:
+            if registration_router is not None:
+                try:
+                    registration_router.job_manager.update_job(
+                        run_id,
+                        status=registration_router.JobStatus.FAILED,
+                        current_phase="Failed",
+                        error="Could not read DEM file",
+                    )
+                except Exception:
+                    pass
             raise HTTPException(
                 status_code=400,
                 detail=f"Could not read DEM file: {dem_file.filename if dem_file else 'dem'}",
@@ -299,10 +340,35 @@ async def register_images(
                 reference_sensor=reference_sensor,
             )
     except Exception as e:
+        if registration_router is not None:
+            try:
+                registration_router.job_manager.update_job(
+                    run_id,
+                    status=registration_router.JobStatus.FAILED,
+                    current_phase="Failed",
+                    error=f"Matching pipeline failed: {str(e)}",
+                )
+                registration_router.job_manager.append_log(run_id, f"Pipeline crashed: {e}")
+            except Exception:
+                pass
         raise HTTPException(status_code=500, detail=f"Matching pipeline failed: {str(e)}")
 
     status = result.get("status", "success")
     if status != "success":
+        if registration_router is not None:
+            try:
+                registration_router.job_manager.update_job(
+                    run_id,
+                    status=registration_router.JobStatus.FAILED,
+                    progress=100.0,
+                    current_phase="Failed",
+                    result=registration_router._result_to_jsonable(dict(result)),
+                )
+                registration_router.job_manager.append_log(
+                    run_id, f"Run {run_id} failed verification: status={status}"
+                )
+            except Exception:
+                pass
         return RegisterResponse(
             status=status,
             message=result.get("message", "Registration failed to verify geometric correspondence."),
@@ -351,8 +417,11 @@ async def register_images(
             except Exception:
                 return None
         try:
-            os.makedirs("reports", exist_ok=True)
-            generator = ISROReportGenerator(output_dir="reports/")
+            # Absolute reports root (cwd-independent: lifespan/tests run from
+            # backend/, prod runs from /app — never a relative "reports/").
+            reports_dir = REPO_ROOT / "reports"
+            os.makedirs(reports_dir, exist_ok=True)
+            generator = ISROReportGenerator(output_dir=str(reports_dir) + "/")
             metrics_dict = result.get("metrics") or {}
             out_pdf = generator.generate_report(
                 metadata={
@@ -392,6 +461,7 @@ async def register_images(
         logger.warning("Report generation failed: %s", e)
 
     # Store run in registration_router.job_manager for /status, /report, and /moon-points
+    # (job was pre-created as RUNNING; this is the terminal update).
     if registration_router is not None:
         try:
             clean_res = registration_router._result_to_jsonable(dict(result))
@@ -399,7 +469,6 @@ async def register_images(
                 clean_res["pdf_path"] = str(pdf_path)
             clean_res["src_image_path"] = str(source_path)
             clean_res["ref_image_path"] = str(ref_path)
-            registration_router.job_manager.create_job(run_id, "registration")
             registration_router.job_manager.update_job(
                 run_id,
                 status=registration_router.JobStatus.SUCCESS if status == "success" else registration_router.JobStatus.FAILED,
@@ -412,6 +481,13 @@ async def register_images(
             )
         except Exception as _jm_exc:
             logger.warning("Could not store run in job_manager: %s", _jm_exc)
+
+    # Enforce TTL after the run too (not just boot/pre-upload) so a burst of
+    # successful runs cannot fill the volume before the next upload arrives.
+    try:
+        purge_expired_runs(loader.DATA_DIR)
+    except Exception:
+        pass
 
     return RegisterResponse(
         status="success",
@@ -464,13 +540,14 @@ def health_check():
 
 
 @app.get("/refresh", response_model=HealthResponse, tags=["system"])
-def refresh_data(current_user: dict = Depends(get_current_user)):
+async def refresh_data(current_user: dict = Depends(get_current_user)):
     """
     Reload all data from disk. Requires a valid Bearer token (Step 12):
     an unauthenticated refresh lets anyone flush the in-memory cache and
     hammer disk I/O on shared tiers.
     """
-    loader.load_all()
+    # Disk I/O off the event loop (lifespan does the same).
+    await run_in_threadpool(loader.load_all)
     return HealthResponse(
         status="refreshed",
         triplets_loaded=loader.triplet_count(),
