@@ -87,15 +87,32 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
 
   const handleCanvasClick = (
     e: React.MouseEvent<HTMLDivElement>,
-    sensor: "ohrc" | "tmc"
+    sensor: "ohrc" | "tmc",
+    // Natural raster dims of the pane that was clicked (ImagePane measures
+    // the loaded file — tiles are not guaranteed 512², e.g. cropped LRO
+    // swaths). Click fractions map into the SAME space the dots use
+    // (coords / nat dims below), so nearest-matching stays self-consistent
+    // at any native resolution. Defaults keep the 512 contract when the
+    // image hasn't loaded yet.
+    tileW: number = TILE_PX,
+    tileH: number = TILE_PX
   ) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = ((e.clientX - rect.left) / rect.width) * TILE_PX;
-    const clickY = ((e.clientY - rect.top) / rect.height) * TILE_PX;
+    // currentTarget is the coordinate frame div, which is exactly the
+    // displayed image rect (letterbox bars live outside it via offX/offY),
+    // so no letterbox subtraction is needed here — but the fraction is
+    // scaled by the pane's own natural dims, never a hardcoded 512.
+    const w = tileW > 0 ? tileW : TILE_PX;
+    const h = tileH > 0 ? tileH : TILE_PX;
+    const clickX = ((e.clientX - rect.left) / rect.width) * w;
+    const clickY = ((e.clientY - rect.top) / rect.height) * h;
 
     const nearest = findNearestMatch([clickX, clickY], points, sensor);
+    // Hit radius scales with the tile so a 1024-px raster has the same
+    // ~9%-of-tile forgiveness as the 512 contract (45/512).
+    const nearbyPx = NEARBY_PX * (Math.max(w, h) / TILE_PX);
 
-    if (nearest && nearest.distance <= NEARBY_PX) {
+    if (nearest && nearest.distance <= nearbyPx) {
       setSelection({
         selectedIndex: nearest.index,
         match: nearest.match,
@@ -104,7 +121,7 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
       setClickNotice(null);
     } else {
       setClickNotice(
-        `Clicked at (${clickX.toFixed(0)}, ${clickY.toFixed(0)} px) · No correspondence within ${NEARBY_PX}px`
+        `Clicked at (${clickX.toFixed(0)}, ${clickY.toFixed(0)} px) · No correspondence within ${nearbyPx.toFixed(0)}px`
       );
       setTimeout(() => setClickNotice(null), 3000);
     }
@@ -154,7 +171,7 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
           label={sourceSensorLabel()}
           innerRef={ohrcRef}
           src={imageUrl(`/images/ohrc/${tripletId}`)}
-          onCanvasClick={(e) => handleCanvasClick(e, "ohrc")}
+          onCanvasClick={(e, tileW, tileH) => handleCanvasClick(e, "ohrc", tileW, tileH)}
           points={points}
           coordKey="ohrc_px"
           selectedIndex={activeIdx}
@@ -172,7 +189,7 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
               }`}
             >
               {activeMatch
-                ? `${(activeMatch.confidence * 100).toFixed(0)}% conf`
+                ? `${((activeMatch.confidence ?? 0) * 100).toFixed(0)}% conf`
                 : "—"}
             </span>
             <span className="font-mono text-[9px] uppercase tracking-widest text-ink-faint">
@@ -206,7 +223,7 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
           label={refLabel}
           innerRef={tmcRef}
           src={refSrc}
-          onCanvasClick={(e) => handleCanvasClick(e, "tmc")}
+          onCanvasClick={(e, tileW, tileH) => handleCanvasClick(e, "tmc", tileW, tileH)}
           points={points}
           coordKey="tmc_px"
           selectedIndex={activeIdx}
@@ -243,7 +260,7 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
                   <span className="h-1.5 w-1.5 rounded-full bg-teal" />
                   <span>#{idx + 1}</span>
                   <span className="text-[9px] text-ink-faint">
-                    {(p.confidence * 100).toFixed(0)}%
+                    {((p.confidence ?? 0) * 100).toFixed(0)}%
                   </span>
                 </button>
               );
@@ -283,7 +300,7 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
             <span className="text-ink-faint">
               Confidence:{" "}
               <span className="text-teal font-semibold">
-                {(activeMatch.confidence * 100).toFixed(1)}%
+                {((activeMatch.confidence ?? 0) * 100).toFixed(1)}%
               </span>
               {activeMatch.ohrc_latlon ? (
                 <span className="ml-3 text-ink-dim">
@@ -318,7 +335,9 @@ function ImagePane({
   sensor: "ohrc" | "tmc";
   label: string;
   src: string;
-  onCanvasClick: (e: React.MouseEvent<HTMLDivElement>) => void;
+  // The pane reports its measured natural dims so clicks land in the same
+  // coordinate space as the dots (never a hardcoded 512).
+  onCanvasClick: (e: React.MouseEvent<HTMLDivElement>, tileW: number, tileH: number) => void;
   innerRef: React.RefObject<HTMLDivElement>;
   points: MatchPoint[];
   coordKey: "ohrc_px" | "tmc_px";
@@ -395,7 +414,7 @@ function ImagePane({
             map 1:1 to tile px for both markers and click handling. */}
         <div
           ref={innerRef}
-          onClick={onCanvasClick}
+          onClick={(e) => onCanvasClick(e, nat.w, nat.h)}
           className="absolute cursor-crosshair"
           style={{ left: offX, top: offY, width: dispW, height: dispH }}
         >
@@ -403,10 +422,16 @@ function ImagePane({
         {points.map((p, idx) => {
           const coords = p[coordKey];
           if (!coords || coords.length < 2) return null;
-          const xFrac = coords[0] / TILE_PX;
-          const yFrac = coords[1] / TILE_PX;
+          // Fractions of the pane's own natural raster — the 512 hardcode
+          // misplaced every dot on non-square crops (e.g. LRO swaths).
+          const tileW = nat.w > 0 ? nat.w : TILE_PX;
+          const tileH = nat.h > 0 ? nat.h : TILE_PX;
+          const xFrac = coords[0] / tileW;
+          const yFrac = coords[1] / tileH;
           const isSelected = idx === selectedIndex;
           const isHovered = idx === hoveredIndex;
+          // Missing confidence renders as 0%, never NaN%.
+          const confPct = (p.confidence ?? 0) * 100;
 
           return (
             <div
@@ -463,7 +488,7 @@ function ImagePane({
                       : "border-white/20 bg-black/90 text-white"
                   }`}
                 >
-                  #{idx + 1} ({coords[0].toFixed(0)}, {coords[1].toFixed(0)}) · {(p.confidence * 100).toFixed(0)}%
+                    #{idx + 1} ({coords[0].toFixed(0)}, {coords[1].toFixed(0)}) · {confPct.toFixed(0)}%
                 </div>
               )}
             </div>

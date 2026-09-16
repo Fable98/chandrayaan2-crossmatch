@@ -3,12 +3,26 @@ import React, { useCallback, useRef, useState } from 'react';
 interface DropZoneProps {
   onFilesSelected: (files: File[]) => void;
   disabled?: boolean;
+  /** Called with the count of dropped non-.zip files the pipeline ignored. */
+  onIgnored?: (ignored: number) => void;
 }
 
-export default function DropZone({ onFilesSelected, disabled = false }: DropZoneProps) {
+export default function DropZone({ onFilesSelected, disabled = false, onIgnored }: DropZoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [ignoredNotice, setIgnoredNotice] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
+  const noticeTimer = useRef<number | null>(null);
+
+  const flagIgnored = useCallback((count: number) => {
+    if (count <= 0) return;
+    onIgnored?.(count);
+    setIgnoredNotice(
+      `${count} non-.zip file${count === 1 ? " was" : "s were"} ignored — the pipeline only accepts PRADAN .zip archives.`
+    );
+    if (noticeTimer.current !== null) window.clearTimeout(noticeTimer.current);
+    noticeTimer.current = window.setTimeout(() => setIgnoredNotice(null), 5000);
+  }, [onIgnored]);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -39,16 +53,19 @@ export default function DropZone({ onFilesSelected, disabled = false }: DropZone
       });
     }
     if (entry.isDirectory) {
+      // readEntries returns at most ~100 entries per call: loop until empty,
+      // then recurse into every entry (subfolders included).
       const reader = (entry as FileSystemDirectoryEntry).createReader();
-      return new Promise((resolve) => {
-        reader.readEntries(
-          async (entries) => {
-            const nested = await Promise.all(entries.map(extractFilesFromEntry));
-            resolve(nested.flat());
-          },
-          () => resolve([])
-        );
-      });
+      const all: FileSystemEntry[] = [];
+      for (;;) {
+        const chunk: FileSystemEntry[] = await new Promise((resolve) => {
+          reader.readEntries((entries) => resolve(entries), () => resolve([]));
+        });
+        if (chunk.length === 0) break;
+        all.push(...chunk);
+      }
+      const nested = await Promise.all(all.map(extractFilesFromEntry));
+      return nested.flat();
     }
     return [];
   };
@@ -78,31 +95,36 @@ export default function DropZone({ onFilesSelected, disabled = false }: DropZone
       }
     }
 
-    // Filter to .zip files
+    // Filter to .zip files; surface the ignored count instead of dropping silently.
     const zipFiles = allFiles.filter(
       (f) => f.name.toLowerCase().endsWith('.zip')
     );
+    flagIgnored(allFiles.length - zipFiles.length);
 
     if (zipFiles.length > 0) {
       onFilesSelected(zipFiles);
     }
-  }, [disabled, onFilesSelected]);
+  }, [disabled, onFilesSelected, flagIgnored]);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const fileList = e.target.files;
     if (!fileList) return;
     const files: File[] = [];
+    let ignored = 0;
     for (let i = 0; i < fileList.length; i++) {
       if (fileList[i].name.toLowerCase().endsWith('.zip')) {
         files.push(fileList[i]);
+      } else {
+        ignored += 1;
       }
     }
+    flagIgnored(ignored);
     if (files.length > 0) {
       onFilesSelected(files);
     }
     // Reset input so re-selecting the same files works
     e.target.value = '';
-  }, [onFilesSelected]);
+  }, [onFilesSelected, flagIgnored]);
 
   return (
     <div
@@ -170,6 +192,11 @@ export default function DropZone({ onFilesSelected, disabled = false }: DropZone
         <p className="text-[11px] text-slate-400 font-mono mt-5">
           Mixed sensor types are fine — the pipeline auto-discovers OHRC + TMC-2 + IIRS triplets
         </p>
+        {ignoredNotice && (
+          <p role="status" className="mt-3 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 px-4 py-2 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+            {ignoredNotice}
+          </p>
+        )}
       </div>
 
       <input

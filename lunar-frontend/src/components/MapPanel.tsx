@@ -23,12 +23,29 @@ function FitOnChange({ boundsKey, bounds }: { boundsKey: string; bounds: LatLngB
 
 type Layer = "iirs" | "dem";
 
+/**
+ * Browsers cannot render TIFF in <img>/Leaflet ImageOverlay — a raw .tif URL
+ * would show a silently empty layer. Rewrite to the web preview the backend
+ * generates alongside every raster (.png), and report whether a rewrite
+ * happened so the UI can badge the fallback honestly.
+ */
+function toWebOverlayUrl(url: string | null | undefined): { url: string; wasTiff: boolean } {
+  const raw = imageUrl(url ?? "");
+  const wasTiff = /\.tiff?($|\?)/i.test(raw);
+  const web = wasTiff ? raw.replace(/\.tiff?($|\?)/i, ".png$1") : raw;
+  return { url: web, wasTiff };
+}
+
 export default function MapPanel({ triplet, iirsOverlay }: Props) {
   const [activeLayers, setActiveLayers] = useState<Set<Layer>>(new Set());
 
   const bounds = toLeafletBounds(triplet.bounds);
   const demBounds = triplet.dem_available ? toLeafletBounds(triplet.bounds) : null;
   const center = boundsCenter(triplet.bounds);
+
+  const iirsWeb = toWebOverlayUrl(iirsOverlay?.image_url);
+  const demWeb = toWebOverlayUrl(triplet.dem_url);
+  const tiffFallback = (activeLayers.has("iirs") && iirsWeb.wasTiff) || (activeLayers.has("dem") && demWeb.wasTiff);
 
   const toggle = (layer: Layer) => {
     setActiveLayers((prev) => {
@@ -58,13 +75,13 @@ export default function MapPanel({ triplet, iirsOverlay }: Props) {
         />
         {activeLayers.has("iirs") && iirsOverlay && (
           <ImageOverlay
-            url={imageUrl(iirsOverlay.image_url)}
+            url={iirsWeb.url}
             bounds={bounds}
             opacity={iirsOverlay.opacity_hint ?? 0.6}
           />
         )}
         {activeLayers.has("dem") && demBounds && triplet.dem_url && (
-          <ImageOverlay url={imageUrl(triplet.dem_url)} bounds={demBounds} opacity={0.7} />
+          <ImageOverlay url={demWeb.url} bounds={demBounds} opacity={0.7} />
         )}
         <FitOnChange boundsKey={triplet.id} bounds={bounds} />
       </MapContainer>
@@ -81,9 +98,17 @@ export default function MapPanel({ triplet, iirsOverlay }: Props) {
       )}
 
       <div className="absolute right-4 top-4 z-10 flex flex-col gap-2 rounded-xl border border-border bg-panel/90 p-3 shadow-2xl backdrop-blur-md">
-        <span className="font-mono text-[10px] uppercase tracking-widest text-ink-faint">
+        <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
           Payload Layers
         </span>
+        {tiffFallback && (
+          <span
+            title="The source raster is a GeoTIFF, which browsers cannot render — showing the backend-generated PNG preview instead."
+            className="rounded-md border border-amber-300/60 bg-amber-50 px-2 py-1 font-mono text-[10px] font-bold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+          >
+            TIFF → PNG preview
+          </span>
+        )}
         <div className="flex flex-col gap-1.5">
           <LayerToggle
             label="IIRS Mineralogy"

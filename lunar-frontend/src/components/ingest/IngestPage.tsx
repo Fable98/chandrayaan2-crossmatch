@@ -253,39 +253,67 @@ export default function IngestPage() {
     }
   }, [files, config]);
 
-  // Poll loop
+  // Poll loop: bounded consecutive-failure budget with exponential backoff.
+  // The old loop retried forever every 1.5s — a dead backend spun the
+  // spinner (and the backend) indefinitely. After MAX_POLL_FAILURES straight
+  // failures the job errors out with a retry path instead of hanging.
   useEffect(() => {
     if (phase !== "processing" || !jobId) return;
 
+    const MAX_POLL_FAILURES = 10;
+    const BASE_POLL_MS = 1500;
+    const MAX_POLL_MS = 15000;
+    let failures = 0;
+    let timer: number | null = null;
+    let cancelled = false;
+
     const poll = async () => {
+      if (cancelled) return;
       try {
         const s = await pollStatus(jobId);
+        failures = 0;
+        if (cancelled) return;
         setStatus(s);
 
         if (s.status === "completed") {
           setPhase("done");
           try {
             const results = await getResults(jobId);
-            setResultTriplets(results.triplets || []);
+            if (!cancelled) setResultTriplets(results.triplets || []);
           } catch {
             // Triplets stay empty
           }
-        } else if (s.status === "failed") {
+          return;
+        }
+        if (s.status === "failed") {
           setPhase("error");
           setError(s.error || "Pipeline failed");
+          return;
         }
+        timer = window.setTimeout(poll, BASE_POLL_MS);
       } catch {
-        // Transient error, keep polling
+        failures += 1;
+        if (failures >= MAX_POLL_FAILURES) {
+          setPhase("error");
+          setError(
+            `Lost contact with the ingest backend after ${MAX_POLL_FAILURES} attempts. ` +
+              "The job may still be running — check Previous Ingestion Runs, then retry."
+          );
+          return;
+        }
+        // Exponential backoff: 1.5s → 3s → 6s … capped at 15s.
+        timer = window.setTimeout(poll, Math.min(BASE_POLL_MS * 2 ** (failures - 1), MAX_POLL_MS));
       }
     };
 
     poll();
-    const id = window.setInterval(poll, 1500);
-    pollRef.current = id;
 
     return () => {
+      cancelled = true;
+      if (timer !== null) window.clearTimeout(timer);
       if (pollRef.current !== null) {
         window.clearInterval(pollRef.current);
+        pollRef.current = null;
       }
     };
   }, [phase, jobId]);

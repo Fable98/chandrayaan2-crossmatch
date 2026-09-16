@@ -146,10 +146,54 @@ export function logout(): void {
 }
 
 /**
- * Check if the user currently has a stored auth token.
+ * Decode the JWT `exp` claim without verifying (signature is verified
+ * server-side on every request). Returns the expiry epoch seconds, or null
+ * when the token is malformed. Short-term client-side guard so an expired
+ * token never renders the app as authenticated; the backend 401 remains
+ * authoritative. Long-term: move to an httpOnly session cookie so JS can
+ * never read the token at all (needs backend Set-Cookie support).
+ */
+export function decodeTokenExp(token: string): number | null {
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const payload = JSON.parse(
+      atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"))
+    ) as { exp?: unknown };
+    return typeof payload.exp === "number" && Number.isFinite(payload.exp)
+      ? payload.exp
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True when the token is missing, malformed, or past its `exp` claim
+ * (60s clock-skew grace). Malformed tokens are treated as expired so they
+ * can never authenticate the UI.
+ */
+export function isTokenExpired(token: string | null): boolean {
+  if (!token) return true;
+  const exp = decodeTokenExp(token);
+  if (exp === null) return true;
+  return exp * 1000 <= Date.now() + 60_000;
+}
+
+/**
+ * Check if the user currently has a stored, unexpired auth token.
+ * An expired (or malformed) token is cleared so the login wall appears
+ * instead of a cascade of 401 banners. The backend 401 remains the
+ * authoritative gate — this is a UI fast-path only.
  */
 export function isAuthenticated(): boolean {
-  return !!getToken();
+  const token = getToken();
+  if (!token) return false;
+  if (isTokenExpired(token)) {
+    logout();
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -186,10 +230,14 @@ export async function fetchCurrentUser(): Promise<AuthUser | null> {
 
 /**
  * Get the Authorization header value for authenticated API requests.
- * Returns an empty object if not authenticated.
+ * Returns an empty object if not authenticated. A client-side expired
+ * token is dropped (and cleared) rather than sent to fail as a 401.
  */
 export function getAuthHeaders(): Record<string, string> {
   const token = getToken();
-  if (!token) return {};
+  if (!token || isTokenExpired(token)) {
+    if (token) logout();
+    return {};
+  }
   return { Authorization: `Bearer ${token}` };
 }

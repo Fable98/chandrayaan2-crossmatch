@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { API_BASE, api, imageUrl } from "@/lib/api";
+import { API_BASE, API_GET_TIMEOUT_MS, api, imageUrl } from "@/lib/api";
+import { getAuthHeaders } from "@/lib/auth";
 import LunarGlobe, { type LunarFootprint } from "@/components/hero/LunarGlobe";
 import type { MoonPoint, MoonPointsResponse } from "@/lib/backend-types";
 import { footprintSizeKm } from "@/lib/geo";
@@ -346,6 +347,25 @@ function absoluteUrl(path?: string | null) {
   return imageUrl(path);
 }
 
+// POST /register holds a CFOG worker for ~6-8s plus upload time: 120s
+// budget (the shared 15s API_GET_TIMEOUT_MS is for idempotent GETs only).
+const REGISTER_TIMEOUT_MS = 120_000;
+
+/**
+ * fetch with an abort budget. Rejects on timeout so callers fall into
+ * their existing error banners instead of hanging spinners forever.
+ */
+function fetchWithTimeout(url: string, init: RequestInit, ms: number): Promise<Response> {
+  try {
+    if (typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+      return fetch(url, { ...init, signal: AbortSignal.timeout(ms) });
+    }
+  } catch {
+    // Fall through to a plain fetch on runtimes without AbortSignal.timeout.
+  }
+  return fetch(url, init);
+}
+
 function metric(metrics: RegistrationMetrics | null | undefined, ...keys: string[]) {
   for (const key of keys) {
     const value = metrics?.[key as keyof RegistrationMetrics];
@@ -619,7 +639,15 @@ export default function RegistrationLauncher() {
     let active = true;
     setMoonPointsLoading(true);
 
-    fetch(`${API_BASE}/api/registration/moon-points/${jobId}`)
+    // Authenticated like every other backend call (moon-points is served by
+    // the same FastAPI app; a rotated JWT must 401 here, not leak points).
+    // 15s budget so a hung backend can't leave the globe spinner forever.
+    const ctrl = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timer = ctrl ? window.setTimeout(() => ctrl.abort(), API_GET_TIMEOUT_MS) : null;
+    fetch(`${API_BASE}/api/registration/moon-points/${jobId}`, {
+      headers: { ...getAuthHeaders() },
+      ...(ctrl ? { signal: ctrl.signal } : {}),
+    })
       .then((res) => {
         if (!res.ok) return null;
         return res.json() as Promise<MoonPointsResponse>;
@@ -636,11 +664,18 @@ export default function RegistrationLauncher() {
         if (active) setMoonPoints([]);
       })
       .finally(() => {
+        if (timer !== null) window.clearTimeout(timer);
         if (active) setMoonPointsLoading(false);
       });
 
     return () => {
       active = false;
+      if (timer !== null) window.clearTimeout(timer);
+      try {
+        ctrl?.abort();
+      } catch {
+        // Aborting an already-settled fetch is a no-op.
+      }
     };
   }, [result?.job_id]);
 
@@ -768,12 +803,14 @@ export default function RegistrationLauncher() {
 
         body.append("source_file", sBlob, "source.png");
         body.append("reference_file", rBlob, "reference.png");
-        const { getAuthHeaders } = await import("@/lib/auth");
-        const response = await fetch(`${API_BASE}/register`, {
+        // POST /register holds a CFOG worker for ~6-8s plus upload time, so
+        // it gets a 120s budget (not the 15s idempotent-GET budget) and the
+        // static auth import (not a per-call dynamic import).
+        const response = await fetchWithTimeout(`${API_BASE}/register`, {
           method: "POST",
           headers: { ...getAuthHeaders() },
           body,
-        });
+        }, REGISTER_TIMEOUT_MS);
         const data = (await response.json().catch(() => null)) as
           | RegistrationResult
           | { detail?: string }
@@ -789,8 +826,12 @@ export default function RegistrationLauncher() {
         setResult(live);
         setResultProvenance("live");
         if (live.matches_url) {
-          const mRes = await fetch(absoluteUrl(live.matches_url)!);
-          if (mRes.ok) setPoints((await mRes.json()) as MatchPoint[]);
+          // Backend artifact fetch: same auth headers + GET timeout so a
+          // rotated JWT or hung backend can't silently yield zero dots.
+          const mRes = await fetchWithTimeout(absoluteUrl(live.matches_url)!, {
+            headers: { ...getAuthHeaders() },
+          }, API_GET_TIMEOUT_MS).catch(() => null);
+          if (mRes && mRes.ok) setPoints((await mRes.json()) as MatchPoint[]);
           else setPoints([]);
         } else {
           setPoints([]);
@@ -821,12 +862,11 @@ export default function RegistrationLauncher() {
       body.append("reference_sensor", referenceSensor);
       if (demFile) body.append("dem_file", demFile);
 
-      const { getAuthHeaders: uploadAuthHeaders } = await import("@/lib/auth");
-      const response = await fetch(`${API_BASE}/register`, {
+      const response = await fetchWithTimeout(`${API_BASE}/register`, {
         method: "POST",
-        headers: { ...uploadAuthHeaders() },
+        headers: { ...getAuthHeaders() },
         body,
-      });
+      }, REGISTER_TIMEOUT_MS);
       const data = (await response.json().catch(() => null)) as RegistrationResult | { detail?: string } | null;
       if (response.status === 401) {
         throw new Error("Session expired or missing — please sign in again, then retry.");
@@ -838,8 +878,10 @@ export default function RegistrationLauncher() {
       setResult(registration);
       setResultProvenance("live");
       if (registration.matches_url) {
-        const matchesResponse = await fetch(absoluteUrl(registration.matches_url)!);
-        if (matchesResponse.ok) setPoints((await matchesResponse.json()) as MatchPoint[]);
+        const matchesResponse = await fetchWithTimeout(absoluteUrl(registration.matches_url)!, {
+          headers: { ...getAuthHeaders() },
+        }, API_GET_TIMEOUT_MS).catch(() => null);
+        if (matchesResponse && matchesResponse.ok) setPoints((await matchesResponse.json()) as MatchPoint[]);
       }
       if (registration.status !== "success") {
         setError(registration.message || "The backend could not verify this registration.");

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import fs from "fs";
+import { promises as fs } from "fs";
 import path from "path";
 
 export async function GET(
@@ -11,41 +11,66 @@ export async function GET(
     return new NextResponse("Not Found", { status: 404 });
   }
 
+  // Reject traversal segments up front — a crafted ".." must 404 before it
+  // ever reaches the filesystem join below.
+  if (slugParts.some((p) => p === ".." || p === "." || p.includes("\0"))) {
+    return new NextResponse("Not Found", { status: 404 });
+  }
+
   const relativePath = slugParts.join("/");
   const publicDir = path.join(process.cwd(), "public", "images");
 
+  // Resolve-then-contain: path.join alone normalizes "a/../../etc/passwd"
+  // OUTSIDE publicDir, and the old existsSync gate would have served it.
+  // Every candidate must resolve inside publicDir or it is skipped.
+  const withinRoot = (p: string): string | null => {
+    const resolved = path.resolve(publicDir, p);
+    return resolved === publicDir || resolved.startsWith(publicDir + path.sep)
+      ? resolved
+      : null;
+  };
+
   // Candidates to look up in public/images
-  const candidates = [
-    path.join(publicDir, relativePath),
-    path.join(publicDir, `${relativePath}.png`),
-    path.join(publicDir, relativePath.replace(/\.png$/, "")),
+  const rawCandidates = [
+    relativePath,
+    `${relativePath}.png`,
+    relativePath.replace(/\.png$/, ""),
   ];
 
   // Specific fallback mappings
   if (slugParts[0] === "iirs" && relativePath.includes("iirs_overlay")) {
-    candidates.push(path.join(publicDir, "iirs", "iirs_overlay.png"));
-    candidates.push(path.join(publicDir, "iirs", "iirs_512.png"));
+    rawCandidates.push(
+      path.join("iirs", "iirs_overlay.png"),
+      path.join("iirs", "iirs_512.png")
+    );
   }
 
-  for (const filePath of candidates) {
-    if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-      const fileBuffer = fs.readFileSync(filePath);
-      const ext = path.extname(filePath).toLowerCase();
-      const contentType =
-        ext === ".json"
-          ? "application/json"
-          : ext === ".jpg" || ext === ".jpeg"
-          ? "image/jpeg"
-          : "image/png";
-
-      return new NextResponse(fileBuffer, {
-        status: 200,
-        headers: {
-          "Content-Type": contentType,
-          "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
-        },
-      });
+  for (const raw of rawCandidates) {
+    const filePath = withinRoot(raw);
+    if (!filePath) continue;
+    let stat;
+    try {
+      stat = await fs.stat(filePath);
+    } catch {
+      continue;
     }
+    if (!stat.isFile()) continue;
+    const fileBuffer = await fs.readFile(filePath);
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType =
+      ext === ".json"
+        ? "application/json"
+        : ext === ".jpg" || ext === ".jpeg"
+        ? "image/jpeg"
+        : "image/png";
+
+    return new NextResponse(fileBuffer, {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=86400, stale-while-revalidate=604800",
+      },
+    });
   }
 
   // Ingested regions (region_auto_*) live only under
@@ -55,7 +80,7 @@ export async function GET(
   // black tiles. Static public/images files above still win when present.
   try {
     const backendBase = (
-      process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000"
+      process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000"
     ).replace(/\/$/, "");
     // Preserve sub-path + extension exactly as requested.
     const hasExt = /\.(png|jpe?g|json)$/i.test(relativePath);
@@ -77,9 +102,11 @@ export async function GET(
         },
       });
     }
+    // Backend answered but has no such tile: honest 404.
+    return new NextResponse(`Image '${relativePath}' not found`, { status: 404 });
   } catch {
-    // Fall through to 404 below — never leak backend errors as images.
+    // Backend unreachable / timed out: 502 Bad Gateway, NOT 404 — a 404
+    // claims the tile doesn't exist, a 502 says the backend is down.
+    return new NextResponse("Image backend unavailable", { status: 502 });
   }
-
-  return new NextResponse(`Image '${relativePath}' not found`, { status: 404 });
 }

@@ -51,15 +51,19 @@ export const SENSOR_META: Record<SensorKind, SensorSpec> = {
   },
 };
 
-/** Normalizes diverse sensor naming (e.g. "OHRC", "TMC", "tmc-2", "LRO_NAC") to canonical SensorKind. */
-export function normalizeSensorId(id: string): SensorKind {
+/**
+ * Normalizes diverse sensor naming (e.g. "OHRC", "TMC", "tmc-2", "LRO_NAC")
+ * to a canonical SensorKind. Unrecognized ids return "unknown" — NEVER a
+ * silent "ohrc" default, which mislabelled every future sensor as OHRC.
+ */
+export function normalizeSensorId(id: string): SensorKind | "unknown" {
   const s = id.toLowerCase().replace(/[-_]/g, "");
   if (s.includes("ohrc")) return "ohrc";
   if (s.includes("tmc")) return "tmc";
   if (s.includes("iirs")) return "iirs";
   if (s.includes("dem")) return "dem";
   if (s.includes("lro")) return "lro_nac";
-  return "ohrc";
+  return "unknown";
 }
 
 export interface SensorMetaEntry {
@@ -78,31 +82,21 @@ export function sensorMeta(
   id: string
 ): SensorMetaEntry {
   const key = normalizeSensorId(id);
+  // Unknown sensors carry no spec constant: surface the raw id with an
+  // absent (NaN) GSD rather than a fabricated OHRC 0.25m claim. Callers
+  // render NaN via the "—" guards in sensorCardGsd/scaleRatioLabel.
+  if (key === "unknown") {
+    const live = liveGsdFor(triplet, id);
+    return {
+      label: id ? id.toUpperCase() : "Unknown",
+      gsdM: live ?? NaN,
+      unit: "m/px",
+      isLive: live !== undefined,
+    };
+  }
   const spec = SENSOR_META[key];
 
-  let liveGsd: number | undefined;
-
-  if (triplet?.sensors && Array.isArray(triplet.sensors)) {
-    const match = triplet.sensors.find((s) => {
-      const name = (s.sensor || "").toLowerCase().replace(/[-_]/g, "");
-      return name === key.replace(/[-_]/g, "") || normalizeSensorId(s.sensor || "") === key;
-    });
-    if (match && typeof match.gsd_m === "number" && Number.isFinite(match.gsd_m) && match.gsd_m > 0) {
-      liveGsd = match.gsd_m;
-    }
-  }
-
-  if (liveGsd === undefined && key === "lro_nac" && typeof triplet?.lro_nac_gsd_m === "number" && triplet.lro_nac_gsd_m > 0) {
-    liveGsd = triplet.lro_nac_gsd_m;
-  }
-
-  if (liveGsd === undefined && triplet?.gsd && typeof triplet.gsd === "object") {
-    const gsdObj = triplet.gsd as Record<string, number>;
-    const direct = gsdObj[key] ?? gsdObj[id];
-    if (typeof direct === "number" && direct > 0) {
-      liveGsd = direct;
-    }
-  }
+  const liveGsd = liveGsdFor(triplet, id);
 
   return {
     label: spec.label,
@@ -110,6 +104,42 @@ export function sensorMeta(
     unit: spec.unit,
     isLive: liveGsd !== undefined,
   };
+}
+
+/** Live per-region gsd_m lookup shared by known and unknown sensor ids. */
+function liveGsdFor(
+  triplet: TripletSummary | null | undefined,
+  id: string
+): number | undefined {
+  const key = id.toLowerCase().replace(/[-_]/g, "");
+  if (triplet?.sensors && Array.isArray(triplet.sensors)) {
+    const want = normalizeSensorId(id);
+    const match = triplet.sensors.find((s) => {
+      const name = (s.sensor || "").toLowerCase().replace(/[-_]/g, "");
+      if (name === key) return true;
+      // Canonical-kind comparison only when BOTH sides are known — two
+      // distinct unknown ids must never equal each other via "unknown".
+      const got = normalizeSensorId(s.sensor || "");
+      return want !== "unknown" && got === want;
+    });
+    if (match && typeof match.gsd_m === "number" && Number.isFinite(match.gsd_m) && match.gsd_m > 0) {
+      return match.gsd_m;
+    }
+  }
+
+  if (key.includes("lro") && typeof triplet?.lro_nac_gsd_m === "number" && triplet.lro_nac_gsd_m > 0) {
+    return triplet.lro_nac_gsd_m;
+  }
+
+  if (triplet?.gsd && typeof triplet.gsd === "object") {
+    const gsdObj = triplet.gsd as Record<string, number>;
+    const direct = gsdObj[key] ?? gsdObj[id];
+    if (typeof direct === "number" && direct > 0) {
+      return direct;
+    }
+  }
+
+  return undefined;
 }
 
 /**
@@ -159,15 +189,15 @@ export function sensorBadge(id: "ohrc" | "tmc" | "iirs" | "lro" | "qa", triplet?
   }
 }
 
-/** Filter button label for vault: "OHRC (0.25m)", "TMC-2 (4m)", "IIRS (70m)", "LRO NAC (0.9m)". */
+/** Filter button labels for the vault — GSDs derived from SENSOR_META spec nominals, never re-typed. */
 export function sensorFilterLabel(id: "ohrc" | "tmc" | "iirs" | "lro"): string {
   switch (id) {
     case "ohrc":
       return `${SENSOR_META.ohrc.label} (${SENSOR_META.ohrc.gsdM}m)`;
     case "tmc":
-      return `${SENSOR_META.tmc.label} (4m)`;
+      return `${SENSOR_META.tmc.label} (${SENSOR_META.tmc.gsdM}m)`;
     case "iirs":
-      return `${SENSOR_META.iirs.label} (70m)`;
+      return `${SENSOR_META.iirs.label} (${SENSOR_META.iirs.gsdM}m)`;
     case "lro":
       return `LRO NAC (${SENSOR_META.lro_nac.gsdM.toFixed(1)}m)`;
   }
@@ -192,13 +222,15 @@ export function sourceSensorLabel(): string {
   return `${SENSOR_META.ohrc.label} · ${SENSOR_META.ohrc.gsdM} m/px (Source)`;
 }
 
-/** Sensor card progress breakdown strings in Console.tsx (live GSD throughout). */
+/** Sensor card progress breakdown strings in Console.tsx (live GSD throughout; "—" when unknown). */
 export function sensorCardGsd(triplet: TripletSummary | null | undefined, id: SensorKind): string {
+  const gsd = sensorMeta(triplet, id).gsdM;
+  if (!Number.isFinite(gsd)) return "—";
   switch (id) {
     case "lro_nac":
-      return `${sensorMeta(triplet, "lro_nac").gsdM.toFixed(1)} m/px`;
+      return `${gsd.toFixed(1)} m/px`;
     default:
-      return `${sensorMeta(triplet, id).gsdM} m/px`;
+      return `${gsd} m/px`;
   }
 }
 

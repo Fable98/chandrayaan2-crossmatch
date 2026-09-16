@@ -34,6 +34,11 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
       t.tmc2_product_id &&
       t.iirs_product_id
   );
+  // Honest accounting: the filter above must never silently shrink the run.
+  const excludedCount = (triplets || []).length - rows.length;
+
+  const rowKey = (t: TripletResult, i: number): string =>
+    String(t.region_id ?? t.triplet_id ?? t.id ?? `row-${i}`);
 
   if (rows.length === 0) {
     return (
@@ -61,6 +66,11 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
           {rows.length} triplet(s)
         </span>
       </div>
+      {excludedCount > 0 && (
+        <p className="border-b border-slate-100 dark:border-[#1b2029] bg-amber-50/60 dark:bg-amber-950/20 px-6 py-2 font-mono text-[11px] text-amber-700 dark:text-amber-300">
+          +{excludedCount} LRO/external row{excludedCount === 1 ? "" : "s"} excluded — this table renders true OHRC+TMC-2+IIRS triplets only.
+        </p>
+      )}
 
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs border-collapse">
@@ -82,7 +92,7 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
               const isExpanded = expandedIdx === i;
 
               return (
-                <React.Fragment key={i}>
+                <React.Fragment key={rowKey(t, i)}>
                   <tr
                     onClick={() => setExpandedIdx(isExpanded ? null : i)}
                     className={`transition-colors cursor-pointer ${

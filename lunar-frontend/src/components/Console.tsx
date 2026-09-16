@@ -150,9 +150,21 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
 
     const matchKey = referenceMode === "lro_nac" ? `${selectedId}_lro_nac` : selectedId;
 
+    // LRO cross-match rows live at {id}_lro_nac; the plain-id fallback fires
+    // ONLY on 404 (no LRO row for this region). Any other failure (401/500/
+    // timeout) must surface as an error — silently swallowing it would render
+    // a neighbouring region's dots as this region's verification.
+    const matchesFor = (key: string) =>
+      api.getMatches(key).catch((err) => {
+        if (matchKey !== selectedId && err instanceof ApiError && err.status === 404) {
+          return api.getMatches(selectedId);
+        }
+        throw err;
+      });
+
     Promise.all([
       api.getTriplet(selectedId),
-      api.getMatches(matchKey).catch(() => api.getMatches(selectedId)),
+      matchesFor(matchKey),
       api.getIirsOverlay(selectedId).catch(() => null),
     ])
       .then(([d, m, iirs]) => {

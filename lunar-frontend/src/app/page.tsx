@@ -6,7 +6,7 @@ import Console from "@/components/Console";
 import ExploreMoonHero from "@/components/hero/ExploreMoonHero";
 import AboutPage from "@/components/AboutPage";
 import LoginPage from "@/components/LoginPage";
-import { isAuthenticated, logout, getCurrentUser, type AuthUser } from "@/lib/auth";
+import { isAuthenticated, logout, fetchCurrentUser, type AuthUser } from "@/lib/auth";
 
 type View = "hero" | "console" | "about" | "login";
 
@@ -17,12 +17,25 @@ function MainContent() {
   const [authChecked, setAuthChecked] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
 
-  // Check authentication on mount
+  // Validate the stored token against the backend on mount — a
+  // localStorage token alone is never trusted (it may be expired, rotated,
+  // or revoked server-side). fetchCurrentUser clears dead tokens and
+  // returns null, dropping the UI to the login wall.
   useEffect(() => {
-    if (isAuthenticated()) {
-      setUser(getCurrentUser());
-    }
-    setAuthChecked(true);
+    let active = true;
+    (async () => {
+      if (!isAuthenticated()) {
+        if (active) setAuthChecked(true);
+        return;
+      }
+      const user = await fetchCurrentUser();
+      if (!active) return;
+      setUser(user);
+      setAuthChecked(true);
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
 
   // Determine initial view from URL, but gate behind auth
@@ -63,7 +76,9 @@ function MainContent() {
   }, [searchParams, view, authChecked]);
 
   const handleLoginSuccess = useCallback(() => {
-    setUser(getCurrentUser());
+    // Re-validate against the backend so the post-login user always reflects
+    // the live session, not a stale localStorage snapshot.
+    fetchCurrentUser().then((u) => setUser(u));
     setView("hero");
     router.push("/");
   }, [router]);

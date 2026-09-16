@@ -123,3 +123,97 @@ describe("frontend contract smoke", () => {
     }
   });
 });
+
+describe("phase 4 hardening", () => {
+  it("API_BASE treats empty-string env as unset (||, not ??)", () => {
+    const text = readFileSync(join(SRC, "lib", "api.ts"), "utf-8");
+    assert.ok(!text.includes('NEXT_PUBLIC_API_BASE_URL ??'), "empty-string env must fall back (?? keeps '')");
+    assert.ok(text.includes('NEXT_PUBLIC_API_BASE_URL ||'), "must use || for the base URL");
+  });
+
+  it("api layer has a GET timeout budget and a 401 branch", async () => {
+    const text = readFileSync(join(SRC, "lib", "api.ts"), "utf-8");
+    assert.ok(text.includes("AbortSignal.timeout"), "GETs must carry an abort timeout");
+    assert.ok(text.includes("API_GET_TIMEOUT_MS"), "timeout budget must be a named constant");
+    assert.equal(api.API_GET_TIMEOUT_MS, 15000);
+    assert.ok(text.includes("status === 401"), "401 must throw a re-login ApiError, not a generic failure");
+  });
+
+  it("auth decodes exp client-side; expired tokens never authenticate", async () => {
+    const auth = await importLib("auth.ts");
+    const b64 = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+    const future = `h.${b64({ exp: Math.floor(Date.now() / 1000) + 3600 })}.s`;
+    const past = `h.${b64({ exp: Math.floor(Date.now() / 1000) - 3600 })}.s`;
+    assert.equal(auth.isTokenExpired(future), false);
+    assert.equal(auth.isTokenExpired(past), true);
+    assert.equal(auth.isTokenExpired("garbage"), true);
+    assert.equal(auth.isTokenExpired(null), true);
+  });
+
+  it("landing page validates the token against the backend on mount", () => {
+    const text = readFileSync(join(SRC, "app", "page.tsx"), "utf-8");
+    assert.ok(text.includes("fetchCurrentUser"), "must validate via /auth/me, not trust localStorage");
+  });
+
+  it("Console LRO fallback fires on 404 only", () => {
+    const text = readFileSync(join(SRC, "components", "Console.tsx"), "utf-8");
+    assert.ok(text.includes("err.status === 404"), "matches fallback must be 404-gated");
+  });
+
+  it("RegistrationLauncher sends auth on moon-points/matches and budgets fetches", () => {
+    const text = readFileSync(join(SRC, "components", "RegistrationLauncher.tsx"), "utf-8");
+    assert.ok(text.includes("moon-points/${jobId}`"), "moon-points fetch must exist");
+    assert.ok(text.includes("getAuthHeaders()"), "all backend fetches must carry auth headers");
+    assert.ok(text.includes("REGISTER_TIMEOUT_MS"), "POST /register needs its own (longer) budget");
+    assert.ok(!text.includes('await import("@/lib/auth")'), "no per-call dynamic auth imports");
+  });
+
+  it("LinkedCursor math scales by natural dims with confidence guards", () => {
+    const text = readFileSync(join(SRC, "components", "LinkedCursorPanel.tsx"), "utf-8");
+    assert.ok(!text.includes("coords[0] / TILE_PX"), "dot fractions must not hardcode 512");
+    assert.ok(text.includes("nat.w") && text.includes("nat.h"), "dots and clicks scale by natural dims");
+    assert.ok(text.includes("p.confidence ?? 0"), "missing confidence must render 0%, never NaN%");
+  });
+
+  it("MapPanel rewrites unrenderable TIFF overlays and badges the fallback", () => {
+    const text = readFileSync(join(SRC, "components", "MapPanel.tsx"), "utf-8");
+    assert.ok(/\.tiff\?/.test(text), "must detect .tif/.tiff overlay URLs");
+    assert.ok(text.includes("TIFF"), "must badge the PNG-preview fallback");
+  });
+
+  it("sensors: unknown ids stay unknown; filter labels derive from SENSOR_META", async () => {
+    const sensors = await importLib("sensors.ts");
+    assert.equal(sensors.normalizeSensorId("TMC-2"), "tmc");
+    assert.equal(sensors.normalizeSensorId("LRO_NAC"), "lro_nac");
+    assert.equal(sensors.normalizeSensorId("FUTURE-X"), "unknown");
+    assert.ok(sensors.sensorFilterLabel("tmc").includes("5"), "TMC label must track the 5.0 spec, not a 4m string");
+    assert.ok(sensors.sensorFilterLabel("iirs").includes("80"), "IIRS label must track the 80.0 spec, not a 70m string");
+  });
+
+  it("IngestPage poll is bounded with backoff", () => {
+    const text = readFileSync(join(SRC, "components", "ingest", "IngestPage.tsx"), "utf-8");
+    assert.ok(text.includes("MAX_POLL_FAILURES"), "poll loop must stop after N consecutive failures");
+    assert.ok(text.includes("2 **"), "backoff must grow exponentially between retries");
+  });
+
+  it("DropZone loops readEntries, recurses, and toasts ignored files", () => {
+    const text = readFileSync(join(SRC, "components", "ingest", "DropZone.tsx"), "utf-8");
+    assert.ok(text.includes("for (;;)"), "directory reads must loop until readEntries drains");
+    assert.ok(text.includes("ignoredNotice") || text.includes("onIgnored"), "ignored non-.zip files must surface, not vanish");
+  });
+
+  it("ResultsTable accounts for LRO-excluded rows and keys by triplet id", () => {
+    const text = readFileSync(join(SRC, "components", "ingest", "ResultsTable.tsx"), "utf-8");
+    assert.ok(text.includes("excludedCount"), "must show how many LRO/external rows were filtered");
+    assert.ok(!text.includes("key={i}"), "rows must not key by array index");
+    assert.ok(text.includes("region_id"), "row keys must derive from the triplet id");
+  });
+
+  it("image proxy contains resolved paths and 502s when the backend is down", () => {
+    const text = readFileSync(join(SRC, "app", "images", "[...slug]", "route.ts"), "utf-8");
+    assert.ok(text.includes("startsWith(publicDir"), "candidates must resolve inside publicDir (traversal guard)");
+    assert.ok(text.includes("status: 502"), "upstream-down must be 502, not 404");
+    assert.ok(text.includes("promises as fs"), "must use async fs/promises, not sync fs");
+    assert.ok(!text.includes("fs.existsSync") && !text.includes("fs.readFileSync") && !text.includes("fs.statSync"), "no sync fs calls on the hot path");
+  });
+});
