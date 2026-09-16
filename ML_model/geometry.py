@@ -660,11 +660,29 @@ def estimate_topographic_relief_strain(
         global_err = np.where(np.isfinite(global_err), global_err, 1e6)
     rmse_global = float(np.sqrt(np.mean(global_err ** 2)))
 
-    # 2. Local piecewise affine / k-NN error
+    # 2. Local piecewise affine / k-NN error (cKDTree, not O(n^2) argsort).
+    try:
+        from scipy.spatial import cKDTree as _KDTree
+    except Exception:
+        _KDTree = None
+    if _KDTree is not None:
+        try:
+            _k = max(4, min(6, n))
+            _, _idx = _KDTree(p1).query(p1, k=_k)
+            _idx = np.atleast_2d(np.asarray(_idx))
+            if _idx.shape[0] != n:
+                _idx = np.broadcast_to(_idx, (n, _k))
+        except Exception:
+            _idx = None
+    else:
+        _idx = None
     local_errs = []
     for i in range(n):
-        dists = np.linalg.norm(p1 - p1[i], axis=1)
-        k_indices = np.argsort(dists)[:max(4, min(6, n))]
+        if _idx is not None:
+            k_indices = np.asarray(_idx[i]).ravel()
+        else:
+            dists = np.linalg.norm(p1 - p1[i], axis=1)
+            k_indices = np.argsort(dists)[:max(4, min(6, n))]
         M, _ = cv2.estimateAffine2D(p1[k_indices], p2[k_indices])
         if M is not None:
             pt_proj = M @ np.array([p1[i, 0], p1[i, 1], 1.0])

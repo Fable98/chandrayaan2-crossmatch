@@ -38,15 +38,26 @@ def iirs_reduce(
 def _pca_bands(arr: np.ndarray, n_components: int, in_place: bool = False) -> np.ndarray:
     bands, h, w = arr.shape
     x = arr.reshape(bands, -1)
-    mean = x.mean(axis=1, keepdims=True)
+    # Subsample 50k pixels for the covariance fit on large scenes (deterministic
+    # seed): full-res eigendecomposition is O(B^2 * H * W) with no accuracy gain
+    # for a 1-component projection. Small scenes use every pixel (bit-identical).
+    n_pix = x.shape[1]
+    fit = x
+    if n_pix > 50_000:
+        rng = np.random.default_rng(20260916)
+        sel = rng.choice(n_pix, size=50_000, replace=False)
+        fit = x[:, sel]
+    mean = fit.mean(axis=1, keepdims=True)
     if in_place:
         # Center the caller's buffer directly: skips a full-size (~66MB for an
         # IIRS window) temporary. Only pass True for single-use buffers.
         x -= mean
         xc = x
+        fit_c = fit - mean
     else:
         xc = x - mean
-    cov = np.cov(xc)
+        fit_c = fit - mean
+    cov = np.cov(fit_c)
     eigvals, eigvecs = np.linalg.eigh(cov)
     order = np.argsort(eigvals)[::-1]
     k = min(n_components, bands)

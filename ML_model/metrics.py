@@ -331,9 +331,9 @@ def calculate_spatial_distribution(
     gx = np.clip(np.floor(pts[:, 0] / max(1e-6, cell_w)).astype(int), 0, grid_size - 1)
     gy = np.clip(np.floor(pts[:, 1] / max(1e-6, cell_h)).astype(int), 0, grid_size - 1)
 
-    cell_counts = np.zeros((grid_size, grid_size), dtype=np.int32)
-    for i in range(len(pts)):
-        cell_counts[gy[i], gx[i]] += 1
+    cell_counts = np.bincount(
+        (gy * grid_size + gx).ravel(), minlength=total_cells
+    ).reshape(grid_size, grid_size).astype(np.int32, copy=False)
 
     flat_counts = cell_counts.flatten()
     occupied = int(np.sum(flat_counts > 0))

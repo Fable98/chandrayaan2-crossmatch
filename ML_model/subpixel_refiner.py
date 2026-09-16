@@ -98,13 +98,34 @@ class SubPixelRefiner:
         if patch_size % 2 == 0:
             patch_size += 1
         patch_size = max(3, patch_size)
+
+        ref = self._to_gray_uint8(ref_img)
+        src = self._to_gray_uint8(src_img)
+        return self._refine_match_u8(ref, src, ref_pt, src_pt, patch_size=patch_size)
+
+    def _refine_match_u8(
+        self,
+        ref: np.ndarray,
+        src: np.ndarray,
+        ref_pt: tuple,
+        src_pt: tuple,
+        patch_size: int = 21,
+    ) -> tuple:
+        """Refine one match on pre-converted uint8 grays (no per-call convert).
+
+        Batch callers convert once and reuse this fast path; numerical output
+        is identical to :meth:`refine_match`.
+        """
+        # Enforce an odd patch size so the window has a true centre pixel.
+        patch_size = int(patch_size)
+        if patch_size % 2 == 0:
+            patch_size += 1
+        patch_size = max(3, patch_size)
         half = patch_size // 2
         margin = 5  # search window extends 5 px beyond patch on each side
         search_size = patch_size + 2 * margin  # == patch_size + 10
         s_half = search_size // 2
 
-        ref = self._to_gray_uint8(ref_img)
-        src = self._to_gray_uint8(src_img)
         h_ref, w_ref = ref.shape[:2]
         h_src, w_src = src.shape[:2]
 
@@ -234,7 +255,7 @@ class SubPixelRefiner:
             r_pt = (float(ref_pt[0]) / div, float(ref_pt[1]) / div)
             s_pt = (float(est[0]) / div, float(est[1]) / div)
             try:
-                fx, fy, conf = self.refine_match(
+                fx, fy, conf = self._refine_match_u8(
                     ref_pyr[lvl], src_pyr[lvl], r_pt, s_pt, patch_size=patch_size)
             except Exception:
                 fx, fy, conf = s_pt[0], s_pt[1], 0.0
@@ -283,11 +304,21 @@ class SubPixelRefiner:
                 np.zeros((0, 2), dtype=np.float32),
             )
 
+        # Convert once outside the loop (was N× normalize+cvtColor).
+        try:
+            ref_u8 = self._to_gray_uint8(ref_img)
+            src_u8 = self._to_gray_uint8(src_img)
+        except ValueError:
+            return (
+                np.zeros((0, 2), dtype=np.float32),
+                np.zeros((0, 2), dtype=np.float32),
+            )
+
         kept_ref, kept_src = [], []
         for rp, sp in zip(ref_pts, src_pts):
             try:
-                fx, fy, conf = self.refine_match(
-                    ref_img, src_img, (float(rp[0]), float(rp[1])),
+                fx, fy, conf = self._refine_match_u8(
+                    ref_u8, src_u8, (float(rp[0]), float(rp[1])),
                     (float(sp[0]), float(sp[1])), patch_size=patch_size,
                 )
             except ValueError:

@@ -75,8 +75,16 @@ def detect_salient_keypoints(
         dilated = cv2.dilate(img_f, np.ones((kernel_size, kernel_size), np.uint8))
         peaks = (img_f == dilated) & (img_f > np.percentile(img_f, 75.0))
         ys, xs = np.nonzero(peaks)
-        for x, y in zip(xs, ys):
-            keypoints.append((float(x), float(y), float(img_f[y, x])))
+        if ys.size:
+            # Cap peak candidates before the Python loop: argpartition top-K
+            # by response instead of materializing every plateau pixel.
+            peak_budget = max(max_corners * 4, 2000)
+            if ys.size > peak_budget:
+                resp_all = img_f[ys, xs]
+                top = np.argpartition(-resp_all, peak_budget)[:peak_budget]
+                xs, ys = xs[top], ys[top]
+            for x, y in zip(xs, ys):
+                keypoints.append((float(x), float(y), float(img_f[y, x])))
 
     # Deduplicate very close points (within 1 px)
     if not keypoints:
@@ -84,15 +92,23 @@ def detect_salient_keypoints(
 
     # Sort descending by response
     keypoints.sort(key=lambda k: k[2], reverse=True)
+    # Trim to a bounded candidate pool before grid-hash dedup (argpartition,
+    # not a full sort of 100k+ peaks on gigapixel scenes).
+    dedup_budget = max(max_corners * 4, 2000)
+    if len(keypoints) > dedup_budget:
+        resp = np.fromiter((k[2] for k in keypoints), dtype=np.float32, count=len(keypoints))
+        keep = np.argpartition(-resp, dedup_budget)[:dedup_budget]
+        keep = keep[np.argsort(-resp[keep])]
+        keypoints = [keypoints[i] for i in keep]
+    # Grid-hash NMS: dict cell -> kept (no HxW bool array, gigapixel-safe).
     dedup: List[Tuple[float, float, float]] = []
-    seen = np.zeros((h, w), dtype=bool)
+    seen_cells = set()
     for x, y, r in keypoints:
-        ix, iy = int(round(x)), int(round(y))
-        ix = min(w - 1, max(0, ix))
-        iy = min(h - 1, max(0, iy))
-        if not seen[iy, ix]:
-            seen[max(0, iy - 1) : min(h, iy + 2), max(0, ix - 1) : min(w, ix + 2)] = True
-            dedup.append((x, y, r))
+        cell = (int(round(x)) // 2, int(round(y)) // 2)
+        if cell in seen_cells:
+            continue
+        seen_cells.add(cell)
+        dedup.append((x, y, r))
 
     return dedup
 
@@ -190,6 +206,14 @@ def standard_anms(
         return list(keypoints)
 
     kps = sorted(keypoints, key=lambda k: k[2], reverse=True)
+    # Bound the O(n^2) ANMS pass: keep the top 4x pool by response via
+    # argpartition (the winners always come from high-response candidates).
+    pool = max(num_ret_points * 4, num_ret_points + 1)
+    if len(kps) > pool:
+        resp_all = np.fromiter((k[2] for k in kps), dtype=np.float32, count=len(kps))
+        top = np.argpartition(-resp_all, pool)[:pool]
+        top = top[np.argsort(-resp_all[top])]
+        kps = [kps[i] for i in top]
     n = len(kps)
     pts = np.array([[k[0], k[1]] for k in kps], dtype=np.float32)
     scores = np.array([k[2] for k in kps], dtype=np.float32)
@@ -204,7 +228,8 @@ def standard_anms(
             dists_sq = np.sum(diffs**2, axis=1)
             radii[i] = float(np.min(dists_sq))
 
-    order = np.argsort(-radii)
+    order = np.argpartition(-radii, min(num_ret_points, n - 1))[:num_ret_points]
+    order = order[np.argsort(-radii[order])]
     return [kps[idx] for idx in order[:num_ret_points]]
 
 

@@ -126,8 +126,23 @@ def extract_sensor_metadata(
     1. Product metadata / PDS4 XML label / GeoTIFF embedded tags.
     2. Explicit caller / API request parameters.
     3. Standard sensor defaults with explicit source tracking.
+
+    In-memory ndarrays (tiled matching) skip file inference and resolve via
+    declared_sensor / explicit overrides only.
     """
-    p = Path(image_path)
+    import numpy as _np
+    if isinstance(image_path, _np.ndarray):
+        try:
+            st = normalize_sensor_name(declared_sensor) if declared_sensor else "UNKNOWN"
+        except Exception:
+            st = str(declared_sensor).strip().upper() if declared_sensor else "UNKNOWN"
+        prov: Dict[str, str] = {"sensor": "request" if declared_sensor else "unknown",
+                                "gsd_m": "request" if explicit_gsd is not None else "unavailable",
+                                "note": "in-memory tile; no file header"}
+        return SensorMetadata(sensor=st, gsd_m=explicit_gsd,  # type: ignore[arg-type]
+                              emission_angle_deg=explicit_emission,
+                              provenance=prov)
+    p = Path(image_path)  # type: ignore[arg-type]
     provenance: Dict[str, str] = {}
 
     # Step 1: Infer sensor type

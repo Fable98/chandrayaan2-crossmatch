@@ -178,12 +178,21 @@ def _bootstrap_ci(
     ci: float = 0.95,
     seed: int = 42,
 ) -> Optional[Dict[str, Any]]:
-    """Calculates bootstrap confidence interval over non-null metric values."""
+    """Calculates bootstrap confidence interval over non-null metric values.
+
+    Perf: single vectorized resample (n_resamples x n index draw, one pass)
+    instead of a 1000-iteration Python mean loop. The resample stream differs
+    from the legacy loop (randint matrix vs sequential choice), so CI bounds
+    may shift in the last decimal vs old runs — same estimator, same seeds,
+    statistically equivalent.
+    """
     if len(vals) < 3:
         return None
     rng = np.random.RandomState(seed)
     arr = np.asarray(vals, dtype=np.float64)
-    boot_means = [float(np.mean(rng.choice(arr, size=len(arr), replace=True))) for _ in range(n_resamples)]
+    n = len(arr)
+    idx = rng.randint(0, n, size=(int(n_resamples), n))
+    boot_means = np.mean(arr[idx], axis=1)
     alpha = (1.0 - ci) / 2.0
     low = float(np.percentile(boot_means, alpha * 100.0))
     high = float(np.percentile(boot_means, (1.0 - alpha) * 100.0))
@@ -196,12 +205,55 @@ def _bootstrap_ci(
     }
 
 
+def _evaluate_one_pair(
+    spec: Tuple[str, str, str, Optional[str], str, bool],
+) -> Dict[str, Any]:
+    """Top-level (spawn-safe) single-pair worker for ProcessPoolExecutor.
+
+    spec = (pair_id, source, reference, dem_or_None, pair_out_dir, use_dem).
+    Imports the engine inside the worker so spawn-method processes resolve
+    ML_model the same way the parent does.
+    """
+    pid, src, ref, dem, pair_out, use_dem = spec
+    try:
+        from matcher_cfog import match_images_cfog  # noqa: PLC0415
+    except Exception:
+        sys.path.insert(0, str(_ML_MODEL_DIR))
+        from matcher_cfog import match_images_cfog  # noqa: PLC0415
+    Path(pair_out).mkdir(parents=True, exist_ok=True)
+    status, message, metrics = "failed", "", None
+    try:
+        result = match_images_cfog(
+            str(src), str(ref),
+            dem_path=str(dem) if dem is not None else None,
+            output_dir=str(pair_out),
+        )
+        status = str(result.get("status", "failed"))
+        message = str(result.get("message", ""))
+        metrics = result.get("metrics")
+    except Exception as exc:  # Null safety: never crash the whole run
+        status, message, metrics = "exception", f"{type(exc).__name__}: {exc}", None
+    return to_json_safe({
+        "id": pid, "source": str(src), "reference": str(ref),
+        "dem": str(dem) if dem is not None else None,
+        "status": status, "message": message,
+        "pair_out": str(pair_out), "metrics": metrics,
+    })
+
+
 def evaluate_all(
     pairs: List[Dict[str, Optional[Path]]],
     output_dir: Path,
     use_dem: bool = True,
+    workers: int = 1,
 ) -> Tuple[Dict, List[Dict]]:
-    """Run match_images_cfog per pair; return (summary, pairwise_results)."""
+    """Run match_images_cfog per pair; return (summary, pairwise_results).
+
+    workers=1 (default) preserves the legacy serial loop. workers>1 fans pairs
+    out over a ProcessPoolExecutor (each pair is independent: own per_pair dir,
+    own RNG stream) so multi-pair evaluations use all cores. workers<=0 means
+    os.cpu_count().
+    """
     pairwise: List[Dict] = []
     fit_rmses: List[float] = []
     held_out_rmses: List[float] = []
@@ -219,7 +271,9 @@ def evaluate_all(
     per_pair_root = output_dir / "per_pair"
     per_pair_root.mkdir(parents=True, exist_ok=True)
 
-    for idx, pair in enumerate(pairs, start=1):
+    # Resolve DEM fallbacks + build spawn-safe specs up front (serial part).
+    _specs: List[Tuple[str, str, str, Optional[str], str, bool]] = []
+    for pair in pairs:
         pid = pair["id"]
         src = pair["source"]
         ref = pair["reference"]
@@ -227,29 +281,46 @@ def evaluate_all(
         if use_dem and dem is not None and not dem.exists():
             logger.warning("Pair %s: DEM %s not found — falling back to dem_path=None.", pid, dem)
             dem = None
+        _specs.append((pid, str(src), str(ref),
+                        str(dem) if dem is not None else None,
+                        str(per_pair_root / f"pair_{pid}"), bool(use_dem)))
 
-        logger.info("Processing pair %d of %d (id=%s)...", idx, total, pid)
-        pair_out = per_pair_root / f"pair_{pid}"
-        pair_out.mkdir(parents=True, exist_ok=True)
-
-        status = "failed"
-        message = ""
-        metrics: Optional[Dict] = None
+    _results: List[Dict[str, Any]] = []
+    _nw = int(workers)
+    if _nw <= 0:
+        import os as _os
+        _nw = max(1, _os.cpu_count() or 1)
+    if _nw > 1 and len(_specs) > 1:
+        import concurrent.futures as _cf
         try:
-            result = match_images_cfog(
-                str(src),
-                str(ref),
-                dem_path=str(dem) if dem is not None else None,
-                output_dir=str(pair_out),
-            )
-            status = str(result.get("status", "failed"))
-            message = str(result.get("message", ""))
-            metrics = result.get("metrics")
-        except Exception as exc:  # Null safety: never crash the whole run
-            status = "exception"
-            message = f"{type(exc).__name__}: {exc}"
-            logger.warning("Pair id=%s raised exception: %s\n%s", pid, exc, traceback.format_exc())
-            metrics = None
+            with _cf.ProcessPoolExecutor(max_workers=min(_nw, len(_specs))) as _ex:
+                for _r in _ex.map(_evaluate_one_pair, _specs):
+                    _results.append(_r)
+        except Exception as _ex_err:
+            logger.warning("Process pool failed (%s); falling back to serial loop.", _ex_err)
+            _results = []
+    if not _results:
+        for idx, _spec in enumerate(_specs, start=1):
+            logger.info("Processing pair %d of %d (id=%s)...", idx, total, _spec[0])
+            try:
+                _r = _evaluate_one_pair(_spec)
+            except Exception as exc:  # Null safety: never crash the whole run
+                _r = {"id": _spec[0], "source": _spec[1], "reference": _spec[2],
+                      "dem": _spec[3], "status": "exception",
+                      "message": f"{type(exc).__name__}: {exc}", "metrics": None}
+                logger.warning("Pair id=%s raised exception: %s\n%s", _spec[0], exc, traceback.format_exc())
+            _results.append(_r)
+
+    for _r in _results:
+        pid = _r.get("id")
+        src = _r.get("source")
+        ref = _r.get("reference")
+        dem = _r.get("dem")
+        status = str(_r.get("status", "failed"))
+        message = str(_r.get("message", ""))
+        metrics = _r.get("metrics")
+        if status in ("exception", "failed") and message:
+            logger.warning("Pair id=%s finished (status=%s): %s", pid, status, message[:300])
 
         fit_insample = _safe_float(metrics.get("fit_rmse_insample_px") or metrics.get("fit_rmse_px")) if (status == "success" and isinstance(metrics, dict)) else None
         heldout = _safe_float(metrics.get("held_out_validation_rmse_px") or metrics.get("held_out_rmse_px") or metrics.get("validation_rmse_px")) if (status == "success" and isinstance(metrics, dict)) else None
@@ -421,6 +492,8 @@ def parse_args(argv=None) -> argparse.Namespace:
     parser.add_argument("--use_dem", default=True, type=str2bool, nargs="?",
                         const=True, metavar="True|False",
                         help="Look for dem_<id>.* files (default: True). Missing DEMs fall back to dem_path=None.")
+    parser.add_argument("--workers", default=1, type=int,
+                        help="Parallel pair workers (default: 1 serial; >1 ProcessPool, <=0 all CPUs).")
     return parser.parse_args(argv)
 
 
@@ -441,7 +514,8 @@ def main(argv=None) -> int:
     if not pairs:
         logger.warning("No source_<id>/reference_<id> pairs found — writing empty report.")
 
-    summary, pairwise = evaluate_all(pairs, output_dir, use_dem=use_dem)
+    summary, pairwise = evaluate_all(pairs, output_dir, use_dem=use_dem,
+                                     workers=int(getattr(args, "workers", 1) or 1))
 
     json_path = output_dir / "isro_evaluation_summary.json"
     json_path.write_text(json.dumps(summary, indent=2), encoding="utf-8")

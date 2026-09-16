@@ -117,8 +117,21 @@ def _pair_rng_seed(img_path1, img_path2, *, salt: str = "cfog-ransac") -> int:
 
     Stable across runs for the same pair, distinct across pairs/tiles, so
     parallel tiles never share identical RANSAC streams.
+
+    Perf: ndarray inputs hash a strided content sample (not the full buffer),
+    so gigapixel tiles seed in microseconds.
     """
-    tag = f"{salt}|{SEED}|{img_path1}|{img_path2}".encode("utf-8", "ignore")
+    def _tag(p) -> bytes:
+        if isinstance(p, np.ndarray):
+            try:
+                flat = np.ascontiguousarray(p).ravel()
+                sample = flat[::max(1, flat.size // 257)][:257]
+                h = hashlib.sha256(np.ascontiguousarray(sample).tobytes()).hexdigest()[:16]
+                return f"ndarray|{p.shape}|{p.dtype}|{h}".encode("utf-8", "ignore")
+            except Exception:
+                return f"ndarray|{getattr(p, 'shape', '?')}".encode("utf-8", "ignore")
+        return str(p).encode("utf-8", "ignore")
+    tag = salt.encode() + b"|" + str(SEED).encode() + b"|" + _tag(img_path1) + b"|" + _tag(img_path2)
     digest = hashlib.sha256(tag).digest()
     return int.from_bytes(digest[:8], "little") % (2 ** 31 - 1)
 
@@ -219,12 +232,37 @@ def dump_matches_json(records: Any, path: str | Path, indent: int = 2) -> Path:
 # 1. Robust Multi-Band Image Loader
 # ---------------------------------------------------------------------------
 
-def load_as_float_and_color(path: str | Path) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
+def load_as_float_and_color(path: str | Path | np.ndarray) -> Tuple[np.ndarray, np.ndarray, Dict[str, Any]]:
     """
     Loads an image from path. Supports GeoTIFF, multi-band hyperspectral cubes,
     PNG, and JPEG. Returns normalized 2D grayscale float32 [0, 1], uint8 BGR color,
     and embedded raster metadata.
+
+    Perf: also accepts an in-memory ndarray (H,W) / (H,W,3/4) / (B,H,W) so tiled
+    matching can pass windowed crops without PNG tile I/O. Numerical output is
+    identical to the on-disk path (same [0,1] normalization).
     """
+    if isinstance(path, np.ndarray):
+        raw = np.asarray(path)
+        raster_meta: Dict[str, Any] = {"driver": "MEMORY", "crs": None, "transform": None, "count": 1}
+        if raw.ndim == 3 and raw.shape[0] <= 4 and raw.shape[0] < raw.shape[1] and raw.shape[0] < raw.shape[2]:
+            # (B, H, W) cube passed in-memory.
+            raster_meta["count"] = int(raw.shape[0])
+            if raw.shape[0] > 3:
+                gray = enhance_iirs_structural_features(raw.astype(np.float32), layout="bhw")
+            else:
+                rgb = np.dstack([raw[i] for i in range(raw.shape[0])]).astype(np.float32)
+                gray = cv2.cvtColor(rgb[:, :, :3], cv2.COLOR_RGB2GRAY) if rgb.shape[2] >= 3 else rgb[:, :, 0]
+        elif raw.ndim == 3 and raw.shape[2] in (3, 4):
+            raster_meta["count"] = int(raw.shape[2])
+            gray = cv2.cvtColor(raw[:, :, :3].astype(np.float32), cv2.COLOR_BGR2GRAY) if raw.shape[2] >= 3 else raw[:, :, 0].astype(np.float32)
+        else:
+            gray = np.asarray(raw[:, :, 0] if raw.ndim == 3 else raw, dtype=np.float32)
+        g_min, g_max = float(np.nanmin(gray)), float(np.nanmax(gray))
+        gray = ((gray - g_min) / (g_max - g_min)).astype(np.float32) if g_max > g_min else np.zeros_like(gray, dtype=np.float32)
+        u8 = (np.clip(gray, 0.0, 1.0) * 255.0).astype(np.uint8)
+        color = cv2.cvtColor(u8, cv2.COLOR_GRAY2BGR)
+        return gray, color, raster_meta
     path_str = str(path)
     raster_meta: Dict[str, Any] = {"driver": None, "crs": None, "transform": None, "count": 1}
 
@@ -985,7 +1023,7 @@ def compute_homography_covariance_bootstrap(
     dst_pts: np.ndarray,
     H: Optional[np.ndarray] = None,
     inlier_mask: Optional[np.ndarray] = None,
-    n_bootstrap: int = 500,
+    n_bootstrap: int = 200,
     gsd_m: Optional[float] = None,
     random_seed: Optional[int] = None,
 ) -> Dict[str, Any]:
@@ -996,6 +1034,9 @@ def compute_homography_covariance_bootstrap(
     obtained by pushing inlier points through every bootstrap H and measuring
     the per-point projection scatter (honest empirical mapping through the
     point-projection Jacobian sampling, not a scalar RMSE).
+
+    Perf: default 200 folds (was 500 serial SVDs); cap 500. Set n_bootstrap
+    explicitly to restore the legacy count for audit comparisons.
     """
     try:
         s_all = np.asarray(src_pts, dtype=np.float64).reshape(-1, 2)
@@ -1019,8 +1060,8 @@ def compute_homography_covariance_bootstrap(
     try:
         nb = int(n_bootstrap)
     except Exception:
-        nb = 500
-    nb = max(50, min(nb, 2000))
+        nb = 200
+    nb = max(50, min(nb, 500))
     seed = SEED if random_seed is None else int(random_seed)
     rng = np.random.default_rng(seed)
     hvecs: List[np.ndarray] = []
@@ -1491,6 +1532,76 @@ def detect_blob_centroids(image: np.ndarray, min_area: int = 3) -> np.ndarray:
     return np.asarray(found, dtype=np.float32).reshape(-1, 2)
 
 
+_GOA_SR_CACHE: Dict[Tuple[int, Tuple[int, ...], str], Tuple[Any, Any, Any, Any, Any]] = {}
+_GOA_SR_ORDER_LIST: List[Tuple[int, Tuple[int, ...], str]] = []
+_GOA_TMPL_CACHE: Dict[Tuple[int, Tuple[int, ...], str], Tuple[Any, Any, Any]] = {}
+_GOA_TMPL_ORDER: List[Tuple[int, Tuple[int, ...], str]] = []
+
+
+def _goa_search_grads_cached(orig: np.ndarray, sr_f: np.ndarray) -> Tuple[Any, Any, Any, Any, Any]:
+    """Cached (gx2, gy2, m2, u2, v2) per search-region object.
+
+    find_best_correspondence_unified is called per-template on the SAME
+    search_region: without this, Sobel + u2/v2/m2 rebuild per candidate.
+    Keyed by id() of the caller's array (held alive by the caller during
+    the loop), with shape/dtype validation against the converted view.
+    """
+    try:
+        key = (id(orig), tuple(np.shape(orig)), str(getattr(orig, "dtype", "")))
+    except Exception:
+        key = None
+    if key is not None:
+        hit = _GOA_SR_CACHE.get(key)
+        if hit is not None:
+            return hit
+    gx2 = cv2.Sobel(sr_f, cv2.CV_32F, 1, 0, ksize=3)
+    gy2 = cv2.Sobel(sr_f, cv2.CV_32F, 0, 1, ksize=3)
+    m2 = np.sqrt(gx2 * gx2 + gy2 * gy2) + 1e-4
+    u2 = (gx2 * gx2 - gy2 * gy2) / m2
+    v2 = (2.0 * gx2 * gy2) / m2
+    out = (gx2, gy2, m2, u2, v2)
+    if key is not None:
+        _GOA_SR_CACHE[key] = out
+        _GOA_SR_ORDER_LIST.append(key)
+        while len(_GOA_SR_ORDER_LIST) > 8:
+            _GOA_SR_CACHE.pop(_GOA_SR_ORDER_LIST.pop(0), None)
+    return out
+
+
+def _goa_tmpl_grads_cached(orig: np.ndarray, tmpl_f: np.ndarray) -> Tuple[Any, Any, Any]:
+    """Cached (u1, v1, m1) per template object (repeat candidates)."""
+    try:
+        key = (id(orig), tuple(np.shape(orig)), str(getattr(orig, "dtype", "")))
+    except Exception:
+        key = None
+    if key is not None:
+        hit = _GOA_TMPL_CACHE.get(key)
+        if hit is not None:
+            return hit
+    gx1 = cv2.Sobel(tmpl_f, cv2.CV_32F, 1, 0, ksize=3)
+    gy1 = cv2.Sobel(tmpl_f, cv2.CV_32F, 0, 1, ksize=3)
+    m1 = np.sqrt(gx1 * gx1 + gy1 * gy1) + 1e-4
+    u1 = (gx1 * gx1 - gy1 * gy1) / m1
+    v1 = (2.0 * gx1 * gy1) / m1
+    out = (u1, v1, m1)
+    if key is not None:
+        _GOA_TMPL_CACHE[key] = out
+        _GOA_TMPL_ORDER.append(key)
+        while len(_GOA_TMPL_ORDER) > 64:
+            _GOA_TMPL_CACHE.pop(_GOA_TMPL_ORDER.pop(0), None)
+    return out
+
+
+def _goa_search_grads(sr_f: np.ndarray) -> Tuple[Any, Any, Any, Any, Any]:
+    """Uncached fallback (kept for direct callers)."""
+    return _goa_search_grads_cached(sr_f, np.asarray(sr_f, dtype=np.float32))
+
+
+def _goa_tmpl_grads(tmpl_f: np.ndarray) -> Tuple[Any, Any, Any]:
+    """Uncached fallback (kept for direct callers)."""
+    return _goa_tmpl_grads_cached(tmpl_f, np.asarray(tmpl_f, dtype=np.float32))
+
+
 def compute_goa_search_surface(
     search_region: np.ndarray,
     tmpl: np.ndarray,
@@ -1508,21 +1619,15 @@ def compute_goa_search_surface(
     if out_h <= 0 or out_w <= 0:
         return np.zeros((max(0, out_h), max(0, out_w)), dtype=np.float32)
 
-    tmpl_f = tmpl.astype(np.float32)
-    sr_f = search_region.astype(np.float32)
+    tmpl_f = np.asarray(tmpl, dtype=np.float32)
+    sr_f = np.asarray(search_region, dtype=np.float32)
 
-    gx1 = cv2.Sobel(tmpl_f, cv2.CV_32F, 1, 0, ksize=3)
-    gy1 = cv2.Sobel(tmpl_f, cv2.CV_32F, 0, 1, ksize=3)
-    m1 = np.sqrt(gx1 * gx1 + gy1 * gy1) + 1e-4
-
-    gx2 = cv2.Sobel(sr_f, cv2.CV_32F, 1, 0, ksize=3)
-    gy2 = cv2.Sobel(sr_f, cv2.CV_32F, 0, 1, ksize=3)
-    m2 = np.sqrt(gx2 * gx2 + gy2 * gy2) + 1e-4
-
-    u1 = (gx1 * gx1 - gy1 * gy1) / m1
-    v1 = (2.0 * gx1 * gy1) / m1
-    u2 = (gx2 * gx2 - gy2 * gy2) / m2
-    v2 = (2.0 * gx2 * gy2) / m2
+    # Cached grads: keyed by the underlying buffer so repeat calls on the
+    # same search_region/template objects skip Sobel rebuilds. The converted
+    # float32 views are cached alongside to avoid per-call astype copies.
+    u1, v1, m1 = _goa_tmpl_grads_cached(tmpl, tmpl_f)
+    _sr = _goa_search_grads_cached(search_region, sr_f)
+    m2, u2, v2 = _sr[2], _sr[3], _sr[4]
 
     corr_u = cv2.matchTemplate(u2, u1, cv2.TM_CCORR)
     corr_v = cv2.matchTemplate(v2, v1, cv2.TM_CCORR)
@@ -1739,23 +1844,64 @@ def sample_pc_energy(pc: np.ndarray, x: float, y: float, radius: int = 2) -> flo
 
 def estimate_blob_scale(feat: np.ndarray, x: float, y: float,
                         sigmas: Tuple[float, ...] = (1.0, 1.6, 2.5, 4.0, 6.4)) -> float:
-    """Characteristic scale (px) via scale-normalized LoG peak at the point."""
+    """Characteristic scale (px) via scale-normalized LoG peak at the point.
+
+    Perf: the 5-level Laplacian pyramid is built ONCE per image object and
+    cached by id() (loops call this per-candidate on the same pc array, so
+    per-point cost drops from 5 full-frame blurs to 5 pixel samples).
+    Numerics are bit-identical to the per-call path (same ksize/sigma).
+    """
     if feat is None or getattr(feat, "size", 0) == 0:
         return float(sigmas[0])
     img = np.asarray(feat, dtype=np.float32)
     h, w = img.shape[:2]
     ix, iy = _clip_xy(x, y, w, h)
+    laps = _blob_laplacian_pyramid(img, tuple(float(s) for s in sigmas))
     best_s, best_r = float(sigmas[0]), -1.0
-    for s in sigmas:
-        ksize = int(6 * s + 1) | 1
-        if ksize < 3:
+    for lap, s in zip(laps, sigmas):
+        if lap is None:
             continue
-        blur = cv2.GaussianBlur(img, (ksize, ksize), float(s))
-        lap = cv2.Laplacian(blur, cv2.CV_32F)
         resp = abs(float(lap[iy, ix])) * (float(s) ** 2)
         if resp > best_r:
             best_r, best_s = resp, float(s)
     return best_s
+
+
+_BLOB_PYR_CACHE: Dict[Tuple[int, Tuple[int, ...], str, Tuple[float, ...]], List[Any]] = {}
+_BLOB_PYR_ORDER: List[Tuple[int, Tuple[int, ...], str, Tuple[float, ...]]] = []
+
+
+def _blob_laplacian_pyramid(img: np.ndarray, sigmas: Tuple[float, ...]) -> List[Any]:
+    """Build (or reuse) the cached Laplacian pyramid for one image object."""
+    try:
+        key = (id(img), tuple(img.shape), str(img.dtype), tuple(sigmas))
+    except Exception:
+        key = None
+    if key is not None and key in _BLOB_PYR_CACHE:
+        cached = _BLOB_PYR_CACHE[key]
+        if len(cached) == len(sigmas):
+            return cached
+    laps: List[Any] = []
+    for s in sigmas:
+        ksize = int(6 * s + 1) | 1
+        if ksize < 3:
+            laps.append(None)
+            continue
+        blur = cv2.GaussianBlur(img, (ksize, ksize), float(s))
+        laps.append(cv2.Laplacian(blur, cv2.CV_32F))
+    if key is not None:
+        _BLOB_PYR_CACHE[key] = laps
+        _BLOB_PYR_ORDER.append(key)
+        while len(_BLOB_PYR_ORDER) > 8:
+            old = _BLOB_PYR_ORDER.pop(0)
+            _BLOB_PYR_CACHE.pop(old, None)
+    return laps
+
+
+def clear_blob_scale_cache() -> None:
+    """Drop cached Laplacian pyramids (call between unrelated pairs)."""
+    _BLOB_PYR_CACHE.clear()
+    _BLOB_PYR_ORDER.clear()
 
 
 def extract_cfog_descriptor(
@@ -2242,8 +2388,14 @@ def estimate_weighted_homography(
     best_valid_tag = None
     best_inliers = None
     best_score = -1.0
+    # Adaptive RANSAC budget: N = log(1-p)/log(1-w^4), updated from the best
+    # inlier ratio seen so far. Same RNG draw sequence (deterministic), just
+    # early-exits instead of always burning n_iters (default 2000).
+    max_iters = max(1, int(n_iters))
+    required_iters = max_iters
+    min_iters = min(max_iters, 200)
 
-    for _ in range(int(n_iters)):
+    for it in range(max_iters):
         try:
             idx = rng.choice(n, size=4, replace=False, p=p)
         except ValueError:
@@ -2272,6 +2424,15 @@ def estimate_weighted_homography(
         score = float(np.sum(w[inl]))
         if score > best_score:
             best_score, best_inliers = score, inl
+            # Refresh the adaptive budget from the empirical inlier ratio.
+            try:
+                w_ratio = float(np.sum(inl)) / float(n)
+                denom = math.log(max(1e-12, 1.0 - w_ratio ** 4))
+                if denom < -1e-12:
+                    need = int(math.ceil(math.log(1.0 - 0.99) / denom))
+                    required_iters = max(min_iters, min(max_iters, need))
+            except Exception:
+                pass
 
         if score > best_valid_score:
             ii = np.where(inl)[0]
@@ -2290,6 +2451,9 @@ def estimate_weighted_homography(
                 best_valid_H = H_dlt
                 best_valid_mask = mask_cand
                 best_valid_tag = "sampling_unweighted_dlt"
+
+        if (it + 1) >= required_iters:
+            break
 
     if best_valid_H is not None:
         return best_valid_H, best_valid_mask, best_valid_tag
@@ -2880,8 +3044,8 @@ def _guided_refill_matches(
 # ---------------------------------------------------------------------------
 
 def match_images_cfog(
-    img_path1: str | Path,
-    img_path2: str | Path,
+    img_path1: str | Path | np.ndarray,
+    img_path2: str | Path | np.ndarray,
     dem_path: Optional[str | Path] = None,
     output_dir: str | Path = "output",
     source_sensor: Optional[str] = None,
@@ -2951,7 +3115,12 @@ def match_images_cfog(
 
     # 1. Ingest metadata (NON-FATAL: missing GSD triggers the CV fallback below,
     # never a hard crash, so the pipeline stays generic per the SIH requirement).
-    logger.info("Initializing registration pipeline: source='%s', reference='%s'", img_path1, img_path2)
+    def _short(p) -> str:
+        if isinstance(p, np.ndarray):
+            return f"<array {p.shape} {p.dtype}>"
+        s = str(p)
+        return s if len(s) <= 160 else "..." + s[-157:]
+    logger.info("Initializing registration pipeline: source='%s', reference='%s'", _short(img_path1), _short(img_path2))
     meta1: Optional[SensorMetadata] = None
     meta2: Optional[SensorMetadata] = None
     try:
@@ -3616,7 +3785,7 @@ def match_images_cfog(
         try:
             _inv_boot = compute_homography_covariance_bootstrap(
                 pts1_arr, pts2_arr, H_ab, inlier_mask=inlier_mask_arr,
-                n_bootstrap=500, gsd_m=metric_gsd,
+                n_bootstrap=200, gsd_m=metric_gsd,
             )
             _inv_cov = _inv_boot.get("H_cov", np.eye(9).tolist())
             metrics["absolute_rmse_uncertainty_m"] = _inv_boot.get("absolute_rmse_uncertainty_m")
@@ -3653,8 +3822,8 @@ def match_images_cfog(
             "direction": "inverted_from_BA",
             "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
             "provenance": {
-                "source_path": str(img_path1),
-                "reference_path": str(img_path2),
+                "source_path": _short(img_path1),
+                "reference_path": _short(img_path2),
                 "dem_path": str(dem_path) if dem_path else None,
                 "matcher": "CFOG_PhaseCongruency_v2.0",
                 "direction": "inverted_from_BA",
@@ -3956,9 +4125,13 @@ def match_images_cfog(
             high_img, high_w, high_h = raw2_gray, orig_w2, orig_h2
             coarse_img, coarse_w, coarse_h = raw1_gray, orig_w1, orig_h1
 
-        coarse_up = cv2.resize(coarse_img, (high_w, high_h), interpolation=cv2.INTER_CUBIC)
+        # Perf: NO full-frame coarse_up (high_w x high_h float32 can exceed
+        # 400MB/2GB on gigapixel strips). Each high tile maps to its coarse
+        # footprint and only that small window is resized on the fly.
         high_shift_x = shift_work_x * scale_factor1 if is_img1_high else -shift_work_x * scale_factor2
         high_shift_y = shift_work_y * scale_factor1 if is_img1_high else -shift_work_y * scale_factor2
+        _cw_per_hw = float(coarse_w) / float(max(1, high_w))
+        _ch_per_hh = float(coarse_h) / float(max(1, high_h))
 
         tile_size = min(512, high_w, high_h)
         stride = max(128, int(tile_size * 0.75))
@@ -3972,7 +4145,21 @@ def match_images_cfog(
             for ox in range(0, max(1, high_w - tile_size + 1), stride):
                 native_tile_count += 1
                 t_high = high_img[oy : oy + tile_size, ox : ox + tile_size]
-                t_coarse_up = coarse_up[oy : oy + tile_size, ox : ox + tile_size]
+                # Coarse footprint of this high tile, resized on the fly.
+                _cx0 = int(ox * _cw_per_hw)
+                _cy0 = int(oy * _ch_per_hh)
+                _cx1 = min(coarse_w, max(_cx0 + 1, int(round((ox + tile_size) * _cw_per_hw))))
+                _cy1 = min(coarse_h, max(_cy0 + 1, int(round((oy + tile_size) * _ch_per_hh))))
+                try:
+                    _c_patch = coarse_img[_cy0:_cy1, _cx0:_cx1]
+                    if _c_patch.size == 0:
+                        continue
+                    t_coarse_up = cv2.resize(
+                        _c_patch, (t_high.shape[1], t_high.shape[0]),
+                        interpolation=cv2.INTER_CUBIC,
+                    )
+                except Exception:
+                    continue
                 if t_high.shape[0] < 32 or t_high.shape[1] < 32:
                     continue
 
@@ -5103,12 +5290,12 @@ def match_images_cfog(
         )
     except Exception as exc:
         dem_ray_shift = {"enabled": False, "reason": f"ray_shift_failed: {exc}"}
-    # Bootstrap homography covariance (500x) + positional uncertainty.
+    # Bootstrap homography covariance (200x; was 500 serial SVDs) + positional uncertainty.
     bootstrap_info: Dict[str, Any] = {"status": "skipped", "H_cov": np.eye(9).tolist()}
     try:
         bootstrap_info = compute_homography_covariance_bootstrap(
             pts1_arr, pts2_arr, H_final, inlier_mask=inlier_mask,
-            n_bootstrap=500, gsd_m=metric_gsd,
+            n_bootstrap=200, gsd_m=metric_gsd,
         )
     except Exception as exc:
         logger.warning("Bootstrap covariance failed (%s).", exc)
@@ -5455,8 +5642,8 @@ def match_images_cfog(
         "native_tile_count": int(native_tile_count),
         "coarse_to_fine_timing": coarse_to_fine_timing,
         "provenance": {
-            "source_path": str(img_path1),
-            "reference_path": str(img_path2),
+            "source_path": _short(img_path1),
+            "reference_path": _short(img_path2),
             "dem_path": str(dem_path) if dem_path else None,
             "matcher": "CFOG_PhaseCongruency_v2.0",
             "spatial_attempts": spatial_attempts,

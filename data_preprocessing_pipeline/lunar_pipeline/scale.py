@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import numpy as np
+import cv2
 from rasterio.transform import Affine
-from skimage.transform import pyramid_gaussian, resize
+from skimage.transform import pyramid_gaussian
 
 
 def scale_factor(native_gsd: float | None, working_gsd: float) -> float:
@@ -28,10 +29,15 @@ def resample_to_gsd(
     _, h, w = arr.shape
     new_h = max(1, int(round(h / sf)))
     new_w = max(1, int(round(w / sf)))
-    out = np.stack(
-        [resize(arr[i], (new_h, new_w), anti_aliasing=True, preserve_range=True) for i in range(arr.shape[0])],
-        axis=0,
-    ).astype(np.float32)
+    # AREA interpolation for downsampling (proper pixel-area averaging;
+    # skimage.resize's anti_aliasing Gaussian is slower and softer). CUBIC
+    # for the rare upscale path.
+    interp = cv2.INTER_AREA if (new_h <= h and new_w <= w) else cv2.INTER_CUBIC
+    bands = []
+    for i in range(arr.shape[0]):
+        band = np.ascontiguousarray(arr[i], dtype=np.float32)
+        bands.append(cv2.resize(band, (new_w, new_h), interpolation=interp))
+    out = np.stack(bands, axis=0).astype(np.float32, copy=False)
 
     new_transform = None
     if transform is not None:

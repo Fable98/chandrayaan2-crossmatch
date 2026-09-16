@@ -13,6 +13,8 @@ and tagged with "derivation": "composed" (vs "derivation": "measured").
 from __future__ import annotations
 
 import argparse
+import concurrent.futures
+import functools
 import json
 import sys
 from pathlib import Path
@@ -34,6 +36,36 @@ except Exception:
         from ML_model.bundle_adjustment import GlobalBundleAdjuster
     except Exception:
         GlobalBundleAdjuster = None  # type: ignore[assignment]
+
+
+def _imread_gray_cached(path_str: str) -> Optional[np.ndarray]:
+    """LRU-cached grayscale read (triplet legs + canvas probing re-read the
+    same A/B/C files; one decode per path instead of 3-4)."""
+    try:
+        img = cv2.imread(path_str, cv2.IMREAD_GRAYSCALE)
+        return img
+    except Exception:
+        return None
+
+
+try:
+    _imread_gray_cached = functools.lru_cache(maxsize=64)(_imread_gray_cached)  # type: ignore[assignment]
+except Exception:
+    pass
+
+
+def _imread_unchanged_uncached(path_str: str) -> Optional[np.ndarray]:
+    """Uncached core for the UNCHANGED LRU below (keeps color depth for warp outputs)."""
+    try:
+        return cv2.imread(path_str, cv2.IMREAD_UNCHANGED)
+    except Exception:
+        return None
+
+
+try:
+    _imread_unchanged_cached = functools.lru_cache(maxsize=32)(_imread_unchanged_uncached)  # type: ignore[assignment]
+except Exception:
+    _imread_unchanged_cached = _imread_unchanged_uncached  # type: ignore[assignment]
 
 
 def _extract_inlier_points(res: Dict[str, Any]) -> Tuple[np.ndarray, np.ndarray]:
@@ -220,21 +252,40 @@ def evaluate_triplet_consistency(
     out_base = Path(output_dir)
     out_base.mkdir(parents=True, exist_ok=True)
 
-    # 1. Match A -> B
-    res_AB = match_images_cfog(
-        image_a_path, image_b_path, dem_path=dem_path, output_dir=out_base / "AB",
-        source_sensor=sensor_a, reference_sensor=sensor_b,
-    )
-    # 2. Match B -> C
-    res_BC = match_images_cfog(
-        image_b_path, image_c_path, dem_path=dem_path, output_dir=out_base / "BC",
-        source_sensor=sensor_b, reference_sensor=sensor_c,
-    )
-    # 3. Match C -> A
-    res_CA = match_images_cfog(
-        image_c_path, image_a_path, dem_path=dem_path, output_dir=out_base / "CA",
-        source_sensor=sensor_c, reference_sensor=sensor_a,
-    )
+    # The three legs are independent (distinct AB/BC/CA output dirs) — run them
+    # concurrently on a 3-thread pool. Threads (not processes) so unit-test
+    # patches of module-global match_images_cfog keep working, and cv2's
+    # GIL-releasing kernels still parallelize. Per-pair RNG streams
+    # (SEED ^ hash(pair)) keep RANSAC draws decorrelated across threads.
+    def _leg(spec):
+        src, ref, sub, sa, sb = spec
+        return match_images_cfog(
+            src, ref, dem_path=dem_path, output_dir=out_base / sub,
+            source_sensor=sa, reference_sensor=sb,
+        )
+
+    _specs = [
+        (image_a_path, image_b_path, "AB", sensor_a, sensor_b),
+        (image_b_path, image_c_path, "BC", sensor_b, sensor_c),
+        (image_c_path, image_a_path, "CA", sensor_c, sensor_a),
+    ]
+    try:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as _pool:
+            res_AB, res_BC, res_CA = list(_pool.map(_leg, _specs))
+    except Exception:
+        # Never let pool plumbing break evaluation honesty: serial fallback.
+        res_AB = match_images_cfog(
+            image_a_path, image_b_path, dem_path=dem_path, output_dir=out_base / "AB",
+            source_sensor=sensor_a, reference_sensor=sensor_b,
+        )
+        res_BC = match_images_cfog(
+            image_b_path, image_c_path, dem_path=dem_path, output_dir=out_base / "BC",
+            source_sensor=sensor_b, reference_sensor=sensor_c,
+        )
+        res_CA = match_images_cfog(
+            image_c_path, image_a_path, dem_path=dem_path, output_dir=out_base / "CA",
+            source_sensor=sensor_c, reference_sensor=sensor_a,
+        )
 
     H_AB = np.array(res_AB["homography"], dtype=np.float64) if (res_AB.get("status") == "success" and res_AB.get("homography") is not None) else None
     H_BC = np.array(res_BC["homography"], dtype=np.float64) if (res_BC.get("status") == "success" and res_BC.get("homography") is not None) else None
@@ -293,7 +344,7 @@ def evaluate_triplet_consistency(
         # Determine source/canvas image shape for cycle testing (dynamic, honest)
         canvas_shape = (512, 512)
         try:
-            _src_probe = cv2.imread(str(image_a_path), cv2.IMREAD_GRAYSCALE)
+            _src_probe = _imread_gray_cached(str(image_a_path))
             if _src_probe is not None and hasattr(_src_probe, "shape") and len(_src_probe.shape) >= 2:
                 canvas_shape = _src_probe.shape[:2]
         except Exception:
@@ -442,8 +493,8 @@ def evaluate_triplet_consistency(
         except Exception:
             pass
 
-        source_image = cv2.imread(str(image_a_path), cv2.IMREAD_UNCHANGED)
-        target_image = cv2.imread(str(image_c_path), cv2.IMREAD_UNCHANGED)
+        source_image = _imread_unchanged_cached(str(image_a_path))
+        target_image = _imread_unchanged_cached(str(image_c_path))
         registered_path = None
         tif_path = None
         checker_path = None
@@ -637,7 +688,7 @@ def evaluate_triplet_consistency(
         dem_arr = None
         if dem_path and Path(dem_path).exists():
             try:
-                dem_arr = cv2.imread(str(dem_path), cv2.IMREAD_UNCHANGED)
+                dem_arr = _imread_unchanged_cached(str(dem_path))
             except Exception:
                 pass
         # Cycle error is evaluated in sensor A pixel frame; resolve sensor A working/nominal GSD (OHRC 0.25m)

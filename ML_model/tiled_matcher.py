@@ -29,26 +29,22 @@ def match_single_tile(
     reference_sensor: Optional[str] = None,
     working_dir: Optional[Path] = None,
 ) -> Dict[str, Any]:
-    """Processes a single tile pair and offsets match coordinates back to global space."""
+    """Processes a single tile pair and offsets match coordinates back to global space.
+
+    Perf: crops are passed in-memory straight into ``match_images_cfog``
+    (ndarray passthrough) — no PNG tile I/O. ``working_dir`` only hosts the
+    matcher's standard output bundle (metrics/matches JSON), not re-encoded tiles.
+    """
     ox1, oy1 = offset1
     ox2, oy2 = offset2
 
     tile_dir = working_dir / f"tile_{tile_id:04d}" if working_dir else Path(f"tile_{tile_id:04d}")
     tile_dir.mkdir(parents=True, exist_ok=True)
 
-    p1 = tile_dir / "tile1.png"
-    p2 = tile_dir / "tile2.png"
-
-    u8_1 = (np.clip(tile_crop1, 0.0, 1.0) * 255.0).astype(np.uint8) if tile_crop1.max() <= 1.0 else tile_crop1.astype(np.uint8)
-    u8_2 = (np.clip(tile_crop2, 0.0, 1.0) * 255.0).astype(np.uint8) if tile_crop2.max() <= 1.0 else tile_crop2.astype(np.uint8)
-
-    cv2.imwrite(str(p1), u8_1)
-    cv2.imwrite(str(p2), u8_2)
-
     try:
         res = match_images_cfog(
-            p1,
-            p2,
+            np.ascontiguousarray(tile_crop1),
+            np.ascontiguousarray(tile_crop2),
             output_dir=tile_dir,
             source_sensor=source_sensor,
             reference_sensor=reference_sensor,
@@ -96,11 +92,40 @@ def match_images_tiled(
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
 
-    img1, _, meta1 = load_as_float_and_color(img_path1)
-    img2, _, meta2 = load_as_float_and_color(img_path2)
+    # Windowed I/O plan: for raster inputs, query (h, w) without reading pixels,
+    # then read per-tile windows inside workers. Falls back to full-load slicing
+    # for plain PNG/JPG inputs (identical numerics to the legacy path).
+    def _raster_shape(p) -> Optional[Tuple[int, int]]:
+        try:
+            import rasterio
+            with rasterio.open(str(p)) as _src:
+                return int(_src.height), int(_src.width)
+        except Exception:
+            return None
 
-    h1, w1 = img1.shape[:2]
-    h2, w2 = img2.shape[:2]
+    def _read_window(p, x0: int, y0: int, x1: int, y1: int) -> np.ndarray:
+        import rasterio
+        from rasterio.windows import Window as _W
+        with rasterio.open(str(p)) as _src:
+            _win = _W(int(x0), int(y0), max(1, int(x1 - x0)), max(1, int(y1 - y0)))
+            _arr = _src.read(window=_win)  # (B, H, W)
+            if _arr.shape[0] == 1:
+                return _arr[0]
+            if _arr.shape[0] in (3, 4):
+                return np.moveaxis(_arr[:3], 0, -1)
+            return _arr
+
+    _sh1, _sh2 = _raster_shape(img_path1), _raster_shape(img_path2)
+    windowed = _sh1 is not None and _sh2 is not None
+    if windowed:
+        h1, w1 = _sh1  # type: ignore[misc]
+        h2, w2 = _sh2  # type: ignore[misc]
+        img1 = img2 = None  # never materialized; workers read windows
+    else:
+        img1, _, meta1 = load_as_float_and_color(img_path1)
+        img2, _, meta2 = load_as_float_and_color(img_path2)
+        h1, w1 = img1.shape[:2]
+        h2, w2 = img2.shape[:2]
 
     # If small enough, run standard single-pass matching
     if max(h1, w1, h2, w2) <= tile_size:
@@ -131,14 +156,40 @@ def match_images_tiled(
             x1_2 = min(w2, int(x1_1 * scale_x))
             y1_2 = min(h2, int(y1_1 * scale_y))
 
-            crop1 = img1[y0_1:y1_1, x0_1:x1_1]
-            crop2 = img2[y0_2:y1_2, x0_2:x1_2]
+            if windowed:
+                # Defer pixel reads to workers (windowed I/O); keep boxes only.
+                if x1_1 > x0_1 and y1_1 > y0_1 and x1_2 > x0_2 and y1_2 > y0_2:
+                    tile_tasks.append((
+                        None, None, (x0_1, y0_1), (x0_2, y0_2), tile_id,
+                        (x0_1, y0_1, x1_1, y1_1), (x0_2, y0_2, x1_2, y1_2),
+                    ))
+                    tile_id += 1
+            else:
+                crop1 = img1[y0_1:y1_1, x0_1:x1_1]
+                crop2 = img2[y0_2:y1_2, x0_2:x1_2]
+                if crop1.size > 0 and crop2.size > 0:
+                    tile_tasks.append((
+                        crop1, crop2, (x0_1, y0_1), (x0_2, y0_2), tile_id,
+                        None, None,
+                    ))
+                    tile_id += 1
 
-            if crop1.size > 0 and crop2.size > 0:
-                tile_tasks.append((
-                    crop1, crop2, (x0_1, y0_1), (x0_2, y0_2), tile_id,
-                ))
-                tile_id += 1
+    def _run_task(task) -> Dict[str, Any]:
+        c1, c2, off1, off2, tid, box1, box2 = task
+        try:
+            if c1 is None and windowed:
+                c1 = _read_window(img_path1, *box1)  # type: ignore[arg-type]
+                c2 = _read_window(img_path2, *box2)  # type: ignore[arg-type]
+                if getattr(c1, "size", 0) == 0 or getattr(c2, "size", 0) == 0:
+                    return {"status": "failed", "tile_id": tid, "matches": []}
+            return match_single_tile(
+                c1, c2, off1, off2, tid,
+                source_sensor=source_sensor,
+                reference_sensor=reference_sensor,
+                working_dir=out_path / "tiles",
+            )
+        except Exception as e:
+            return {"status": "failed", "tile_id": tid, "error": str(e), "matches": []}
 
     # Execute tile matching in parallel using ThreadPoolExecutor.
     # RNG honesty: cv2's RNG is process-global and shared across these threads,
@@ -148,16 +199,7 @@ def match_images_tiled(
     # identical RANSAC draws (the old per-call setRNGSeed(42) did exactly that).
     all_stitched_matches = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [
-            executor.submit(
-                match_single_tile,
-                c1, c2, off1, off2, tid,
-                source_sensor=source_sensor,
-                reference_sensor=reference_sensor,
-                working_dir=out_path / "tiles",
-            )
-            for (c1, c2, off1, off2, tid) in tile_tasks
-        ]
+        futures = [executor.submit(_run_task, t) for t in tile_tasks]
         for f in concurrent.futures.as_completed(futures):
             res = f.result()
             if res.get("status") == "success" and res.get("matches"):

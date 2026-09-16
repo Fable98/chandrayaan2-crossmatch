@@ -114,8 +114,15 @@ def census_transform(band: np.ndarray, radius: int = 1) -> np.ndarray:
     survives float32 GeoTIFF storage exactly (all values < 2^24), and the
     default radius=1 (8-bit) keeps descriptors compact. Callers needing the
     legacy float preview can min-max normalize themselves (order-preserving).
+
+    Perf: a Numba-compiled kernel is used when numba is importable (single
+    fused pass, no per-neighbour temporary); otherwise the vectorized NumPy
+    fallback below runs (bit-identical output).
     """
     x = _normalize01(band)
+    _nb = _census_numba(x, int(radius))
+    if _nb is not None:
+        return _nb[np.newaxis, ...]
     pad = np.pad(x, radius, mode="edge")
     h, w = x.shape
     bits = np.zeros((h, w), dtype=np.uint32)
@@ -133,6 +140,53 @@ def census_transform(band: np.ndarray, radius: int = 1) -> np.ndarray:
         if k >= 32:
             break
     return bits[np.newaxis, ...]
+
+
+def _census_numba(x: np.ndarray, radius: int) -> np.ndarray | None:
+    """Numba census kernel; None when numba is unavailable or unsuitable."""
+    try:
+        import numba as _numba
+    except Exception:
+        return None
+    try:
+        h, w = int(x.shape[0]), int(x.shape[1])
+        nbits = (2 * radius + 1) * (2 * radius + 1) - 1
+        if nbits <= 0 or nbits > 32:
+            return None
+        xc = np.ascontiguousarray(x, dtype=np.float32)
+
+        @_numba.njit(cache=True)
+        def _kernel(img: np.ndarray, r: int, out: np.ndarray) -> None:
+            hh, ww = img.shape[0], img.shape[1]
+            for yy in range(hh):
+                for xx in range(ww):
+                    c = img[yy, xx]
+                    code = np.uint32(0)
+                    k = np.uint32(0)
+                    for dyy in range(-r, r + 1):
+                        y2 = yy + dyy
+                        if y2 < 0:
+                            y2 = 0
+                        elif y2 >= hh:
+                            y2 = hh - 1
+                        for dxx in range(-r, r + 1):
+                            if dxx == 0 and dyy == 0:
+                                continue
+                            x2 = xx + dxx
+                            if x2 < 0:
+                                x2 = 0
+                            elif x2 >= ww:
+                                x2 = ww - 1
+                            if img[y2, x2] >= c:
+                                code |= np.uint32(1) << k
+                            k += np.uint32(1)
+                    out[yy, xx] = code
+
+        out = np.zeros((h, w), dtype=np.uint32)
+        _kernel(xc, int(radius), out)
+        return out
+    except Exception:
+        return None
 
 
 def lbp(band: np.ndarray) -> np.ndarray:

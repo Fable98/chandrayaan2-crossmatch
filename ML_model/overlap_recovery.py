@@ -387,6 +387,10 @@ def recover_content_overlap(
     # ---- Conjugate-peak guard: phase correlation can lock onto the negated
     # shift when padding edges dominate. Verify {d, -d, 0} by masked NCC in
     # the winner's frame and keep the best-supported shift. ----
+    # Perf: candidates deduped to unique integer shifts (near-zero d collapses
+    # 3 warps into 1); verification runs on ≤256px thumbnails (NCC ranking is
+    # scale-robust; full-res warpAffine x3 dominated runtime on large scenes);
+    # early-exit once a candidate is dominant (>=0.85, others cannot beat it).
     try:
         if _tag == "A":
             _v_src, _v_ref = A_src, A_ref
@@ -401,8 +405,19 @@ def recover_content_overlap(
             _vr = np.zeros((_sh, _sw), dtype=np.float32)
             _vr[:min(_sh, _rh), :min(_sw, _rw)] = 1.0
 
+        _v_scale = min(1.0, 256.0 / max(1, _v_ref.shape[0], _v_ref.shape[1]))
+        if _v_scale < 1.0:
+            _vw = max(8, int(round(_v_ref.shape[1] * _v_scale)))
+            _vh = max(8, int(round(_v_ref.shape[0] * _v_scale)))
+            _v_src = cv2.resize(_v_src, (_vw, _vh), interpolation=cv2.INTER_AREA)
+            _v_ref = cv2.resize(_v_ref, (_vw, _vh), interpolation=cv2.INTER_AREA)
+            _vs = cv2.resize(_vs, (_vw, _vh), interpolation=cv2.INTER_NEAREST)
+            _vr = cv2.resize(_vr, (_vw, _vh), interpolation=cv2.INTER_NEAREST)
+        else:
+            _vw, _vh = _v_ref.shape[1], _v_ref.shape[0]
+
         def _masked_ncc(dxx: float, dyy: float) -> float:
-            M = np.float32([[1, 0, dxx], [0, 1, dyy]])
+            M = np.float32([[1, 0, float(dxx) * _v_scale], [0, 1, float(dyy) * _v_scale]])
             h, w = _v_ref.shape[:2]
             warped = cv2.warpAffine(_v_src, M, (w, h), flags=cv2.INTER_LINEAR,
                                     borderMode=cv2.BORDER_CONSTANT, borderValue=float(np.mean(_v_src)))
@@ -420,12 +435,27 @@ def recover_content_overlap(
                 return float("-inf")
             return float(np.dot(a, b) / denom)
 
-        _cands = [(dx_c, dy_c), (-dx_c, -dy_c), (0.0, 0.0)]
-        _scores = [_masked_ncc(_x, _y) for _x, _y in _cands]
+        # Unique integer shifts only (dict preserves first-seen order), with an
+        # early-exit once a dominant NCC (>=0.85) is found.
+        _seen: dict[tuple[int, int], tuple[float, float]] = {}
+        for _x, _y in ((dx_c, dy_c), (-dx_c, -dy_c), (0.0, 0.0)):
+            _k = (int(round(_x)), int(round(_y)))
+            if _k not in _seen:
+                _seen[_k] = (_x, _y)
+        _cands = list(_seen.values())
+        _scores: list[float] = []
+        for _x, _y in _cands:
+            _s = _masked_ncc(_x, _y)
+            _scores.append(_s)
+            if _s >= 0.85:
+                break
+        _cands = _cands[:len(_scores)]
         _bi = int(np.argmax(_scores))
+        _neg_key = (int(round(-dx_c)), int(round(-dy_c)))
+        _pos_key = (int(round(dx_c)), int(round(dy_c)))
         if _scores[_bi] == float("-inf"):
             dx_c, dy_c, confidence, method = 0.0, 0.0, 0.0, "none_fallback_zero"
-        elif _bi == 1:
+        elif _pos_key != _neg_key and list(_seen.keys())[_bi] == _neg_key:
             dx_c, dy_c = -dx_c, -dy_c
             method = f"{method}_sign_corrected"
     except Exception as exc:

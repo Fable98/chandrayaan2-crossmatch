@@ -73,15 +73,17 @@ class IIRS_Multimodal_Registrar:
                 del cube  # free the (B, H, W) copy ASAP
 
             # Handle NaNs/Infs: replace with per-band mean of valid pixels.
+            # Vectorized (no per-band Python loop / boolean-mask copies).
             finite_mask = np.isfinite(data)
             if not bool(np.all(finite_mask)):
-                band_means = np.zeros((data.shape[1],), dtype=np.float32)
-                for b in range(data.shape[1]):
-                    col = data[:, b]
-                    valid = col[np.isfinite(col)]
-                    band_means[b] = float(np.mean(valid)) if valid.size else 0.0
-                    col[~np.isfinite(col)] = band_means[b]
-                    data[:, b] = col
+                with np.errstate(all="ignore"):
+                    band_means = np.nanmean(np.where(finite_mask, data, np.nan), axis=0)
+                band_means = np.where(
+                    np.isfinite(band_means), band_means, 0.0
+                ).astype(np.float32, copy=False)
+                bad = np.where(~finite_mask)
+                if bad[0].size:
+                    data[bad] = np.take(band_means, bad[1])
                 logger.info("Replaced NaN/Inf pixels with per-band means.")
 
             # PCA -> PC1.
