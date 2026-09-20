@@ -119,6 +119,11 @@ export interface MatchPoint {
   "ohrc_latlon": unknown[];
   "tmc_latlon": unknown[];
   "confidence": number;
+  "covariance_xy"?: number[][] | null;
+  "sigma_major_px"?: number | null;
+  "sigma_minor_px"?: number | null;
+  "ellipse_angle_deg"?: number | null;
+  "uncertainty_status"?: string | null;
 }
 
 export interface MatchesResponse {
@@ -187,6 +192,13 @@ export interface RegistrationResponse {
 export interface SensorMeta {
   "sensor": string;
   "gsd_m": number;
+  "native_gsd_m"?: number | null;
+  "effective_gsd_m"?: number | null;
+  "resampling_factor"?: number | null;
+  "crop_transform"?: {
+  [key: string]: unknown;
+} | null;
+  "parent_product_id"?: string | null;
   "sun_elevation_deg"?: number | null;
   "sun_azimuth_deg"?: number | null;
   "incidence_angle_deg"?: number | null;

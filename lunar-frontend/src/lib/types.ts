@@ -64,6 +64,11 @@ export interface MatchPoint {
   tmc_latlon: [number, number] | null;
   georeferenced?: boolean;
   confidence: number;
+  covariance_xy?: [[number, number], [number, number]] | null;
+  sigma_major_px?: number | null;
+  sigma_minor_px?: number | null;
+  ellipse_angle_deg?: number | null;
+  uncertainty_status?: string | null;
 }
 
 // Moon-globe tie points (GET /api/registration/moon-points/{job_id}).

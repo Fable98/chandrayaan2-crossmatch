@@ -69,8 +69,24 @@ export function normalizeSensorId(id: string): SensorKind | "unknown" {
 export interface SensorMetaEntry {
   label: string;
   gsdM: number;
+  nativeGsdM?: number;
+  effectiveGsdM?: number;
+  resamplingFactor?: number;
+  parentProductId?: string;
   unit: string;
   isLive?: boolean;
+}
+
+/** Formats dual GSD string (e.g. "0.25m native / 5.4m grid"). */
+export function formatDualGsd(entry: SensorMetaEntry): string {
+  if (
+    entry.nativeGsdM !== undefined &&
+    entry.effectiveGsdM !== undefined &&
+    Math.abs(entry.nativeGsdM - entry.effectiveGsdM) > 0.05
+  ) {
+    return `${entry.nativeGsdM}m native / ${entry.effectiveGsdM}m grid`;
+  }
+  return Number.isFinite(entry.gsdM) ? `${entry.gsdM} ${entry.unit}` : "—";
 }
 
 /**
@@ -82,28 +98,53 @@ export function sensorMeta(
   id: string
 ): SensorMetaEntry {
   const key = normalizeSensorId(id);
+  const sensorObj = findSensorMatch(triplet, id);
+  const liveGsd = sensorObj?.gsd_m ?? liveGsdFor(triplet, id);
+  const natGsd = sensorObj?.native_gsd_m ?? (key !== "unknown" ? SENSOR_META[key]?.gsdM : undefined);
+  const effGsd = sensorObj?.effective_gsd_m ?? liveGsd;
+
   // Unknown sensors carry no spec constant: surface the raw id with an
-  // absent (NaN) GSD rather than a fabricated OHRC 0.25m claim. Callers
-  // render NaN via the "—" guards in sensorCardGsd/scaleRatioLabel.
+  // absent (NaN) GSD rather than a fabricated OHRC 0.25m claim.
   if (key === "unknown") {
-    const live = liveGsdFor(triplet, id);
     return {
       label: id ? id.toUpperCase() : "Unknown",
-      gsdM: live ?? NaN,
+      gsdM: effGsd ?? NaN,
+      nativeGsdM: natGsd,
+      effectiveGsdM: effGsd,
+      resamplingFactor: sensorObj?.resampling_factor ?? undefined,
+      parentProductId: sensorObj?.parent_product_id ?? undefined,
       unit: "m/px",
-      isLive: live !== undefined,
+      isLive: liveGsd !== undefined,
     };
   }
   const spec = SENSOR_META[key];
 
-  const liveGsd = liveGsdFor(triplet, id);
-
   return {
     label: spec.label,
-    gsdM: liveGsd ?? spec.gsdM,
+    gsdM: effGsd ?? spec.gsdM,
+    nativeGsdM: natGsd ?? spec.gsdM,
+    effectiveGsdM: effGsd ?? spec.gsdM,
+    resamplingFactor: sensorObj?.resampling_factor ?? undefined,
+    parentProductId: sensorObj?.parent_product_id ?? undefined,
     unit: spec.unit,
     isLive: liveGsd !== undefined,
   };
+}
+
+/** Finds matching sensor object from triplet.sensors. */
+function findSensorMatch(
+  triplet: TripletSummary | null | undefined,
+  id: string
+) {
+  if (!triplet?.sensors || !Array.isArray(triplet.sensors)) return undefined;
+  const key = id.toLowerCase().replace(/[-_]/g, "");
+  const want = normalizeSensorId(id);
+  return triplet.sensors.find((s) => {
+    const name = (s.sensor || "").toLowerCase().replace(/[-_]/g, "");
+    if (name === key) return true;
+    const got = normalizeSensorId(s.sensor || "");
+    return want !== "unknown" && got === want;
+  });
 }
 
 /** Live per-region gsd_m lookup shared by known and unknown sensor ids. */
@@ -111,22 +152,12 @@ function liveGsdFor(
   triplet: TripletSummary | null | undefined,
   id: string
 ): number | undefined {
-  const key = id.toLowerCase().replace(/[-_]/g, "");
-  if (triplet?.sensors && Array.isArray(triplet.sensors)) {
-    const want = normalizeSensorId(id);
-    const match = triplet.sensors.find((s) => {
-      const name = (s.sensor || "").toLowerCase().replace(/[-_]/g, "");
-      if (name === key) return true;
-      // Canonical-kind comparison only when BOTH sides are known — two
-      // distinct unknown ids must never equal each other via "unknown".
-      const got = normalizeSensorId(s.sensor || "");
-      return want !== "unknown" && got === want;
-    });
-    if (match && typeof match.gsd_m === "number" && Number.isFinite(match.gsd_m) && match.gsd_m > 0) {
-      return match.gsd_m;
-    }
+  const match = findSensorMatch(triplet, id);
+  if (match && typeof match.gsd_m === "number" && Number.isFinite(match.gsd_m) && match.gsd_m > 0) {
+    return match.gsd_m;
   }
 
+  const key = id.toLowerCase().replace(/[-_]/g, "");
   if (key.includes("lro") && typeof triplet?.lro_nac_gsd_m === "number" && triplet.lro_nac_gsd_m > 0) {
     return triplet.lro_nac_gsd_m;
   }
@@ -224,13 +255,20 @@ export function sourceSensorLabel(): string {
 
 /** Sensor card progress breakdown strings in Console.tsx (live GSD throughout; "—" when unknown). */
 export function sensorCardGsd(triplet: TripletSummary | null | undefined, id: SensorKind): string {
-  const gsd = sensorMeta(triplet, id).gsdM;
-  if (!Number.isFinite(gsd)) return "—";
+  const meta = sensorMeta(triplet, id);
+  if (!Number.isFinite(meta.gsdM)) return "—";
+  if (
+    meta.nativeGsdM !== undefined &&
+    meta.effectiveGsdM !== undefined &&
+    Math.abs(meta.nativeGsdM - meta.effectiveGsdM) > 0.05
+  ) {
+    return `${meta.nativeGsdM}m native (${meta.effectiveGsdM}m grid)`;
+  }
   switch (id) {
     case "lro_nac":
-      return `${gsd.toFixed(1)} m/px`;
+      return `${meta.gsdM.toFixed(1)} m/px`;
     default:
-      return `${gsd} m/px`;
+      return `${meta.gsdM} m/px`;
   }
 }
 

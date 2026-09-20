@@ -45,12 +45,12 @@ logger = logging.getLogger(__name__)
 def _resolve_gsd_m(result: Dict[str, Any]) -> float:
     """Single-source-of-truth pixel size in meters for display conversion.
 
-    Precedence: per-job result metadata (PDS4/manifest-derived) ->
+    Precedence: effective_gsd_m -> working_gsd_m -> gsd_m ->
     ML_model SENSOR_SPECS OHRC spec (0.25) -> literal 0.25 fallback.
     The old hardcoded legacy constant is gone: it silently disagreed with the
     sensor spec and corrupted every moon-globe rmse_meters value by 28%.
     """
-    for key in ("gsd_m", "working_gsd_m"):
+    for key in ("effective_gsd_m", "working_gsd_m", "gsd_m"):
         try:
             val = result.get(key, result.get("metadata", {}).get(key))
             if val is not None and float(val) > 0:

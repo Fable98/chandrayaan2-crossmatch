@@ -257,21 +257,44 @@ class ISROReportGenerator:
         story.append(Paragraph("1. Sensor &amp; Illumination Metadata", styles["heading"]))
         md = metadata if isinstance(metadata, dict) else {}
         sensor = _get(md, "sensor", "sensor_name", default=None)
-        gsd = _get(md, "gsd", "gsd_m", "gsd_x", default=None)
-        if gsd is None and sensor is not None:
-            gsd = SENSOR_GSD.get(str(sensor).upper(), None)
-        if gsd is not None:
+        native_gsd = _get(md, "native_gsd_m", "native_gsd", default=None)
+        effective_gsd = _get(md, "effective_gsd_m", "effective_gsd", "working_gsd_m", "gsd", "gsd_m", "gsd_x", default=None)
+        if native_gsd is None and sensor is not None:
+            native_gsd = SENSOR_GSD.get(str(sensor).upper(), None)
+        if effective_gsd is None:
+            effective_gsd = native_gsd
+
+        native_str = None
+        if native_gsd is not None:
             try:
-                gsd = f"{float(gsd):.2f} m/px"
+                native_str = f"{float(native_gsd):.2f} m/px"
             except (TypeError, ValueError):
-                gsd = str(gsd)
+                native_str = str(native_gsd)
+
+        eff_str = None
+        if effective_gsd is not None:
+            try:
+                eff_str = f"{float(effective_gsd):.2f} m/px"
+            except (TypeError, ValueError):
+                eff_str = str(effective_gsd)
+
+        rf = _get(md, "resampling_factor", default=None)
+        rf_str = None
+        if rf is not None:
+            try:
+                rf_str = f"{float(rf):.4f}"
+            except (TypeError, ValueError):
+                rf_str = str(rf)
+
         dims = _get(md, "dimensions", "image_shape", "image_dimensions", default=None)
         if isinstance(dims, (list, tuple)) and len(dims) >= 2:
             dims = f"{dims[1]} x {dims[0]}" if len(dims) == 2 else " x ".join(str(d) for d in dims)
         rows = [
             [Paragraph("<b>Parameter</b>", styles["cell"]), Paragraph("<b>Value</b>", styles["cell"])],
             [Paragraph("Sensor (OHRC / TMC / IIRS)", styles["cell"]), Paragraph(_safe(sensor), styles["cell"])],
-            [Paragraph("GSD (Ground Sample Distance)", styles["cell"]), Paragraph(_safe(gsd), styles["cell"])],
+            [Paragraph("Native Sensor GSD (Flight Spec)", styles["cell"]), Paragraph(_safe(native_str), styles["cell"])],
+            [Paragraph("Effective Raster GSD (Current Grid)", styles["cell"]), Paragraph(_safe(eff_str), styles["cell"])],
+            [Paragraph("Resampling Factor (Derived / Native)", styles["cell"]), Paragraph(_safe(rf_str or "1.0000"), styles["cell"])],
             [Paragraph("Sun Azimuth (deg)", styles["cell"]), Paragraph(_safe(_get(md, "sun_az", "sun_azimuth", default=None)), styles["cell"])],
             [Paragraph("Sun Elevation (deg)", styles["cell"]), Paragraph(_safe(_get(md, "sun_el", "sun_elevation", default=None)), styles["cell"])],
             [Paragraph("Capture Timestamp", styles["cell"]), Paragraph(_safe(_get(md, "timestamp", "capture_time", "acquisition_time", default=None)), styles["cell"])],

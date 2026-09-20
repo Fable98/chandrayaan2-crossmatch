@@ -51,8 +51,13 @@ class Footprint(BaseModel):
 
 class SensorMeta(BaseModel):
     """Per-sensor metadata within a triplet."""
-    sensor: str  # "ohrc", "tmc", "iirs", "dem"
-    gsd_m: float
+    sensor: str  # "ohrc", "tmc", "iirs", "dem", "lro_nac"
+    gsd_m: float  # Effective raster pixel GSD (for backwards compatibility)
+    native_gsd_m: float | None = None
+    effective_gsd_m: float | None = None
+    resampling_factor: float | None = None
+    crop_transform: dict | None = None
+    parent_product_id: str | None = None
     sun_elevation_deg: float | None = None
     sun_azimuth_deg: float | None = None
     incidence_angle_deg: float | None = None
@@ -134,6 +139,11 @@ class MatchPoint(BaseModel):
     ohrc_latlon: tuple[float, float]  # (lat, lon) — computed from shared TripletBounds
     tmc_latlon: tuple[float, float]   # (lat, lon) — computed from shared TripletBounds
     confidence: float
+    covariance_xy: list[list[float]] | None = None
+    sigma_major_px: float | None = None
+    sigma_minor_px: float | None = None
+    ellipse_angle_deg: float | None = None
+    uncertainty_status: str | None = None
 
 
 class MatchMetrics(BaseModel):

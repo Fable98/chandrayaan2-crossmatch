@@ -95,13 +95,35 @@ def parse_pds4_label(xml_path: Path) -> tuple[ET.Element, ImageMetadata]:
             lat_s, lat_n = min(lats), max(lats)
 
     footprint: dict = {}
-    if None not in (lon_w, lon_e, lat_s, lat_n):
-        footprint = {
-            "west_lon": lon_w,
-            "east_lon": lon_e,
-            "south_lat": lat_s,
-            "north_lat": lat_n,
-        }
+    try:
+        from data.ingestion.footprint_geometry import parse_footprint_from_pds4, OverlapConfidence
+        fp_geom = parse_footprint_from_pds4(root)
+        if fp_geom.confidence != OverlapConfidence.UNAVAILABLE:
+            footprint = fp_geom.to_dict()
+            if fp_geom.bbox is not None:
+                footprint["west_lon"] = fp_geom.bbox.get("west_lon")
+                footprint["east_lon"] = fp_geom.bbox.get("east_lon")
+                footprint["south_lat"] = fp_geom.bbox.get("south_lat")
+                footprint["north_lat"] = fp_geom.bbox.get("north_lat")
+        elif None not in (lon_w, lon_e, lat_s, lat_n):
+            footprint = {
+                "west_lon": lon_w,
+                "east_lon": lon_e,
+                "south_lat": lat_s,
+                "north_lat": lat_n,
+                "vertices": None,
+                "wkt": None,
+                "confidence": "bbox_only",
+            }
+    except Exception:
+        if None not in (lon_w, lon_e, lat_s, lat_n):
+            footprint = {
+                "west_lon": lon_w,
+                "east_lon": lon_e,
+                "south_lat": lat_s,
+                "north_lat": lat_n,
+                "confidence": "bbox_only",
+            }
 
     incidence = floats.get("incidence_angle", floats.get("solar_incidence"))
     emission = floats.get("emission_angle")

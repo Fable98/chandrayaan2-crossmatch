@@ -302,6 +302,30 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
               <span className="text-teal font-semibold">
                 {((activeMatch.confidence ?? 0) * 100).toFixed(1)}%
               </span>
+              {activeMatch.sigma_major_px !== undefined && activeMatch.sigma_major_px !== null && (
+                <span className="ml-3 text-ink-dim">
+                  Uncertainty:{" "}
+                  <span className="text-teal font-mono font-bold">
+                    σ=({activeMatch.sigma_major_px.toFixed(2)}, {activeMatch.sigma_minor_px?.toFixed(2)})px
+                  </span>
+                  {activeMatch.ellipse_angle_deg !== undefined && activeMatch.ellipse_angle_deg !== null && (
+                    <span className="text-ink-faint"> @ {activeMatch.ellipse_angle_deg.toFixed(1)}°</span>
+                  )}
+                  {activeMatch.uncertainty_status && (
+                    <span className={`ml-2 rounded px-1.5 py-0.5 text-[9px] uppercase font-bold tracking-wider ${
+                      activeMatch.uncertainty_status === "valid"
+                        ? "bg-teal/10 text-teal border border-teal/30"
+                        : activeMatch.uncertainty_status === "flat_peak"
+                        ? "bg-amber-500/10 text-amber-500 border border-amber-500/30"
+                        : activeMatch.uncertainty_status === "multimodal"
+                        ? "bg-rose-500/10 text-rose-500 border border-rose-500/30"
+                        : "bg-slate-500/10 text-slate-400 border border-slate-500/30"
+                    }`}>
+                      {activeMatch.uncertainty_status}
+                    </span>
+                  )}
+                </span>
+              )}
               {activeMatch.ohrc_latlon ? (
                 <span className="ml-3 text-ink-dim">
                   Lat/Lon: ({activeMatch.ohrc_latlon[0].toFixed(3)}°, {activeMatch.ohrc_latlon[1].toFixed(3)}°)
@@ -449,6 +473,43 @@ function ImagePane({
                 zIndex: isSelected ? 30 : isHovered ? 25 : 15,
               }}
             >
+              {/* Uncertainty Ellipse (2-sigma spatial covariance) */}
+              {p.sigma_major_px !== undefined && p.sigma_major_px !== null && (
+                <svg
+                  className="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 overflow-visible"
+                  style={{
+                    left: "50%",
+                    top: "50%",
+                    width: 0,
+                    height: 0,
+                  }}
+                >
+                  <ellipse
+                    cx="0"
+                    cy="0"
+                    rx={Math.max(3.5, (p.sigma_major_px * (dispW / tileW)) * 2.5)}
+                    ry={Math.max(2.5, ((p.sigma_minor_px ?? p.sigma_major_px) * (dispH / tileH)) * 2.5)}
+                    transform={`rotate(${p.ellipse_angle_deg ?? 0})`}
+                    fill={
+                      p.uncertainty_status === "multimodal"
+                        ? "rgba(244, 63, 94, 0.2)"
+                        : p.uncertainty_status === "flat_peak"
+                        ? "rgba(245, 158, 11, 0.2)"
+                        : "rgba(45, 212, 191, 0.18)"
+                    }
+                    stroke={
+                      p.uncertainty_status === "multimodal"
+                        ? "#f43f5e"
+                        : p.uncertainty_status === "flat_peak"
+                        ? "#f59e0b"
+                        : "#2dd4bf"
+                    }
+                    strokeWidth={isSelected ? 1.5 : 1}
+                    strokeDasharray={p.uncertainty_status === "valid" ? undefined : "2 2"}
+                  />
+                </svg>
+              )}
+
               {/* Selected Concentric Pulsing Rings */}
               {isSelected && (
                 <>
@@ -488,7 +549,7 @@ function ImagePane({
                       : "border-white/20 bg-black/90 text-white"
                   }`}
                 >
-                    #{idx + 1} ({coords[0].toFixed(0)}, {coords[1].toFixed(0)}) · {confPct.toFixed(0)}%
+                    #{idx + 1} ({coords[0].toFixed(0)}, {coords[1].toFixed(0)}) · {confPct.toFixed(0)}%{p.sigma_major_px !== undefined && p.sigma_major_px !== null ? ` · σ=${p.sigma_major_px.toFixed(2)}px` : ""}
                 </div>
               )}
             </div>

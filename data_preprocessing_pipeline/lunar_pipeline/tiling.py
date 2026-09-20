@@ -116,6 +116,12 @@ def write_tiles(
             files[key] = str(p)
 
         west, south, east, north = array_bounds(int(win.height), int(win.width), t)
+        crop_tf = {
+            "col_off": int(win.col_off),
+            "row_off": int(win.row_off),
+            "width": int(win.width),
+            "height": int(win.height),
+        }
         return TileRecord(
             tile_id=tile_id,
             product_id=meta.product_id,
@@ -123,7 +129,7 @@ def write_tiles(
             row=row,
             col=col,
             level=level,
-            gsd_m=meta.gsd_m,
+            gsd_m=meta.working_gsd_m or meta.gsd_m,
             working_gsd_m=meta.working_gsd_m,
             scale_factor=meta.scale_factor,
             sun_azimuth_deg=meta.sun_azimuth_deg,
@@ -136,6 +142,11 @@ def write_tiles(
             bbox=[west, south, east, north],
             crs=crs_str,
             files=files,
+            native_gsd_m=meta.native_gsd_m or meta.gsd_m,
+            effective_gsd_m=meta.working_gsd_m or meta.gsd_m,
+            resampling_factor=meta.scale_factor,
+            crop_transform=crop_tf,
+            parent_product_id=meta.product_id,
         )
 
     # Tiles are independent: write them across workers (order restored after).

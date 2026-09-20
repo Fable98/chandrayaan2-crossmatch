@@ -19,29 +19,79 @@ class SensorMetadata:
     Physical and geometric metadata for a Chandrayaan-2 raster product.
     Tracks whether values originate from embedded headers, request parameters,
     or documented standard sensor specifications.
+
+    Distinguishes native_sensor_gsd_m (the physical sensor footprint at nominal orbit)
+    from effective_raster_gsd_m (the physical ground distance spanned by each pixel
+    in the raster after cropping, resampling, or tiling).
     """
     sensor: str  # "OHRC", "TMC-2", "IIRS", or "DEM"
-    gsd_m: float  # Ground Sampling Distance in meters per pixel
+    gsd_m: Optional[float] = None  # Ground Sampling Distance (effective raster pixel size)
+    native_gsd_m: Optional[float] = None  # Native detector GSD in meters per pixel
+    effective_gsd_m: Optional[float] = None  # Effective raster GSD in meters per pixel
+    resampling_factor: float = 1.0  # physical_scale_factor = derived_w / native_crop_w
+    crop_transform: Optional[Dict[str, Any]] = None  # {"x_offset", "y_offset", "width", "height"}
+    parent_product_id: Optional[str] = None  # Upstream source product identifier
     wavelength_range_um: Optional[Tuple[float, float]] = None
     sun_azimuth_deg: Optional[float] = None
     sun_elevation_deg: Optional[float] = None
     incidence_angle_deg: Optional[float] = None
     emission_angle_deg: Optional[float] = None
     phase_angle_deg: Optional[float] = None
+    spacecraft_azimuth_deg: Optional[float] = None
     acquisition_time: Optional[str] = None
     bounds: Optional[Tuple[float, float, float, float]] = None  # (min_lon, max_lon, min_lat, max_lat)
-    provenance: Dict[str, str] = field(default_factory=dict)  # field_name -> "header" | "request" | "default" | "unavailable"
+    provenance: Dict[str, str] = field(default_factory=dict)  # field_name -> provenance source
+
+    def __post_init__(self) -> None:
+        # Harmonize gsd_m, effective_gsd_m, and native_gsd_m
+        if self.effective_gsd_m is None and self.gsd_m is not None:
+            self.effective_gsd_m = float(self.gsd_m)
+        if self.native_gsd_m is None:
+            if self.effective_gsd_m is not None and abs(self.resampling_factor - 1.0) < 1e-6:
+                self.native_gsd_m = self.effective_gsd_m
+            elif self.gsd_m is not None:
+                self.native_gsd_m = float(self.gsd_m)
+        if self.effective_gsd_m is None and self.native_gsd_m is not None:
+            rf = max(float(self.resampling_factor), 1e-9)
+            self.effective_gsd_m = self.native_gsd_m / rf
+        # Ensure gsd_m always mirrors effective_gsd_m for raster calculations
+        if self.effective_gsd_m is not None:
+            self.gsd_m = float(self.effective_gsd_m)
+
+    @property
+    def native_sensor_gsd_m(self) -> Optional[float]:
+        return self.native_gsd_m
+
+    @property
+    def effective_raster_gsd_m(self) -> Optional[float]:
+        return self.effective_gsd_m
+
+    def validate_gsd(self, tolerance: float = 0.05) -> None:
+        """Validates that GSD fields are physically consistent."""
+        validate_gsd_consistency(
+            native_gsd_m=self.native_gsd_m,
+            effective_gsd_m=self.effective_gsd_m,
+            resampling_factor=self.resampling_factor,
+            tolerance=tolerance,
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         return {
             "sensor": self.sensor,
             "gsd_m": self.gsd_m,
+            "native_gsd_m": self.native_gsd_m,
+            "effective_gsd_m": self.effective_gsd_m,
+            "resampling_factor": self.resampling_factor,
+            "crop_transform": self.crop_transform,
+            "parent_product_id": self.parent_product_id,
             "wavelength_range_um": list(self.wavelength_range_um) if self.wavelength_range_um else None,
             "sun_azimuth_deg": self.sun_azimuth_deg,
             "sun_elevation_deg": self.sun_elevation_deg,
             "incidence_angle_deg": self.incidence_angle_deg,
             "emission_angle_deg": self.emission_angle_deg,
             "phase_angle_deg": self.phase_angle_deg,
+            "spacecraft_azimuth_deg": self.spacecraft_azimuth_deg,
+            "sensor_los_azimuth_deg": self.sensor_los_azimuth_deg,
             "acquisition_time": self.acquisition_time,
             "bounds": list(self.bounds) if self.bounds else None,
             "provenance": self.provenance,
@@ -60,9 +110,39 @@ class SensorMetadata:
 
     @property
     def sensor_los_azimuth_deg(self) -> Optional[float]:
-        # Sensor line-of-sight azimuth is currently unavailable in PDS4/PDS3
-        # ingestion; DEM code must treat this as None (default geometry).
-        return None
+        # Return spacecraft viewing / LOS azimuth if explicitly known.
+        # Rule 7: Never return solar azimuth as LOS azimuth.
+        return self.spacecraft_azimuth_deg
+
+
+def validate_gsd_consistency(
+    native_gsd_m: Optional[float],
+    effective_gsd_m: Optional[float],
+    resampling_factor: Optional[float] = 1.0,
+    tolerance: float = 0.05,
+) -> None:
+    """
+    Validates physical consistency of GSD metadata across derived rasters:
+    1. native_gsd_m and effective_gsd_m must be strictly positive floats.
+    2. resampling_factor must be strictly positive float.
+    3. effective_gsd_m must match native_gsd_m / resampling_factor within tolerance.
+    """
+    if native_gsd_m is None or native_gsd_m <= 0:
+        raise ValueError(f"Inconsistent GSD metadata: native_gsd_m must be > 0, got {native_gsd_m}")
+    if effective_gsd_m is None or effective_gsd_m <= 0:
+        raise ValueError(f"Inconsistent GSD metadata: effective_gsd_m must be > 0, got {effective_gsd_m}")
+    rf = 1.0 if resampling_factor is None else float(resampling_factor)
+    if rf <= 0:
+        raise ValueError(f"Inconsistent GSD metadata: resampling_factor must be > 0, got {rf}")
+
+    expected_eff = native_gsd_m / rf
+    rel_err = abs(effective_gsd_m - expected_eff) / expected_eff
+    if rel_err > tolerance:
+        raise ValueError(
+            f"Inconsistent GSD metadata: effective_gsd_m ({effective_gsd_m:.4f} m) does not match "
+            f"native_gsd_m / resampling_factor ({native_gsd_m:.4f} / {rf:.4f} = {expected_eff:.4f} m, "
+            f"relative discrepancy: {rel_err * 100:.2f}% > {tolerance * 100:.1f}%)"
+        )
 
 
 # Standard physical sensor specifications per Chandrayaan-2 mission documentation
@@ -232,6 +312,8 @@ def extract_sensor_metadata(
                         header_data["incidence_angle_deg"] = float(text.split()[0])
                     elif tag_local in ("solar_azimuth_angle", "sun_azimuth", "azimuth"):
                         header_data["sun_azimuth_deg"] = float(text.split()[0])
+                    elif tag_local in ("spacecraft_azimuth_angle", "spacecraft_azimuth", "sensor_azimuth", "viewing_azimuth", "instrument_azimuth"):
+                        header_data["spacecraft_azimuth_deg"] = float(text.split()[0])
                     elif tag_local in ("start_date_time", "acquisition_time"):
                         header_data["acquisition_time"] = text
                 except (ValueError, IndexError):
@@ -240,55 +322,106 @@ def extract_sensor_metadata(
             pass
 
     # Check for region manifest.json sidecar
+    parent_prod_id = None
+    crop_xform = None
     manifest_path = p.parent / "manifest.json"
+    manifest_data: Dict[str, Any] = {}
     if manifest_path.exists():
         try:
             import json
             with open(manifest_path) as mf:
-                mdata = json.load(mf)
+                manifest_data = json.load(mf)
+                mdata = manifest_data
                 if sensor_type == "OHRC":
-                    # If this is a pre-gridded tile (e.g. ohrc_512.png), its effective grid GSD is normalized to the reference grid
-                    if "_512" in p.name:
+                    parent_prod_id = mdata.get("ohrc_product_id")
+                    header_data["native_gsd_m"] = mdata.get("ohrc_native_gsd_m", mdata.get("ohrc_gsd_m", 0.25))
+                    if "_large_512" in p.name:
+                        header_data["effective_gsd_m"] = mdata.get("ohrc_large_effective_gsd_m", 15.9883)
+                    elif "_512" in p.name:
                         if mdata.get("reference_type") == "external_LRO_NAC":
-                            header_data["gsd_m"] = mdata.get("working_gsd_m", 1.0)
+                            geo = mdata.get("georeferencing", {})
+                            header_data["effective_gsd_m"] = geo.get("working_pixel_m") or mdata.get("working_gsd_m", 1.0)
                         else:
-                            header_data["gsd_m"] = mdata.get("tmc2_gsd_m", 5.0)
+                            header_data["effective_gsd_m"] = mdata.get("tmc2_gsd_m", 5.0)
                     else:
-                        header_data["gsd_m"] = mdata.get("ohrc_gsd_m", 0.25)
+                        header_data["effective_gsd_m"] = header_data["native_gsd_m"]
                     header_data["sun_azimuth_deg"] = mdata.get("ohrc_sun_azimuth_deg")
                 elif sensor_type == "TMC-2":
-                    header_data["gsd_m"] = mdata.get("tmc2_gsd_m", 5.0)
+                    parent_prod_id = mdata.get("tmc2_product_id")
+                    header_data["native_gsd_m"] = mdata.get("tmc2_native_gsd_m", mdata.get("tmc2_gsd_m", 5.0))
+                    if "_large_512" in p.name:
+                        header_data["effective_gsd_m"] = mdata.get("tmc2_large_effective_gsd_m", 39.4316)
+                    else:
+                        header_data["effective_gsd_m"] = header_data["native_gsd_m"]
                     header_data["sun_azimuth_deg"] = mdata.get("tmc2_sun_azimuth_deg")
                 elif sensor_type == "IIRS":
-                    header_data["gsd_m"] = mdata.get("iirs_gsd_m", 75.0)
-                elif sensor_type == "LRO_NAC":
-                    if "_512" in p.name:
-                        header_data["gsd_m"] = mdata.get("working_gsd_m", 1.0)
+                    parent_prod_id = mdata.get("iirs_product_id")
+                    header_data["native_gsd_m"] = mdata.get("iirs_native_gsd_m", mdata.get("iirs_gsd_m", 75.0))
+                    if "_large_512" in p.name:
+                        header_data["effective_gsd_m"] = mdata.get("iirs_large_effective_gsd_m", 39.4316)
+                    elif "_512" in p.name:
+                        header_data["effective_gsd_m"] = mdata.get("working_gsd_m", mdata.get("tmc2_gsd_m", 5.0))
                     else:
-                        header_data["gsd_m"] = mdata.get("lro_nac_gsd_m", mdata.get("nac_gsd_m", 0.5))
+                        header_data["effective_gsd_m"] = header_data["native_gsd_m"]
+                elif sensor_type == "LRO_NAC":
+                    parent_prod_id = mdata.get("lro_nac_product_id")
+                    header_data["native_gsd_m"] = mdata.get("lro_nac_native_gsd_m", mdata.get("lro_nac_gsd_m", mdata.get("nac_gsd_m", 0.914)))
+                    if "_512" in p.name:
+                        geo = mdata.get("georeferencing", {})
+                        header_data["effective_gsd_m"] = geo.get("working_pixel_m") or mdata.get("working_gsd_m", 1.0)
+                    else:
+                        header_data["effective_gsd_m"] = header_data["native_gsd_m"]
                     header_data["sun_azimuth_deg"] = mdata.get("lro_nac_sun_azimuth_deg")
                 if "bounds" in mdata:
                     b = mdata["bounds"]
                     header_data["bounds"] = (b["west_lon"], b["east_lon"], b["south_lat"], b["north_lat"])
+                    crop_xform = {"bounds": b}
         except Exception:
             pass
 
-    # Step 3: Resolve GSD (explicit request parameter has highest precedence)
-    gsd_val = None
+    # Step 3: Resolve Native GSD & Effective GSD
+    native_gsd_val = header_data.get("native_gsd_m")
+    if native_gsd_val is None:
+        if "gsd_m" in header_data:
+            native_gsd_val = header_data["gsd_m"]
+            provenance["native_gsd_m"] = "header"
+        elif sensor_type in SENSOR_SPECS and SENSOR_SPECS[sensor_type].get("gsd_m") is not None:
+            native_gsd_val = SENSOR_SPECS[sensor_type]["gsd_m"]
+            provenance["native_gsd_m"] = "sensor_spec"
+        elif explicit_gsd is not None and explicit_gsd > 0:
+            native_gsd_val = float(explicit_gsd)
+            provenance["native_gsd_m"] = "request"
+        else:
+            raise ValueError(
+                f"Physical ground sampling distance (GSD) could not be determined for image '{p.name}' (sensor: {sensor_type}). "
+                "Please provide an explicit 'explicit_gsd' parameter or product metadata headers."
+            )
+
+    effective_gsd_val = None
     if explicit_gsd is not None and explicit_gsd > 0:
-        gsd_val = float(explicit_gsd)
+        effective_gsd_val = float(explicit_gsd)
         provenance["gsd_m"] = "request"
-    elif "gsd_m" in header_data:
-        gsd_val = header_data["gsd_m"]
-        provenance["gsd_m"] = "header"
-    elif sensor_type in SENSOR_SPECS and SENSOR_SPECS[sensor_type].get("gsd_m") is not None:
-        gsd_val = SENSOR_SPECS[sensor_type]["gsd_m"]
-        provenance["gsd_m"] = "sensor_spec"
+        provenance["effective_gsd_m"] = "request"
+    elif "effective_gsd_m" in header_data:
+        effective_gsd_val = float(header_data["effective_gsd_m"])
+        provenance["gsd_m"] = "manifest"
+        provenance["effective_gsd_m"] = "manifest"
+    elif "_512" in p.name:
+        # Fallback grid normalization for 512px derivative rasters without manifest
+        if sensor_type == "OHRC":
+            effective_gsd_val = 5.0
+        elif sensor_type == "LRO_NAC":
+            effective_gsd_val = 1.0
+        else:
+            effective_gsd_val = native_gsd_val
+        provenance["gsd_m"] = "grid_normalized_fallback"
+        provenance["effective_gsd_m"] = "grid_normalized_fallback"
     else:
-        raise ValueError(
-            f"Physical ground sampling distance (GSD) could not be determined for image '{p.name}' (sensor: {sensor_type}). "
-            "Please provide an explicit 'explicit_gsd' parameter or product metadata headers."
-        )
+        effective_gsd_val = native_gsd_val
+        provenance["gsd_m"] = provenance.get("native_gsd_m", "header")
+        provenance["effective_gsd_m"] = provenance.get("native_gsd_m", "header")
+
+    resampling_factor = float(native_gsd_val) / float(effective_gsd_val) if effective_gsd_val else 1.0
 
     # Step 4: Resolve observation geometry (emission & azimuth)
     emission_val = None
@@ -320,18 +453,31 @@ def extract_sensor_metadata(
     else:
         provenance["incidence_angle_deg"] = "unavailable"
 
+    spacecraft_az_val = header_data.get("spacecraft_azimuth_deg")
+    if spacecraft_az_val is not None:
+        provenance["spacecraft_azimuth_deg"] = "header"
+
     specs = SENSOR_SPECS.get(sensor_type, {})
     wavelength = specs.get("wavelength_range_um")
     if wavelength:
         provenance["wavelength_range_um"] = "sensor_spec"
 
-    return SensorMetadata(
+    meta_obj = SensorMetadata(
         sensor=sensor_type,
-        gsd_m=gsd_val,
+        gsd_m=effective_gsd_val,
+        native_gsd_m=native_gsd_val,
+        effective_gsd_m=effective_gsd_val,
+        resampling_factor=resampling_factor,
+        crop_transform=crop_xform,
+        parent_product_id=parent_prod_id,
         wavelength_range_um=wavelength,
         sun_azimuth_deg=azimuth_val,
         incidence_angle_deg=incidence_val,
         emission_angle_deg=emission_val,
+        spacecraft_azimuth_deg=spacecraft_az_val,
         acquisition_time=header_data.get("acquisition_time"),
+        bounds=header_data.get("bounds"),
         provenance=provenance,
     )
+    meta_obj.validate_gsd()
+    return meta_obj

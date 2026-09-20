@@ -209,7 +209,26 @@ def make_match_record(
 
     Coordinates are coerced with ``float()`` only (no ``round()``/``int()``).
     ``confidence`` is rounded to 2 decimals for readability.
+    Uncertainty fields (covariance_xy, sigma_major_px, sigma_minor_px,
+    ellipse_angle_deg, uncertainty_status) are guaranteed present and non-null.
     """
+    covariance_xy = extra.pop("covariance_xy", None)
+    sigma_major_px = extra.pop("sigma_major_px", None)
+    sigma_minor_px = extra.pop("sigma_minor_px", None)
+    ellipse_angle_deg = extra.pop("ellipse_angle_deg", None)
+    uncertainty_status = extra.pop("uncertainty_status", None)
+
+    if covariance_xy is None:
+        covariance_xy = [[1.0, 0.0], [0.0, 1.0]]
+    if sigma_major_px is None:
+        sigma_major_px = 1.0
+    if sigma_minor_px is None:
+        sigma_minor_px = 1.0
+    if ellipse_angle_deg is None:
+        ellipse_angle_deg = 0.0
+    if uncertainty_status is None:
+        uncertainty_status = "prior_only"
+
     return {
         "source_x": float(source_x),
         "source_y": float(source_y),
@@ -220,6 +239,11 @@ def make_match_record(
         "image2_x": float(target_x),
         "image2_y": float(target_y),
         "confidence": round(float(confidence), 2),
+        "covariance_xy": sanitize_for_json(covariance_xy),
+        "sigma_major_px": round(float(sigma_major_px), 4),
+        "sigma_minor_px": round(float(sigma_minor_px), 4),
+        "ellipse_angle_deg": round(float(ellipse_angle_deg), 2),
+        "uncertainty_status": str(uncertainty_status),
         **{k: sanitize_for_json(v) for k, v in extra.items()},
     }
 
@@ -639,7 +663,7 @@ def estimate_scale_ratio_cv(
     img2: np.ndarray,
     lp_max_dim: int = 1024,
     response_threshold: float = 0.03,
-    max_ratio: float = 300.0,
+    max_ratio: float = 10.0,
 ) -> float:
     """
     Pure computer-vision estimate of the relative scale ratio between two
@@ -670,7 +694,8 @@ def estimate_scale_ratio_cv(
     Raises:
         ValueError: blank/uniform inputs, correlation response below
             ``response_threshold`` (unrelated scenes or gaps beyond ~8-10x
-            where log-polar correlation decorrelates), or ``S > max_ratio``.
+            where log-polar correlation decorrelates), canvas dimension disparity
+            exceeding ``max_ratio`` (SCALE_CAP=10.0), or ``S > max_ratio``.
 
     Validated on synthetic crater fields: true 1.0/1.6/2.0/4.0/8.0 ->
     estimated 1.00/1.59/1.98/3.92/7.69 with responses 1.0..0.05.
@@ -701,6 +726,15 @@ def estimate_scale_ratio_cv(
     h2, w2 = g2.shape[:2]
     if min(h1, w1, h2, w2) < 16:
         raise ValueError("images too small for log-polar scale estimation (min dim < 16 px)")
+
+    # Strict guardrail: never let Fourier-Mellin estimate extreme ratios (e.g. 20x, 100x, 250x) directly
+    canvas_ratio = max(max(h1, w1), max(h2, w2)) / max(1.0, min(min(h1, w1), min(h2, w2)))
+    if canvas_ratio > float(max_ratio):
+        raise ValueError(
+            f"Canvas dimension ratio {canvas_ratio:.1f}x exceeds SCALE_CAP ({float(max_ratio):.1f}x). "
+            "Fourier-Mellin log-polar correlation cannot estimate extreme scale differences (e.g. 250x OHRC-to-IIRS) directly. "
+            "Metadata-driven common-GSD normalization must be performed first."
+        )
 
     # Ratio-preserving joint downsample (-same- factor keeps S intact).
     down = max(1.0, float(max(h1, w1, h2, w2)) / float(lp_max_dim))
@@ -1418,83 +1452,26 @@ def render_synthetic_shaded_relief(
 def subpixel_phase_correlation(
     patch1: np.ndarray,
     patch2: np.ndarray,
-) -> Tuple[float, float, float, bool]:
+    return_uncertainty: bool = False,
+) -> Union[Tuple[float, float, float, bool], Tuple[float, float, float, bool, Dict[str, Any]]]:
     """
-    Fourier Phase Correlation with 2D quadratic peak surface fitting.
-    Returns (delta_x, delta_y, peak_correlation, is_valid).
-    Rejects patches with low texture or ambiguous peak responses.
+    Fourier Phase Correlation with 2D quadratic peak surface fitting and
+    rigorous physical uncertainty estimation (negative Hessian curvature to 2x2 covariance).
+    
+    If return_uncertainty=True, returns:
+        (shift_x, shift_y, peak_val, is_valid, uncertainty_dict)
+    If return_uncertainty=False (default), returns:
+        (shift_x, shift_y, peak_val, is_valid)
     """
-    h, w = patch1.shape[:2]
-    if h < 16 or w < 16:
-        return 0.0, 0.0, 0.0, False
+    try:
+        from ML_model.subpixel_uncertainty import subpixel_phase_correlation_with_uncertainty
+    except Exception:
+        from subpixel_uncertainty import subpixel_phase_correlation_with_uncertainty
 
-    p1 = patch1.astype(np.float32)
-    p2 = patch2.astype(np.float32)
-
-    # Check texture variance
-    if np.var(p1) < 1e-6 or np.var(p2) < 1e-6:
-        return 0.0, 0.0, 0.0, False
-
-    win_y = np.hanning(h).astype(np.float32)
-    win_x = np.hanning(w).astype(np.float32)
-    window = np.outer(win_y, win_x)
-
-    p1 = (p1 - float(np.mean(p1))) * window
-    p2 = (p2 - float(np.mean(p2))) * window
-
-    F1 = np.fft.fft2(p1)
-    F2 = np.fft.fft2(p2)
-
-    denom = np.abs(F2 * np.conj(F1)) + 1e-9
-    cross_power = (F2 * np.conj(F1)) / denom
-    corr = np.fft.fftshift(np.real(np.fft.ifft2(cross_power)).astype(np.float32))
-
-    peak_y, peak_x = np.unravel_index(np.argmax(corr), corr.shape)
-    peak_val = float(corr[peak_y, peak_x])
-
-    if peak_val < 0.15:
-        # Ambiguous peak
-        return 0.0, 0.0, peak_val, False
-
-    cy, cx = h // 2, w // 2
-    sub_y, sub_x = float(peak_y), float(peak_x)
-
-    # --- TRUE 2D ALGEBRAIC PARABOLOID FIT ---
-    # Fits z(x,y) = ax^2 + by^2 + cxy + dx + ey + f to the 3x3 neighborhood
-    if 0 < peak_y < h - 1 and 0 < peak_x < w - 1:
-        # Extract 3x3 neighborhood around the peak
-        c = float(corr[peak_y, peak_x])
-        c_l = float(corr[peak_y, peak_x - 1])
-        c_r = float(corr[peak_y, peak_x + 1])
-        c_u = float(corr[peak_y - 1, peak_x])
-        c_d = float(corr[peak_y + 1, peak_x])
-        c_ul = float(corr[peak_y - 1, peak_x - 1])
-        c_ur = float(corr[peak_y - 1, peak_x + 1])
-        c_dl = float(corr[peak_y + 1, peak_x - 1])
-        c_dr = float(corr[peak_y + 1, peak_x + 1])
-
-        # Compute coefficients for 2D paraboloid
-        a = 0.5 * (c_r + c_l - 2 * c)
-        b = 0.5 * (c_d + c_u - 2 * c)
-        c_cross = 0.25 * (c_dr + c_ul - c_dl - c_ur)
-        d = 0.5 * (c_r - c_l)
-        e = 0.5 * (c_d - c_u)
-
-        denom = 4 * a * b - c_cross * c_cross
-        if abs(denom) > 1e-9:
-            dx = (c_cross * e - 2 * b * d) / denom
-            dy = (c_cross * d - 2 * a * e) / denom
-
-            # Clip to prevent crazy jumps
-            dx = np.clip(dx, -0.9, 0.9)
-            dy = np.clip(dy, -0.9, 0.9)
-
-            sub_x += float(dx)
-            sub_y += float(dy)
-
-    shift_x = float(sub_x - cx)
-    shift_y = float(sub_y - cy)
-    return shift_x, shift_y, peak_val, True
+    res = subpixel_phase_correlation_with_uncertainty(patch1, patch2)
+    if return_uncertainty:
+        return res.dx, res.dy, res.peak_val, res.is_valid, res.to_dict()
+    return res.dx, res.dy, res.peak_val, res.is_valid
 
 
 def mutual_information_score(image_a: np.ndarray, image_b: np.ndarray, bins: int = 32) -> float:
@@ -2340,18 +2317,46 @@ def _weighted_dlt_homography(
     pts1: np.ndarray,
     pts2: np.ndarray,
     weights: np.ndarray,
+    covariances: Optional[Sequence[np.ndarray]] = None,
 ) -> Optional[np.ndarray]:
-    """sqrt(w) row-scaled DLT. Returns None if the SVD is unusable."""
+    """
+    Weighted DLT: uses 2x2 residual covariance whitening W_i when covariances
+    are provided; otherwise sqrt(w) row-scaled DLT. Returns None if SVD is unusable.
+    """
     if len(pts1) < 4:
         return None
-    sw = np.sqrt(np.clip(np.asarray(weights, dtype=np.float64), 0.0, None))
     A = []
-    for i in range(len(pts1)):
-        x, y = float(pts1[i, 0]), float(pts1[i, 1])
-        xp, yp = float(pts2[i, 0]), float(pts2[i, 1])
-        s = float(sw[i])
-        A.append([-x * s, -y * s, -s, 0, 0, 0, xp * x * s, xp * y * s, xp * s])
-        A.append([0, 0, 0, -x * s, -y * s, -s, yp * x * s, yp * y * s, yp * s])
+    _whiten_fn = None
+    if covariances is not None and len(covariances) == len(pts1):
+        try:
+            from ML_model.covariance_geometry import compute_whitening_matrix as _whiten_fn
+        except Exception:
+            try:
+                from covariance_geometry import compute_whitening_matrix as _whiten_fn
+            except Exception:
+                _whiten_fn = None
+
+    if _whiten_fn is not None and covariances is not None:
+        for i in range(len(pts1)):
+            x, y = float(pts1[i, 0]), float(pts1[i, 1])
+            xp, yp = float(pts2[i, 0]), float(pts2[i, 1])
+            cov_i = covariances[i]
+            W_i = _whiten_fn(cov_i)
+            block = np.array([
+                [-x, -y, -1.0, 0.0, 0.0, 0.0, xp * x, xp * y, xp],
+                [0.0, 0.0, 0.0, -x, -y, -1.0, yp * x, yp * y, yp],
+            ], dtype=np.float64)
+            w_block = W_i @ block
+            A.append(w_block[0])
+            A.append(w_block[1])
+    else:
+        sw = np.sqrt(np.clip(np.asarray(weights, dtype=np.float64), 0.0, None))
+        for i in range(len(pts1)):
+            x, y = float(pts1[i, 0]), float(pts1[i, 1])
+            xp, yp = float(pts2[i, 0]), float(pts2[i, 1])
+            s = float(sw[i])
+            A.append([-x * s, -y * s, -s, 0, 0, 0, xp * x * s, xp * y * s, xp * s])
+            A.append([0, 0, 0, -x * s, -y * s, -s, yp * x * s, yp * y * s, yp * s])
     try:
         _, _, vt = np.linalg.svd(np.asarray(A, dtype=np.float64))
     except np.linalg.LinAlgError:
@@ -2373,6 +2378,7 @@ def estimate_weighted_homography(
     image_shape: Tuple[int, int] = (512, 512),
     rng_seed: int = SEED,
     n_iters: int = 2000,
+    covariances: Optional[Sequence[Any]] = None,
 ) -> Tuple[Optional[np.ndarray], Optional[np.ndarray], str]:
     """PROSAC-style weighted homography that Quality Gate 3 will accept.
 
@@ -2490,8 +2496,9 @@ def estimate_weighted_homography(
         if score > best_valid_score:
             ii = np.where(inl)[0]
             src_i, dst_i, w_i = pts1[ii], pts2[ii], w[ii]
+            cov_i = [covariances[k] for k in ii] if (covariances is not None and len(covariances) == n) else None
             mask_cand = inl.reshape(-1, 1).astype(np.uint8)
-            H_w = _weighted_dlt_homography(src_i, dst_i, w_i)
+            H_w = _weighted_dlt_homography(src_i, dst_i, w_i, covariances=cov_i)
             if _accept(H_w, mask_cand):
                 best_valid_score = score
                 best_valid_H = H_w
@@ -2514,10 +2521,11 @@ def estimate_weighted_homography(
     if best_inliers is not None:
         ii = np.where(best_inliers)[0]
         src_i, dst_i, w_i = pts1[ii], pts2[ii], w[ii]
+        cov_i = [covariances[k] for k in ii] if (covariances is not None and len(covariances) == n) else None
         H_dlt, _ = cv2.findHomography(src_i, dst_i, 0)
         mask = best_inliers.reshape(-1, 1).astype(np.uint8)
 
-        H_w = _weighted_dlt_homography(src_i, dst_i, w_i)
+        H_w = _weighted_dlt_homography(src_i, dst_i, w_i, covariances=cov_i)
         if _accept(H_w, mask):
             return H_w, mask, "sampling_weighted_dlt"
         if _accept(H_dlt, mask):
@@ -3125,6 +3133,10 @@ def match_images_cfog(
     finest_scale_only: bool = False,
     enable_illumination_normalization: bool = False,
     enforce_q5_safety: bool = True,
+    enable_terrain_adaptive_log_gabor: bool = False,
+    dem_aligned: bool = False,
+    propagate_uncertainty_to_weights: bool = False,
+    enable_covariance_refinement: bool = False,
 ) -> Dict[str, Any]:
     """
     Executes the primary cross-sensor registration pipeline:
@@ -3237,6 +3249,17 @@ def match_images_cfog(
             logger.warning("Failed to load DEM from '%s': %s", dem_path, e)
             dem_arr = None
 
+    terrain_engine = None
+    if enable_terrain_adaptive_log_gabor:
+        try:
+            from ML_model.terrain_adaptive_log_gabor import TerrainAdaptiveLogGaborEngine
+        except Exception:
+            from terrain_adaptive_log_gabor import TerrainAdaptiveLogGaborEngine
+        terrain_engine = TerrainAdaptiveLogGaborEngine(
+            enable_terrain_adaptive=True,
+            gsd_m=float(working_gsd) if "working_gsd" in locals() and working_gsd is not None else 1.0,
+        )
+
     orig_h1, orig_w1 = raw1_gray.shape[:2]
     orig_h2, orig_w2 = raw2_gray.shape[:2]
 
@@ -3247,18 +3270,56 @@ def match_images_cfog(
     scale_estimation_method = "pds4_metadata"
     estimated_scale_ratio: Optional[float] = None
     working_scale_note = "common_physical_gsd_normalization"
+    native_scale_ratio: Optional[float] = None
+    pre_normalization_ratio: Optional[float] = None
+    residual_scale_ratio: Optional[float] = 1.0
 
     if gsd1 is not None and gsd2 is not None:
         # Bring both images to the working physical scale (e.g. TMC-2 ~5.0 m/px)
         working_gsd = max(gsd1, gsd2)
         scale_factor1 = float(working_gsd / gsd1)  # e.g. 5.0 / 0.25 = 20.0
         scale_factor2 = float(working_gsd / gsd2)  # e.g. 5.0 / 5.0 = 1.0
+        native_scale_ratio = float(max(gsd1, gsd2) / min(gsd1, gsd2))
+        pre_normalization_ratio = native_scale_ratio
+        residual_scale_ratio = 1.0
         logger.info(
-            "Sensor metadata: %s (%.2fm GSD) -> %s (%.2fm GSD). Target working scale: %.2fm/px (scales: %.1fx, %.1fx)",
-            meta1.sensor, gsd1, meta2.sensor, gsd2, working_gsd, scale_factor1, scale_factor2
+            "Sensor metadata: %s (%.2fm GSD) -> %s (%.2fm GSD). Target working scale: %.2fm/px (scales: %.1fx, %.1fx, native ratio: %.2fx)",
+            meta1.sensor, gsd1, meta2.sensor, gsd2, working_gsd, scale_factor1, scale_factor2, native_scale_ratio
         )
     else:
         # --- CV LOG-POLAR FALLBACK ---
+        canvas_ratio = max(orig_h1, orig_w1, orig_h2, orig_w2) / max(1.0, min(orig_h1, orig_w1, orig_h2, orig_w2))
+        if canvas_ratio > 10.0:
+            logger.error(
+                "Scale disparity (%.1fx) exceeds SCALE_CAP (10.0x). Common-GSD normalization cannot be computed without GSD metadata.",
+                canvas_ratio,
+            )
+            return {
+                "status": "scale_normalization_failed",
+                "message": (
+                    f"Scale ratio (disparity ~{canvas_ratio:.1f}x) exceeds SCALE_CAP (10.0x). "
+                    "Fourier-Mellin cannot directly estimate extreme scale ratios (e.g. 20x-250x) without metadata. "
+                    "Common-GSD normalization cannot be computed because valid GSD metadata is missing. "
+                    "Provide 'explicit_gsd1'/'explicit_gsd2' or attach PDS4 XML labels."
+                ),
+                "match_count": 0,
+                "inlier_count": 0,
+                "metrics": None,
+                "homography": None,
+                "metadata": {
+                    "source": meta1.to_dict() if meta1 else {},
+                    "reference": meta2.to_dict() if meta2 else {},
+                    "scale_estimation_method": "failed",
+                    "working_scale": {
+                        "working_gsd_m": None,
+                        "method": working_scale_note,
+                        "native_scale_ratio": round(canvas_ratio, 4),
+                        "pre_normalization_ratio": round(canvas_ratio, 4),
+                        "residual_scale_ratio": round(canvas_ratio, 4),
+                    },
+                },
+            }
+
         # No absolute GSD: keep placeholder metas (gsd None, UNKNOWN sensor) so
         # downstream provenance/reporting code keeps working, and build the
         # working canvas relatively: the larger image stays fixed (scale 1.0)
@@ -3278,7 +3339,10 @@ def match_images_cfog(
                 logger.info("Reusing threaded CV scale ratio S=%.3f (inverted call).", s_est)
             else:
                 s_est = estimate_scale_ratio_cv(raw1_gray, raw2_gray)
-            estimated_scale_ratio = float(np.clip(s_est, 1.0, 300.0))
+            estimated_scale_ratio = float(np.clip(s_est, 1.0, 10.0))
+            native_scale_ratio = estimated_scale_ratio
+            pre_normalization_ratio = estimated_scale_ratio
+            residual_scale_ratio = 1.0
             if orig_h1 * orig_w1 >= orig_h2 * orig_w2:
                 scale_factor1 = 1.0
                 scale_factor2 = 1.0 / estimated_scale_ratio
@@ -3293,7 +3357,7 @@ def match_images_cfog(
         except Exception as e:
             logger.error("CV log-polar scale fallback failed: %s", e)
             return {
-                "status": "scale_estimation_failed",
+                "status": "scale_normalization_failed",
                 "message": (
                     "Unable to determine the inter-image scale ratio: PDS4/sensor "
                     "GSD metadata is missing and the CV log-polar fallback failed "
@@ -3309,7 +3373,10 @@ def match_images_cfog(
                     "reference": meta2.to_dict(),
                     "scale_estimation_method": "failed",
                     "working_scale": {"working_gsd_m": None,
-                                      "method": working_scale_note},
+                                      "method": working_scale_note,
+                                      "native_scale_ratio": None,
+                                      "pre_normalization_ratio": None,
+                                      "residual_scale_ratio": None},
                 },
             }
 
@@ -3322,6 +3389,17 @@ def match_images_cfog(
     # before the old definition site; without this the NameError was swallowed
     # by `except: pass` and the product silently lost its georeferencing.
     tag_gsd = working_gsd if np.isfinite(working_gsd) else 1.0
+    if terrain_engine is not None:
+        terrain_engine.gsd_m = float(working_gsd) if (working_gsd is not None and np.isfinite(working_gsd)) else 1.0
+
+    def _build_working_scale_meta() -> Dict[str, Any]:
+        return {
+            "working_gsd_m": working_gsd,
+            "method": working_scale_note,
+            "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+            "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+            "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
+        }
 
     # 3.5. Content-Based Overlap Recovery Setup
     content_overlap_info: Optional[Dict[str, Any]] = None
@@ -3351,9 +3429,18 @@ def match_images_cfog(
             "metadata": {
                 "source": meta1.to_dict(),
                 "reference": meta2.to_dict(),
-                "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                "working_scale": {
+                    "working_gsd_m": working_gsd,
+                    "method": working_scale_note,
+                    "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                    "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                    "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
+                },
                 "scale_estimation_method": scale_estimation_method,
                 "estimated_scale_ratio": estimated_scale_ratio,
+                "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
             },
         }
 
@@ -3399,7 +3486,14 @@ def match_images_cfog(
             # (dx_px, dy_px) and applies it to shift_work_x/y, which re-centers
             # the search region (cx2/cy2) before CFOG matching runs.
             content_overlap_info = recover_content_overlap(
-                work1_gray, work2_gray, initial_bounds=effective_bounds, gsd_m=working_gsd
+                work1_gray,
+                work2_gray,
+                initial_bounds=effective_bounds,
+                gsd_m=working_gsd,
+                source_gsd_m=working_gsd,
+                ref_gsd_m=working_gsd,
+                native_scale_ratio=native_scale_ratio,
+                pre_normalization_ratio=pre_normalization_ratio,
             )
             if content_overlap_info.get("overlap_recovered"):
                 if content_overlap_info.get("frame") == "reference_pixels":
@@ -3567,9 +3661,12 @@ def match_images_cfog(
             fail_meta = {
                 "source": meta1.to_dict(),
                 "reference": meta2.to_dict(),
-                "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                "working_scale": _build_working_scale_meta(),
                 "scale_estimation_method": scale_estimation_method,
                 "estimated_scale_ratio": estimated_scale_ratio,
+                "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
                 "direction": "inverted_from_BA",
                 "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
             }
@@ -3585,9 +3682,13 @@ def match_images_cfog(
                 "metadata": fail_meta,
                 "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": _finite_gsd(meta1)},
                 "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": _finite_gsd(meta2)},
-                "working_scale": {"gsd_m": working_gsd, "method": working_scale_note},
+                "working_scale": _build_working_scale_meta(),
                 "scale_estimation_method": scale_estimation_method,
                 "estimated_scale_ratio": estimated_scale_ratio,
+                "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
+                "content_overlap_recovery": res_ba.get("content_overlap_recovery") or content_overlap_info,
                 "matches": [],
                 "all_matches": [],
                 "outputs": {},
@@ -3612,17 +3713,24 @@ def match_images_cfog(
                 "metadata": {
                     "source": meta1.to_dict(),
                     "reference": meta2.to_dict(),
-                    "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                    "working_scale": _build_working_scale_meta(),
                     "scale_estimation_method": scale_estimation_method,
                     "estimated_scale_ratio": estimated_scale_ratio,
+                    "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                    "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                    "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
                     "direction": "inverted_from_BA",
                     "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
                 },
                 "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": _finite_gsd(meta1)},
                 "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": _finite_gsd(meta2)},
-                "working_scale": {"gsd_m": working_gsd, "method": working_scale_note},
+                "working_scale": _build_working_scale_meta(),
                 "scale_estimation_method": scale_estimation_method,
                 "estimated_scale_ratio": estimated_scale_ratio,
+                "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
+                "content_overlap_recovery": res_ba.get("content_overlap_recovery") or content_overlap_info,
                 "matches": [],
                 "all_matches": [],
                 "outputs": {},
@@ -3642,17 +3750,24 @@ def match_images_cfog(
                 "metadata": {
                     "source": meta1.to_dict(),
                     "reference": meta2.to_dict(),
-                    "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                    "working_scale": _build_working_scale_meta(),
                     "scale_estimation_method": scale_estimation_method,
                     "estimated_scale_ratio": estimated_scale_ratio,
+                    "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                    "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                    "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
                     "direction": "inverted_from_BA",
                     "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
                 },
                 "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": _finite_gsd(meta1)},
                 "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": _finite_gsd(meta2)},
-                "working_scale": {"gsd_m": working_gsd, "method": working_scale_note},
+                "working_scale": _build_working_scale_meta(),
                 "scale_estimation_method": scale_estimation_method,
                 "estimated_scale_ratio": estimated_scale_ratio,
+                "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
+                "content_overlap_recovery": res_ba.get("content_overlap_recovery") or content_overlap_info,
                 "matches": [],
                 "all_matches": [],
                 "outputs": {},
@@ -3703,17 +3818,24 @@ def match_images_cfog(
                 "metadata": {
                     "source": meta1.to_dict(),
                     "reference": meta2.to_dict(),
-                    "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                    "working_scale": _build_working_scale_meta(),
                     "scale_estimation_method": scale_estimation_method,
                     "estimated_scale_ratio": estimated_scale_ratio,
+                    "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                    "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                    "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
                     "direction": "inverted_from_BA",
                     "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
                 },
                 "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": _finite_gsd(meta1)},
                 "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": _finite_gsd(meta2)},
-                "working_scale": {"gsd_m": working_gsd, "method": working_scale_note},
+                "working_scale": _build_working_scale_meta(),
                 "scale_estimation_method": scale_estimation_method,
                 "estimated_scale_ratio": estimated_scale_ratio,
+                "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
+                "content_overlap_recovery": res_ba.get("content_overlap_recovery") or content_overlap_info,
                 "matches": [],
                 "all_matches": inverted_all_matches,
                 "outputs": {},
@@ -3756,17 +3878,24 @@ def match_images_cfog(
                 "metadata": {
                     "source": meta1.to_dict(),
                     "reference": meta2.to_dict(),
-                    "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                    "working_scale": _build_working_scale_meta(),
                     "scale_estimation_method": scale_estimation_method,
                     "estimated_scale_ratio": estimated_scale_ratio,
+                    "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                    "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                    "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
                     "direction": "inverted_from_BA",
                     "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
                 },
                 "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": _finite_gsd(meta1)},
                 "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": _finite_gsd(meta2)},
-                "working_scale": {"gsd_m": working_gsd, "method": working_scale_note},
+                "working_scale": _build_working_scale_meta(),
                 "scale_estimation_method": scale_estimation_method,
                 "estimated_scale_ratio": estimated_scale_ratio,
+                "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
+                "content_overlap_recovery": res_ba.get("content_overlap_recovery") or content_overlap_info,
                 "matches": [],
                 "all_matches": inverted_all_matches,
                 "outputs": {},
@@ -3881,9 +4010,12 @@ def match_images_cfog(
         full_metadata = {
             "source": meta1.to_dict(),
             "reference": meta2.to_dict(),
-            "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+            "working_scale": _build_working_scale_meta(),
             "scale_estimation_method": scale_estimation_method,
             "estimated_scale_ratio": estimated_scale_ratio,
+            "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+            "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+            "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
             "terrain_correction": {"source": None, "reference": None},
             "direction": "inverted_from_BA",
             "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
@@ -3905,10 +4037,14 @@ def match_images_cfog(
             "measured_direction": f"{meta2.sensor} -> {meta1.sensor}",
             "source": {"sensor": meta1.sensor, "width": orig_w1, "height": orig_h1, "gsd_m": _finite_gsd(meta1)},
             "reference": {"sensor": meta2.sensor, "width": orig_w2, "height": orig_h2, "gsd_m": _finite_gsd(meta2)},
-            "working_scale": {"gsd_m": working_gsd, "method": working_scale_note},
+            "working_scale": _build_working_scale_meta(),
             "scale_estimation_method": scale_estimation_method,
             "estimated_scale_ratio": estimated_scale_ratio,
+            "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+            "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+            "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
             "metrics": metrics,
+            "verdict": metrics.get("verdict", "FAIL"),
             "homography": H_ab.tolist(),
             "terrain_correction": full_metadata["terrain_correction"],
             "spatial_attempts": res_ba.get("spatial_attempts", 0),
@@ -4040,9 +4176,22 @@ def match_images_cfog(
 
     import time
     t_start_l2 = time.perf_counter()
-    pyr1 = multi_scale_phase_congruency(comp1_gray, scales=3)
+    if terrain_engine is not None and dem_aligned and dem_arr is not None:
+        pc1_l0 = terrain_engine.process_image(
+            comp1_gray,
+            dem=dem_arr,
+            dem_aligned=dem_aligned,
+            tile_size=128,
+        )
+        l1_w, l1_h = max(1, comp1_gray.shape[1] // 2), max(1, comp1_gray.shape[0] // 2)
+        l2_w, l2_h = max(1, comp1_gray.shape[1] // 4), max(1, comp1_gray.shape[0] // 4)
+        pc1_l1 = cv2.resize(pc1_l0, (l1_w, l1_h), interpolation=cv2.INTER_AREA)
+        pc1_l2 = cv2.resize(pc1_l0, (l2_w, l2_h), interpolation=cv2.INTER_AREA)
+        pyr1 = [pc1_l0, pc1_l1, pc1_l2]
+    else:
+        pyr1 = multi_scale_phase_congruency(comp1_gray, scales=3)
+        pc1_l0, pc1_l1, pc1_l2 = pyr1[0], pyr1[1], pyr1[2]
     pyr2 = multi_scale_phase_congruency(match_ref_gray, scales=3)
-    pc1_l0, pc1_l1, pc1_l2 = pyr1[0], pyr1[1], pyr1[2]
     pc2_l0, pc2_l1, pc2_l2 = pyr2[0], pyr2[1], pyr2[2]
 
     # --- Level 2 (1/4 scale): Global Phase Correlation for Large Displacement ---
@@ -4229,8 +4378,22 @@ def match_images_cfog(
                 if t_high.shape[0] < 32 or t_high.shape[1] < 32:
                     continue
 
-                pc_t_high = compute_phase_congruency(t_high, num_orientations=4, num_scales=3)
-                pc_t_coarse = compute_phase_congruency(t_coarse_up, num_orientations=4, num_scales=3)
+                if terrain_engine is not None and dem_aligned and dem_arr is not None:
+                    # Extract DEM patch aligned with t_high if available
+                    dem_patch = None
+                    if dem_arr.shape[:2] == high_img.shape[:2]:
+                        dem_patch = dem_arr[oy : oy + tile_size, ox : ox + tile_size]
+                    pc_t_high, _ = terrain_engine.process_tile(
+                        t_high,
+                        dem_tile=dem_patch,
+                        dem_aligned=dem_aligned,
+                        tile_id=f"tile_{oy}_{ox}",
+                        bounds=(oy, oy + tile_size, ox, ox + tile_size),
+                    )
+                    pc_t_coarse = compute_phase_congruency(t_coarse_up, num_orientations=4, num_scales=3)
+                else:
+                    pc_t_high = compute_phase_congruency(t_high, num_orientations=4, num_scales=3)
+                    pc_t_coarse = compute_phase_congruency(t_coarse_up, num_orientations=4, num_scales=3)
 
                 kps_raw = detect_salient_keypoints(pc_t_high, max_corners=100, quality_level=0.01)
                 kps_ssc = suppression_via_square_covering(
@@ -4267,9 +4430,16 @@ def match_images_cfog(
                         p1_ref = t_high[ky_i - pw : ky_i + pw, kx_i - pw : kx_i + pw]
                         p2_ref = t_coarse_up[best_y - pw : best_y + pw, best_x - pw : best_x + pw]
                         if p1_ref.shape == p2_ref.shape:
-                            dx, dy, _, valid = subpixel_phase_correlation(p1_ref, p2_ref)
+                            dx, dy, _, valid, unc = subpixel_phase_correlation(p1_ref, p2_ref, return_uncertainty=True)
                         else:
                             dx, dy, valid = 0.0, 0.0, False
+                            unc = {
+                                "covariance_xy": [[1.0, 0.0], [0.0, 1.0]],
+                                "sigma_major_px": 1.0,
+                                "sigma_minor_px": 1.0,
+                                "ellipse_angle_deg": 0.0,
+                                "uncertainty_status": "unrefined",
+                            }
                         sub_dx = float(dx) if valid else 0.0
                         sub_dy = float(dy) if valid else 0.0
 
@@ -4304,6 +4474,7 @@ def match_images_cfog(
                             "cell": fine_cell,
                             "method": "native_tiling",
                             "peak_uniqueness": float(peak_uniq),
+                            **unc,
                             **_desc,
                         })
                         native_pts1.append([nat_x1, nat_y1])
@@ -4320,6 +4491,7 @@ def match_images_cfog(
                                 is_refined=bool(valid),
                                 x=nat_x1, y=nat_y1, width=orig_w1, height=orig_h1,
                             ),
+                            **unc,
                             **_desc,
                         ))
 
@@ -4374,9 +4546,12 @@ def match_images_cfog(
                 "metadata": {
                     "source": meta1.to_dict(),
                     "reference": meta2.to_dict(),
-                    "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                    "working_scale": _build_working_scale_meta(),
                     "scale_estimation_method": scale_estimation_method,
                     "estimated_scale_ratio": estimated_scale_ratio,
+                    "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                    "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                    "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
                     "native_tiling_applied": bool(native_tiling_applied),
                     "native_tile_count": int(native_tile_count),
                     "coarse_to_fine_timing": {"L2_s": round(t_l2, 4), "L1_s": round(t_l1, 4), "L0_s": 0.0},
@@ -4732,9 +4907,12 @@ def match_images_cfog(
                 "metadata": {
                     "source": meta1.to_dict(),
                     "reference": meta2.to_dict(),
-                    "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                    "working_scale": _build_working_scale_meta(),
                     "scale_estimation_method": scale_estimation_method,
                     "estimated_scale_ratio": estimated_scale_ratio,
+                    "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                    "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                    "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
                 },
             }
 
@@ -4759,6 +4937,13 @@ def match_images_cfog(
 
             ref_dx, ref_dy = 0.0, 0.0
             refined = False
+            unc = {
+                "covariance_xy": [[1.0, 0.0], [0.0, 1.0]],
+                "sigma_major_px": 1.0,
+                "sigma_minor_px": 1.0,
+                "ellipse_angle_deg": 0.0,
+                "uncertainty_status": "prior_only",
+            }
 
             if (
                 wy1 >= half_p
@@ -4776,7 +4961,7 @@ def match_images_cfog(
                 # domain as the coarse PC matching.
                 p2 = match_ref_gray[wy2 - half_p : wy2 + half_p, wx2 - half_p : wx2 + half_p]
 
-                dx, dy, peak, valid = subpixel_phase_correlation(p1, p2)
+                dx, dy, peak, valid, unc = subpixel_phase_correlation(p1, p2, return_uncertainty=True)
                 if valid:
                     ref_dx, ref_dy = float(dx), float(dy)
                     refined = True
@@ -4811,6 +4996,7 @@ def match_images_cfog(
                     is_refined=refined,
                     x=nat_x1, y=nat_y1, width=orig_w1, height=orig_h1,
                 ),
+                **unc,
                 **_desc,
             ))
     t_l0 = time.perf_counter() - t_start_l0
@@ -4916,11 +5102,27 @@ def match_images_cfog(
             else:
                 _w_src = []
             if len(_w_src) == len(pts1_arr) and len(pts1_arr) >= 4:
-                weights = np.array(
-                    [float(m.get("ai_inlier_prob", m.get("confidence", m.get("score", 0.5))))
-                     for m in _w_src],
-                    dtype=np.float64,
-                )
+                raw_weights = []
+                for m in _w_src:
+                    prior = float(m.get("ai_inlier_prob", m.get("confidence", m.get("score", 0.5))))
+                    if propagate_uncertainty_to_weights:
+                        sig_maj = float(m.get("sigma_major_px", 1.0))
+                        sig_min = float(m.get("sigma_minor_px", 1.0))
+                        u_status = str(m.get("uncertainty_status", "valid"))
+                        # Precision weight inversely proportional to localized variance
+                        prec_w = 1.0 / max(sig_maj ** 2 + sig_min ** 2, 1e-4)
+                        if u_status in ("flat_peak", "multimodal"):
+                            status_factor = 0.05
+                        elif u_status == "valid":
+                            status_factor = 1.0
+                        else:
+                            status_factor = 0.5
+                        raw_weights.append(prior * prec_w * status_factor)
+                    else:
+                        raw_weights.append(prior)
+                weights = np.array(raw_weights, dtype=np.float64)
+                if float(np.max(weights)) > 0:
+                    weights = weights / float(np.max(weights))
             else:
                 weights = np.full(len(pts1_arr), 0.5, dtype=np.float64)
             H_final, inlier_mask, _w_tag = estimate_weighted_homography(
@@ -4947,7 +5149,7 @@ def match_images_cfog(
     if dem_arr is not None and len(pts1_arr) >= 4:
         try:
             _em = float(meta1.emission_angle_deg) if (meta1 and meta1.emission_angle_deg is not None) else 0.0
-            _az = float(look_azimuth_deg) if look_azimuth_deg is not None else (float(meta1.sensor_los_azimuth_deg) if (meta1 and meta1.sensor_los_azimuth_deg is not None) else 45.0)
+            _az = float(look_azimuth_deg) if look_azimuth_deg is not None else (float(meta1.sensor_los_azimuth_deg) if (meta1 and meta1.sensor_los_azimuth_deg is not None) else None)
             if abs(_em) > 1e-2:
                 H_dem, mask_dem, dem_fit_info = ransac_dem_aware_fit(
                     pts1_arr, pts2_arr, dem=dem_arr, emission_deg=_em, azimuth_deg=_az, gsd_m=working_gsd
@@ -5010,13 +5212,16 @@ def match_images_cfog(
                 "inlier_count": int(np.sum(inlier_mask)) if inlier_mask is not None else 0,
                 "metrics": None,
                 "homography": None,
+            "content_overlap_recovery": content_overlap_info,
             "metadata": {
                 "source": meta1.to_dict(),
                 "reference": meta2.to_dict(),
                 "scale_estimation_method": scale_estimation_method,
                 "estimated_scale_ratio": estimated_scale_ratio,
-                "working_scale": {"working_gsd_m": working_gsd,
-                                  "method": working_scale_note},
+                "working_scale": _build_working_scale_meta(),
+                "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
                 "native_tiling_applied": bool(native_tiling_applied),
                 "native_tile_count": int(native_tile_count),
                 "coarse_to_fine_timing": coarse_to_fine_timing,
@@ -5027,6 +5232,33 @@ def match_images_cfog(
     # absolute RMSE in meters is reported as unavailable (relative units only).
     # (metric_gsd/tag_gsd hoisted to section 3; re-asserted here, not redefined.)
     metric_gsd = working_gsd if scale_estimation_method == "pds4_metadata" else None
+
+    # Covariance-Weighted Inlier Refinement (Requirements 3 & 4)
+    # Applied strictly on the consensus inlier set selected by robust RANSAC/MAGSAC.
+    covariance_refinement_applied = False
+    if enable_covariance_refinement and inlier_mask is not None and int(np.sum(inlier_mask)) >= 4:
+        try:
+            from ML_model.covariance_geometry import (
+                refine_homography_covariance_weighted,
+                refine_affine_covariance_weighted,
+            )
+            _ref_inl = np.where(inlier_mask.ravel() == 1)[0]
+            _inl_covs = [refinement_records[k].get("covariance_xy") for k in _ref_inl] if len(refinement_records) == len(pts1_arr) else None
+            if _inl_covs is not None:
+                is_affine = bool(abs(H_final[2, 0]) < 1e-9 and abs(H_final[2, 1]) < 1e-9 and abs(H_final[2, 2] - 1.0) < 1e-9)
+                if is_affine:
+                    H_cand_cov = refine_affine_covariance_weighted(pts1_arr[_ref_inl], pts2_arr[_ref_inl], _inl_covs)
+                else:
+                    H_cand_cov = refine_homography_covariance_weighted(pts1_arr[_ref_inl], pts2_arr[_ref_inl], _inl_covs, H_init=H_final)
+
+                if H_cand_cov is not None:
+                    _cov_chk = verify_transformation_quality(H_cand_cov, (orig_h2, orig_w2))
+                    if _cov_chk.get("is_valid"):
+                        H_final = H_cand_cov
+                        covariance_refinement_applied = True
+                        logger.info("Covariance-weighted geometric refinement accepted on consensus inliers.")
+        except Exception as exc:
+            logger.warning("Covariance-weighted refinement failed (%s); keeping RANSAC consensus model.", exc)
 
     # QUALITY GATE 3: Sanity Check Transformation Conditioning
     # Include inlier fit RMSE so excessive residuals fail here, not silently.
@@ -5047,12 +5279,16 @@ def match_images_cfog(
             "inlier_count": int(np.sum(inlier_mask)),
             "metrics": None,
             "homography": None,
+            "content_overlap_recovery": content_overlap_info,
             "metadata": {
                 "source": meta1.to_dict(),
                 "reference": meta2.to_dict(),
-                "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                "working_scale": _build_working_scale_meta(),
                 "scale_estimation_method": scale_estimation_method,
                 "estimated_scale_ratio": estimated_scale_ratio,
+                "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
                 "native_tiling_applied": bool(native_tiling_applied),
                 "native_tile_count": int(native_tile_count),
                 "coarse_to_fine_timing": coarse_to_fine_timing,
@@ -5077,12 +5313,16 @@ def match_images_cfog(
             "inlier_count": len(inlier_indices),
             "metrics": None,
             "homography": None,
+            "content_overlap_recovery": content_overlap_info,
             "metadata": {
                 "source": meta1.to_dict(),
                 "reference": meta2.to_dict(),
-                "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                "working_scale": _build_working_scale_meta(),
                 "scale_estimation_method": scale_estimation_method,
                 "estimated_scale_ratio": estimated_scale_ratio,
+                "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
                 "native_tiling_applied": bool(native_tiling_applied),
                 "native_tile_count": int(native_tile_count),
                 "coarse_to_fine_timing": coarse_to_fine_timing,
@@ -5408,11 +5648,14 @@ def match_images_cfog(
         dem_model = "homography"
 
     # 9. Compute Canonical Master Metrics (fixed 10x10 reporting grid)
+    _all_match_covs = [m.get("covariance_xy") for m in refinement_records] if len(refinement_records) == len(pts1_arr) else None
     metrics = compute_canonical_metrics(
         pts1_arr, pts2_arr, inlier_mask, H_final, (orig_h2, orig_w2), canonical_grid_size,
         gsd_m=metric_gsd, dem_data=dem_arr, source_img=raw1_gray, ref_img=raw2_gray,
         anchor_inlier_indices=final_anchor_inliers,
+        match_covariances=_all_match_covs,
     )
+    metrics["covariance_refinement_applied"] = bool(covariance_refinement_applied)
     metrics["guided_densification"] = {
         "enabled": bool(enable_guided_refill),
         "anchor_inliers_count": len(final_anchor_inliers),
@@ -5487,12 +5730,16 @@ def match_images_cfog(
             "inlier_count": int(np.sum(inlier_mask)),
             "metrics": None,
             "homography": None,
+            "content_overlap_recovery": content_overlap_info,
             "metadata": {
                 "source": meta1.to_dict(),
                 "reference": meta2.to_dict(),
-                "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                "working_scale": _build_working_scale_meta(),
                 "scale_estimation_method": scale_estimation_method,
                 "estimated_scale_ratio": estimated_scale_ratio,
+                "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
             },
         }
 
@@ -5544,12 +5791,22 @@ def match_images_cfog(
             "diagnostics": {"inlier_ratio": _q5_ratio, "held_out_rmse": _q5_held,
                             "inlier_ratio_min": 0.3, "held_out_rmse_max_px": 2.5,
                             "reasons": _q5_reasons},
+            "content_overlap_recovery": content_overlap_info,
             "metadata": {
                 "source": meta1.to_dict(),
                 "reference": meta2.to_dict(),
-                "working_scale": {"working_gsd_m": working_gsd, "method": working_scale_note},
+                "working_scale": {
+                    "working_gsd_m": working_gsd,
+                    "method": working_scale_note,
+                    "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                    "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                    "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
+                },
                 "scale_estimation_method": scale_estimation_method,
                 "estimated_scale_ratio": estimated_scale_ratio,
+                "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+                "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+                "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
             },
         }
     elif _q5_reasons:
@@ -5693,9 +5950,15 @@ def match_images_cfog(
         "working_scale": {
             "working_gsd_m": working_gsd,
             "method": working_scale_note,
+            "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+            "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+            "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
         },
         "scale_estimation_method": scale_estimation_method,
         "estimated_scale_ratio": estimated_scale_ratio,
+        "native_scale_ratio": round(native_scale_ratio, 4) if native_scale_ratio is not None else None,
+        "pre_normalization_ratio": round(pre_normalization_ratio, 4) if pre_normalization_ratio is not None else None,
+        "residual_scale_ratio": round(residual_scale_ratio, 4) if residual_scale_ratio is not None else None,
         "terrain_correction": {
             "source": terrain_info1,
             "reference": terrain_info2,
@@ -5768,11 +6031,14 @@ def match_images_cfog(
         "scale_estimation_method": scale_estimation_method,
         "estimated_scale_ratio": estimated_scale_ratio,
         "metrics": metrics,
+        "verdict": metrics.get("verdict", "FAIL"),
         "homography": H_final.tolist(),
         "H_cov": _h_cov,
         "dem_ray_shift": dem_ray_shift,
         "slope_residual_correlation": slope_residual_correlation,
         "dem_model": dem_model,
+        "terrain_adaptive_log_gabor_enabled": bool(enable_terrain_adaptive_log_gabor and dem_aligned),
+        "terrain_log_gabor_audit": terrain_engine.get_audit_log() if terrain_engine is not None else [],
         "bootstrap": bootstrap_info,
         "synthetic_reference_used": bool(synthetic_reference_used),
         "illumination_compensation": illumination_compensation,

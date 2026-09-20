@@ -44,6 +44,11 @@ class PDS4ProductInfo:
     incidence_angle_deg: Optional[float] = None
     emission_angle_deg: Optional[float] = None
     phase_angle_deg: Optional[float] = None
+    spacecraft_azimuth_deg: Optional[float] = None
+    footprint_vertices: Optional[List[Tuple[float, float]]] = None
+    footprint_wkt: Optional[str] = None
+    footprint_bbox: Optional[Dict[str, float]] = None
+    footprint_confidence: str = "unavailable"
     spice_kernels: List[str] = field(default_factory=list)
     image_file: Optional[str] = None
     label_path: Optional[str] = None
@@ -89,6 +94,12 @@ class PDS4ProductInfo:
             "image_file": self.image_file,
             "label_path": self.label_path,
             "geometry_status": self.geometry_status,
+            "footprint": {
+                "vertices": self.footprint_vertices,
+                "wkt": self.footprint_wkt,
+                "bbox": self.footprint_bbox,
+                "confidence": self.footprint_confidence,
+            },
             "unknown_fields": list(self.unknown_fields),
         }
 
@@ -268,6 +279,16 @@ def _parse_pds4_xml(xml_text: str, path: Path) -> PDS4ProductInfo:
         except ValueError:
             pass
 
+    # Spacecraft Line-of-Sight Azimuth (None when unstated — never substitute sun azimuth).
+    spacecraft_az: Optional[float] = None
+    for k in ("spacecraft_azimuth", "sensor_azimuth", "viewing_azimuth", "instrument_azimuth", "spacecraft_azimuth_angle"):
+        if k in tag_map:
+            try:
+                spacecraft_az = float(tag_map[k])
+                break
+            except ValueError:
+                pass
+
     for _name, _val in (
         ("lines", lines), ("samples", samples),
         ("sun_azimuth_deg", sun_az), ("sun_elevation_deg", sun_el),
@@ -298,6 +319,20 @@ def _parse_pds4_xml(xml_text: str, path: Path) -> PDS4ProductInfo:
                 img_file = candidate.name
                 break
 
+    # Footprint parsing
+    try:
+        from data.ingestion.footprint_geometry import parse_footprint_from_pds4
+        fp_geom = parse_footprint_from_pds4(tree.getroot())
+        fp_vertices = fp_geom.vertices
+        fp_wkt = fp_geom.wkt
+        fp_bbox = fp_geom.bbox
+        fp_conf = fp_geom.confidence.value
+    except Exception:
+        fp_vertices = None
+        fp_wkt = None
+        fp_bbox = None
+        fp_conf = "unavailable"
+
     return PDS4ProductInfo(
         product_id=product_id,
         sensor=sensor,
@@ -312,6 +347,11 @@ def _parse_pds4_xml(xml_text: str, path: Path) -> PDS4ProductInfo:
         incidence_angle_deg=inc_ang,
         emission_angle_deg=em_ang,
         phase_angle_deg=ph_ang,
+        spacecraft_azimuth_deg=spacecraft_az,
+        footprint_vertices=fp_vertices,
+        footprint_wkt=fp_wkt,
+        footprint_bbox=fp_bbox,
+        footprint_confidence=fp_conf,
         spice_kernels=list(set(spice_kernels)),
         image_file=img_file,
         label_path=str(path),
@@ -376,6 +416,37 @@ def _parse_vicar_text(text: str, path: Path) -> PDS4ProductInfo:
         if "KERNEL" in k or "SPICE" in k:
             spice_kernels.append(v)
 
+    # Look for corner coordinates in VICAR/PDS3
+    corner_keys = [
+        ("UPPER_LEFT_LONGITUDE", "UPPER_LEFT_LATITUDE"),
+        ("UPPER_RIGHT_LONGITUDE", "UPPER_RIGHT_LATITUDE"),
+        ("LOWER_RIGHT_LONGITUDE", "LOWER_RIGHT_LATITUDE"),
+        ("LOWER_LEFT_LONGITUDE", "LOWER_LEFT_LATITUDE"),
+    ]
+    vicar_corners = []
+    for lon_k, lat_k in corner_keys:
+        if lon_k in vicar_dict and lat_k in vicar_dict:
+            try:
+                vicar_corners.append((float(vicar_dict[lon_k]), float(vicar_dict[lat_k])))
+            except ValueError:
+                pass
+    if len(vicar_corners) == 4:
+        vicar_corners.append(vicar_corners[0])
+        fp_vertices = vicar_corners
+        fp_wkt = "POLYGON ((" + ", ".join(f"{c[0]:.6f} {c[1]:.6f}" for c in vicar_corners) + "))"
+        fp_bbox = {
+            "west_lon": min(c[0] for c in vicar_corners),
+            "east_lon": max(c[0] for c in vicar_corners),
+            "south_lat": min(c[1] for c in vicar_corners),
+            "north_lat": max(c[1] for c in vicar_corners),
+        }
+        fp_conf = "polygon_exact"
+    else:
+        fp_vertices = None
+        fp_wkt = None
+        fp_bbox = None
+        fp_conf = "unavailable"
+
     return PDS4ProductInfo(
         product_id=path.stem,
         sensor=sensor,
@@ -390,6 +461,10 @@ def _parse_vicar_text(text: str, path: Path) -> PDS4ProductInfo:
         incidence_angle_deg=inc_ang,
         emission_angle_deg=em_ang,
         phase_angle_deg=ph_ang,
+        footprint_vertices=fp_vertices,
+        footprint_wkt=fp_wkt,
+        footprint_bbox=fp_bbox,
+        footprint_confidence=fp_conf,
         spice_kernels=spice_kernels,
         image_file=None,
         label_path=str(path),
