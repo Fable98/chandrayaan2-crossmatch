@@ -1,0 +1,257 @@
+[
+  {
+    "source_x": 454.0,
+    "source_y": 461.0,
+    "target_x": 254.0,
+    "target_y": 451.0,
+    "image1_x": 454.0,
+    "image1_y": 461.0,
+    "image2_x": 254.0,
+    "image2_y": 451.0,
+    "confidence": 0.26,
+    "covariance_xy": [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0
+      ]
+    ],
+    "sigma_major_px": 1.0,
+    "sigma_minor_px": 1.0,
+    "ellipse_angle_deg": 0.0,
+    "uncertainty_status": "failed",
+    "refinement_dx": 0.0,
+    "refinement_dy": 0.0,
+    "is_refined": false,
+    "spatial_quality_score": 0.1594105968037992,
+    "dx": 0.0,
+    "dy": 0.0,
+    "peak_val": 0.0,
+    "is_valid": false,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 1.0,
+    "cfog_distance": 1.0401824712753296,
+    "pc_energy_src": 0.9975395798683167,
+    "pc_energy_tgt": 0.9758092761039734,
+    "nn_ratio": 1.0,
+    "scale_diff": 3.9000000000000004,
+    "match_id": 0,
+    "cell": [
+      2,
+      1
+    ],
+    "disp_consistency": 0.5145080459229066,
+    "pairwise_dist_ratio": 0.9078578688782848,
+    "ai_inlier_prob": 0.07999999821186066,
+    "is_inlier": false,
+    "provenance": "anchor",
+    "h_conditioned": false
+  },
+  {
+    "source_x": 347.0,
+    "source_y": 488.0,
+    "target_x": 133.03015767969384,
+    "target_y": 459.03352145458047,
+    "image1_x": 347.0,
+    "image1_y": 488.0,
+    "image2_x": 133.03015767969384,
+    "image2_y": 459.03352145458047,
+    "confidence": 0.21,
+    "covariance_xy": [
+      [
+        4.0,
+        -3.96
+      ],
+      [
+        -3.96,
+        4.0
+      ]
+    ],
+    "sigma_major_px": 2.8213,
+    "sigma_minor_px": 0.2,
+    "ellipse_angle_deg": -45.0,
+    "uncertainty_status": "valid",
+    "refinement_dx": 2.0301576796938434,
+    "refinement_dy": 1.0335214545804412,
+    "is_refined": true,
+    "spatial_quality_score": 0.22445140471306255,
+    "dx": 2.0301576796938434,
+    "dy": 1.0335214545804412,
+    "peak_val": 0.15375831723213196,
+    "is_valid": true,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 1.3,
+    "cfog_distance": 0.8320372700691223,
+    "pc_energy_src": 0.9969971179962158,
+    "pc_energy_tgt": 0.9782976508140564,
+    "nn_ratio": 1.0,
+    "scale_diff": 3.9000000000000004,
+    "match_id": 1,
+    "cell": [
+      2,
+      3
+    ],
+    "disp_consistency": 0.5582832715920454,
+    "pairwise_dist_ratio": 0.940853000339147,
+    "ai_inlier_prob": 0.09000000357627869,
+    "is_inlier": true,
+    "provenance": "anchor",
+    "h_conditioned": false
+  },
+  {
+    "source_x": 260.0,
+    "source_y": 144.0,
+    "target_x": 45.059852657928595,
+    "target_y": 118.12229719443468,
+    "image1_x": 260.0,
+    "image1_y": 144.0,
+    "image2_x": 45.059852657928595,
+    "image2_y": 118.12229719443468,
+    "confidence": 0.2,
+    "covariance_xy": [
+      [
+        4.0,
+        -3.754742
+      ],
+      [
+        -3.754742,
+        4.0
+      ]
+    ],
+    "sigma_major_px": 2.7847,
+    "sigma_minor_px": 0.4952,
+    "ellipse_angle_deg": -45.0,
+    "uncertainty_status": "valid",
+    "refinement_dx": 1.0598526579285945,
+    "refinement_dy": 3.122297194434683,
+    "is_refined": true,
+    "spatial_quality_score": 0.16412486889884925,
+    "dx": 1.0598526579285945,
+    "dy": 3.122297194434683,
+    "peak_val": 0.15110370516777039,
+    "is_valid": true,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 1.59,
+    "cfog_distance": 0.8724992871284485,
+    "pc_energy_src": 0.9965358376502991,
+    "pc_energy_tgt": 0.980318546295166,
+    "nn_ratio": 1.0,
+    "scale_diff": 2.4000000000000004,
+    "match_id": 2,
+    "cell": [
+      3,
+      3
+    ],
+    "disp_consistency": 0.5695207078834942,
+    "pairwise_dist_ratio": 0.9821404194909896,
+    "ai_inlier_prob": 0.27000001072883606,
+    "is_inlier": true,
+    "provenance": "anchor",
+    "h_conditioned": false
+  },
+  {
+    "source_x": 491.0,
+    "source_y": 433.0,
+    "target_x": 294.0,
+    "target_y": 402.0,
+    "image1_x": 491.0,
+    "image1_y": 433.0,
+    "image2_x": 294.0,
+    "image2_y": 402.0,
+    "confidence": 0.3,
+    "covariance_xy": [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0
+      ]
+    ],
+    "sigma_major_px": 1.0,
+    "sigma_minor_px": 1.0,
+    "ellipse_angle_deg": 0.0,
+    "uncertainty_status": "flat_peak",
+    "refinement_dx": 0.0,
+    "refinement_dy": 0.0,
+    "is_refined": false,
+    "spatial_quality_score": 0.17908283487244056,
+    "dx": 0.0,
+    "dy": 0.0,
+    "peak_val": 0.1460077166557312,
+    "is_valid": false,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 1.0,
+    "cfog_distance": 0.6950475573539734,
+    "pc_energy_src": 0.99519282579422,
+    "pc_energy_tgt": 0.9886921048164368,
+    "nn_ratio": 1.0,
+    "scale_diff": 3.9000000000000004,
+    "match_id": 3,
+    "cell": [
+      3,
+      0
+    ],
+    "disp_consistency": 0.4971692433409581,
+    "pairwise_dist_ratio": 0.8866756520147339,
+    "ai_inlier_prob": 0.12999999523162842,
+    "is_inlier": true,
+    "provenance": "anchor",
+    "h_conditioned": false
+  },
+  {
+    "source_x": 493.0,
+    "source_y": 93.0,
+    "target_x": 284.0852615242997,
+    "target_y": 82.77536542326175,
+    "image1_x": 493.0,
+    "image1_y": 93.0,
+    "image2_x": 284.0852615242997,
+    "image2_y": 82.77536542326175,
+    "confidence": 0.2,
+    "covariance_xy": [
+      [
+        4.0,
+        -3.96
+      ],
+      [
+        -3.96,
+        4.0
+      ]
+    ],
+    "sigma_major_px": 2.8213,
+    "sigma_minor_px": 0.2,
+    "ellipse_angle_deg": -45.0,
+    "uncertainty_status": "valid",
+    "refinement_dx": -0.9147384757003039,
+    "refinement_dy": 1.7753654232617535,
+    "is_refined": true,
+    "spatial_quality_score": 0.16985364313648244,
+    "dx": -0.9147384757003039,
+    "dy": 1.7753654232617535,
+    "peak_val": 0.15954294800758362,
+    "is_valid": true,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 1.65,
+    "cfog_distance": 0.5679258108139038,
+    "pc_energy_src": 0.9944737553596497,
+    "pc_energy_tgt": 0.9888653755187988,
+    "nn_ratio": 1.0,
+    "scale_diff": 4.800000000000001,
+    "match_id": 4,
+    "cell": [
+      3,
+      3
+    ],
+    "disp_consistency": 0.5367277234112352,
+    "pairwise_dist_ratio": 0.973409569304055,
+    "ai_inlier_prob": 0.11999999731779099,
+    "is_inlier": true,
+    "provenance": "anchor",
+    "h_conditioned": false
+  }
+]

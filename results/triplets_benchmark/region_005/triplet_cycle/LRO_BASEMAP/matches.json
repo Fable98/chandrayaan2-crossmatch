@@ -1,0 +1,257 @@
+[
+  {
+    "source_x": 78.0,
+    "source_y": 431.0,
+    "target_x": 79.0,
+    "target_y": 350.0,
+    "image1_x": 78.0,
+    "image1_y": 431.0,
+    "image2_x": 79.0,
+    "image2_y": 350.0,
+    "confidence": 0.22,
+    "covariance_xy": [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0
+      ]
+    ],
+    "sigma_major_px": 1.0,
+    "sigma_minor_px": 1.0,
+    "ellipse_angle_deg": 0.0,
+    "uncertainty_status": "flat_peak",
+    "refinement_dx": 0.0,
+    "refinement_dy": 0.0,
+    "is_refined": false,
+    "spatial_quality_score": 0.2767908144980319,
+    "dx": 0.0,
+    "dy": 0.0,
+    "peak_val": 0.13927209377288818,
+    "is_valid": false,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 1.0,
+    "cfog_distance": 1.1020262241363525,
+    "pc_energy_src": 0.9971812963485718,
+    "pc_energy_tgt": 0.7685938477516174,
+    "nn_ratio": 1.0,
+    "scale_diff": 0.0,
+    "match_id": 0,
+    "cell": [
+      0,
+      2
+    ],
+    "disp_consistency": 0.49373273208127966,
+    "pairwise_dist_ratio": 0.9069445728678591,
+    "ai_inlier_prob": 0.019999999552965164,
+    "is_inlier": true,
+    "provenance": "anchor",
+    "h_conditioned": false
+  },
+  {
+    "source_x": 177.0,
+    "source_y": 273.0,
+    "target_x": 174.0,
+    "target_y": 202.0,
+    "image1_x": 177.0,
+    "image1_y": 273.0,
+    "image2_x": 174.0,
+    "image2_y": 202.0,
+    "confidence": 0.24,
+    "covariance_xy": [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0
+      ]
+    ],
+    "sigma_major_px": 1.0,
+    "sigma_minor_px": 1.0,
+    "ellipse_angle_deg": 0.0,
+    "uncertainty_status": "flat_peak",
+    "refinement_dx": 0.0,
+    "refinement_dy": 0.0,
+    "is_refined": false,
+    "spatial_quality_score": 0.3207057309333427,
+    "dx": 0.0,
+    "dy": 0.0,
+    "peak_val": 0.14570175111293793,
+    "is_valid": false,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 1.0,
+    "cfog_distance": 0.49814555048942566,
+    "pc_energy_src": 0.9963988065719604,
+    "pc_energy_tgt": 0.9822654128074646,
+    "nn_ratio": 1.0,
+    "scale_diff": 0.0,
+    "match_id": 1,
+    "cell": [
+      0,
+      3
+    ],
+    "disp_consistency": 0.5127307569162415,
+    "pairwise_dist_ratio": 0.8913972929889966,
+    "ai_inlier_prob": 0.11999999731779099,
+    "is_inlier": true,
+    "provenance": "anchor",
+    "h_conditioned": false
+  },
+  {
+    "source_x": 231.0,
+    "source_y": 258.0,
+    "target_x": 251.0,
+    "target_y": 199.0,
+    "image1_x": 231.0,
+    "image1_y": 258.0,
+    "image2_x": 251.0,
+    "image2_y": 199.0,
+    "confidence": 0.31,
+    "covariance_xy": [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0
+      ]
+    ],
+    "sigma_major_px": 1.0,
+    "sigma_minor_px": 1.0,
+    "ellipse_angle_deg": 0.0,
+    "uncertainty_status": "flat_peak",
+    "refinement_dx": 0.0,
+    "refinement_dy": 0.0,
+    "is_refined": false,
+    "spatial_quality_score": 0.36732002695542687,
+    "dx": 0.0,
+    "dy": 0.0,
+    "peak_val": 0.13897459208965302,
+    "is_valid": false,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 1.0,
+    "cfog_distance": 0.4098106324672699,
+    "pc_energy_src": 0.9953553676605225,
+    "pc_energy_tgt": 0.9750348925590515,
+    "nn_ratio": 0.9133967250477822,
+    "scale_diff": 0.0,
+    "match_id": 2,
+    "cell": [
+      1,
+      3
+    ],
+    "disp_consistency": 0.5132230089616153,
+    "pairwise_dist_ratio": 0.8948800391343128,
+    "ai_inlier_prob": 0.41999998688697815,
+    "is_inlier": true,
+    "provenance": "anchor",
+    "h_conditioned": false
+  },
+  {
+    "source_x": 145.0,
+    "source_y": 401.0,
+    "target_x": 166.0,
+    "target_y": 332.0,
+    "image1_x": 145.0,
+    "image1_y": 401.0,
+    "image2_x": 166.0,
+    "image2_y": 332.0,
+    "confidence": 0.29,
+    "covariance_xy": [
+      [
+        4.272381,
+        0.701124
+      ],
+      [
+        0.701124,
+        4.272381
+      ]
+    ],
+    "sigma_major_px": 2.2301,
+    "sigma_minor_px": 1.8898,
+    "ellipse_angle_deg": 45.0,
+    "uncertainty_status": "multimodal",
+    "refinement_dx": 0.0,
+    "refinement_dy": 0.0,
+    "is_refined": false,
+    "spatial_quality_score": 0.3391845868728236,
+    "dx": 4.1080663353052,
+    "dy": 0.02628969562102057,
+    "peak_val": 0.18884938955307007,
+    "is_valid": false,
+    "secondary_peak_ratio": 0.8167,
+    "curvature_condition_number": 1.09,
+    "cfog_distance": 0.584922194480896,
+    "pc_energy_src": 0.9949730038642883,
+    "pc_energy_tgt": 0.9912046790122986,
+    "nn_ratio": 1.0,
+    "scale_diff": 0.0,
+    "match_id": 3,
+    "cell": [
+      1,
+      2
+    ],
+    "disp_consistency": 0.539712002490069,
+    "pairwise_dist_ratio": 0.9255962881302027,
+    "ai_inlier_prob": 0.25999999046325684,
+    "is_inlier": true,
+    "provenance": "anchor",
+    "h_conditioned": false
+  },
+  {
+    "source_x": 20.0,
+    "source_y": 322.0,
+    "target_x": 31.0,
+    "target_y": 257.0,
+    "image1_x": 20.0,
+    "image1_y": 322.0,
+    "image2_x": 31.0,
+    "image2_y": 257.0,
+    "confidence": 0.23,
+    "covariance_xy": [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0
+      ]
+    ],
+    "sigma_major_px": 1.0,
+    "sigma_minor_px": 1.0,
+    "ellipse_angle_deg": 0.0,
+    "uncertainty_status": "flat_peak",
+    "refinement_dx": 0.0,
+    "refinement_dy": 0.0,
+    "is_refined": false,
+    "spatial_quality_score": 0.22775232693157238,
+    "dx": 0.0,
+    "dy": 0.0,
+    "peak_val": 0.12180029600858688,
+    "is_valid": false,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 1.0,
+    "cfog_distance": 0.7476248741149902,
+    "pc_energy_src": 0.9942737817764282,
+    "pc_energy_tgt": 0.9870933294296265,
+    "nn_ratio": 1.0,
+    "scale_diff": 0.0,
+    "match_id": 4,
+    "cell": [
+      1,
+      2
+    ],
+    "disp_consistency": 0.5895944310302454,
+    "pairwise_dist_ratio": 0.9308692550071686,
+    "ai_inlier_prob": 0.05000000074505806,
+    "is_inlier": false,
+    "provenance": "anchor",
+    "h_conditioned": false
+  }
+]

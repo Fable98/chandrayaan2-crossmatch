@@ -1,0 +1,912 @@
+{
+    "status": "cycle_not_computable",
+    "reason": "Missing verified homography for leg(s): AB (A -> B), BC (B -> C), CA (C -> A)",
+    "triplet_cycle_rmse_px": null,
+    "triplet_mean_cycle_error_px": null,
+    "cycle_closed_successfully": false,
+    "failed_legs": [
+        "AB (A -> B)",
+        "BC (B -> C)",
+        "CA (C -> A)"
+    ],
+    "leg_derivations": {
+        "AB": "failed",
+        "BC": "failed",
+        "CA": "failed"
+    },
+    "pair_AB_metrics": {
+        "match_count": 78,
+        "inlier_count": 9,
+        "inlier_ratio": 0.0769,
+        "fit_rmse_px": 2.3955,
+        "fit_rmse_insample_px": 2.3955,
+        "fit_rmse_insample": 2.3955,
+        "unweighted_rmse_px": 2.3955,
+        "covariance_weighted_rmse": 3.7141,
+        "raw_residuals_px": [
+            3.9709,
+            1.0755,
+            1.0466,
+            3.4666,
+            0.4546,
+            1.2705,
+            1.3077,
+            3.5863,
+            2.2839
+        ],
+        "raw_residual_vectors_px": [
+            [
+                3.5976,
+                -1.6809
+            ],
+            [
+                -0.9168,
+                0.5623
+            ],
+            [
+                0.9392,
+                0.4619
+            ],
+            [
+                -3.3716,
+                0.8063
+            ],
+            [
+                0.4545,
+                0.0099
+            ],
+            [
+                1.1693,
+                -0.497
+            ],
+            [
+                -0.6176,
+                -1.1527
+            ],
+            [
+                -3.5459,
+                0.5367
+            ],
+            [
+                1.1447,
+                1.9764
+            ]
+        ],
+        "mahalanobis_residuals": [
+            1.6961,
+            1.0568,
+            1.0239,
+            3.0872,
+            0.2303,
+            1.2418,
+            1.2727,
+            10.0709,
+            2.2227
+        ],
+        "in_sample_rmse": 2.3955,
+        "held_out_rmse": 4.9152,
+        "uniformity_score": 0.0219,
+        "cyclic_rmse": null,
+        "cyclic_status": "single_pair_no_cycle",
+        "absolute_rmse_m": 14.6933,
+        "validation_rmse_px": 4.9152,
+        "held_out_inlier_validation_rmse_px": 4.9152,
+        "held_out_validation_rmse_px": 4.9152,
+        "held_out_rmse_px": 4.9152,
+        "validation_median_error_px": 4.915,
+        "validation_status": "evaluated",
+        "validation_mode": "HELD_OUT_80_20",
+        "is_independent_validation": false,
+        "loo_rmse": null,
+        "loo_median_error": null,
+        "loo_p95_error": null,
+        "number_of_folds": null,
+        "checkpoint_rmse_px": null,
+        "checkpoint_unweighted_rmse_px": null,
+        "checkpoint_mean_error_px": null,
+        "checkpoint_median_error_px": null,
+        "checkpoint_p95_error_px": null,
+        "checkpoint_max_error_px": null,
+        "checkpoint_raw_residuals_px": null,
+        "checkpoint_raw_residual_vectors_px": null,
+        "pixel_resolution_m": null,
+        "checkpoint_rmse_m": null,
+        "checkpoint_mean_error_m": null,
+        "checkpoint_median_error_m": null,
+        "checkpoint_p95_error_m": null,
+        "checkpoint_max_error_m": null,
+        "checkpoint_raw_residuals_m": null,
+        "checkpoint_covariance_weighted_rmse": null,
+        "checkpoint_mahalanobis_distances": null,
+        "checkpoint_mean_mahalanobis": null,
+        "checkpoint_median_mahalanobis": null,
+        "checkpoint_p95_mahalanobis": null,
+        "checkpoint_max_mahalanobis": null,
+        "covariance_ellipse_containment": null,
+        "containment_1sigma_fraction": null,
+        "containment_2sigma_fraction": null,
+        "containment_3sigma_fraction": null,
+        "containment_p95_fraction": null,
+        "checkpoint_covariance_provenance": null,
+        "checkpoint_points_count": 0,
+        "has_independent_checkpoints": false,
+        "held_out_is_h_conditioned": false,
+        "anchor_inliers_count": 9,
+        "guided_inliers_count": 0,
+        "quality_tier": "LOW_CONFIDENCE",
+        "confidence_tier": "LOW_CONFIDENCE",
+        "tier": "LOW",
+        "verdict": "FAIL",
+        "mean_reprojection_error_px": 2.0514,
+        "median_reprojection_error_px": 1.3077,
+        "max_reprojection_error_px": 3.9709,
+        "fraction_below_1px": 0.1111,
+        "fraction_below_0_5px": 0.1111,
+        "fraction_below_0_25px": 0.0,
+        "sub_pixel_accurate": false,
+        "sub_pixel_accurate_note": "Requires both in-sample fit_rmse < 1.0px and held-out validation_rmse < 1.0px; never claimed on in-sample alone.",
+        "fit_rmse_is_in_sample": true,
+        "fit_rmse_note": "In-sample RMSE on RANSAC inliers; see held_out_validation_rmse_px for out-of-sample error.",
+        "spatial_coverage": 0.07,
+        "spatial_uniformity": 0.0219,
+        "coverage_relative_to_inlier_count": 0.5556,
+        "spatial_distribution": {
+            "grid_rows": 10,
+            "grid_cols": 10,
+            "total_cells": 100,
+            "occupied_cells": 7,
+            "coverage": 0.07,
+            "count_std": 0.3491,
+            "count_mean": 0.09,
+            "spatial_entropy": 0.4102,
+            "uniformity_score": 0.0219,
+            "adaptive_grid_size": 3,
+            "coverage_relative_to_inlier_count": 0.5556,
+            "adaptive_uniformity_score": 0.4187
+        },
+        "transform_quality": {
+            "is_valid": true,
+            "reason": "OK",
+            "determinant": 0.628761,
+            "condition_number": 4744.73,
+            "scale_ratio": 1.124,
+            "fit_rmse_px": 2.3955
+        },
+        "ssim": 0.3835,
+        "ssim_score": 0.3453,
+        "confidence_score": 22,
+        "traffic_light_color": "RED",
+        "traffic_light": {
+            "ssim_score": 0.3453,
+            "confidence_score": 22,
+            "traffic_light_color": "RED",
+            "traffic_light_reasons": [
+                "inlier_ratio 0.115 < 0.30 (weak consensus)",
+                "held_out_rmse 4.915px > 3.00px (poor generalization)"
+            ]
+        },
+        "psnr": 19.3041,
+        "nmi": 0.003,
+        "composite_quality_score": 0.1486,
+        "composite_quality_score_is_derived": true,
+        "composite_quality_score_derivation": "Synthetic heuristic combination of geometric consensus, spatial distribution, and photometric/structural alignment.",
+        "composite_quality_score_formula": "0.25*inlier_ratio + 0.25*exp(-fit_rmse_px/2) + 0.25*spatial_uniformity + 0.25*(0.6*NMI + 0.4*max(0,SSIM))",
+        "composite_quality_score_components": {
+            "inlier_ratio_term": 0.1154,
+            "rmse_term": 0.3019,
+            "uniformity_term": 0.0219,
+            "alignment_term": 0.1552
+        },
+        "covariance_refinement_applied": false,
+        "guided_densification": {
+            "enabled": false,
+            "anchor_inliers_count": 9,
+            "guided_inliers_count": 0,
+            "h_conditioned": false,
+            "held_out_is_h_conditioned": false
+        },
+        "dem_ray_shift": {
+            "enabled": false,
+            "reason": "emission_unavailable_or_nadir"
+        },
+        "slope_residual_correlation": -0.18595522710358867,
+        "dem_model": "homography",
+        "topographic_relief": {
+            "model": "homography",
+            "dem_available": true,
+            "dem_ransac_applied": false,
+            "dem_ransac_frame": "raw_source_to_dst",
+            "dem_relief_max_shift_px": 0.0,
+            "dem_raw_frame_rmse_px": null,
+            "slope_residual_correlation": -0.18595522710358867,
+            "relief_strain_detected": false,
+            "relief_strain_ratio": 0.1762
+        },
+        "absolute_rmse_uncertainty_m": 196.3577,
+        "positional_uncertainty_m": 196.3577,
+        "matching_grid_size": 4,
+        "canonical_grid_size": 10,
+        "outlier_method": "ransac",
+        "outlier_method_requested": "ransac",
+        "outlier_method_fallback": false,
+        "synthetic_reference_used": false,
+        "illumination_compensation": "none",
+        "illumination_detail": {
+            "delta_azimuth_deg": 160.77988599999998,
+            "threshold_deg": 90.0,
+            "source_azimuth_deg": 269.646098,
+            "reference_azimuth_deg": 108.866212,
+            "triggered": true,
+            "skipped_reason": "DEM or source sun-azimuth unavailable; cannot synthesize reference"
+        },
+        "lk_refinement": {
+            "refined_count": 2,
+            "total": 9,
+            "fb_threshold": 0.5,
+            "max_shift_px": 3.0,
+            "debug_points": [
+                {
+                    "point_index": 0,
+                    "src_pt": [
+                        139.0,
+                        470.0
+                    ],
+                    "dst_pt": [
+                        140.0,
+                        456.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 17.186859130859375,
+                    "shift_mag": 0.18742530047893524,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=17.1869 > 0.5)"
+                },
+                {
+                    "point_index": 1,
+                    "src_pt": [
+                        158.0,
+                        498.0
+                    ],
+                    "dst_pt": [
+                        161.0,
+                        478.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 4.465034484863281,
+                    "shift_mag": 0.40981361269950867,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=4.4650 > 0.5)"
+                },
+                {
+                    "point_index": 2,
+                    "src_pt": [
+                        213.0,
+                        65.0
+                    ],
+                    "dst_pt": [
+                        181.0,
+                        110.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 2.523958206176758,
+                    "shift_mag": 0.5334697961807251,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=2.5240 > 0.5)"
+                },
+                {
+                    "point_index": 3,
+                    "src_pt": [
+                        288.0,
+                        294.0
+                    ],
+                    "dst_pt": [
+                        259.76275634765625,
+                        309.0813903808594
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 2.86238169670105,
+                    "shift_mag": 4.2663350105285645,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=2.8624 > 0.5)"
+                },
+                {
+                    "point_index": 4,
+                    "src_pt": [
+                        314.0,
+                        108.0
+                    ],
+                    "dst_pt": [
+                        268.9443054199219,
+                        145.87576293945312
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 1.8991867303848267,
+                    "shift_mag": 3.796522855758667,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=1.8992 > 0.5)"
+                },
+                {
+                    "point_index": 5,
+                    "src_pt": [
+                        436.0,
+                        486.0
+                    ],
+                    "dst_pt": [
+                        394.0,
+                        485.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 22.981828689575195,
+                    "shift_mag": 5.205155849456787,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=22.9818 > 0.5)"
+                },
+                {
+                    "point_index": 6,
+                    "src_pt": [
+                        498.0,
+                        77.0
+                    ],
+                    "dst_pt": [
+                        435.0,
+                        114.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.285775750875473,
+                    "shift_mag": 0.3976042866706848,
+                    "passed": true,
+                    "failure_gate": null
+                },
+                {
+                    "point_index": 7,
+                    "src_pt": [
+                        290.0,
+                        298.0
+                    ],
+                    "dst_pt": [
+                        261.833251953125,
+                        312.8739929199219
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 5.106090068817139,
+                    "shift_mag": 3.547379970550537,
+                    "passed": false,
+                    "failure_gate": "fb_threshold_exceeded (fb_err=5.1061 > 0.5)"
+                },
+                {
+                    "point_index": 8,
+                    "src_pt": [
+                        500.0,
+                        74.0
+                    ],
+                    "dst_pt": [
+                        435.0,
+                        108.0
+                    ],
+                    "status_fwd": 1,
+                    "status_bwd": 1,
+                    "fb_err": 0.23465365171432495,
+                    "shift_mag": 0.2227076292037964,
+                    "passed": true,
+                    "failure_gate": null
+                }
+            ],
+            "step1_comparison": {
+                "fit_rmse_a_orig": 2.3955,
+                "fit_rmse_b_all_refined": 2.2674,
+                "fit_rmse_c_passed_only": null,
+                "n_passed_debug": 2,
+                "n_total_inliers": 9
+            }
+        },
+        "native_polish": {
+            "applied": false,
+            "reason": "not_triggered"
+        },
+        "native_polish_applied": false,
+        "pyramid_matching": {
+            "levels_executed": [
+                2,
+                1,
+                0
+            ],
+            "l2_global_shift_px": [
+                0.0,
+                0.0
+            ],
+            "l1_matches_found": 32,
+            "l1_inliers": 7,
+            "l1_homography_valid": true,
+            "coarse_to_fine_applied": true,
+            "finest_scale_only": false,
+            "timing_s": {
+                "L2": 1.2428,
+                "L1": 0.1935,
+                "L0": 3.8688
+            }
+        }
+    },
+    "pair_BC_metrics": {
+        "match_count": 110,
+        "inlier_count": 5,
+        "inlier_ratio": 0.0455,
+        "fit_rmse_px": 0.3631,
+        "fit_rmse_insample_px": 0.3631,
+        "fit_rmse_insample": 0.3631,
+        "unweighted_rmse_px": 0.3631,
+        "covariance_weighted_rmse": 0.3562,
+        "raw_residuals_px": [
+            0.1533,
+            0.0458,
+            0.4859,
+            0.0825,
+            0.625
+        ],
+        "raw_residual_vectors_px": [
+            [
+                0.0076,
+                0.1531
+            ],
+            [
+                -0.0013,
+                -0.0458
+            ],
+            [
+                -0.2412,
+                0.4219
+            ],
+            [
+                0.0021,
+                0.0825
+            ],
+            [
+                0.2576,
+                -0.5694
+            ]
+        ],
+        "mahalanobis_residuals": [
+            0.0874,
+            0.0458,
+            0.4843,
+            0.0394,
+            0.6234
+        ],
+        "in_sample_rmse": 0.3631,
+        "held_out_rmse": null,
+        "uniformity_score": 0.0084,
+        "cyclic_rmse": null,
+        "cyclic_status": "single_pair_no_cycle",
+        "absolute_rmse_m": 3.6938,
+        "validation_rmse_px": null,
+        "held_out_inlier_validation_rmse_px": null,
+        "held_out_validation_rmse_px": null,
+        "held_out_rmse_px": null,
+        "validation_median_error_px": null,
+        "validation_status": "non_finite_reprojection_error",
+        "validation_mode": "LOOCV",
+        "is_independent_validation": false,
+        "loo_rmse": null,
+        "loo_median_error": null,
+        "loo_p95_error": null,
+        "number_of_folds": 5,
+        "checkpoint_rmse_px": null,
+        "checkpoint_unweighted_rmse_px": null,
+        "checkpoint_mean_error_px": null,
+        "checkpoint_median_error_px": null,
+        "checkpoint_p95_error_px": null,
+        "checkpoint_max_error_px": null,
+        "checkpoint_raw_residuals_px": null,
+        "checkpoint_raw_residual_vectors_px": null,
+        "pixel_resolution_m": null,
+        "checkpoint_rmse_m": null,
+        "checkpoint_mean_error_m": null,
+        "checkpoint_median_error_m": null,
+        "checkpoint_p95_error_m": null,
+        "checkpoint_max_error_m": null,
+        "checkpoint_raw_residuals_m": null,
+        "checkpoint_covariance_weighted_rmse": null,
+        "checkpoint_mahalanobis_distances": null,
+        "checkpoint_mean_mahalanobis": null,
+        "checkpoint_median_mahalanobis": null,
+        "checkpoint_p95_mahalanobis": null,
+        "checkpoint_max_mahalanobis": null,
+        "covariance_ellipse_containment": null,
+        "containment_1sigma_fraction": null,
+        "containment_2sigma_fraction": null,
+        "containment_3sigma_fraction": null,
+        "containment_p95_fraction": null,
+        "checkpoint_covariance_provenance": null,
+        "checkpoint_points_count": 0,
+        "has_independent_checkpoints": false,
+        "held_out_is_h_conditioned": true,
+        "anchor_inliers_count": 5,
+        "guided_inliers_count": 0,
+        "quality_tier": "LOW_CONFIDENCE",
+        "confidence_tier": "LOW_CONFIDENCE",
+        "tier": "LOW",
+        "verdict": "FAIL",
+        "mean_reprojection_error_px": 0.2785,
+        "median_reprojection_error_px": 0.1533,
+        "max_reprojection_error_px": 0.625,
+        "fraction_below_1px": 1.0,
+        "fraction_below_0_5px": 0.8,
+        "fraction_below_0_25px": 0.6,
+        "sub_pixel_accurate": false,
+        "sub_pixel_accurate_note": "Requires both in-sample fit_rmse < 1.0px and held-out validation_rmse < 1.0px; never claimed on in-sample alone.",
+        "fit_rmse_is_in_sample": true,
+        "fit_rmse_note": "In-sample RMSE on RANSAC inliers; see held_out_validation_rmse_px for out-of-sample error.",
+        "spatial_coverage": 0.04,
+        "spatial_uniformity": 0.0084,
+        "coverage_relative_to_inlier_count": 0.4444,
+        "spatial_distribution": {
+            "grid_rows": 10,
+            "grid_cols": 10,
+            "total_cells": 100,
+            "occupied_cells": 4,
+            "coverage": 0.04,
+            "count_std": 0.2598,
+            "count_mean": 0.05,
+            "spatial_entropy": 0.2893,
+            "uniformity_score": 0.0084,
+            "adaptive_grid_size": 3,
+            "coverage_relative_to_inlier_count": 0.4444,
+            "adaptive_uniformity_score": 0.307
+        },
+        "transform_quality": {
+            "is_valid": true,
+            "reason": "OK",
+            "determinant": 0.032343,
+            "condition_number": 5819941.97,
+            "scale_ratio": 3.8802,
+            "fit_rmse_px": 0.3631
+        },
+        "ssim": 0.1113,
+        "ssim_score": 0.0585,
+        "confidence_score": 6,
+        "traffic_light_color": "RED",
+        "traffic_light": {
+            "ssim_score": 0.0585,
+            "confidence_score": 6,
+            "traffic_light_color": "RED",
+            "traffic_light_reasons": [
+                "inlier_ratio 0.045 < 0.30 (weak consensus)"
+            ]
+        },
+        "psnr": 6.7825,
+        "nmi": 0.0319,
+        "composite_quality_score": 0.2379,
+        "composite_quality_score_is_derived": true,
+        "composite_quality_score_derivation": "Synthetic heuristic combination of geometric consensus, spatial distribution, and photometric/structural alignment.",
+        "composite_quality_score_formula": "0.25*inlier_ratio + 0.25*exp(-fit_rmse_px/2) + 0.25*spatial_uniformity + 0.25*(0.6*NMI + 0.4*max(0,SSIM))",
+        "composite_quality_score_components": {
+            "inlier_ratio_term": 0.0455,
+            "rmse_term": 0.834,
+            "uniformity_term": 0.0084,
+            "alignment_term": 0.0637
+        },
+        "covariance_refinement_applied": false,
+        "guided_densification": {
+            "enabled": false,
+            "anchor_inliers_count": 5,
+            "guided_inliers_count": 0,
+            "h_conditioned": false,
+            "held_out_is_h_conditioned": true
+        },
+        "dem_ray_shift": {
+            "enabled": false,
+            "reason": "emission_unavailable_or_nadir"
+        },
+        "slope_residual_correlation": -0.8354494428133915,
+        "dem_model": "homography",
+        "topographic_relief": {
+            "model": "homography",
+            "dem_available": true,
+            "dem_ransac_applied": false,
+            "dem_ransac_frame": "raw_source_to_dst",
+            "dem_relief_max_shift_px": 0.0,
+            "dem_raw_frame_rmse_px": null,
+            "slope_residual_correlation": -0.8354494428133915,
+            "relief_strain_detected": false,
+            "relief_strain_ratio": 1.0
+        },
+        "absolute_rmse_uncertainty_m": 6081.0042,
+        "positional_uncertainty_m": 6081.0042,
+        "matching_grid_size": 4,
+        "canonical_grid_size": 10,
+        "outlier_method": "ransac",
+        "outlier_method_requested": "ransac",
+        "outlier_method_fallback": false,
+        "synthetic_reference_used": false,
+        "illumination_compensation": "none",
+        "illumination_detail": {
+            "delta_azimuth_deg": null,
+            "threshold_deg": 90.0,
+            "source_azimuth_deg": 108.866212,
+            "reference_azimuth_deg": null,
+            "triggered": false
+        },
+        "native_polish": {
+            "applied": false,
+            "reason": "not_triggered"
+        },
+        "native_polish_applied": false,
+        "pyramid_matching": {
+            "levels_executed": [
+                2,
+                1,
+                0
+            ],
+            "l2_global_shift_px": [
+                0.0,
+                0.0
+            ],
+            "l1_matches_found": 35,
+            "l1_inliers": 6,
+            "l1_homography_valid": true,
+            "coarse_to_fine_applied": true,
+            "finest_scale_only": false,
+            "timing_s": {
+                "L2": 1.1873,
+                "L1": 0.67,
+                "L0": 17.1158
+            }
+        }
+    },
+    "pair_CA_metrics": {
+        "match_count": 112,
+        "inlier_count": 5,
+        "inlier_ratio": 0.0446,
+        "fit_rmse_px": 1.0841,
+        "fit_rmse_insample_px": 1.0841,
+        "fit_rmse_insample": 1.0841,
+        "unweighted_rmse_px": 1.0841,
+        "covariance_weighted_rmse": 0.9932,
+        "raw_residuals_px": [
+            0.4264,
+            1.6413,
+            1.2171,
+            0.0977,
+            1.2285
+        ],
+        "raw_residual_vectors_px": [
+            [
+                0.4218,
+                0.0625
+            ],
+            [
+                -1.6179,
+                0.2762
+            ],
+            [
+                0.1552,
+                -1.2072
+            ],
+            [
+                0.0347,
+                -0.0914
+            ],
+            [
+                0.2255,
+                1.2076
+            ]
+        ],
+        "mahalanobis_residuals": [
+            0.2086,
+            1.4386,
+            1.1877,
+            0.0456,
+            1.186
+        ],
+        "in_sample_rmse": 1.0841,
+        "held_out_rmse": null,
+        "uniformity_score": 0.0135,
+        "cyclic_rmse": null,
+        "cyclic_status": "single_pair_no_cycle",
+        "absolute_rmse_m": 5.905,
+        "validation_rmse_px": null,
+        "held_out_inlier_validation_rmse_px": null,
+        "held_out_validation_rmse_px": null,
+        "held_out_rmse_px": null,
+        "validation_median_error_px": null,
+        "validation_status": "non_finite_reprojection_error",
+        "validation_mode": "LOOCV",
+        "is_independent_validation": false,
+        "loo_rmse": null,
+        "loo_median_error": null,
+        "loo_p95_error": null,
+        "number_of_folds": 5,
+        "checkpoint_rmse_px": null,
+        "checkpoint_unweighted_rmse_px": null,
+        "checkpoint_mean_error_px": null,
+        "checkpoint_median_error_px": null,
+        "checkpoint_p95_error_px": null,
+        "checkpoint_max_error_px": null,
+        "checkpoint_raw_residuals_px": null,
+        "checkpoint_raw_residual_vectors_px": null,
+        "pixel_resolution_m": null,
+        "checkpoint_rmse_m": null,
+        "checkpoint_mean_error_m": null,
+        "checkpoint_median_error_m": null,
+        "checkpoint_p95_error_m": null,
+        "checkpoint_max_error_m": null,
+        "checkpoint_raw_residuals_m": null,
+        "checkpoint_covariance_weighted_rmse": null,
+        "checkpoint_mahalanobis_distances": null,
+        "checkpoint_mean_mahalanobis": null,
+        "checkpoint_median_mahalanobis": null,
+        "checkpoint_p95_mahalanobis": null,
+        "checkpoint_max_mahalanobis": null,
+        "covariance_ellipse_containment": null,
+        "containment_1sigma_fraction": null,
+        "containment_2sigma_fraction": null,
+        "containment_3sigma_fraction": null,
+        "containment_p95_fraction": null,
+        "checkpoint_covariance_provenance": null,
+        "checkpoint_points_count": 0,
+        "has_independent_checkpoints": false,
+        "held_out_is_h_conditioned": true,
+        "anchor_inliers_count": 5,
+        "guided_inliers_count": 0,
+        "quality_tier": "LOW_CONFIDENCE",
+        "confidence_tier": "LOW_CONFIDENCE",
+        "tier": "LOW",
+        "verdict": "FAIL",
+        "mean_reprojection_error_px": 0.9222,
+        "median_reprojection_error_px": 1.2171,
+        "max_reprojection_error_px": 1.6413,
+        "fraction_below_1px": 0.4,
+        "fraction_below_0_5px": 0.4,
+        "fraction_below_0_25px": 0.2,
+        "sub_pixel_accurate": false,
+        "sub_pixel_accurate_note": "Requires both in-sample fit_rmse < 1.0px and held-out validation_rmse < 1.0px; never claimed on in-sample alone.",
+        "fit_rmse_is_in_sample": true,
+        "fit_rmse_note": "In-sample RMSE on RANSAC inliers; see held_out_validation_rmse_px for out-of-sample error.",
+        "spatial_coverage": 0.05,
+        "spatial_uniformity": 0.0135,
+        "coverage_relative_to_inlier_count": 0.4444,
+        "spatial_distribution": {
+            "grid_rows": 10,
+            "grid_cols": 10,
+            "total_cells": 100,
+            "occupied_cells": 5,
+            "coverage": 0.05,
+            "count_std": 0.2179,
+            "count_mean": 0.05,
+            "spatial_entropy": 0.3495,
+            "uniformity_score": 0.0135,
+            "adaptive_grid_size": 3,
+            "coverage_relative_to_inlier_count": 0.4444,
+            "adaptive_uniformity_score": 0.307
+        },
+        "transform_quality": {
+            "is_valid": true,
+            "reason": "OK",
+            "determinant": 819.462842,
+            "condition_number": 105039.33,
+            "scale_ratio": 4.1038,
+            "fit_rmse_px": 1.0841
+        },
+        "ssim": 0.4372,
+        "ssim_score": 0.4064,
+        "confidence_score": 16,
+        "traffic_light_color": "RED",
+        "traffic_light": {
+            "ssim_score": 0.4064,
+            "confidence_score": 16,
+            "traffic_light_color": "RED",
+            "traffic_light_reasons": [
+                "inlier_ratio 0.045 < 0.30 (weak consensus)"
+            ]
+        },
+        "psnr": 11.7188,
+        "nmi": 0.0098,
+        "composite_quality_score": 0.2051,
+        "composite_quality_score_is_derived": true,
+        "composite_quality_score_derivation": "Synthetic heuristic combination of geometric consensus, spatial distribution, and photometric/structural alignment.",
+        "composite_quality_score_formula": "0.25*inlier_ratio + 0.25*exp(-fit_rmse_px/2) + 0.25*spatial_uniformity + 0.25*(0.6*NMI + 0.4*max(0,SSIM))",
+        "composite_quality_score_components": {
+            "inlier_ratio_term": 0.0446,
+            "rmse_term": 0.5816,
+            "uniformity_term": 0.0135,
+            "alignment_term": 0.1808
+        },
+        "covariance_refinement_applied": false,
+        "guided_densification": {
+            "enabled": false,
+            "anchor_inliers_count": 5,
+            "guided_inliers_count": 0,
+            "h_conditioned": false,
+            "held_out_is_h_conditioned": true
+        },
+        "dem_ray_shift": {
+            "enabled": false,
+            "reason": "emission_unavailable_or_nadir"
+        },
+        "slope_residual_correlation": -0.37294878956012256,
+        "dem_model": "homography",
+        "topographic_relief": {
+            "model": "homography",
+            "dem_available": true,
+            "dem_ransac_applied": false,
+            "dem_ransac_frame": "raw_source_to_dst",
+            "dem_relief_max_shift_px": 0.0,
+            "dem_raw_frame_rmse_px": null,
+            "slope_residual_correlation": -0.37294878956012256,
+            "relief_strain_detected": false,
+            "relief_strain_ratio": 1.0
+        },
+        "absolute_rmse_uncertainty_m": 2445.3818,
+        "positional_uncertainty_m": 2445.3818,
+        "matching_grid_size": 4,
+        "canonical_grid_size": 10,
+        "outlier_method": "ransac",
+        "outlier_method_requested": "ransac",
+        "outlier_method_fallback": false,
+        "synthetic_reference_used": false,
+        "illumination_compensation": "none",
+        "illumination_detail": {
+            "delta_azimuth_deg": null,
+            "threshold_deg": 90.0,
+            "source_azimuth_deg": null,
+            "reference_azimuth_deg": 269.646098,
+            "triggered": false
+        },
+        "native_polish": {
+            "applied": false,
+            "reason": "not_triggered"
+        },
+        "native_polish_applied": false,
+        "pyramid_matching": {
+            "levels_executed": [
+                2,
+                1,
+                0
+            ],
+            "l2_global_shift_px": [
+                0.0,
+                0.0
+            ],
+            "l1_matches_found": 35,
+            "l1_inliers": 6,
+            "l1_homography_valid": true,
+            "coarse_to_fine_applied": true,
+            "finest_scale_only": false,
+            "timing_s": {
+                "L2": 1.2589,
+                "L1": 0.6696,
+                "L0": 19.7772
+            }
+        }
+    },
+    "bundle_adjustment": {
+        "status": "failed",
+        "reason": "insufficient_constraints",
+        "optimized_matrices": {}
+    },
+    "composition": null,
+    "direct_ohrc_iirs_homography": null,
+    "production_grade_chained_homography": null,
+    "direct": {
+        "status": "not_attempted_on_failure_path"
+    },
+    "chained": {
+        "status": "not_computable"
+    },
+    "Intra-CH2 Pixel RMSE": null,
+    "Basemap Pixel RMSE": 0.0,
+    "Absolute RMSE (Meters)": 1.118,
+    "basemap_registration": {
+        "status": "success",
+        "basemap_pixel_rmse": 0.0,
+        "absolute_rmse_m": 1.118,
+        "inlier_count": 4
+    }
+}

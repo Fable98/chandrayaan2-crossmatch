@@ -1,0 +1,30 @@
+{
+    "status": "failure_diagnosed",
+    "failure_reason": "insufficient_matches",
+    "identified_root_causes": [
+        "Geometric verification rejected: insufficient_matches"
+    ],
+    "primary_root_cause": "Geometric verification rejected: insufficient_matches",
+    "diagnostics": {
+        "texture_variance": {
+            "source_laplacian_var": 589.24,
+            "reference_laplacian_var": 61.98
+        },
+        "illumination": {
+            "source_sun_azimuth_deg": 45.0,
+            "reference_sun_azimuth_deg": 45.0,
+            "delta_azimuth_deg": 0.0
+        },
+        "scale": {
+            "source_gsd_m": 5.0,
+            "reference_gsd_m": 5.0,
+            "scale_ratio": 1.0
+        },
+        "dynamic_range": {
+            "source_dark_fraction": 0.002,
+            "reference_dark_fraction": 0.0,
+            "source_saturated_fraction": 0.0,
+            "reference_saturated_fraction": 0.0
+        }
+    }
+}
