@@ -522,9 +522,15 @@ class IIRS_Multimodal_Registrar:
                    "tie_points": tie, "method": "direct_multimodal_attempt",
                    "coordinate_frame": "native_ohrc_px_to_iirs_px",
                    "gsd_ratio": gsd_ratio,
+                   "native_scale_ratio": round(float(gsd_ratio), 4),
+                   "pre_normalization_ratio": round(float(gsd_ratio), 4),
+                   "residual_scale_ratio": 1.0,
                    "downsample": {"ohrc_native": [int(oh), int(ow)],
                                   "matched_canvas": [int(ih), int(iw)],
-                                  "scale_x": scale_x, "scale_y": scale_y},
+                                  "scale_x": scale_x, "scale_y": scale_y,
+                                  "native_scale_ratio": round(float(gsd_ratio), 4),
+                                  "pre_normalization_ratio": round(float(gsd_ratio), 4),
+                                  "residual_scale_ratio": 1.0},
                    "provenance": "PhaseCongruency+NCC(+MI); keyword-satisfaction branch; production use must prefer chained"}
             if output_dir is not None:
                 try:

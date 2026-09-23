@@ -196,7 +196,7 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
 
                             <div className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 p-3 shadow-xs">
                               <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                OHRC GSD
+                                OHRC Native GSD
                               </span>
                               <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
                                 {fmtGsd(t.ohrc_gsd_m)}
@@ -205,7 +205,7 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
 
                             <div className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 p-3 shadow-xs">
                               <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                TMC-2 GSD
+                                TMC-2 Native GSD
                               </span>
                               <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
                                 {fmtGsd(t.tmc2_gsd_m)}
@@ -214,7 +214,7 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
 
                             <div className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 p-3 shadow-xs">
                               <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                                IIRS GSD
+                                IIRS Native GSD
                               </span>
                               <span className="font-mono text-xs font-bold text-slate-800 dark:text-slate-200">
                                 {fmtGsd(t.iirs_gsd_m)}

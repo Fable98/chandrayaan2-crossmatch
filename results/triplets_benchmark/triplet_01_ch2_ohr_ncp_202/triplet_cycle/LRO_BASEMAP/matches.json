@@ -1,0 +1,257 @@
+[
+  {
+    "source_x": 45.0,
+    "source_y": 234.0,
+    "target_x": 38.0,
+    "target_y": 245.0,
+    "image1_x": 45.0,
+    "image1_y": 234.0,
+    "image2_x": 38.0,
+    "image2_y": 245.0,
+    "confidence": 0.21,
+    "covariance_xy": [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0
+      ]
+    ],
+    "sigma_major_px": 1.0,
+    "sigma_minor_px": 1.0,
+    "ellipse_angle_deg": 0.0,
+    "uncertainty_status": "flat_peak",
+    "refinement_dx": 0.0,
+    "refinement_dy": 0.0,
+    "is_refined": false,
+    "spatial_quality_score": 0.2233851542145544,
+    "dx": 0.0,
+    "dy": 0.0,
+    "peak_val": 0.11586825549602509,
+    "is_valid": false,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 1.0,
+    "cfog_distance": 1.0019242763519287,
+    "pc_energy_src": 0.9979641437530518,
+    "pc_energy_tgt": 0.8703547120094299,
+    "nn_ratio": 1.0,
+    "scale_diff": 0.8999999999999999,
+    "match_id": 0,
+    "cell": [
+      0,
+      1
+    ],
+    "disp_consistency": 0.5512931772732916,
+    "pairwise_dist_ratio": 0.9373040528784106,
+    "ai_inlier_prob": 0.05000000074505806,
+    "is_inlier": true,
+    "provenance": "anchor",
+    "h_conditioned": false
+  },
+  {
+    "source_x": 87.0,
+    "source_y": 343.0,
+    "target_x": 85.0,
+    "target_y": 364.0,
+    "image1_x": 87.0,
+    "image1_y": 343.0,
+    "image2_x": 85.0,
+    "image2_y": 364.0,
+    "confidence": 0.23,
+    "covariance_xy": [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0
+      ]
+    ],
+    "sigma_major_px": 1.0,
+    "sigma_minor_px": 1.0,
+    "ellipse_angle_deg": 0.0,
+    "uncertainty_status": "flat_peak",
+    "refinement_dx": 0.0,
+    "refinement_dy": 0.0,
+    "is_refined": false,
+    "spatial_quality_score": 0.2813378330051295,
+    "dx": 0.0,
+    "dy": 0.0,
+    "peak_val": 0.13623714447021484,
+    "is_valid": false,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 1.0,
+    "cfog_distance": 0.7268645167350769,
+    "pc_energy_src": 0.9978045225143433,
+    "pc_energy_tgt": 0.9782205820083618,
+    "nn_ratio": 1.0,
+    "scale_diff": 2.4000000000000004,
+    "match_id": 1,
+    "cell": [
+      0,
+      2
+    ],
+    "disp_consistency": 0.4608841777813302,
+    "pairwise_dist_ratio": 0.9427358674036338,
+    "ai_inlier_prob": 0.019999999552965164,
+    "is_inlier": false,
+    "provenance": "anchor",
+    "h_conditioned": false
+  },
+  {
+    "source_x": 257.0,
+    "source_y": 405.0,
+    "target_x": 255.82715981390436,
+    "target_y": 409.91871651578896,
+    "image1_x": 257.0,
+    "image1_y": 405.0,
+    "image2_x": 255.82715981390436,
+    "image2_y": 409.91871651578896,
+    "confidence": 0.26,
+    "covariance_xy": [
+      [
+        4.0,
+        0.432291
+      ],
+      [
+        0.432291,
+        4.0
+      ]
+    ],
+    "sigma_major_px": 2.1053,
+    "sigma_minor_px": 1.8888,
+    "ellipse_angle_deg": 45.0,
+    "uncertainty_status": "valid",
+    "refinement_dx": -1.1728401860956286,
+    "refinement_dy": 0.9187165157889687,
+    "is_refined": true,
+    "spatial_quality_score": 0.2611117002758527,
+    "dx": -1.1728401860956286,
+    "dy": 0.9187165157889687,
+    "peak_val": 0.17343127727508545,
+    "is_valid": true,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 1.19,
+    "cfog_distance": 0.595249354839325,
+    "pc_energy_src": 0.9976281523704529,
+    "pc_energy_tgt": 0.9765245914459229,
+    "nn_ratio": 1.0,
+    "scale_diff": 0.0,
+    "match_id": 2,
+    "cell": [
+      0,
+      3
+    ],
+    "disp_consistency": 0.5327286632195186,
+    "pairwise_dist_ratio": 0.9158826263191874,
+    "ai_inlier_prob": 0.03999999910593033,
+    "is_inlier": true,
+    "provenance": "anchor",
+    "h_conditioned": false
+  },
+  {
+    "source_x": 190.0,
+    "source_y": 341.0,
+    "target_x": 178.00883871882868,
+    "target_y": 329.87075824033917,
+    "image1_x": 190.0,
+    "image1_y": 341.0,
+    "image2_x": 178.00883871882868,
+    "image2_y": 329.87075824033917,
+    "confidence": 0.23,
+    "covariance_xy": [
+      [
+        4.0,
+        -3.96
+      ],
+      [
+        -3.96,
+        4.0
+      ]
+    ],
+    "sigma_major_px": 2.8213,
+    "sigma_minor_px": 0.2,
+    "ellipse_angle_deg": -45.0,
+    "uncertainty_status": "valid",
+    "refinement_dx": 0.00883871882868803,
+    "refinement_dy": -5.12924175966082,
+    "is_refined": true,
+    "spatial_quality_score": 0.2253894470951122,
+    "dx": 0.00883871882868803,
+    "dy": -5.12924175966082,
+    "peak_val": 0.16626662015914917,
+    "is_valid": true,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 1.91,
+    "cfog_distance": 0.9472991228103638,
+    "pc_energy_src": 0.9972867965698242,
+    "pc_energy_tgt": 0.9845724105834961,
+    "nn_ratio": 1.0,
+    "scale_diff": 1.5,
+    "match_id": 3,
+    "cell": [
+      1,
+      2
+    ],
+    "disp_consistency": 0.4587924764158014,
+    "pairwise_dist_ratio": 0.8934552902370496,
+    "ai_inlier_prob": 0.10000000149011612,
+    "is_inlier": true,
+    "provenance": "anchor",
+    "h_conditioned": false
+  },
+  {
+    "source_x": 76.0,
+    "source_y": 404.0,
+    "target_x": 49.0,
+    "target_y": 404.0,
+    "image1_x": 76.0,
+    "image1_y": 404.0,
+    "image2_x": 49.0,
+    "image2_y": 404.0,
+    "confidence": 0.33,
+    "covariance_xy": [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0
+      ]
+    ],
+    "sigma_major_px": 1.0,
+    "sigma_minor_px": 1.0,
+    "ellipse_angle_deg": 0.0,
+    "uncertainty_status": "flat_peak",
+    "refinement_dx": 0.0,
+    "refinement_dy": 0.0,
+    "is_refined": false,
+    "spatial_quality_score": 0.28759799203087205,
+    "dx": 0.0,
+    "dy": 0.0,
+    "peak_val": 0.13833661377429962,
+    "is_valid": false,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 1.0,
+    "cfog_distance": 0.5798702239990234,
+    "pc_energy_src": 0.9958553314208984,
+    "pc_energy_tgt": 0.9608980417251587,
+    "nn_ratio": 0.8666449662637127,
+    "scale_diff": 4.800000000000001,
+    "match_id": 4,
+    "cell": [
+      1,
+      3
+    ],
+    "disp_consistency": 0.4433328111262812,
+    "pairwise_dist_ratio": 0.8898850432810071,
+    "ai_inlier_prob": 0.27000001072883606,
+    "is_inlier": true,
+    "provenance": "anchor",
+    "h_conditioned": false
+  }
+]

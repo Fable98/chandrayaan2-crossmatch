@@ -7,6 +7,23 @@ Correlation. Used when PDS label-derived bounds (bounds_optical) are
 imprecise or misaligned due to orbital ephemeris/attitude jitter in lunar
 orbiter labels.
 
+Scale reduction architecture:
+  In multimodal cross-matching (e.g. OHRC 0.25 m/px to IIRS ~70 m/px, native ratio ~275x),
+  the physical GSD ratio is reduced to a common working scale BEFORE overlap recovery:
+  1. In the matcher pipeline (matcher_cfog.py Step 3), working_gsd = max(gsd1, gsd2)
+     is computed and the finer raster is resampled via cv2.INTER_AREA downsampling.
+  2. Step 3.5 then invokes recover_content_overlap on the common-GSD rasters where
+     the residual scale gap is ~1.0x.
+  3. If recover_content_overlap is called directly on unnormalized rasters whose scale
+     ratio exceeds SCALE_CAP (10.0x), metadata-driven common-GSD normalization is
+     performed first.
+  4. Fourier-Mellin log-polar estimation is strictly prohibited from directly estimating
+     extreme scale ratios (e.g. 20x, 100x, 250x); if common-GSD normalization cannot be
+     computed due to missing GSD metadata, the module fails cleanly (overlap_recovered=False)
+     without hallucinating transforms.
+  5. Provenance tracking: native_scale_ratio, pre_normalization_ratio, and residual_scale_ratio
+     are recorded in the returned result dictionary.
+
 Pipeline order (scale FIRST, then translation):
   1. Relative scale ratio S is estimated with a translation-invariant
      Fourier-Mellin log-polar estimator on ratio-preserving thumbnails.
@@ -22,9 +39,9 @@ Documented capability caps:
   * SCALE_CAP (default 10.0x): log-polar scale estimates are reliable in
     roughly 1-10x. Raw estimates above the cap are clamped and reported via
     ``scale_capped=True``; translation then proceeds scale-uncertain with
-    reduced confidence. Gaps around ~20x (OHRC<->TMC-2 natives) MUST go
-    through the metadata-GSD common-scale path in matcher_cfog first — this
-    module alone cannot bridge them reliably.
+    reduced confidence. Gaps around ~20x-275x (OHRC<->TMC-2, OHRC<->IIRS natives)
+    MUST go through metadata-driven common-GSD normalization first — Fourier-Mellin
+    alone cannot bridge them reliably.
   * SHIFT_CAP: translation is clamped to ``max_shift_fraction`` of the
     reference dims (default 25%); larger true offsets are reported clamped
     with ``shift_capped=True``.
@@ -126,6 +143,7 @@ def estimate_scale_ratio_logpolar(
     ref_img: np.ndarray,
     lp_max_dim: int = LP_MAX_DIM,
     response_threshold: float = LP_RESPONSE_THRESHOLD,
+    max_scale_ratio: float = SCALE_CAP,
 ) -> Tuple[Optional[float], float]:
     """Translation-invariant relative scale estimate (Fourier-Mellin).
 
@@ -135,6 +153,11 @@ def estimate_scale_ratio_logpolar(
     the magnitude of the scale gap (larger-canvas / smaller-canvas pixel
     count direction is resolved by the caller), or (None, response) when the
     correlation is too weak to trust.
+
+    Strict guardrail: Fourier-Mellin decorrelates beyond ~8-10x and must NEVER
+    attempt to directly estimate an extreme (e.g. 20x, 100x, 250x) scale ratio.
+    If the canvas dimension ratio or estimated ratio exceeds max_scale_ratio (SCALE_CAP=10.0),
+    direct estimation is refused.
     """
     try:
         src = _to_gray_f32(source_img)
@@ -143,6 +166,17 @@ def estimate_scale_ratio_logpolar(
         h2, w2 = ref.shape[:2]
         if min(h1, w1, h2, w2) < 16:
             return None, 0.0
+
+        # Guard: never attempt Fourier-Mellin on extreme scale gaps directly
+        dim_ratio = max(max(h1, w1), max(h2, w2)) / max(1.0, min(min(h1, w1), min(h2, w2)))
+        if dim_ratio > float(max_scale_ratio):
+            logger.warning(
+                "Canvas dimension ratio %.1fx exceeds SCALE_CAP (%.1fx); "
+                "refusing direct Fourier-Mellin log-polar estimation without metadata normalization.",
+                dim_ratio, float(max_scale_ratio),
+            )
+            return None, 0.0
+
         # Ratio-preserving joint downsample (SAME factor keeps S intact).
         down = max(1.0, float(max(h1, w1, h2, w2)) / float(lp_max_dim))
         d1 = cv2.resize(src, (max(8, int(round(w1 / down))), max(8, int(round(h1 / down)))),
@@ -180,7 +214,7 @@ def estimate_scale_ratio_logpolar(
         if not np.isfinite(dx) or float(response) < float(response_threshold):
             return None, float(response) if np.isfinite(response) else 0.0
         s_ratio = float(math.exp(abs(float(dx)) / m_gain))
-        if not np.isfinite(s_ratio) or s_ratio < 1.0:
+        if not np.isfinite(s_ratio) or s_ratio < 1.0 or s_ratio > float(max_scale_ratio):
             return None, float(response)
         return s_ratio, float(response)
     except Exception as exc:
@@ -197,6 +231,10 @@ def recover_content_overlap(
     scale_ratio: Optional[float] = None,
     estimate_scale: bool = True,
     max_scale_ratio: float = SCALE_CAP,
+    source_gsd_m: Optional[float] = None,
+    ref_gsd_m: Optional[float] = None,
+    native_scale_ratio: Optional[float] = None,
+    pre_normalization_ratio: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
     Recovers true image overlap: scale estimation FIRST, then translation.
@@ -204,6 +242,11 @@ def recover_content_overlap(
     Neither input is resized to min(H, W); scale is estimated on
     ratio-preserving thumbnails and the smaller-scale canvas is resampled to
     the common scale before translation measurement.
+
+    If the scale gap exceeds max_scale_ratio (SCALE_CAP=10.0x), metadata-driven
+    common-GSD normalization is performed first. Fourier-Mellin is NEVER permitted
+    to estimate extreme scale gaps (e.g. 20x, 100x, 250x) directly. If GSD metadata
+    is missing, the function fails cleanly.
 
     Args:
         source_img: (H, W) or (H, W, C) source image array.
@@ -219,10 +262,15 @@ def recover_content_overlap(
             zero-padded native canvases).
         max_scale_ratio: Documented scale cap (default 10.0x). Raw estimates
             above it are clamped with scale_capped=True.
+        source_gsd_m: Optional physical GSD of source raster.
+        ref_gsd_m: Optional physical GSD of reference raster.
+        native_scale_ratio: Optional pre-recorded native scale ratio.
+        pre_normalization_ratio: Optional ratio before common-GSD normalization.
 
     Returns:
         Dict with dx_px, dy_px (reference pixels), confidence,
         scale_ratio, scale_confidence, scale_capped, shift_capped,
+        native_scale_ratio, pre_normalization_ratio, residual_scale_ratio,
         frame="reference_pixels", method, overlap_recovered, bounds fields.
     """
     src_gray = _to_gray_f32(source_img)
@@ -231,12 +279,86 @@ def recover_content_overlap(
     h_src, w_src = src_gray.shape[:2]
     h_ref, w_ref = ref_gray.shape[:2]
 
+    # Calculate native scale ratio if metadata or explicit scale provided
+    if native_scale_ratio is None:
+        if source_gsd_m is not None and ref_gsd_m is not None and source_gsd_m > 0 and ref_gsd_m > 0:
+            native_scale_ratio = float(max(source_gsd_m, ref_gsd_m) / min(source_gsd_m, ref_gsd_m))
+        elif scale_ratio is not None and np.isfinite(float(scale_ratio)) and float(scale_ratio) >= 1.0:
+            native_scale_ratio = float(scale_ratio)
+
+    canvas_dim_ratio = max(max(h_src, w_src), max(h_ref, w_ref)) / max(1.0, min(min(h_src, w_src), min(h_ref, w_ref)))
+
+    rec_native_ratio = float(native_scale_ratio) if native_scale_ratio is not None else float(canvas_dim_ratio)
+    rec_pre_norm_ratio = float(pre_normalization_ratio) if pre_normalization_ratio is not None else rec_native_ratio
+    rec_residual_ratio = 1.0
+
+    # Requirement 2 & 5: If the ratio exceeds SCALE_CAP, perform metadata-driven common-GSD normalization first.
+    # Never let Fourier-Mellin estimate a 250x (or >10x) ratio directly.
+    ratio_to_check = native_scale_ratio if native_scale_ratio is not None else canvas_dim_ratio
+    scale_norm_applied = False
+    norm_s_ref = 1.0
+
+    if ratio_to_check > float(max_scale_ratio):
+        if source_gsd_m is not None and ref_gsd_m is not None and source_gsd_m > 0 and ref_gsd_m > 0:
+            working_gsd = max(source_gsd_m, ref_gsd_m)
+            s_src = float(working_gsd / source_gsd_m)
+            s_ref = float(working_gsd / ref_gsd_m)
+            if s_src > 1.0 + 1e-4:
+                nw_s = max(8, int(round(w_src / s_src)))
+                nh_s = max(8, int(round(h_src / s_src)))
+                src_gray = cv2.resize(src_gray, (nw_s, nh_s), interpolation=cv2.INTER_AREA)
+            if s_ref > 1.0 + 1e-4:
+                nw_r = max(8, int(round(w_ref / s_ref)))
+                nh_r = max(8, int(round(h_ref / s_ref)))
+                ref_gray = cv2.resize(ref_gray, (nw_r, nh_r), interpolation=cv2.INTER_AREA)
+                norm_s_ref = s_ref
+            h_src, w_src = src_gray.shape[:2]
+            h_ref, w_ref = ref_gray.shape[:2]
+            scale_norm_applied = True
+            rec_pre_norm_ratio = float(max(source_gsd_m, ref_gsd_m) / min(source_gsd_m, ref_gsd_m))
+            scale_ratio = 1.0
+            rec_residual_ratio = 1.0
+            logger.info(
+                "Scale ratio %.1fx exceeds SCALE_CAP (%.1fx); common-GSD normalization applied (working GSD=%.2fm).",
+                rec_pre_norm_ratio, float(max_scale_ratio), working_gsd,
+            )
+        else:
+            # Metadata missing and ratio exceeds SCALE_CAP: FAIL CLEARLY.
+            logger.warning(
+                "Scale ratio %.1fx exceeds SCALE_CAP (%.1fx) and common-GSD normalization cannot be computed (missing GSD metadata). Aborting overlap recovery.",
+                ratio_to_check, float(max_scale_ratio),
+            )
+            return {
+                "dx_px": 0.0, "dy_px": 0.0, "confidence": 0.0,
+                "scale_ratio": round(float(ratio_to_check), 4),
+                "scale_confidence": 0.0,
+                "scale_capped": True,
+                "shift_capped": False,
+                "frame": "reference_pixels",
+                "method": "none_scale_gap_exceeds_cap_without_metadata",
+                "overlap_recovered": False,
+                "error": (
+                    f"Scale ratio ({ratio_to_check:.1f}x) exceeds SCALE_CAP ({max_scale_ratio:.1f}x). "
+                    "Fourier-Mellin cannot directly estimate extreme scale ratios; "
+                    "common-GSD normalization cannot be computed because valid GSD metadata is missing."
+                ),
+                "native_scale_ratio": round(rec_native_ratio, 4),
+                "pre_normalization_ratio": round(rec_pre_norm_ratio, 4),
+                "residual_scale_ratio": round(rec_native_ratio, 4),
+                "initial_bounds": initial_bounds,
+                "recovered_bounds": initial_bounds,
+                "bounds_shift_meters": None,
+            }
+
     if min(h_src, w_src, h_ref, w_ref) < 8:
         return {
             "dx_px": 0.0, "dy_px": 0.0, "confidence": 0.0,
-            "scale_ratio": 1.0, "scale_confidence": 0.0, "scale_capped": False,
+            "scale_ratio": 1.0, "scale_confidence": 0.0, "scale_capped": bool(ratio_to_check > float(max_scale_ratio)),
             "shift_capped": False, "frame": "reference_pixels",
             "method": "none_canvas_too_small", "overlap_recovered": False,
+            "native_scale_ratio": round(rec_native_ratio, 4),
+            "pre_normalization_ratio": round(rec_pre_norm_ratio, 4),
+            "residual_scale_ratio": 1.0,
             "initial_bounds": initial_bounds,
             "recovered_bounds": initial_bounds, "bounds_shift_meters": None,
         }
@@ -249,7 +371,7 @@ def recover_content_overlap(
         s_est = float(scale_ratio)
         scale_confidence = 1.0
     elif estimate_scale:
-        s_raw, resp = estimate_scale_ratio_logpolar(src_gray, ref_gray)
+        s_raw, resp = estimate_scale_ratio_logpolar(src_gray, ref_gray, max_scale_ratio=max_scale_ratio)
         scale_confidence = round(float(resp), 4)
         if s_raw is not None:
             if s_raw > float(max_scale_ratio):
@@ -472,8 +594,8 @@ def recover_content_overlap(
         method = f"{method}_scale_capped"
         confidence = float(confidence * 0.5)
 
-    final_dx = dx_c / max(fx_ref_win, 1e-9)
-    final_dy = dy_c / max(fx_ref_win, 1e-9)
+    final_dx = (dx_c / max(fx_ref_win, 1e-9)) * norm_s_ref
+    final_dy = (dy_c / max(fx_ref_win, 1e-9)) * norm_s_ref
 
     # Clamp shifts to the documented translation cap.
     shift_capped = False
@@ -523,6 +645,9 @@ def recover_content_overlap(
         "frame": "reference_pixels",
         "method": method,
         "overlap_recovered": overlap_recovered,
+        "native_scale_ratio": round(rec_native_ratio, 4),
+        "pre_normalization_ratio": round(rec_pre_norm_ratio, 4),
+        "residual_scale_ratio": round(float(s_est), 4),
         "initial_bounds": initial_bounds,
         "recovered_bounds": recovered_bounds if recovered_bounds else initial_bounds,
         "bounds_shift_meters": bounds_shift_meters,

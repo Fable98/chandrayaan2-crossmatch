@@ -12,15 +12,35 @@ def scale_factor(native_gsd: float | None, working_gsd: float) -> float:
     return working_gsd / native_gsd
 
 
+def compute_effective_gsd(native_gsd_m: float, physical_scale_factor: float) -> float:
+    """
+    Computes effective raster GSD: effective_gsd = native_gsd / physical_scale_factor.
+    physical_scale_factor = derived_pixels / original_pixels (e.g. 0.05 for 20x downsample).
+    """
+    if physical_scale_factor <= 0:
+        raise ValueError(f"physical_scale_factor must be > 0, got {physical_scale_factor}")
+    return float(native_gsd_m) / float(physical_scale_factor)
+
+
+def compute_resampling_factor(original_size: int, derived_size: int) -> float:
+    """Returns dimensional ratio of derived raster to original raster."""
+    if original_size <= 0 or derived_size <= 0:
+        raise ValueError("Sizes must be > 0")
+    return float(derived_size) / float(original_size)
+
+
 def resample_to_gsd(
     arr: np.ndarray,
     transform: Affine | None,
     native_gsd: float | None,
     working_gsd: float,
+    anti_aliasing_method: str = "INTER_AREA",
+    sensor: str | None = None,
 ) -> tuple[np.ndarray, Affine | None, float]:
     """
     Resample so matching GSD is shared (TMC up / OHRC down).
     scale > 1 means coarsen (OHRC → working); < 1 means refine (if ever needed).
+    Preserves cv2.INTER_AREA as the reproducible default baseline (Requirement 1).
     """
     sf = scale_factor(native_gsd, working_gsd)
     if abs(sf - 1.0) < 1e-6:
@@ -29,14 +49,37 @@ def resample_to_gsd(
     _, h, w = arr.shape
     new_h = max(1, int(round(h / sf)))
     new_w = max(1, int(round(w / sf)))
-    # AREA interpolation for downsampling (proper pixel-area averaging;
-    # skimage.resize's anti_aliasing Gaussian is slower and softer). CUBIC
-    # for the rare upscale path.
-    interp = cv2.INTER_AREA if (new_h <= h and new_w <= w) else cv2.INTER_CUBIC
+
+    is_downsample = (new_h <= h and new_w <= w)
     bands = []
-    for i in range(arr.shape[0]):
-        band = np.ascontiguousarray(arr[i], dtype=np.float32)
-        bands.append(cv2.resize(band, (new_w, new_h), interpolation=interp))
+
+    if is_downsample and anti_aliasing_method.upper() != "INTER_AREA":
+        try:
+            from lunar_pipeline.anti_aliasing import downsample_sensor_aware, AntiAliasingMethod
+            aa_method = AntiAliasingMethod(anti_aliasing_method.upper())
+        except (ImportError, ValueError):
+            from data_preprocessing_pipeline.lunar_pipeline.anti_aliasing import (
+                downsample_sensor_aware,
+                AntiAliasingMethod,
+            )
+            aa_method = AntiAliasingMethod(anti_aliasing_method.upper())
+
+        for i in range(arr.shape[0]):
+            band = np.ascontiguousarray(arr[i], dtype=np.float32)
+            res = downsample_sensor_aware(
+                band,
+                target_shape_or_factor=(new_h, new_w),
+                method=aa_method,
+                sensor=sensor,
+            )
+            bands.append(res.output_raster)
+    else:
+        # Default reproducible INTER_AREA path
+        interp = cv2.INTER_AREA if is_downsample else cv2.INTER_CUBIC
+        for i in range(arr.shape[0]):
+            band = np.ascontiguousarray(arr[i], dtype=np.float32)
+            bands.append(cv2.resize(band, (new_w, new_h), interpolation=interp))
+
     out = np.stack(bands, axis=0).astype(np.float32, copy=False)
 
     new_transform = None

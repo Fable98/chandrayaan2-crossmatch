@@ -178,7 +178,10 @@ def test_refresh_with_auth(client, isolated_users, fresh_limits):
 # Lockout + rate limits on /auth/*
 # ---------------------------------------------------------------------------
 
-def test_login_lockout_after_repeated_failures(client, isolated_users, fresh_limits):
+def test_login_lockout_after_repeated_failures(client, isolated_users, fresh_limits, monkeypatch):
+    from config import settings as _settings
+
+    monkeypatch.setattr(_settings, "AUTH_LOCKOUT_ATTEMPTS", 5)
     email = f"lockout-{uuid.uuid4().hex[:8]}@example.com"
     _register(client, email)
     for _ in range(5):

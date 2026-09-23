@@ -1,0 +1,206 @@
+[
+  {
+    "source_x": 394.0,
+    "source_y": 119.0,
+    "target_x": 324.0,
+    "target_y": 83.0,
+    "image1_x": 394.0,
+    "image1_y": 119.0,
+    "image2_x": 324.0,
+    "image2_y": 83.0,
+    "confidence": 0.25,
+    "covariance_xy": [
+      [
+        1.0,
+        0.0
+      ],
+      [
+        0.0,
+        1.0
+      ]
+    ],
+    "sigma_major_px": 1.0,
+    "sigma_minor_px": 1.0,
+    "ellipse_angle_deg": 0.0,
+    "uncertainty_status": "flat_peak",
+    "refinement_dx": 0.0,
+    "refinement_dy": 0.0,
+    "is_refined": false,
+    "spatial_quality_score": 0.2544846186103877,
+    "dx": 0.0,
+    "dy": 0.0,
+    "peak_val": 0.14138001203536987,
+    "is_valid": false,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 1.0,
+    "cfog_distance": 0.676703691482544,
+    "pc_energy_src": 0.9982187747955322,
+    "pc_energy_tgt": 0.9881380200386047,
+    "nn_ratio": 1.0,
+    "scale_diff": 0.0,
+    "match_id": 0,
+    "cell": [
+      0,
+      1
+    ],
+    "disp_consistency": 0.7209250407711141,
+    "pairwise_dist_ratio": 0.989324623933575,
+    "ai_inlier_prob": 0.11999999731779099,
+    "is_inlier": true,
+    "provenance": "anchor",
+    "h_conditioned": false
+  },
+  {
+    "source_x": 387.0,
+    "source_y": 429.0,
+    "target_x": 327.0,
+    "target_y": 390.0,
+    "image1_x": 387.0,
+    "image1_y": 429.0,
+    "image2_x": 327.0,
+    "image2_y": 390.0,
+    "confidence": 0.21,
+    "covariance_xy": [
+      [
+        5.254202,
+        -0.760526
+      ],
+      [
+        -0.760526,
+        5.254202
+      ]
+    ],
+    "sigma_major_px": 2.4525,
+    "sigma_minor_px": 2.1198,
+    "ellipse_angle_deg": -45.0,
+    "uncertainty_status": "multimodal",
+    "refinement_dx": 0.0,
+    "refinement_dy": 0.0,
+    "is_refined": false,
+    "spatial_quality_score": 0.1895746618496405,
+    "dx": 4.280097338100212,
+    "dy": 11.799909142186667,
+    "peak_val": 0.17845435440540314,
+    "is_valid": false,
+    "secondary_peak_ratio": 0.8731,
+    "curvature_condition_number": 1.35,
+    "cfog_distance": 0.731070339679718,
+    "pc_energy_src": 0.9974363446235657,
+    "pc_energy_tgt": 0.8770983219146729,
+    "nn_ratio": 1.0,
+    "scale_diff": 4.800000000000001,
+    "match_id": 1,
+    "cell": [
+      3,
+      0
+    ],
+    "disp_consistency": 0.6289139356991752,
+    "pairwise_dist_ratio": 0.9920914869878511,
+    "ai_inlier_prob": 0.03999999910593033,
+    "is_inlier": true,
+    "provenance": "anchor",
+    "h_conditioned": false
+  },
+  {
+    "source_x": 490.0,
+    "source_y": 214.0,
+    "target_x": 423.08495776200743,
+    "target_y": 175.17446099139693,
+    "image1_x": 490.0,
+    "image1_y": 214.0,
+    "image2_x": 423.08495776200743,
+    "image2_y": 175.17446099139693,
+    "confidence": 0.22,
+    "covariance_xy": [
+      [
+        4.0,
+        3.96
+      ],
+      [
+        3.96,
+        4.0
+      ]
+    ],
+    "sigma_major_px": 2.8213,
+    "sigma_minor_px": 0.2,
+    "ellipse_angle_deg": 45.0,
+    "uncertainty_status": "valid",
+    "refinement_dx": 3.084957762007427,
+    "refinement_dy": -0.82553900860308,
+    "is_refined": true,
+    "spatial_quality_score": 0.11714035484534022,
+    "dx": 3.084957762007427,
+    "dy": -0.82553900860308,
+    "peak_val": 0.15093103051185608,
+    "is_valid": true,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 2.68,
+    "cfog_distance": 0.576815128326416,
+    "pc_energy_src": 0.9972331523895264,
+    "pc_energy_tgt": 0.9947865605354309,
+    "nn_ratio": 1.0,
+    "scale_diff": 2.4000000000000004,
+    "match_id": 2,
+    "cell": [
+      2,
+      3
+    ],
+    "disp_consistency": 0.715746764251699,
+    "pairwise_dist_ratio": 0.9895764134211497,
+    "ai_inlier_prob": 0.12999999523162842,
+    "is_inlier": true,
+    "provenance": "anchor",
+    "h_conditioned": false
+  },
+  {
+    "source_x": 121.0,
+    "source_y": 167.0,
+    "target_x": 45.96094998356803,
+    "target_y": 137.97243303411824,
+    "image1_x": 121.0,
+    "image1_y": 167.0,
+    "image2_x": 45.96094998356803,
+    "image2_y": 137.97243303411824,
+    "confidence": 0.35,
+    "covariance_xy": [
+      [
+        4.0,
+        2.514976
+      ],
+      [
+        2.514976,
+        4.0
+      ]
+    ],
+    "sigma_major_px": 2.5524,
+    "sigma_minor_px": 1.2186,
+    "ellipse_angle_deg": 45.0,
+    "uncertainty_status": "valid",
+    "refinement_dx": -2.0390500164319754,
+    "refinement_dy": -2.0275669658817606,
+    "is_refined": true,
+    "spatial_quality_score": 0.13131615962747817,
+    "dx": -2.0390500164319754,
+    "dy": -2.0275669658817606,
+    "peak_val": 0.16415554285049438,
+    "is_valid": true,
+    "secondary_peak_ratio": 0.0,
+    "curvature_condition_number": 1.31,
+    "cfog_distance": 0.3511837422847748,
+    "pc_energy_src": 0.9965827465057373,
+    "pc_energy_tgt": 0.9643821120262146,
+    "nn_ratio": 0.6590790745821976,
+    "scale_diff": 0.0,
+    "match_id": 3,
+    "cell": [
+      3,
+      1
+    ],
+    "disp_consistency": 0.6037696509027668,
+    "pairwise_dist_ratio": 0.9962050398286806,
+    "ai_inlier_prob": 0.49000000953674316,
+    "is_inlier": true,
+    "provenance": "anchor",
+    "h_conditioned": false
+  }
+]

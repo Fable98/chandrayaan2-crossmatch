@@ -18,8 +18,13 @@ class ImageMetadata:
     label_path: str | None = None
     acquisition_utc: str | None = None
     gsd_m: float | None = None
+    native_gsd_m: float | None = None
+    effective_gsd_m: float | None = None
     working_gsd_m: float | None = None
     scale_factor: float | None = None
+    resampling_factor: float | None = None
+    crop_transform: dict[str, Any] | None = None
+    parent_product_id: str | None = None
     sun_azimuth_deg: float | None = None
     sun_elevation_deg: float | None = None
     incidence_deg: float | None = None
@@ -30,6 +35,14 @@ class ImageMetadata:
     height: int | None = None
     bands: int = 1
     extra: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.native_gsd_m is None and self.gsd_m is not None:
+            self.native_gsd_m = self.gsd_m
+        if self.effective_gsd_m is None:
+            self.effective_gsd_m = self.working_gsd_m or self.gsd_m
+        if self.parent_product_id is None:
+            self.parent_product_id = self.product_id
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -56,6 +69,19 @@ class TileRecord:
     bbox: list[float]
     crs: str
     files: dict[str, str]
+    native_gsd_m: float | None = None
+    effective_gsd_m: float | None = None
+    resampling_factor: float | None = None
+    crop_transform: dict[str, Any] | None = None
+    parent_product_id: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.native_gsd_m is None and self.gsd_m is not None:
+            self.native_gsd_m = self.gsd_m
+        if self.effective_gsd_m is None:
+            self.effective_gsd_m = self.working_gsd_m or self.gsd_m
+        if self.parent_product_id is None:
+            self.parent_product_id = self.product_id
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)

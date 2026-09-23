@@ -1,0 +1,235 @@
+{
+  "match_count": 4,
+  "inlier_count": 4,
+  "inlier_ratio": 1.0,
+  "fit_rmse_px": 0.0,
+  "fit_rmse_insample_px": 0.0,
+  "fit_rmse_insample": 0.0,
+  "unweighted_rmse_px": 0.0,
+  "covariance_weighted_rmse": 0.0,
+  "raw_residuals_px": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "raw_residual_vectors_px": [
+    [
+      -0.0,
+      0.0
+    ],
+    [
+      -0.0,
+      -0.0
+    ],
+    [
+      -0.0,
+      -0.0
+    ],
+    [
+      -0.0,
+      -0.0
+    ]
+  ],
+  "mahalanobis_residuals": [
+    0.0,
+    0.0,
+    0.0,
+    0.0
+  ],
+  "in_sample_rmse": 0.0,
+  "held_out_rmse": null,
+  "uniformity_score": 0.0092,
+  "cyclic_rmse": null,
+  "cyclic_status": "single_pair_no_cycle",
+  "absolute_rmse_m": 1.118,
+  "validation_rmse_px": 5.1617,
+  "held_out_inlier_validation_rmse_px": null,
+  "held_out_validation_rmse_px": null,
+  "held_out_rmse_px": null,
+  "validation_median_error_px": 4.6683,
+  "validation_status": "evaluated",
+  "validation_mode": "LOOCV",
+  "is_independent_validation": false,
+  "loo_rmse": 5.1617,
+  "loo_median_error": 4.6683,
+  "loo_p95_error": 6.8734,
+  "number_of_folds": 4,
+  "checkpoint_rmse_px": null,
+  "checkpoint_unweighted_rmse_px": null,
+  "checkpoint_mean_error_px": null,
+  "checkpoint_median_error_px": null,
+  "checkpoint_p95_error_px": null,
+  "checkpoint_max_error_px": null,
+  "checkpoint_raw_residuals_px": null,
+  "checkpoint_raw_residual_vectors_px": null,
+  "pixel_resolution_m": null,
+  "checkpoint_rmse_m": null,
+  "checkpoint_mean_error_m": null,
+  "checkpoint_median_error_m": null,
+  "checkpoint_p95_error_m": null,
+  "checkpoint_max_error_m": null,
+  "checkpoint_raw_residuals_m": null,
+  "checkpoint_covariance_weighted_rmse": null,
+  "checkpoint_mahalanobis_distances": null,
+  "checkpoint_mean_mahalanobis": null,
+  "checkpoint_median_mahalanobis": null,
+  "checkpoint_p95_mahalanobis": null,
+  "checkpoint_max_mahalanobis": null,
+  "covariance_ellipse_containment": null,
+  "containment_1sigma_fraction": null,
+  "containment_2sigma_fraction": null,
+  "containment_3sigma_fraction": null,
+  "containment_p95_fraction": null,
+  "checkpoint_covariance_provenance": null,
+  "checkpoint_points_count": 0,
+  "has_independent_checkpoints": false,
+  "held_out_is_h_conditioned": true,
+  "anchor_inliers_count": 4,
+  "guided_inliers_count": 0,
+  "quality_tier": "LOW_CONFIDENCE",
+  "confidence_tier": "LOW_CONFIDENCE",
+  "tier": "LOW",
+  "verdict": "FAIL",
+  "mean_reprojection_error_px": 0.0,
+  "median_reprojection_error_px": 0.0,
+  "max_reprojection_error_px": 0.0,
+  "fraction_below_1px": 1.0,
+  "fraction_below_0_5px": 1.0,
+  "fraction_below_0_25px": 1.0,
+  "sub_pixel_accurate": false,
+  "sub_pixel_accurate_note": "Requires both in-sample fit_rmse < 1.0px and held-out validation_rmse < 1.0px; never claimed on in-sample alone.",
+  "fit_rmse_is_in_sample": true,
+  "fit_rmse_note": "In-sample RMSE on RANSAC inliers; see held_out_validation_rmse_px for out-of-sample error.",
+  "spatial_coverage": 0.04,
+  "spatial_uniformity": 0.0092,
+  "coverage_relative_to_inlier_count": 0.75,
+  "spatial_distribution": {
+    "grid_rows": 10,
+    "grid_cols": 10,
+    "total_cells": 100,
+    "occupied_cells": 4,
+    "coverage": 0.04,
+    "count_std": 0.196,
+    "count_mean": 0.04,
+    "spatial_entropy": 0.301,
+    "uniformity_score": 0.0092,
+    "adaptive_grid_size": 2,
+    "coverage_relative_to_inlier_count": 0.75,
+    "adaptive_uniformity_score": 0.6066
+  },
+  "transform_quality": {
+    "is_valid": true,
+    "reason": "OK",
+    "determinant": 1.103435,
+    "condition_number": 8328.94,
+    "scale_ratio": 1.037,
+    "fit_rmse_px": 0.0
+  },
+  "ssim": 0.2587,
+  "ssim_score": 0.2536,
+  "confidence_score": 37,
+  "traffic_light_color": "RED",
+  "traffic_light": {
+    "ssim_score": 0.2536,
+    "confidence_score": 37,
+    "traffic_light_color": "RED",
+    "traffic_light_reasons": [
+      "held_out_rmse 5.162px > 3.00px (poor generalization)"
+    ]
+  },
+  "psnr": 13.1006,
+  "nmi": 0.0191,
+  "composite_quality_score": 0.531,
+  "composite_quality_score_is_derived": true,
+  "composite_quality_score_derivation": "Synthetic heuristic combination of geometric consensus, spatial distribution, and photometric/structural alignment.",
+  "composite_quality_score_formula": "0.25*inlier_ratio + 0.25*exp(-fit_rmse_px/2) + 0.25*spatial_uniformity + 0.25*(0.6*NMI + 0.4*max(0,SSIM))",
+  "composite_quality_score_components": {
+    "inlier_ratio_term": 1.0,
+    "rmse_term": 1.0,
+    "uniformity_term": 0.0092,
+    "alignment_term": 0.1149
+  },
+  "covariance_refinement_applied": false,
+  "guided_densification": {
+    "enabled": false,
+    "anchor_inliers_count": 4,
+    "guided_inliers_count": 0,
+    "h_conditioned": false,
+    "held_out_is_h_conditioned": true
+  },
+  "dem_ray_shift": {
+    "enabled": false,
+    "reason": "emission_unavailable_or_nadir"
+  },
+  "slope_residual_correlation": -0.06547750152224256,
+  "dem_model": "homography",
+  "topographic_relief": {
+    "model": "homography",
+    "dem_available": true,
+    "dem_ransac_applied": false,
+    "dem_ransac_frame": "raw_source_to_dst",
+    "dem_relief_max_shift_px": 0.0,
+    "dem_raw_frame_rmse_px": null,
+    "slope_residual_correlation": -0.06547750152224256,
+    "relief_strain_detected": false,
+    "relief_strain_ratio": 1.0
+  },
+  "absolute_rmse_uncertainty_m": 1624514.9315,
+  "positional_uncertainty_m": 1624514.9315,
+  "matching_grid_size": 4,
+  "canonical_grid_size": 10,
+  "outlier_method": "ransac",
+  "outlier_method_requested": "ransac",
+  "outlier_method_fallback": false,
+  "synthetic_reference_used": false,
+  "illumination_compensation": "none",
+  "illumination_detail": {
+    "delta_azimuth_deg": null,
+    "threshold_deg": 90.0,
+    "source_azimuth_deg": 108.866212,
+    "reference_azimuth_deg": null,
+    "triggered": false
+  },
+  "native_polish": {
+    "applied": true,
+    "refined_count": 0,
+    "total_inliers": 4,
+    "native_gsd_m": 5.4,
+    "mean_shift_m": 0.0,
+    "max_shift_native_px": 3.5
+  },
+  "native_polish_applied": true,
+  "pyramid_matching": {
+    "levels_executed": [
+      2,
+      1,
+      0
+    ],
+    "l2_global_shift_px": [
+      -3.34,
+      -2.32
+    ],
+    "l1_matches_found": 3,
+    "l1_inliers": 0,
+    "l1_homography_valid": false,
+    "coarse_to_fine_applied": true,
+    "finest_scale_only": false,
+    "timing_s": {
+      "L2": 0.4034,
+      "L1": 0.0092,
+      "L0": 1.4083
+    }
+  },
+  "difference_map": {
+    "status": "success",
+    "output_path": "results\\triplets_benchmark\\region_002\\triplet_cycle\\LRO_BASEMAP\\difference_map.png",
+    "mean_abs_diff": 57.7535,
+    "fraction_near_black": 0.0641,
+    "shape": [
+      512,
+      512
+    ]
+  },
+  "difference_map_path": "results\\triplets_benchmark\\region_002\\triplet_cycle\\LRO_BASEMAP\\difference_map.png"
+}

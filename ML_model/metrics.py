@@ -33,9 +33,14 @@ except Exception:
     except Exception:
         SEED = 42
 
+try:
+    from ML_model.covariance_geometry import compute_dual_rmse_metrics
+except Exception:
+    try:
+        from covariance_geometry import compute_dual_rmse_metrics
+    except Exception:
+        compute_dual_rmse_metrics = None
 
-
-# ---------------------------------------------------------------------------
 # 1. Reprojection Error Functions
 # ---------------------------------------------------------------------------
 
@@ -62,6 +67,8 @@ def calculate_reprojection_errors(
     src = np.asarray(src_pts, dtype=np.float64)
     dst = np.asarray(dst_pts, dtype=np.float64)
     H_mat = np.asarray(H, dtype=np.float64)
+    if not np.all(np.isfinite(H_mat)):
+        return np.full(len(src), np.inf, dtype=np.float64)
 
     ones = np.ones((len(src), 1), dtype=np.float64)
     src_h = np.hstack([src, ones])
@@ -242,10 +249,12 @@ def evaluate_held_out_validation(
     evaluated on the unseen held-out validation subset to eliminate in-sample bias.
     Note: Evaluated on held-out inliers; for true independent ground truth, see synthetic benchmarks.
     """
-    n = len(inliers_src)
+    n = len(inliers_src) if inliers_src is not None else 0
     if n < 8:
         return {
             "validation_status": "insufficient_points_for_holdout",
+            "validation_mode": None,
+            "is_independent_validation": False,
             "validation_rmse_px": None,
             "validation_median_error_px": None,
             "validation_points_count": 0,
@@ -275,6 +284,8 @@ def evaluate_held_out_validation(
     if H_train is None:
         return {
             "validation_status": "fit_failed_on_training_subset",
+            "validation_mode": "HELD_OUT_80_20",
+            "is_independent_validation": False,
             "validation_rmse_px": None,
             "validation_median_error_px": None,
             "validation_points_count": num_val,
@@ -286,9 +297,403 @@ def evaluate_held_out_validation(
 
     return {
         "validation_status": "evaluated",
+        "validation_mode": "HELD_OUT_80_20",
+        "is_independent_validation": False,
         "validation_rmse_px": round(val_rmse, 4),
         "validation_median_error_px": round(val_median, 4),
         "validation_points_count": int(num_val),
+    }
+
+
+def _fit_loocv_fold_model(train_src: np.ndarray, train_dst: np.ndarray) -> Optional[np.ndarray]:
+    """
+    Fits a transformation matrix for a single LOOCV training fold.
+    For >= 4 points, attempts homography (RANSAC or DLT).
+    For 3 points (or as fallback), attempts affine transform.
+    For 2 points (or as fallback), attempts affine partial transform.
+    """
+    n_pts = len(train_src)
+    H_fold = None
+    if n_pts >= 4:
+        try:
+            H_fold, _ = cv2.findHomography(train_src, train_dst, cv2.RANSAC, 3.0)
+            if H_fold is not None and not np.all(np.isfinite(H_fold)):
+                H_fold = None
+        except Exception:
+            H_fold = None
+        if H_fold is None:
+            try:
+                H_fold, _ = cv2.findHomography(train_src, train_dst, 0)
+                if H_fold is not None and not np.all(np.isfinite(H_fold)):
+                    H_fold = None
+            except Exception:
+                H_fold = None
+
+    if H_fold is None and n_pts >= 3:
+        try:
+            M, _ = cv2.estimateAffine2D(train_src, train_dst)
+            if M is not None and np.all(np.isfinite(M)):
+                H_fold = np.vstack([M, [0.0, 0.0, 1.0]])
+        except Exception:
+            H_fold = None
+        if H_fold is None:
+            try:
+                M = cv2.getAffineTransform(train_src[:3].astype(np.float32), train_dst[:3].astype(np.float32))
+                if M is not None and np.all(np.isfinite(M)):
+                    H_fold = np.vstack([M, [0.0, 0.0, 1.0]])
+            except Exception:
+                H_fold = None
+
+    if H_fold is None and n_pts >= 2:
+        try:
+            M, _ = cv2.estimateAffinePartial2D(train_src, train_dst)
+            if M is not None and np.all(np.isfinite(M)):
+                H_fold = np.vstack([M, [0.0, 0.0, 1.0]])
+        except Exception:
+            H_fold = None
+
+    if H_fold is not None and not np.all(np.isfinite(H_fold)):
+        H_fold = None
+
+    return H_fold
+
+
+def evaluate_loocv_validation(
+    inliers_src: np.ndarray,
+    inliers_dst: np.ndarray,
+) -> Dict[str, Any]:
+    """
+    Evaluates Leave-One-Out Cross-Validation (LOOCV) for small inlier correspondence sets (4 <= N < 8).
+
+    For each fold i in 0..N-1:
+      - Point i is held out as the single validation point.
+      - A transformation is estimated strictly on the remaining N-1 points.
+      - Reprojection error is evaluated on point i.
+
+    Aggregates errors over all N folds:
+      - loo_rmse: root-mean-square reprojection error across folds
+      - loo_median_error: median reprojection error across folds
+      - loo_p95_error: 95th-percentile reprojection error across folds
+      - number_of_folds: N
+
+    IMPORTANT: LOOCV is cross-validation on fitted correspondences and is NEVER labeled
+    as independent validation.
+    """
+    n = len(inliers_src) if inliers_src is not None else 0
+    if n < 4:
+        return {
+            "validation_status": "insufficient_points_for_loocv",
+            "validation_mode": "LOOCV",
+            "is_independent_validation": False,
+            "loo_rmse": None,
+            "loo_median_error": None,
+            "loo_p95_error": None,
+            "number_of_folds": int(n),
+            "validation_rmse_px": None,
+            "validation_median_error_px": None,
+            "validation_points_count": int(n),
+        }
+
+    src_arr = np.asarray(inliers_src, dtype=np.float64)
+    dst_arr = np.asarray(inliers_dst, dtype=np.float64)
+
+    fold_errors: List[float] = []
+    for i in range(n):
+        train_src = np.delete(src_arr, i, axis=0)
+        train_dst = np.delete(dst_arr, i, axis=0)
+        test_src = src_arr[i : i + 1]
+        test_dst = dst_arr[i : i + 1]
+
+        H_fold = _fit_loocv_fold_model(train_src, train_dst)
+        if H_fold is None:
+            return {
+                "validation_status": "fit_failed_on_training_fold",
+                "validation_mode": "LOOCV",
+                "is_independent_validation": False,
+                "loo_rmse": None,
+                "loo_median_error": None,
+                "loo_p95_error": None,
+                "number_of_folds": int(n),
+                "validation_rmse_px": None,
+                "validation_median_error_px": None,
+                "validation_points_count": int(n),
+            }
+
+        err = calculate_reprojection_errors(test_src, test_dst, H_fold)
+        fold_errors.append(float(err[0]))
+
+    fold_errors_arr = np.asarray(fold_errors, dtype=np.float64)
+    if not np.all(np.isfinite(fold_errors_arr)):
+        return {
+            "validation_status": "non_finite_reprojection_error",
+            "validation_mode": "LOOCV",
+            "is_independent_validation": False,
+            "loo_rmse": None,
+            "loo_median_error": None,
+            "loo_p95_error": None,
+            "number_of_folds": int(n),
+            "validation_rmse_px": None,
+            "validation_median_error_px": None,
+            "validation_points_count": int(n),
+        }
+
+    loo_rmse = float(np.sqrt(np.mean(fold_errors_arr**2)))
+    loo_median = float(np.median(fold_errors_arr))
+    loo_p95 = float(np.percentile(fold_errors_arr, 95))
+
+    return {
+        "validation_status": "evaluated",
+        "validation_mode": "LOOCV",
+        "is_independent_validation": False,
+        "loo_rmse": round(loo_rmse, 4),
+        "loo_median_error": round(loo_median, 4),
+        "loo_p95_error": round(loo_p95, 4),
+        "number_of_folds": int(n),
+        "validation_rmse_px": round(loo_rmse, 4),
+        "validation_median_error_px": round(loo_median, 4),
+        "validation_points_count": int(n),
+    }
+
+
+def evaluate_independent_checkpoints(
+    checkpoints_src: np.ndarray,
+    checkpoints_dst: np.ndarray,
+    H: np.ndarray,
+    checkpoints_cov_dst: Optional[Sequence[Any]] = None,
+    checkpoints_cov_src: Optional[Sequence[Any]] = None,
+    inlier_covariances: Optional[Sequence[Any]] = None,
+    allow_inherited_inlier_covariance: bool = False,
+    pixel_resolution_m: Optional[float] = None,
+    gsd_m: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    Evaluates registration accuracy on external independent checkpoints with uncertainty-aware metrics.
+    
+    Independent checkpoints are physical or surveyed tie-points that were NOT used
+    during feature matching, inlier filtering, or transformation fitting.
+
+    CIRCULARITY & INDEPENDENCE AUDIT CONTRACT:
+    1. Independent checkpoints must be evaluated with independent observations and
+       MUST NOT inherit fitted inlier residual covariance without explicit justification.
+    2. If checkpoint covariance is unavailable:
+       - Report raw Euclidean metrics.
+       - Set Mahalanobis checkpoint metrics and ellipse containment to None.
+       - Do NOT borrow training-match covariance.
+    """
+    res_m = pixel_resolution_m if pixel_resolution_m is not None else gsd_m
+    res_m = float(res_m) if res_m is not None and res_m > 0 else None
+
+    empty_res: Dict[str, Any] = {
+        "validation_status": "no_checkpoints_provided",
+        "validation_mode": None,
+        "is_independent_validation": False,
+        "checkpoint_rmse_px": None,
+        "checkpoint_unweighted_rmse_px": None,
+        "checkpoint_mean_error_px": None,
+        "checkpoint_median_error_px": None,
+        "checkpoint_p95_error_px": None,
+        "checkpoint_max_error_px": None,
+        "checkpoint_raw_residuals_px": [],
+        "checkpoint_raw_residual_vectors_px": [],
+        "checkpoint_rmse_m": None,
+        "checkpoint_mean_error_m": None,
+        "checkpoint_median_error_m": None,
+        "checkpoint_p95_error_m": None,
+        "checkpoint_max_error_m": None,
+        "checkpoint_raw_residuals_m": None,
+        "pixel_resolution_m": res_m,
+        "checkpoint_covariance_weighted_rmse": None,
+        "checkpoint_mahalanobis_distances": None,
+        "checkpoint_mean_mahalanobis": None,
+        "checkpoint_median_mahalanobis": None,
+        "checkpoint_p95_mahalanobis": None,
+        "checkpoint_max_mahalanobis": None,
+        "covariance_ellipse_containment": None,
+        "containment_1sigma_fraction": None,
+        "containment_2sigma_fraction": None,
+        "containment_3sigma_fraction": None,
+        "containment_p95_fraction": None,
+        "checkpoint_covariance_provenance": None,
+        "checkpoint_points_count": 0,
+        "validation_rmse_px": None,
+        "validation_median_error_px": None,
+    }
+
+    if checkpoints_src is None or checkpoints_dst is None:
+        return empty_res
+
+    # Circularity guard: prevent accidental inheritance of fitted inlier covariances
+    if inlier_covariances is not None and not allow_inherited_inlier_covariance:
+        if (checkpoints_cov_dst is not None and checkpoints_cov_dst is inlier_covariances) or \
+           (checkpoints_cov_src is not None and checkpoints_cov_src is inlier_covariances):
+            raise ValueError(
+                "Circularity detected: Independent checkpoints must be evaluated with "
+                "independent observations and cannot inherit fitted inlier residual covariance "
+                "without explicit justification (allow_inherited_inlier_covariance=True)."
+            )
+
+    src_chk = np.asarray(checkpoints_src, dtype=np.float64)
+    dst_chk = np.asarray(checkpoints_dst, dtype=np.float64)
+    n_chk = len(src_chk)
+    if n_chk == 0 or len(dst_chk) != n_chk:
+        err_res = dict(empty_res)
+        err_res["validation_status"] = "empty_or_mismatched_checkpoints"
+        return err_res
+
+    if H is None or not np.all(np.isfinite(H)):
+        err_res = dict(empty_res)
+        err_res.update({
+            "validation_status": "invalid_transform_for_checkpoints",
+            "validation_mode": "INDEPENDENT_CHECKPOINTS",
+            "is_independent_validation": True,
+            "checkpoint_points_count": int(n_chk),
+        })
+        return err_res
+
+    # Project source checkpoints through H to compute 2D residual vectors
+    ones = np.ones((n_chk, 1), dtype=np.float64)
+    src_h = np.hstack([src_chk, ones])
+    proj_h = (H @ src_h.T).T
+    z = proj_h[:, 2:3]
+    eps = 1e-12
+    z_safe = np.where(np.abs(z) < eps, np.copysign(eps, z), z)
+    proj_2d = proj_h[:, :2] / z_safe
+
+    raw_vecs = proj_2d - dst_chk
+    chk_errors = np.linalg.norm(raw_vecs, axis=1)
+
+    if not np.all(np.isfinite(chk_errors)):
+        err_res = dict(empty_res)
+        err_res.update({
+            "validation_status": "non_finite_checkpoint_errors",
+            "validation_mode": "INDEPENDENT_CHECKPOINTS",
+            "is_independent_validation": True,
+            "checkpoint_points_count": int(n_chk),
+        })
+        return err_res
+
+    chk_rmse = float(np.sqrt(np.mean(chk_errors**2)))
+    chk_mean = float(np.mean(chk_errors))
+    chk_median = float(np.median(chk_errors))
+    chk_p95 = float(np.percentile(chk_errors, 95))
+    chk_max = float(np.max(chk_errors))
+
+    raw_residuals_px = [round(float(e), 4) for e in chk_errors]
+    raw_residual_vectors_px = [[round(float(v[0]), 4), round(float(v[1]), 4)] for v in raw_vecs]
+
+    if res_m is not None:
+        raw_residuals_m = [round(float(e * res_m), 4) for e in chk_errors]
+        chk_rmse_m = round(float(chk_rmse * res_m), 4)
+        chk_mean_m = round(float(chk_mean * res_m), 4)
+        chk_median_m = round(float(chk_median * res_m), 4)
+        chk_p95_m = round(float(chk_p95 * res_m), 4)
+        chk_max_m = round(float(chk_max * res_m), 4)
+    else:
+        raw_residuals_m = None
+        chk_rmse_m = None
+        chk_mean_m = None
+        chk_median_m = None
+        chk_p95_m = None
+        chk_max_m = None
+
+    # Checkpoint covariance-weighted Mahalanobis error & Ellipse Containment
+    chk_cov_weighted_rmse = None
+    m_dists = None
+    chk_mean_maha = None
+    chk_median_maha = None
+    chk_p95_maha = None
+    chk_max_maha = None
+    containment_dict = None
+    frac_1sig = None
+    frac_2sig = None
+    frac_3sig = None
+    frac_p95 = None
+    chk_provenance = "unweighted_euclidean"
+
+    if checkpoints_cov_dst is not None and len(checkpoints_cov_dst) == n_chk:
+        chk_provenance = "independent_observations"
+        if compute_dual_rmse_metrics is not None:
+            try:
+                dual_chk = compute_dual_rmse_metrics(
+                    src_chk, dst_chk, H,
+                    covariances_src=checkpoints_cov_src,
+                    covariances_dst=checkpoints_cov_dst,
+                )
+                chk_cov_weighted_rmse = dual_chk.get("covariance_weighted_rmse")
+                raw_m = dual_chk.get("mahalanobis_distances", [])
+                if raw_m:
+                    m_dists = [round(float(d), 4) for d in raw_m]
+                    m_arr = np.asarray(raw_m, dtype=np.float64)
+                    chk_mean_maha = round(float(np.mean(m_arr)), 4)
+                    chk_median_maha = round(float(np.median(m_arr)), 4)
+                    chk_p95_maha = round(float(np.percentile(m_arr, 95)), 4)
+                    chk_max_maha = round(float(np.max(m_arr)), 4)
+
+                    # Chi-square(2) ellipse containment
+                    c_1sig = int(np.sum(m_arr <= 1.0))
+                    c_2sig = int(np.sum(m_arr <= 2.0))
+                    c_3sig = int(np.sum(m_arr <= 3.0))
+                    # 95% quantile for chi2(2) is sqrt(5.9915) = ~2.4477
+                    c_p95 = int(np.sum(m_arr <= 2.4477))
+
+                    frac_1sig = round(float(c_1sig / n_chk), 4)
+                    frac_2sig = round(float(c_2sig / n_chk), 4)
+                    frac_3sig = round(float(c_3sig / n_chk), 4)
+                    frac_p95 = round(float(c_p95 / n_chk), 4)
+
+                    containment_dict = {
+                        "containment_1sigma_fraction": frac_1sig,
+                        "containment_2sigma_fraction": frac_2sig,
+                        "containment_3sigma_fraction": frac_3sig,
+                        "containment_p95_fraction": frac_p95,
+                        "inside_1sigma_count": c_1sig,
+                        "inside_2sigma_count": c_2sig,
+                        "inside_3sigma_count": c_3sig,
+                        "inside_p95_count": c_p95,
+                        "total_checkpoints": int(n_chk),
+                    }
+            except Exception as exc:
+                logger.warning("Failed to compute weighted checkpoint RMSE (%s)", exc)
+
+    return {
+        "validation_status": "evaluated",
+        "validation_mode": "INDEPENDENT_CHECKPOINTS",
+        "is_independent_validation": True,
+        # Pixel Euclidean residuals
+        "checkpoint_rmse_px": round(chk_rmse, 4),
+        "checkpoint_unweighted_rmse_px": round(chk_rmse, 4),
+        "checkpoint_mean_error_px": round(chk_mean, 4),
+        "checkpoint_median_error_px": round(chk_median, 4),
+        "checkpoint_p95_error_px": round(chk_p95, 4),
+        "checkpoint_max_error_px": round(chk_max, 4),
+        "checkpoint_raw_residuals_px": raw_residuals_px,
+        "checkpoint_raw_residual_vectors_px": raw_residual_vectors_px,
+        # Meter residuals (when pixel_resolution_m or gsd_m is provided)
+        "pixel_resolution_m": res_m,
+        "checkpoint_rmse_m": chk_rmse_m,
+        "checkpoint_mean_error_m": chk_mean_m,
+        "checkpoint_median_error_m": chk_median_m,
+        "checkpoint_p95_error_m": chk_p95_m,
+        "checkpoint_max_error_m": chk_max_m,
+        "checkpoint_raw_residuals_m": raw_residuals_m,
+        # Mahalanobis errors (null if checkpoint covariance unavailable)
+        "checkpoint_covariance_weighted_rmse": round(chk_cov_weighted_rmse, 4) if chk_cov_weighted_rmse is not None else None,
+        "checkpoint_mahalanobis_distances": m_dists,
+        "checkpoint_mean_mahalanobis": chk_mean_maha,
+        "checkpoint_median_mahalanobis": chk_median_maha,
+        "checkpoint_p95_mahalanobis": chk_p95_maha,
+        "checkpoint_max_mahalanobis": chk_max_maha,
+        # Covariance ellipse containment (null if checkpoint covariance unavailable)
+        "covariance_ellipse_containment": containment_dict,
+        "containment_1sigma_fraction": frac_1sig,
+        "containment_2sigma_fraction": frac_2sig,
+        "containment_3sigma_fraction": frac_3sig,
+        "containment_p95_fraction": frac_p95,
+        # Metadata
+        "checkpoint_covariance_provenance": chk_provenance,
+        "checkpoint_points_count": int(n_chk),
+        "validation_rmse_px": round(chk_rmse, 4),
+        "validation_median_error_px": round(chk_median, 4),
     }
 
 
@@ -937,6 +1342,14 @@ def compute_canonical_metrics(
     warped_source: Optional[np.ndarray] = None,
     anchor_inlier_indices: Optional[List[int] | np.ndarray] = None,
     cyclic_homographies: Optional[Tuple] = None,
+    independent_checkpoints: Optional[Tuple[np.ndarray, np.ndarray]] = None,
+    checkpoints_src: Optional[np.ndarray] = None,
+    checkpoints_dst: Optional[np.ndarray] = None,
+    match_covariances: Optional[Sequence[Any]] = None,
+    source_covariances: Optional[Sequence[Any]] = None,
+    checkpoints_cov_dst: Optional[Sequence[Any]] = None,
+    checkpoints_cov_src: Optional[Sequence[Any]] = None,
+    allow_inherited_checkpoint_covariance: bool = False,
 ) -> Dict[str, Any]:
     """
     Single canonical entry point to compute all registration metrics across the repository.
@@ -980,6 +1393,12 @@ def compute_canonical_metrics(
             "fit_rmse_px": None,
             "fit_rmse_insample_px": None,
             "fit_rmse_insample": None,
+            # Dual RMSE and whitened metrics
+            "unweighted_rmse_px": None,
+            "covariance_weighted_rmse": None,
+            "raw_residuals_px": [],
+            "raw_residual_vectors_px": [],
+            "mahalanobis_residuals": [],
             # SIH Task 4 required aliases (strict 5-key contract).
             "in_sample_rmse": None,
             "held_out_rmse": None,
@@ -993,9 +1412,24 @@ def compute_canonical_metrics(
             "held_out_rmse_px": None,
             "validation_median_error_px": None,
             "validation_status": "no_inliers",
+            "validation_mode": None,
+            "is_independent_validation": False,
+            "loo_rmse": None,
+            "loo_median_error": None,
+            "loo_p95_error": None,
+            "number_of_folds": 0,
+            "checkpoint_rmse_px": None,
+            "checkpoint_unweighted_rmse_px": None,
+            "checkpoint_covariance_weighted_rmse": None,
+            "checkpoint_covariance_provenance": None,
+            "checkpoint_median_error_px": None,
+            "checkpoint_p95_error_px": None,
+            "checkpoint_points_count": 0,
+            "has_independent_checkpoints": False,
             "quality_tier": "FAILED",
             "confidence_tier": "FAILED",
             "tier": "FAIL",
+            "verdict": "FAIL",
             "mean_reprojection_error_px": None,
             "median_reprojection_error_px": None,
             "max_reprojection_error_px": None,
@@ -1048,17 +1482,143 @@ def compute_canonical_metrics(
     median_err = float(median_err) if np.isfinite(median_err) else None
     max_err = float(max_err) if np.isfinite(max_err) else None
 
-    # Held-Out Inlier Correspondence Validation
-    # To eliminate H-conditioning circularity, evaluate strictly on independent anchor inliers if >= 8 points
+    # Dual RMSE and whitened Mahalanobis residual calculation using match covariances
+    inlier_covs_dst = None
+    if match_covariances is not None and len(match_covariances) == raw_count:
+        inlier_covs_dst = [match_covariances[i] for i in inlier_indices]
+    inlier_covs_src = None
+    if source_covariances is not None and len(source_covariances) == raw_count:
+        inlier_covs_src = [source_covariances[i] for i in inlier_indices]
+
+    dual_metrics: Dict[str, Any] = {}
+    if compute_dual_rmse_metrics is not None:
+        try:
+            dual_metrics = compute_dual_rmse_metrics(
+                inliers_src, inliers_dst, H,
+                covariances_src=inlier_covs_src,
+                covariances_dst=inlier_covs_dst,
+            )
+        except Exception as exc:
+            logger.warning("compute_dual_rmse_metrics error (%s)", exc)
+
+
+    # Resolve independent checkpoints if provided
+    ext_src = None
+    ext_dst = None
+    if independent_checkpoints is not None and len(independent_checkpoints) == 2:
+        ext_src = np.asarray(independent_checkpoints[0], dtype=np.float64)
+        ext_dst = np.asarray(independent_checkpoints[1], dtype=np.float64)
+    elif checkpoints_src is not None and checkpoints_dst is not None:
+        ext_src = np.asarray(checkpoints_src, dtype=np.float64)
+        ext_dst = np.asarray(checkpoints_dst, dtype=np.float64)
+
+    has_independent_checkpoints = bool(
+        ext_src is not None and ext_dst is not None and len(ext_src) > 0 and len(ext_src) == len(ext_dst)
+    )
+
     held_out_is_h_conditioned = False
-    if anchor_inlier_indices is not None and len(anchor_inlier_indices) >= 8:
-        val_results = evaluate_held_out_validation(src_pts_raw[anchor_inlier_indices], dst_pts_raw[anchor_inlier_indices])
-        held_out_is_h_conditioned = False
-    else:
-        val_results = evaluate_held_out_validation(inliers_src, inliers_dst)
-        held_out_is_h_conditioned = bool(
-            anchor_inlier_indices is not None and inlier_count > len(anchor_inlier_indices)
+    loo_rmse = None
+    loo_median_error = None
+    loo_p95_error = None
+    number_of_folds = None
+    checkpoint_rmse_px = None
+    checkpoint_unweighted_rmse_px = None
+    checkpoint_mean_error_px = None
+    checkpoint_median_error_px = None
+    checkpoint_p95_error_px = None
+    checkpoint_max_error_px = None
+    checkpoint_raw_residuals_px = None
+    checkpoint_raw_residuals_m = None
+    checkpoint_rmse_m = None
+    checkpoint_mean_error_m = None
+    checkpoint_median_error_m = None
+    checkpoint_p95_error_m = None
+    checkpoint_max_error_m = None
+    checkpoint_covariance_weighted_rmse = None
+    checkpoint_mahalanobis_distances = None
+    checkpoint_mean_mahalanobis = None
+    checkpoint_median_mahalanobis = None
+    checkpoint_p95_mahalanobis = None
+    checkpoint_max_mahalanobis = None
+    covariance_ellipse_containment = None
+    containment_1sigma_fraction = None
+    containment_2sigma_fraction = None
+    containment_3sigma_fraction = None
+    containment_p95_fraction = None
+    checkpoint_covariance_provenance = None
+    checkpoint_points_count = 0
+
+    if has_independent_checkpoints:
+        # Requirement 1 & 2: Use independent checkpoints when available; LOOCV only when unavailable.
+        val_results = evaluate_independent_checkpoints(
+            ext_src, ext_dst, H,
+            checkpoints_cov_dst=checkpoints_cov_dst,
+            checkpoints_cov_src=checkpoints_cov_src,
+            inlier_covariances=inlier_covs_dst,
+            allow_inherited_inlier_covariance=allow_inherited_checkpoint_covariance,
+            pixel_resolution_m=gsd_m,
         )
+        validation_mode = "INDEPENDENT_CHECKPOINTS"
+        is_independent_validation = True
+        checkpoint_rmse_px = val_results.get("checkpoint_rmse_px")
+        checkpoint_unweighted_rmse_px = val_results.get("checkpoint_unweighted_rmse_px", checkpoint_rmse_px)
+        checkpoint_mean_error_px = val_results.get("checkpoint_mean_error_px")
+        checkpoint_median_error_px = val_results.get("checkpoint_median_error_px")
+        checkpoint_p95_error_px = val_results.get("checkpoint_p95_error_px")
+        checkpoint_max_error_px = val_results.get("checkpoint_max_error_px")
+        checkpoint_raw_residuals_px = val_results.get("checkpoint_raw_residuals_px")
+        checkpoint_raw_residuals_m = val_results.get("checkpoint_raw_residuals_m")
+        checkpoint_rmse_m = val_results.get("checkpoint_rmse_m")
+        checkpoint_mean_error_m = val_results.get("checkpoint_mean_error_m")
+        checkpoint_median_error_m = val_results.get("checkpoint_median_error_m")
+        checkpoint_p95_error_m = val_results.get("checkpoint_p95_error_m")
+        checkpoint_max_error_m = val_results.get("checkpoint_max_error_m")
+        checkpoint_covariance_weighted_rmse = val_results.get("checkpoint_covariance_weighted_rmse")
+        checkpoint_mahalanobis_distances = val_results.get("checkpoint_mahalanobis_distances")
+        checkpoint_mean_mahalanobis = val_results.get("checkpoint_mean_mahalanobis")
+        checkpoint_median_mahalanobis = val_results.get("checkpoint_median_mahalanobis")
+        checkpoint_p95_mahalanobis = val_results.get("checkpoint_p95_mahalanobis")
+        checkpoint_max_mahalanobis = val_results.get("checkpoint_max_mahalanobis")
+        covariance_ellipse_containment = val_results.get("covariance_ellipse_containment")
+        containment_1sigma_fraction = val_results.get("containment_1sigma_fraction")
+        containment_2sigma_fraction = val_results.get("containment_2sigma_fraction")
+        containment_3sigma_fraction = val_results.get("containment_3sigma_fraction")
+        containment_p95_fraction = val_results.get("containment_p95_fraction")
+        checkpoint_covariance_provenance = val_results.get("checkpoint_covariance_provenance", "unweighted_euclidean")
+        checkpoint_points_count = int(val_results.get("checkpoint_points_count", 0))
+        held_out_is_h_conditioned = False
+    elif 4 <= inlier_count < 8:
+        # Requirement 2, 3, 4, 5: LOOCV for 4 <= N < 8 when independent checkpoints unavailable
+        val_results = evaluate_loocv_validation(inliers_src, inliers_dst)
+        validation_mode = "LOOCV"
+        is_independent_validation = False
+        loo_rmse = val_results.get("loo_rmse")
+        loo_median_error = val_results.get("loo_median_error")
+        loo_p95_error = val_results.get("loo_p95_error")
+        number_of_folds = val_results.get("number_of_folds")
+        held_out_is_h_conditioned = True
+    elif inlier_count >= 8:
+        # Standard 80/20 train/test holdout on inliers
+        if anchor_inlier_indices is not None and len(anchor_inlier_indices) >= 8:
+            val_results = evaluate_held_out_validation(src_pts_raw[anchor_inlier_indices], dst_pts_raw[anchor_inlier_indices])
+            held_out_is_h_conditioned = False
+        else:
+            val_results = evaluate_held_out_validation(inliers_src, inliers_dst)
+            held_out_is_h_conditioned = bool(
+                anchor_inlier_indices is not None and inlier_count > len(anchor_inlier_indices)
+            )
+        validation_mode = "HELD_OUT_80_20"
+        is_independent_validation = False
+    else:
+        # inlier_count < 4
+        val_results = {
+            "validation_status": "insufficient_points_for_validation",
+            "validation_rmse_px": None,
+            "validation_median_error_px": None,
+            "validation_points_count": 0,
+        }
+        validation_mode = None
+        is_independent_validation = False
 
     # Spatial Distribution (Fixed Grid, default 10x10)
     dist_metrics = calculate_spatial_distribution(inliers_src, image_shape, grid_size)
@@ -1179,7 +1739,14 @@ def compute_canonical_metrics(
             _cyclic_status = str(_cres.get("status", "evaluated"))
     except Exception:
         _cyclic_rmse, _cyclic_status = None, "cyclic_failed"
-    _held_out = val_results["validation_rmse_px"]
+    if validation_mode == "INDEPENDENT_CHECKPOINTS":
+        _held_out = checkpoint_rmse_px
+    elif validation_mode == "LOOCV":
+        _held_out = loo_rmse
+    elif validation_mode == "HELD_OUT_80_20":
+        _held_out = val_results.get("validation_rmse_px")
+    else:
+        _held_out = None
 
     # EPIC 3 traffic light (never overrides Task-5 honest-failure veto upstream).
     # Raw fit (possibly inf) labels correctly; inf is comparison-safe here.
@@ -1213,6 +1780,23 @@ def compute_canonical_metrics(
         # fit_rmse/mean/median/max were sanitized to None above when degenerate.
         return round(float(x), 4) if x is not None and np.isfinite(x) else None
 
+    if _color_out == "GREEN" and quality_tier != "FAILED":
+        verdict = "PASS"
+    elif _color_out == "RED" or quality_tier == "FAILED" or tier_short == "FAIL":
+        verdict = "FAIL"
+    else:
+        verdict = "REVIEW"
+
+    # Enforce strict small-N requirements (Rule 14 & LOOCV specification):
+    if inlier_count < 4:
+        # Requirement 6: If N < 4, return FAIL.
+        verdict = "FAIL"
+    elif 4 <= inlier_count < 8:
+        # Requirement 7: If N is 4–7, return REVIEW unless external checkpoints exist.
+        if not has_independent_checkpoints:
+            if verdict != "FAIL":
+                verdict = "REVIEW"
+
     return {
         "match_count": raw_count,
         "inlier_count": inlier_count,
@@ -1220,32 +1804,79 @@ def compute_canonical_metrics(
         "fit_rmse_px": _r4(fit_rmse),
         "fit_rmse_insample_px": _r4(fit_rmse),
         "fit_rmse_insample": _r4(fit_rmse),
+        # Dual RMSE and whitened Mahalanobis metrics (Requirements 5 & 8)
+        "unweighted_rmse_px": _r4(dual_metrics.get("unweighted_rmse_px", fit_rmse)),
+        "covariance_weighted_rmse": _r4(dual_metrics.get("covariance_weighted_rmse")),
+        "raw_residuals_px": dual_metrics.get("raw_residuals_px", []),
+        "raw_residual_vectors_px": dual_metrics.get("raw_residual_vectors_px", []),
+        "mahalanobis_residuals": dual_metrics.get("mahalanobis_distances", []),
         # SIH Task 4 strict 5-key contract.
         "in_sample_rmse": _r4(fit_rmse),
-        "held_out_rmse": _held_out,
+        "held_out_rmse": _r4(checkpoint_rmse_px) if has_independent_checkpoints else (_r4(val_results.get("validation_rmse_px")) if validation_mode == "HELD_OUT_80_20" else None),
         "uniformity_score": dist_metrics["uniformity_score"],
         "cyclic_rmse": _cyclic_rmse,
         "cyclic_status": _cyclic_status,
         "absolute_rmse_m": abs_rmse_m,
-        "validation_rmse_px": val_results["validation_rmse_px"],  # Kept for API backward compatibility
-        "held_out_inlier_validation_rmse_px": val_results["validation_rmse_px"],
-        "held_out_validation_rmse_px": val_results["validation_rmse_px"],
-        "held_out_rmse_px": _held_out,
-        "validation_median_error_px": val_results["validation_median_error_px"],
-        "validation_status": val_results["validation_status"],
+        "validation_rmse_px": _r4(val_results.get("validation_rmse_px")),  # Kept for API backward compatibility
+        "held_out_inlier_validation_rmse_px": _r4(val_results.get("validation_rmse_px")) if validation_mode == "HELD_OUT_80_20" else None,
+        "held_out_validation_rmse_px": _r4(checkpoint_rmse_px) if has_independent_checkpoints else (_r4(val_results.get("validation_rmse_px")) if validation_mode == "HELD_OUT_80_20" else None),
+        "held_out_rmse_px": _r4(checkpoint_rmse_px) if has_independent_checkpoints else (_r4(val_results.get("validation_rmse_px")) if validation_mode == "HELD_OUT_80_20" else None),
+        "validation_median_error_px": _r4(val_results.get("validation_median_error_px")),
+        "validation_status": val_results.get("validation_status"),
+        "validation_mode": validation_mode,
+        "is_independent_validation": is_independent_validation,
+        "loo_rmse": _r4(loo_rmse),
+        "loo_median_error": _r4(loo_median_error),
+        "loo_p95_error": _r4(loo_p95_error),
+        "number_of_folds": number_of_folds,
+        "checkpoint_rmse_px": _r4(checkpoint_rmse_px),
+        "checkpoint_unweighted_rmse_px": _r4(checkpoint_unweighted_rmse_px),
+        "checkpoint_mean_error_px": _r4(checkpoint_mean_error_px),
+        "checkpoint_median_error_px": _r4(checkpoint_median_error_px),
+        "checkpoint_p95_error_px": _r4(checkpoint_p95_error_px),
+        "checkpoint_max_error_px": _r4(checkpoint_max_error_px),
+        "checkpoint_raw_residuals_px": checkpoint_raw_residuals_px,
+        "checkpoint_raw_residual_vectors_px": val_results.get("checkpoint_raw_residual_vectors_px"),
+        "pixel_resolution_m": val_results.get("pixel_resolution_m"),
+        "checkpoint_rmse_m": _r4(checkpoint_rmse_m),
+        "checkpoint_mean_error_m": _r4(checkpoint_mean_error_m),
+        "checkpoint_median_error_m": _r4(checkpoint_median_error_m),
+        "checkpoint_p95_error_m": _r4(checkpoint_p95_error_m),
+        "checkpoint_max_error_m": _r4(checkpoint_max_error_m),
+        "checkpoint_raw_residuals_m": checkpoint_raw_residuals_m,
+        "checkpoint_covariance_weighted_rmse": _r4(checkpoint_covariance_weighted_rmse),
+        "checkpoint_mahalanobis_distances": checkpoint_mahalanobis_distances,
+        "checkpoint_mean_mahalanobis": _r4(checkpoint_mean_mahalanobis),
+        "checkpoint_median_mahalanobis": _r4(checkpoint_median_mahalanobis),
+        "checkpoint_p95_mahalanobis": _r4(checkpoint_p95_mahalanobis),
+        "checkpoint_max_mahalanobis": _r4(checkpoint_max_mahalanobis),
+        "covariance_ellipse_containment": covariance_ellipse_containment,
+        "containment_1sigma_fraction": containment_1sigma_fraction,
+        "containment_2sigma_fraction": containment_2sigma_fraction,
+        "containment_3sigma_fraction": containment_3sigma_fraction,
+        "containment_p95_fraction": containment_p95_fraction,
+        "checkpoint_covariance_provenance": checkpoint_covariance_provenance,
+        "checkpoint_points_count": checkpoint_points_count,
+        "has_independent_checkpoints": has_independent_checkpoints,
         "held_out_is_h_conditioned": held_out_is_h_conditioned,
         "anchor_inliers_count": len(anchor_inlier_indices) if anchor_inlier_indices is not None else inlier_count,
         "guided_inliers_count": inlier_count - (len(anchor_inlier_indices) if anchor_inlier_indices is not None else inlier_count),
         "quality_tier": quality_tier,
         "confidence_tier": quality_tier,
         "tier": tier_short,
+        "verdict": verdict,
         "mean_reprojection_error_px": _r4(mean_err),
         "median_reprojection_error_px": _r4(median_err),
         "max_reprojection_error_px": _r4(max_err),
         "fraction_below_1px": round(frac_1, 4),
         "fraction_below_0_5px": round(frac_05, 4),
         "fraction_below_0_25px": round(frac_025, 4),
-        "sub_pixel_accurate": bool(fit_rmse is not None and fit_rmse < 1.0 and val_rmse is not None and val_rmse < 1.0),
+        "sub_pixel_accurate": bool(
+            fit_rmse is not None and fit_rmse < 1.0 and (
+                (has_independent_checkpoints and checkpoint_rmse_px is not None and checkpoint_rmse_px < 1.0) or
+                (validation_mode == "HELD_OUT_80_20" and val_results.get("validation_rmse_px") is not None and val_results.get("validation_rmse_px") < 1.0)
+            )
+        ),
         "sub_pixel_accurate_note": "Requires both in-sample fit_rmse < 1.0px and held-out validation_rmse < 1.0px; never claimed on in-sample alone.",
         "fit_rmse_is_in_sample": True,
         "fit_rmse_note": "In-sample RMSE on RANSAC inliers; see held_out_validation_rmse_px for out-of-sample error.",

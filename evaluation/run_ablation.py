@@ -129,12 +129,14 @@ def run_ablation_study(
     failures = []
     for r in results:
         if r.get("status") != "success" or r.get("inlier_count", 0) < 4:
+            import re
+            safe_method = re.sub(r'[^a-zA-Z0-9_-]+', '_', r['method'].lower()).strip('_')
             diag = analyze_failure_case(
                 source_img,
                 reference_img,
                 failure_reason=r.get("status", "insufficient_inliers"),
                 rmse_px=r.get("fit_rmse_px"),
-                out_dir=out_base / f"failure_{r['method'].replace(' ', '_').lower()}",
+                out_dir=out_base / f"failure_{safe_method}",
             )
             r["failure_analysis"] = diag
             failures.append({"method": r["method"], "primary_cause": diag["primary_root_cause"]})

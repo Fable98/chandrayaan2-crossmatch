@@ -1,0 +1,156 @@
+{
+  "source": {
+    "sensor": "TMC-2",
+    "gsd_m": 5.4,
+    "native_gsd_m": 5.4,
+    "effective_gsd_m": 5.4,
+    "resampling_factor": 1.0,
+    "crop_transform": {
+      "bounds": {
+        "west_lon": 336.484646,
+        "east_lon": 336.589455,
+        "south_lat": -3.0385188000000003,
+        "north_lat": -2.9123904
+      }
+    },
+    "parent_product_id": "ch2_tmc_ncf_20250807t1904346039_d_img_d18",
+    "wavelength_range_um": [
+      0.4,
+      0.85
+    ],
+    "sun_azimuth_deg": 108.866212,
+    "sun_elevation_deg": null,
+    "incidence_angle_deg": null,
+    "emission_angle_deg": null,
+    "phase_angle_deg": null,
+    "spacecraft_azimuth_deg": null,
+    "sensor_los_azimuth_deg": null,
+    "acquisition_time": null,
+    "bounds": [
+      336.484646,
+      336.589455,
+      -3.0385188000000003,
+      -2.9123904
+    ],
+    "provenance": {
+      "sensor": "request",
+      "gsd_m": "manifest",
+      "effective_gsd_m": "manifest",
+      "emission_angle_deg": "unavailable",
+      "sun_azimuth_deg": "header",
+      "incidence_angle_deg": "unavailable",
+      "wavelength_range_um": "sensor_spec"
+    }
+  },
+  "reference": {
+    "sensor": "LRO_NAC",
+    "gsd_m": 100.0,
+    "native_gsd_m": 100.0,
+    "effective_gsd_m": 100.0,
+    "resampling_factor": 1.0,
+    "crop_transform": null,
+    "parent_product_id": null,
+    "wavelength_range_um": [
+      0.4,
+      0.75
+    ],
+    "sun_azimuth_deg": null,
+    "sun_elevation_deg": null,
+    "incidence_angle_deg": null,
+    "emission_angle_deg": null,
+    "phase_angle_deg": null,
+    "spacecraft_azimuth_deg": null,
+    "sensor_los_azimuth_deg": null,
+    "acquisition_time": null,
+    "bounds": null,
+    "provenance": {
+      "sensor": "request",
+      "native_gsd_m": "header",
+      "gsd_m": "header",
+      "effective_gsd_m": "header",
+      "emission_angle_deg": "unavailable",
+      "sun_azimuth_deg": "unavailable",
+      "incidence_angle_deg": "unavailable",
+      "wavelength_range_um": "sensor_spec"
+    }
+  },
+  "working_scale": {
+    "working_gsd_m": 100.0,
+    "method": "common_physical_gsd_normalization",
+    "native_scale_ratio": 18.5185,
+    "pre_normalization_ratio": 18.5185,
+    "residual_scale_ratio": 1.0
+  },
+  "scale_estimation_method": "pds4_metadata",
+  "estimated_scale_ratio": null,
+  "native_scale_ratio": 18.5185,
+  "pre_normalization_ratio": 18.5185,
+  "residual_scale_ratio": 1.0,
+  "terrain_correction": {
+    "source": {
+      "enabled": false,
+      "method": null,
+      "reason": "No DEM or nadir viewing",
+      "sun_azimuth_deg_not_used_for_dem": 108.866212,
+      "sun_azimuth_provenance": "header"
+    },
+    "reference": {
+      "enabled": false,
+      "method": null,
+      "reason": "No DEM or nadir viewing",
+      "sun_azimuth_deg_not_used_for_dem": null,
+      "sun_azimuth_provenance": "unavailable"
+    }
+  },
+  "illumination_compensation": "none",
+  "synthetic_reference_used": false,
+  "illumination_detail": {
+    "delta_azimuth_deg": null,
+    "threshold_deg": 90.0,
+    "source_azimuth_deg": 108.866212,
+    "reference_azimuth_deg": null,
+    "triggered": false
+  },
+  "direction": "native",
+  "native_tiling_applied": true,
+  "native_tile_count": 1,
+  "coarse_to_fine_timing": {
+    "L2_s": 0.4387,
+    "L1_s": 0.0121,
+    "L0_s": 0.9146
+  },
+  "provenance": {
+    "source_path": "data_preprocessing_pipeline\\processed_triplets\\region_003\\tmc_512.png",
+    "reference_path": "results\\triplets_benchmark\\region_003\\triplet_cycle\\LRO_BASEMAP_CACHE\\lro_wac_-10.00_-9.00_+30.00_+31.00.png",
+    "dem_path": "data_preprocessing_pipeline\\processed_triplets\\region_003\\dem_512.png",
+    "matcher": "CFOG_PhaseCongruency_v2.0",
+    "spatial_attempts": {
+      "grid_size": 4,
+      "attempted_cells": 8,
+      "total_cells": 16,
+      "attempted_coverage": 0.4375,
+      "matched_cells": 7,
+      "macro_grid": 2,
+      "macro_cells_occupied": 3,
+      "mandatory_fill_count": 0,
+      "native_tiling_applied": true,
+      "native_tile_count": 1
+    },
+    "coarse_matcher": "normalized_correlation",
+    "direction": "native",
+    "illumination_compensation": "none",
+    "synthetic_reference_used": false,
+    "outlier_method": "ransac",
+    "outlier_method_requested": "ransac",
+    "outlier_method_fallback": false,
+    "outlier_method_fallback_reason": null,
+    "content_overlap_recovery": null,
+    "native_tiling_applied": true,
+    "native_tile_count": 1,
+    "coarse_to_fine_timing": {
+      "L2_s": 0.4387,
+      "L1_s": 0.0121,
+      "L0_s": 0.9146
+    }
+  }
+}

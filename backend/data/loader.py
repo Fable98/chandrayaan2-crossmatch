@@ -130,6 +130,11 @@ def _parse_ml_matches(
             "ohrc_latlon": ohrc_latlons[i],
             "tmc_latlon": tmc_latlons[i],
             "confidence": float(m.get("confidence", 1.0)),
+            "covariance_xy": m.get("covariance_xy"),
+            "sigma_major_px": m.get("sigma_major_px"),
+            "sigma_minor_px": m.get("sigma_minor_px"),
+            "ellipse_angle_deg": m.get("ellipse_angle_deg"),
+            "uncertainty_status": m.get("uncertainty_status"),
         })
 
     return points, homography
@@ -395,30 +400,71 @@ def _normalize_triplet(data: dict, default_id: str | None = None, region_dir: st
     # Build sensors list if not present
     if "sensors" not in triplet:
         sensors = []
+        crop_tf = {"bounds": triplet.get("bounds")} if triplet.get("bounds") else None
         if "ohrc_product_id" in triplet:
+            nat = triplet.get("ohrc_gsd_m", 0.25)
+            eff = triplet.get("working_gsd_m") or triplet.get("tmc2_gsd_m", 5.0)
+            rf = float(nat) / float(eff) if eff else 1.0
             sensors.append({
                 "sensor": "ohrc",
-                "gsd_m": triplet.get("ohrc_gsd_m", 0.25),
+                "gsd_m": eff,
+                "native_gsd_m": nat,
+                "effective_gsd_m": eff,
+                "resampling_factor": rf,
+                "crop_transform": crop_tf,
+                "parent_product_id": triplet.get("ohrc_product_id"),
                 "sun_elevation_deg": triplet.get("ohrc_sun_elevation_deg"),
                 "sun_azimuth_deg": triplet.get("ohrc_sun_azimuth_deg"),
                 "incidence_angle_deg": triplet.get("ohrc_incidence_deg"),
             })
         if "tmc2_product_id" in triplet or "tmc_product_id" in triplet:
+            nat = triplet.get("tmc2_gsd_m", 5.0)
+            eff = triplet.get("working_gsd_m") or nat
+            rf = float(nat) / float(eff) if eff else 1.0
             sensors.append({
                 "sensor": "tmc",
-                "gsd_m": triplet.get("tmc2_gsd_m", 5.0),
+                "gsd_m": eff,
+                "native_gsd_m": nat,
+                "effective_gsd_m": eff,
+                "resampling_factor": rf,
+                "crop_transform": crop_tf,
+                "parent_product_id": triplet.get("tmc2_product_id") or triplet.get("tmc_product_id"),
                 "sun_elevation_deg": triplet.get("tmc2_sun_elevation_deg"),
                 "sun_azimuth_deg": triplet.get("tmc2_sun_azimuth_deg"),
                 "incidence_angle_deg": triplet.get("tmc2_incidence_deg"),
             })
         if "iirs_product_id" in triplet:
+            nat = triplet.get("iirs_gsd_m", 80.0)
+            eff = triplet.get("working_gsd_m") or triplet.get("tmc2_gsd_m", 5.0)
+            rf = float(nat) / float(eff) if eff else 1.0
             sensors.append({
                 "sensor": "iirs",
                 "tile_id": "iirs_overlay.png",
-                "gsd_m": triplet.get("iirs_gsd_m", 80.0),
+                "gsd_m": eff,
+                "native_gsd_m": nat,
+                "effective_gsd_m": eff,
+                "resampling_factor": rf,
+                "crop_transform": crop_tf,
+                "parent_product_id": triplet.get("iirs_product_id"),
                 "sun_elevation_deg": triplet.get("iirs_sun_elevation_deg"),
                 "sun_azimuth_deg": triplet.get("iirs_sun_azimuth_deg"),
                 "incidence_angle_deg": triplet.get("iirs_incidence_deg"),
+            })
+        if "lro_nac_product_id" in triplet:
+            nat = triplet.get("lro_nac_gsd_m", 0.914)
+            eff = triplet.get("working_gsd_m", 1.0)
+            rf = float(nat) / float(eff) if eff else 1.0
+            sensors.append({
+                "sensor": "lro_nac",
+                "gsd_m": eff,
+                "native_gsd_m": nat,
+                "effective_gsd_m": eff,
+                "resampling_factor": rf,
+                "crop_transform": crop_tf,
+                "parent_product_id": triplet.get("lro_nac_product_id"),
+                "sun_elevation_deg": triplet.get("lro_nac_sun_elevation_deg"),
+                "sun_azimuth_deg": triplet.get("lro_nac_sun_azimuth_deg"),
+                "incidence_angle_deg": triplet.get("lro_nac_incidence_deg"),
             })
         triplet["sensors"] = sensors
 
