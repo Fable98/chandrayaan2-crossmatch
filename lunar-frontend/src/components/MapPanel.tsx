@@ -57,7 +57,7 @@ export default function MapPanel({ triplet, iirsOverlay }: Props) {
   };
 
   return (
-    <div className="relative z-0 h-[460px] w-full overflow-hidden rounded-xl bg-[#dfe4ec] dark:bg-[#090b0e]">
+    <div className="relative z-0 h-[460px] w-full overflow-hidden retro-inset bg-[#D5CFC2] dark:bg-[#090b0e]">
       <MapContainer
         center={center}
         zoom={13}
@@ -71,7 +71,7 @@ export default function MapPanel({ triplet, iirsOverlay }: Props) {
             overlays are enough context for the demo. */}
         <Rectangle
           bounds={bounds}
-          pathOptions={{ color: "#3fb5c9", weight: 2, fillOpacity: 0.05 }}
+          pathOptions={{ color: "#1F4743", weight: 2, fillOpacity: 0.08 }}
         />
         {activeLayers.has("iirs") && iirsOverlay && (
           <ImageOverlay
@@ -87,24 +87,24 @@ export default function MapPanel({ triplet, iirsOverlay }: Props) {
       </MapContainer>
 
       {activeLayers.size === 0 && (
-        <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border bg-panel/90 px-5 py-3 text-center shadow-2xl backdrop-blur-md">
-          <p className="text-xs font-medium text-ink">
-            The <span className="text-teal font-semibold">teal box</span> is the shared OHRC/TMC/IIRS footprint.
+        <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 retro-outset bg-panel p-3 text-center font-mono">
+          <p className="text-xs font-bold text-ink">
+            The <span className="text-[#1F4743] dark:text-[#52938B]">teal box</span> is the shared OHRC/TMC/IIRS footprint.
           </p>
-          <p className="mt-1 text-2xs font-mono text-ink-faint">
+          <p className="mt-0.5 text-2xs text-[#717874] dark:text-[#8C9893]">
             Toggle a payload layer on the right to project raster data.
           </p>
         </div>
       )}
 
-      <div className="absolute right-4 top-4 z-10 flex flex-col gap-2 rounded-xl border border-border bg-panel/90 p-3 shadow-2xl backdrop-blur-md">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-ink-faint">
+      <div className="absolute right-3 top-3 z-10 flex flex-col gap-2 retro-outset bg-panel p-2.5 font-mono">
+        <span className="text-[10px] uppercase font-bold tracking-wider text-[#1F4743] dark:text-[#52938B]">
           Payload Layers
         </span>
         {tiffFallback && (
           <span
             title="The source raster is a GeoTIFF, which browsers cannot render — showing the backend-generated PNG preview instead."
-            className="rounded-md border border-amber-300/60 bg-amber-50 px-2 py-1 font-mono text-[10px] font-bold text-amber-700 dark:bg-amber-950/40 dark:text-amber-300"
+            className="retro-inset bg-amber-50 px-2 py-0.5 text-[9px] font-bold text-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
           >
             TIFF → PNG preview
           </span>
@@ -143,18 +143,18 @@ function LayerToggle({
     <button
       onClick={onChange}
       disabled={disabled}
-      className={`flex items-center justify-between gap-3 rounded-full px-3 py-1.5 text-xs font-medium transition-all duration-200 ${
+      className={`flex items-center justify-between gap-3 px-2.5 py-1 text-xs font-mono font-bold transition ${
         disabled
-          ? "cursor-not-allowed border border-slate-300/70 dark:border-white/5 text-ink-faint/50"
+          ? "cursor-not-allowed opacity-40 retro-inset text-[#888]"
           : checked
-          ? "bg-teal text-black font-semibold shadow-[0_0_15px_rgba(63,181,201,0.4)] hover:bg-[#52cde3]"
-          : "border border-slate-300/70 dark:border-white/10 bg-white dark:bg-white/5 text-ink-dim hover:border-slate-400 dark:hover:border-white/20 hover:text-slate-900 dark:hover:text-white"
+          ? "retro-inset bg-[#143532] text-white"
+          : "retro-button text-ink"
       }`}
     >
       <span>{label}</span>
       <span
-        className={`h-2 w-2 rounded-full ${
-          checked ? "bg-black" : disabled ? "bg-ink-faint/40" : "bg-ink-faint"
+        className={`h-2 w-2 border border-black/40 ${
+          checked ? "bg-emerald-400 shadow-[0_0_6px_#34D399]" : disabled ? "bg-neutral-500/40" : "bg-neutral-400"
         }`}
       />
     </button>

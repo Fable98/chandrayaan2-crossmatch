@@ -154,7 +154,18 @@ async def register(request: Request, body: UserCreate):
     after registration.
     """
     # Check if email is already taken
-    if auth_store.find_user_by_email(body.email):
+    existing = auth_store.find_user_by_email(body.email)
+    if existing:
+        if settings.ENVIRONMENT == "development":
+            updated = auth_store.update_user(existing["id"], {
+                "name": body.name.strip(),
+                "password_hash": _hash_password(body.password),
+            }) or existing
+            token = _create_access_token(updated["id"])
+            return TokenResponse(
+                access_token=token,
+                user=_user_to_response(updated),
+            )
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="An account with this email already exists",

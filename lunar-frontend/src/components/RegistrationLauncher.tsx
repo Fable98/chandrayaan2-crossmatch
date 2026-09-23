@@ -434,21 +434,43 @@ function FilePicker({
   onChange: (file: File | null) => void;
 }) {
   return (
-    <label className="block cursor-pointer rounded-xl border border-dashed border-slate-300 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 p-4 transition hover:border-indigo-300 dark:hover:border-indigo-700 hover:bg-indigo-50/40 dark:hover:bg-indigo-950/40">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 dark:text-slate-300">{label}</span>
-        {optional && <span className="text-[9px] font-bold text-slate-400">OPTIONAL</span>}
+    <div className="retro-inset p-2.5 bg-[#F9F7F1] dark:bg-[#141817] flex flex-col justify-between">
+      <div>
+        <div className="flex items-center justify-between text-[11px] font-bold text-[#143532] dark:text-emerald-400">
+          <span>{label}</span>
+          {optional && <span className="text-[9px] bg-[#E2DDCF] dark:bg-[#222927] px-1 border border-[#AFA99B] dark:border-[#3A4541]">OPTIONAL</span>}
+        </div>
+        <label className="my-2 border border-dashed border-[#A09A8D] dark:border-[#3A4541] p-3 text-center bg-[#F3EFE6] dark:bg-[#1A201E] block cursor-pointer hover:bg-[#EAE5D8] dark:hover:bg-[#222927] transition">
+          <div className="text-xl">📁</div>
+          <div className="text-xs font-bold text-[#2A312D] dark:text-[#E7E2D6] mt-0.5">
+            {file ? file.name : preview ? "Pre-loaded image ready" : "Drop GeoTIFF / PNG here"}
+          </div>
+          <div className="text-[10px] text-[#717874] dark:text-[#8C9893] mt-0.5">
+            or click to browse from workstation
+          </div>
+          <input
+            type="file"
+            accept=".jpg,.jpeg,.png,.tif,.tiff,image/*"
+            onChange={(event) => onChange(event.target.files?.[0] || null)}
+            className="hidden"
+          />
+        </label>
       </div>
-      <input
-        type="file"
-        accept=".jpg,.jpeg,.png,.tif,.tiff,image/*"
-        onChange={(event) => onChange(event.target.files?.[0] || null)}
-        className="mt-3 block w-full text-[11px] text-slate-500 dark:text-slate-400 file:mr-3 file:rounded-lg file:border-0 file:bg-indigo-100 dark:file:bg-indigo-950 file:px-3 file:py-1.5 file:text-[10px] file:font-bold file:text-indigo-700 dark:file:text-indigo-300"
-      />
-      <p className="mt-2 truncate text-[10px] text-slate-400">
-        {file ? file.name : preview ? "Using pre-loaded sample image" : optional ? "No DEM supplied" : "Choose an image or select sample"}
-      </p>
-    </label>
+      <div className="flex items-center justify-between pt-1">
+        <label className="retro-button px-2.5 py-0.5 text-xs font-bold cursor-pointer">
+          Choose File
+          <input
+            type="file"
+            accept=".jpg,.jpeg,.png,.tif,.tiff,image/*"
+            onChange={(event) => onChange(event.target.files?.[0] || null)}
+            className="hidden"
+          />
+        </label>
+        <span className="text-[10px] font-mono text-[#777] dark:text-[#888] truncate max-w-[140px]">
+          {file ? file.name : preview ? "Sample image loaded" : "No file chosen"}
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -465,22 +487,20 @@ function MetricCard({
   suffix?: string;
   emphasis?: boolean;
   sublabel?: string;
-  // Shown in place of the sublabel when the value is unavailable ("—") so a
-  // missing number always carries its reason, never a bare dash.
   hint?: string | null;
 }) {
   const missing = value === "—";
   return (
-    <div className={`rounded-xl border p-4 ${emphasis ? "border-indigo-200 dark:border-indigo-900/50 bg-indigo-50/60 dark:bg-indigo-950/30" : "border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5"}`}>
-      <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">{label}</p>
-      <p className={`mt-2 text-2xl font-black tracking-tight ${emphasis ? "text-[#4F46E5] dark:text-indigo-300" : "text-slate-900 dark:text-slate-100"}`}>
+    <div className={`retro-inset p-3 ${emphasis ? "bg-[#EEF5FA] dark:bg-[#152330] border-[#5A85A8]" : "bg-[#F9F7F1] dark:bg-[#141817]"}`}>
+      <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#555C58] dark:text-[#8C9893]">{label}</p>
+      <p className={`mt-1 text-xl font-mono font-bold tracking-tight ${emphasis ? "text-[#28557E] dark:text-cyan-300" : "text-[#1E2321] dark:text-[#E7E2D6]"}`}>
         {value}
-        {suffix && !missing && <span className="ml-1 text-xs font-bold text-slate-500 dark:text-slate-400">{suffix}</span>}
+        {suffix && !missing && <span className="ml-1 text-xs font-normal text-[#555C58] dark:text-[#8C9893]">{suffix}</span>}
       </p>
       {missing && hint ? (
-        <p className="mt-1 text-[10px] font-semibold text-amber-600 dark:text-amber-400">{hint}</p>
+        <p className="mt-1 text-[10px] font-mono font-semibold text-amber-700 dark:text-amber-400">{hint}</p>
       ) : (
-        sublabel && <p className="mt-1 text-[10px] text-slate-400">{sublabel}</p>
+        sublabel && <p className="mt-1 text-[10px] font-mono text-[#777] dark:text-[#888]">{sublabel}</p>
       )}
     </div>
   );
@@ -502,7 +522,7 @@ function DownloadLink({ href, label }: { href?: string | null; label: string }) 
       download
       target="_blank"
       rel="noreferrer"
-      className="rounded-lg border border-indigo-100 dark:border-indigo-900/50 bg-white dark:bg-white/5 px-3 py-2 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 transition hover:bg-indigo-50 dark:hover:bg-indigo-950/40"
+      className="retro-button px-2.5 py-1 text-[11px] font-mono font-bold text-[#1E2321] dark:text-[#E7E2D6]"
     >
       ↓ {label}
     </a>
@@ -544,12 +564,12 @@ function OverlayImage({
   };
 
   return (
-    <div className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-3">
-      <div className="mb-2 flex items-center justify-between">
-        <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">{title}</h4>
-        <span className="text-[10px] font-mono text-slate-400">{points.length} inlier pts</span>
+    <div className="retro-outset p-2.5">
+      <div className="mb-2 flex items-center justify-between font-mono">
+        <h4 className="text-xs font-bold text-[#143532] dark:text-[#52938B]">{title}</h4>
+        <span className="text-[10px] text-[#717874] dark:text-[#8C9893]">{points.length} inlier pts</span>
       </div>
-      <div className="relative aspect-square overflow-hidden rounded-lg bg-slate-950 flex items-center justify-center">
+      <div className="relative aspect-square overflow-hidden retro-inset bg-[#0A0D0C] flex items-center justify-center">
         {!failed && currentSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -961,264 +981,278 @@ export default function RegistrationLauncher() {
       : null;
 
   return (
-    <section className="rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-5 shadow-sm md:p-6">
-      {/* Header Bar */}
-      <div className="flex flex-col justify-between gap-3 border-b border-slate-100 dark:border-[#1b2029] pb-5 md:flex-row md:items-center">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-[#4F46E5] shadow-[0_0_0_4px_rgba(79,70,229,.12)]" />
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#4F46E5] dark:text-indigo-300">Live Registration Pipeline</p>
-          </div>
-          <h3 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-slate-100">Upload &amp; Register</h3>
-          <p className="mt-1 max-w-2xl text-xs text-slate-500 dark:text-slate-400">
-            Run the cross-sensor matching engine and inspect sub-pixel alignment, correspondence geometry, and Quality Gates.
-          </p>
-        </div>
-
+    <section className="retro-outset p-1 text-[#1E2321] dark:text-[#E7E2D6]">
+      {/* Retro OS Titlebar */}
+      <div className="bg-[#1F4743] text-white px-2 py-1 flex items-center justify-between text-xs font-bold font-mono">
         <div className="flex items-center gap-2">
-          {result && resultProvenance === "snapshot" && (
-            <span
-              className="rounded-full border border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300"
-              title="Committed benchmark snapshot from the repo manifests — press Run to verify live against the backend."
-            >
-              Snapshot · run live to verify
-            </span>
-          )}
-          {result && resultProvenance === "live" && (
-            <span className="rounded-full border border-emerald-300 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-              Live backend run
-            </span>
-          )}
-          <div className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${result ? qualityTone : "border-slate-200 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400"}`}>
-            {loading ? "PROCESSING..." : result ? qualityTier.replaceAll("_", " ") : "READY TO RUN"}
-          </div>
-          {result && !loading && (
-            <TrafficLightBadge
-              color={trafficColor}
-              confidence_score={confidenceScore}
-              ssim_score={ssimScore}
-              held_out_rmse={heldOutRmse}
-            />
-          )}
+          <span className="w-2.5 h-2.5 bg-[#428178] border border-white/40" />
+          <span>MISSION PAYLOAD // REGISTRATION PIPELINE v2.4</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <button type="button" className="window-ctrl-btn">_</button>
+          <button type="button" className="window-ctrl-btn">□</button>
+          <button type="button" className="window-ctrl-btn">X</button>
         </div>
       </div>
 
-      {/* 1. Custom Upload Inputs & Controls (Rendered FIRST, above the fold) */}
-      <div ref={uploadSectionRef} className="mt-5 space-y-4 rounded-xl border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50/20 dark:bg-indigo-950/30 p-4">
-        <div className="flex items-center justify-between border-b border-indigo-100 dark:border-indigo-900/50 pb-2">
-          <span className="text-xs font-bold text-slate-800 dark:text-slate-100">Upload Custom Multi-Sensor Pair</span>
-          <span className="text-[10px] text-slate-500 dark:text-slate-400 font-mono">GeoTIFF (.tif) or PNG (.png)</span>
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <FilePicker
-            label={`Source Image · ${sourceSensor}`}
-            file={sourceFile}
-            preview={sourcePreview}
-            onChange={handleSourceFile}
-          />
-          <FilePicker
-            label={`Reference Image · ${referenceSensor}`}
-            file={referenceFile}
-            preview={referencePreview}
-            onChange={handleReferenceFile}
-          />
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-[1fr_1fr_1.2fr]">
-          <label className="block">
-            <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Source Sensor</span>
-            <select
-              value={sourceSensor}
-              onChange={(e) => setSourceSensor(e.target.value as Sensor)}
-              className="w-full rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-            >
-              {SENSOR_OPTIONS.filter((s) => s.value !== "LRO_NAC").map((sensor) => (
-                <option key={sensor.value} value={sensor.value}>
-                  {sensor.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="block">
-            <span className="mb-1.5 block text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">Reference Sensor</span>
-            <select
-              value={referenceSensor}
-              onChange={(e) => setReferenceSensor(e.target.value as Sensor)}
-              className="w-full rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-200 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
-            >
-              {SENSOR_OPTIONS.map((sensor) => (
-                <option key={sensor.value} value={sensor.value}>
-                  {sensor.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <FilePicker label="Optional DEM Elevation DTM" file={demFile} optional onChange={setDemFile} />
-        </div>
-
-        {/* Quick Pre-aligned test buttons */}
-        <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-indigo-100/60 dark:border-indigo-900/50 text-[10px]">
-          <span className="font-bold text-slate-500 dark:text-slate-400">Quick Test Pairs:</span>
-          <button
-            type="button"
-            onClick={() =>
-              loadTestPairIntoForm(
-                "/images/ohrc/region_001.png",
-                "/images/lro_nac/region_001.png",
-                "OHRC",
-                "LRO_NAC",
-                "region_001_ohrc.png",
-                "region_001_lro_nac.png"
-              )
-            }
-            className="rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-white dark:bg-white/5 px-2.5 py-1 font-bold text-indigo-600 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition shadow-xs"
-          >
-            🌙 Load Region 001 (OHRC + LRO NAC)
-          </button>
-          <button
-            type="button"
-            onClick={() =>
-              loadTestPairIntoForm(
-                "/images/ohrc/region_001.png",
-                "/images/tmc/region_001.png",
-                "OHRC",
-                "TMC",
-                "region_001_ohrc.png",
-                "region_001_tmc.png"
-              )
-            }
-            className="rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-white dark:bg-white/5 px-2.5 py-1 font-bold text-indigo-600 dark:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 transition shadow-xs"
-          >
-            🪐 Load Region 001 (OHRC + TMC-2)
-          </button>
-        </div>
-
-        {error && customMode && (
-          <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 px-4 py-3 text-xs text-rose-700 dark:text-rose-300">
-            <span className="font-black uppercase tracking-wider">Verification Notice:</span>
-            <span className="ml-2">{error}</span>
+      <div className="p-3 md:p-4 space-y-4">
+        {/* Header Bar */}
+        <div className="flex flex-col justify-between gap-3 border-b border-[#AAA496] dark:border-[#2D3835] pb-3 md:flex-row md:items-center">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 bg-[#28557E] shadow-[0_0_0_2px_rgba(40,85,126,.4)]" />
+              <p className="text-[10px] font-mono font-bold uppercase tracking-[0.2em] text-[#1F4743] dark:text-[#52938B]">Live Registration Pipeline</p>
+            </div>
+            <h3 className="mt-1 text-lg font-mono font-bold tracking-tight text-[#1E2321] dark:text-[#E7E2D6]">Upload &amp; Register Workstation</h3>
+            <p className="mt-0.5 max-w-2xl text-xs text-[#555C58] dark:text-[#8C9893]">
+              Run the cross-sensor matching engine and inspect sub-pixel alignment, correspondence geometry, and Quality Gates.
+            </p>
           </div>
-        )}
 
-        <button
-          type="button"
-          onClick={register}
-          disabled={loading || !sourceFile || !referenceFile}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#4F46E5] px-5 py-3 text-xs font-black uppercase tracking-[0.15em] text-white shadow-sm transition hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {loading ? (
-            <>
-              <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-              Registering &amp; Validating Correspondences...
-            </>
-          ) : (
-            "Run Registration on Uploaded Pair"
-          )}
-        </button>
-      </div>
-
-      {/* Live-run error banner (Step 13: backend failures surface, never snapshots) */}
-      {error && !customMode && (
-        <div className="mt-5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 px-4 py-3 text-xs text-rose-700 dark:text-rose-300">
-          <span className="font-black uppercase tracking-wider">Backend error:</span>
-          <span className="ml-2">{error}</span>
-        </div>
-      )}
-
-      {/* 2. Benchmark Pair Selector (Rendered AFTER upload section) */}
-      <div className="mt-5">
-        <div className="flex flex-wrap items-center justify-between gap-2 mb-2.5">
-          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            ⚡ Quick Benchmark Pairs (1-Click Verification)
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setCustomMode(true);
-                setSelectedSample(null);
-                setResult(null);
-                uploadSectionRef.current?.scrollIntoView({ behavior: "smooth" });
-              }}
-              className={`rounded-lg px-2.5 py-1 text-xs font-bold transition flex items-center gap-1.5 ${
-                customMode && !selectedSample
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/20"
-              }`}
-            >
-              <span>+ Custom GeoTIFF Upload</span>
-            </button>
-            {(result || selectedSample || sourceFile || referenceFile) && (
-              <button
-                type="button"
-                onClick={reset}
-                className="rounded-lg border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10"
+          <div className="flex items-center gap-2 font-mono">
+            {result && resultProvenance === "snapshot" && (
+              <span
+                className="retro-inset bg-[#FFFBEB] dark:bg-[#2A2312] border border-[#D97706] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#B45309] dark:text-amber-300"
+                title="Committed benchmark snapshot from the repo manifests — press Run to verify live against the backend."
               >
-                Clear
-              </button>
+                Snapshot · run live to verify
+              </span>
+            )}
+            {result && resultProvenance === "live" && (
+              <span className="retro-inset bg-[#ECFDF5] dark:bg-[#122A1E] border border-[#059669] px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#047857] dark:text-emerald-300">
+                Live backend run
+              </span>
+            )}
+            <div className={`retro-outset px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${result ? qualityTone : "bg-[#E7E2D6] dark:bg-[#1A201E] text-[#555C58] dark:text-[#8C9893]"}`}>
+              {loading ? "PROCESSING..." : result ? qualityTier.replaceAll("_", " ") : "READY TO RUN"}
+            </div>
+            {result && !loading && (
+              <TrafficLightBadge
+                color={trafficColor}
+                confidence_score={confidenceScore}
+                ssim_score={ssimScore}
+                held_out_rmse={heldOutRmse}
+              />
             )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
-          {SAMPLE_PAIRS.map((sample) => {
-            const active = selectedSample?.id === sample.id && !customMode;
-            return (
+        {/* 1. Custom Upload Inputs & Controls (Rendered FIRST, above the fold) */}
+        <div ref={uploadSectionRef} className="space-y-3 retro-outset bg-[#E3DECFA8] dark:bg-[#161B19] p-3">
+          <div className="flex items-center justify-between border-b border-[#AAA496] dark:border-[#2D3835] pb-1.5 font-mono">
+            <span className="text-xs font-bold text-[#143532] dark:text-[#52938B]">Upload Custom Multi-Sensor Pair</span>
+            <span className="text-[10px] text-[#717874] dark:text-[#8C9893]">GeoTIFF (.tif) or PNG (.png)</span>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <FilePicker
+              label={`Source Image · ${sourceSensor}`}
+              file={sourceFile}
+              preview={sourcePreview}
+              onChange={handleSourceFile}
+            />
+            <FilePicker
+              label={`Reference Image · ${referenceSensor}`}
+              file={referenceFile}
+              preview={referencePreview}
+              onChange={handleReferenceFile}
+            />
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-[1fr_1fr_1.2fr]">
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-mono font-bold uppercase tracking-wider text-[#555C58] dark:text-[#8C9893]">Source Sensor</span>
+              <select
+                value={sourceSensor}
+                onChange={(e) => setSourceSensor(e.target.value as Sensor)}
+                className="w-full retro-inset bg-white dark:bg-[#0F1211] px-2.5 py-1.5 text-xs font-mono font-bold text-[#1E2321] dark:text-[#E7E2D6] outline-none"
+              >
+                {SENSOR_OPTIONS.filter((s) => s.value !== "LRO_NAC").map((sensor) => (
+                  <option key={sensor.value} value={sensor.value}>
+                    {sensor.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-[10px] font-mono font-bold uppercase tracking-wider text-[#555C58] dark:text-[#8C9893]">Reference Sensor</span>
+              <select
+                value={referenceSensor}
+                onChange={(e) => setReferenceSensor(e.target.value as Sensor)}
+                className="w-full retro-inset bg-white dark:bg-[#0F1211] px-2.5 py-1.5 text-xs font-mono font-bold text-[#1E2321] dark:text-[#E7E2D6] outline-none"
+              >
+                {SENSOR_OPTIONS.map((sensor) => (
+                  <option key={sensor.value} value={sensor.value}>
+                    {sensor.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <FilePicker label="Optional DEM Elevation DTM" file={demFile} optional onChange={setDemFile} />
+          </div>
+
+          {/* Quick Pre-aligned test buttons */}
+          <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-[#AAA496] dark:border-[#2D3835] text-[10px] font-mono">
+            <span className="font-bold text-[#555C58] dark:text-[#8C9893]">Quick Test Pairs:</span>
+            <button
+              type="button"
+              onClick={() =>
+                loadTestPairIntoForm(
+                  "/images/ohrc/region_001.png",
+                  "/images/lro_nac/region_001.png",
+                  "OHRC",
+                  "LRO_NAC",
+                  "region_001_ohrc.png",
+                  "region_001_lro_nac.png"
+                )
+              }
+              className="retro-button px-2 py-1 font-bold text-[#1E2321] dark:text-[#E7E2D6]"
+            >
+              🌙 Load Region 001 (OHRC + LRO NAC)
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                loadTestPairIntoForm(
+                  "/images/ohrc/region_001.png",
+                  "/images/tmc/region_001.png",
+                  "OHRC",
+                  "TMC",
+                  "region_001_ohrc.png",
+                  "region_001_tmc.png"
+                )
+              }
+              className="retro-button px-2 py-1 font-bold text-[#1E2321] dark:text-[#E7E2D6]"
+            >
+              🪐 Load Region 001 (OHRC + TMC-2)
+            </button>
+          </div>
+
+          {error && customMode && (
+            <div className="retro-inset bg-[#FEE2E2] dark:bg-[#2A1515] border border-[#EF4444] p-2 text-xs font-mono text-rose-800 dark:text-rose-300">
+              <span className="font-bold uppercase tracking-wider">Verification Notice:</span>
+              <span className="ml-2">{error}</span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={register}
+            disabled={loading || !sourceFile || !referenceFile}
+            className="retro-button flex w-full items-center justify-center gap-2 bg-[#28557E] hover:bg-[#1E3F5E] active:bg-[#142C42] py-2.5 text-xs font-mono font-bold uppercase tracking-wider text-white border-t-[#6795BE] border-l-[#6795BE] border-r-[#0E2031] border-b-[#0E2031] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {loading ? (
+              <>
+                <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                Registering &amp; Validating Correspondences...
+              </>
+            ) : (
+              "Run Registration on Uploaded Pair"
+            )}
+          </button>
+        </div>
+
+        {/* Live-run error banner */}
+        {error && !customMode && (
+          <div className="retro-inset bg-[#FEE2E2] dark:bg-[#2A1515] border border-[#EF4444] p-2 text-xs font-mono text-rose-800 dark:text-rose-300">
+            <span className="font-bold uppercase tracking-wider">Backend error:</span>
+            <span className="ml-2">{error}</span>
+          </div>
+        )}
+
+        {/* 2. Benchmark Pair Selector (Rendered AFTER upload section) */}
+        <div className="mt-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2 font-mono">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#1F4743] dark:text-[#52938B]">
+              ⚡ Quick Benchmark Pairs (1-Click Verification)
+            </span>
+            <div className="flex items-center gap-2">
               <button
-                key={sample.id}
                 type="button"
-                onClick={() => loadSample(sample)}
-                className={`flex flex-col justify-between rounded-xl border p-3 text-left transition ${
-                  active
-                    ? "border-[#4F46E5] bg-indigo-50/50 dark:bg-indigo-950/30 shadow-sm ring-2 ring-indigo-200 dark:ring-indigo-900/50"
-                    : "border-slate-200 dark:border-[#1b2029] bg-slate-50/60 dark:bg-white/5 hover:border-slate-300 dark:hover:border-slate-600 hover:bg-slate-50 dark:hover:bg-white/10"
+                onClick={() => {
+                  setCustomMode(true);
+                  setSelectedSample(null);
+                  setResult(null);
+                  uploadSectionRef.current?.scrollIntoView({ behavior: "smooth" });
+                }}
+                className={`retro-button px-2.5 py-1 text-xs font-bold transition flex items-center gap-1.5 ${
+                  customMode && !selectedSample
+                    ? "bg-[#28557E] text-white border-t-[#6795BE] border-l-[#6795BE] border-r-[#0E2031] border-b-[#0E2031]"
+                    : "text-[#1E2321] dark:text-[#E7E2D6]"
                 }`}
               >
-                <div>
-                  <div className="flex items-center justify-between gap-1 mb-1.5">
-                    <span className="text-[11px] font-bold text-slate-900 dark:text-slate-100 leading-snug">{sample.title}</span>
-                  </div>
-                  <span className={`inline-block rounded-md border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider ${sample.badgeStyle}`}>
-                    {sample.tag}
-                  </span>
-                  <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500 dark:text-slate-400 line-clamp-2">{sample.description}</p>
-                </div>
-                <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 dark:border-[#1b2029] pt-1.5 text-[10px] font-bold text-indigo-600 dark:text-indigo-300">
-                  <span>{active ? "✓ Active Verification" : "Load Pair"}</span>
-                  <span>→</span>
-                </div>
+                <span>+ Custom GeoTIFF Upload</span>
               </button>
-            );
-          })}
+              {(result || selectedSample || sourceFile || referenceFile) && (
+                <button
+                  type="button"
+                  onClick={reset}
+                  className="retro-button px-2.5 py-1 text-xs font-bold text-[#1E2321] dark:text-[#E7E2D6]"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {SAMPLE_PAIRS.map((sample) => {
+              const active = selectedSample?.id === sample.id && !customMode;
+              return (
+                <button
+                  key={sample.id}
+                  type="button"
+                  onClick={() => loadSample(sample)}
+                  className={`flex flex-col justify-between p-2.5 text-left font-mono transition ${
+                    active
+                      ? "retro-inset bg-[#E0DACB] dark:bg-[#121615] ring-1 ring-[#1F4743] dark:ring-[#428178]"
+                      : "retro-outset bg-[#E7E2D6] dark:bg-[#1A201E] hover:bg-[#F2EFE9] dark:hover:bg-[#202725]"
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <span className="text-[11px] font-bold text-[#1E2321] dark:text-[#E7E2D6] leading-snug">{sample.title}</span>
+                    </div>
+                    <span className={`inline-block border px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider ${sample.badgeStyle}`}>
+                      {sample.tag}
+                    </span>
+                    <p className="mt-1 text-[10px] leading-relaxed text-[#555C58] dark:text-[#8C9893] line-clamp-2">{sample.description}</p>
+                  </div>
+                  <div className="mt-2 flex items-center justify-between border-t border-[#AAA496] dark:border-[#2D3835] pt-1 text-[10px] font-bold text-[#28557E] dark:text-[#52938B]">
+                    <span>{active ? "✓ Active Verification" : "Load Pair"}</span>
+                    <span>→</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </div>
 
       {/* 3. Scientific Failure State: Quality Gate Rejection Panel */}
       {isFailedRegistration && (
-        <div className="mt-5 space-y-4">
-          <div className="rounded-2xl border border-rose-200 dark:border-rose-900/50 bg-rose-50/70 dark:bg-rose-950/30 p-5 md:p-6">
-            <div className="flex flex-col sm:flex-row items-start gap-4">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-100 dark:bg-rose-950/50 text-2xl text-rose-600 dark:text-rose-400">
+        <div className="mt-4 space-y-3">
+          <div className="retro-outset p-3 bg-[#FDF2F2] dark:bg-[#201414] border-t-[#F87171] border-l-[#F87171] border-r-[#991B1B] border-b-[#991B1B] font-mono">
+            <div className="flex flex-col sm:flex-row items-start gap-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center retro-outset bg-[#FEE2E2] dark:bg-[#2D1616] text-xl">
                 🛡️
               </div>
               <div className="flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-rose-200/90 dark:bg-rose-950/60 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-rose-900 dark:text-rose-200">
+                  <span className="retro-inset bg-rose-200 dark:bg-rose-950/60 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-rose-900 dark:text-rose-200">
                     Quality Gate Rejection
                   </span>
-                  <span className="text-[11px] font-mono font-bold text-rose-700 dark:text-rose-300">
+                  <span className="text-[11px] font-bold text-rose-700 dark:text-rose-300">
                     Zero Synthetic Fallback Standard Enforced
                   </span>
                 </div>
 
-                <h4 className="mt-2 text-base font-bold text-rose-950 dark:text-rose-100">
+                <h4 className="mt-1.5 text-sm font-bold text-rose-950 dark:text-rose-100">
                   Robust Geometric Verification Refused Transformation
                 </h4>
 
-                <p className="mt-1.5 text-xs leading-relaxed text-rose-800 dark:text-rose-200">
+                <p className="mt-1 text-xs leading-relaxed text-rose-800 dark:text-rose-200 font-sans">
                   In strict compliance with SIH Problem Statement 26166 integrity requirements, Astralynx enforces a strict{" "}
                   <strong className="font-semibold text-rose-950 dark:text-rose-100">Zero Synthetic Fallback policy</strong>. When image pairs lack
                   sufficient consensus crater correspondences or exhibit extreme geometric distortion, the pipeline{" "}
@@ -1226,36 +1260,36 @@ export default function RegistrationLauncher() {
                   an artificial identity homography or hallucinating correspondence points.
                 </p>
 
-                <div className="mt-4 rounded-xl border border-rose-200/80 dark:border-rose-900/50 bg-white/90 dark:bg-[#0e1117] p-3.5 text-xs text-slate-700 dark:text-slate-300">
-                  <div className="font-bold text-slate-900 dark:text-slate-100 mb-1.5">Verification Audit Details:</div>
+                <div className="mt-3 retro-inset bg-white/90 dark:bg-[#0E1117] p-2.5 text-xs text-[#1E2321] dark:text-[#E7E2D6]">
+                  <div className="font-bold mb-1">Verification Audit Details:</div>
                   <div className="space-y-1 font-mono text-[11px]">
-                    <div className="flex justify-between border-b border-slate-100 dark:border-[#1b2029] pb-1">
-                      <span className="font-sans text-slate-500 dark:text-slate-400">Rejection Cause:</span>
+                    <div className="flex justify-between border-b border-[#AAA496] dark:border-[#2D3835] pb-1">
+                      <span className="text-[#555C58] dark:text-[#8C9893]">Rejection Cause:</span>
                       <span className="font-bold text-rose-700 dark:text-rose-300">{result?.message || error || "Robust geometric verification failed to estimate a valid transformation from verified correspondences."}</span>
                     </div>
-                    <div className="flex justify-between border-b border-slate-100 dark:border-[#1b2029] pb-1">
-                      <span className="font-sans text-slate-500 dark:text-slate-400">Verified Inliers:</span>
-                      <span className="font-bold text-slate-900 dark:text-slate-100">{result?.metrics?.num_inliers ?? 0} consensus points (minimum 4 required)</span>
+                    <div className="flex justify-between border-b border-[#AAA496] dark:border-[#2D3835] pb-1">
+                      <span className="text-[#555C58] dark:text-[#8C9893]">Verified Inliers:</span>
+                      <span className="font-bold">{result?.metrics?.num_inliers ?? 0} consensus points (minimum 4 required)</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="font-sans text-slate-500 dark:text-slate-400">Synthetic Fallback Action:</span>
+                      <span className="text-[#555C58] dark:text-[#8C9893]">Synthetic Fallback Action:</span>
                       <span className="font-bold text-emerald-700 dark:text-emerald-400">Refused (Zero fake points generated)</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Visual Comparison of Divergent Pair */}
-                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="rounded-xl border border-rose-200/80 dark:border-rose-900/50 bg-white dark:bg-[#0e1117] p-2.5">
-                    <div className="flex items-center justify-between mb-1.5 px-1">
-                      <span className="text-[11px] font-bold text-slate-800 dark:text-slate-100">
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="retro-outset p-2 bg-[#E7E2D6] dark:bg-[#1A201E]">
+                    <div className="flex items-center justify-between mb-1 px-1">
+                      <span className="text-[11px] font-bold text-[#1E2321] dark:text-[#E7E2D6]">
                         {customMode && sourceFile ? `Uploaded Source: ${sourceFile.name}` : `Source: ${SENSOR_META.ohrc.label} (${SENSOR_META.ohrc.gsdM}m)`}
                       </span>
-                      <span className="rounded bg-rose-100 dark:bg-rose-950/50 px-1.5 py-0.5 text-[9px] font-bold text-rose-800 dark:text-rose-300 font-mono">
+                      <span className="retro-inset px-1 py-0.2 text-[9px] font-bold text-rose-800 dark:text-rose-300 font-mono">
                         {customMode ? sourceSensor : "Sun: 269.6° (West)"}
                       </span>
                     </div>
-                    <div className="relative aspect-square bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center">
+                    <div className="relative aspect-square retro-inset bg-[#0A0D0C] overflow-hidden flex items-center justify-center">
                       <img
                         src={sourcePreview || sourcePrimarySrc || imageUrl("/images/ohrc/triplet_new_2022.png")}
                         alt="Source Divergent"
@@ -1264,16 +1298,16 @@ export default function RegistrationLauncher() {
                       />
                     </div>
                   </div>
-                  <div className="rounded-xl border border-rose-200/80 dark:border-rose-900/50 bg-white dark:bg-[#0e1117] p-2.5">
-                    <div className="flex items-center justify-between mb-1.5 px-1">
-                      <span className="text-[11px] font-bold text-slate-800 dark:text-slate-100">
+                  <div className="retro-outset p-2 bg-[#E7E2D6] dark:bg-[#1A201E]">
+                    <div className="flex items-center justify-between mb-1 px-1">
+                      <span className="text-[11px] font-bold text-[#1E2321] dark:text-[#E7E2D6]">
                         {customMode && referenceFile ? `Uploaded Reference: ${referenceFile.name}` : `Reference: ${SENSOR_META.tmc.label} (${(4).toFixed(1)}m)`}
                       </span>
-                      <span className="rounded bg-rose-100 dark:bg-rose-950/50 px-1.5 py-0.5 text-[9px] font-bold text-rose-800 dark:text-rose-300 font-mono">
+                      <span className="retro-inset px-1 py-0.2 text-[9px] font-bold text-rose-800 dark:text-rose-300 font-mono">
                         {customMode ? referenceSensor : "Sun: 108.9° (East)"}
                       </span>
                     </div>
-                    <div className="relative aspect-square bg-slate-950 rounded-lg overflow-hidden flex items-center justify-center">
+                    <div className="relative aspect-square retro-inset bg-[#0A0D0C] overflow-hidden flex items-center justify-center">
                       <img
                         src={referencePreview || referencePrimarySrc || imageUrl("/images/tmc/triplet_new_2022.png")}
                         alt="Reference Divergent"
@@ -1283,20 +1317,20 @@ export default function RegistrationLauncher() {
                     </div>
                   </div>
                 </div>
-                <div className="mt-2.5 rounded-lg bg-rose-100/70 dark:bg-rose-950/40 py-1.5 px-3 text-center text-[10px] font-bold text-rose-800 dark:text-rose-300">
+                <div className="mt-2 retro-inset bg-[#FEE2E2] dark:bg-[#201414] py-1 px-2.5 text-center text-[10px] font-bold text-rose-800 dark:text-rose-300 font-mono">
                   {customMode
                     ? "⚠️ Insufficient Consensus Overlap: When uploaded images lack sufficient shared crater topography or feature points, the pipeline cleanly rejects registration rather than producing hallucinated matches."
                     : "⚠️ 160.8° Solar Azimuth Inversion: Shadows fall toward opposite crater rims, causing cross-correlation to fail safely rather than producing hallucinated matches."}
                 </div>
 
-                <div className="mt-5 flex flex-wrap items-center gap-3">
+                <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
                     onClick={() => {
                       const verifiedSample = SAMPLE_PAIRS[1] || SAMPLE_PAIRS[0];
                       loadSample(verifiedSample);
                     }}
-                    className="rounded-xl bg-[#4F46E5] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-[#4338CA]"
+                    className="retro-button bg-[#28557E] text-white px-3 py-1 text-xs font-mono font-bold border-t-[#6795BE] border-l-[#6795BE] border-r-[#0E2031] border-b-[#0E2031]"
                   >
                     ⚡ Switch to Verified Lunar Pair (Region 001 LRO NAC)
                   </button>
@@ -1307,7 +1341,7 @@ export default function RegistrationLauncher() {
                       const tmcSample = SAMPLE_PAIRS[0];
                       loadSample(tmcSample);
                     }}
-                    className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm transition hover:bg-slate-50 dark:hover:bg-white/10"
+                    className="retro-button px-3 py-1 text-xs font-mono font-bold text-[#1E2321] dark:text-[#E7E2D6]"
                   >
                     View 21x Scale Pair (Region 001 TMC-2)
                   </button>
@@ -1325,7 +1359,7 @@ export default function RegistrationLauncher() {
                           "region_001_lro_nac.png"
                         );
                       }}
-                      className="rounded-xl border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 px-4 py-2.5 text-xs font-bold text-indigo-700 dark:text-indigo-300 shadow-sm transition hover:bg-indigo-100 dark:hover:bg-indigo-950/50"
+                      className="retro-button px-3 py-1 text-xs font-mono font-bold text-[#1E2321] dark:text-[#E7E2D6]"
                     >
                       Load Verified Sample Files into Form
                     </button>
@@ -1339,21 +1373,21 @@ export default function RegistrationLauncher() {
 
       {/* Success State: Verified Registered Package */}
       {result && result.status === "success" && (
-        <div className="mt-5 space-y-5">
+        <div className="mt-4 space-y-4">
           {result.message && (
             <div
               className={
                 isIIRSPair
-                  ? "rounded-xl border border-purple-200 dark:border-purple-900/50 bg-purple-50 dark:bg-purple-950/30 px-4 py-3 text-xs text-purple-800 dark:text-purple-300"
-                  : "rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 px-4 py-3 text-xs text-emerald-800 dark:text-emerald-300"
+                  ? "retro-inset p-2.5 text-xs font-mono bg-[#F5EEF8] dark:bg-[#1E1428] border border-[#6C3483] text-[#5B2C6F] dark:text-[#D7BDE2]"
+                  : "retro-inset p-2.5 text-xs font-mono bg-[#E8F8F5] dark:bg-[#0E201B] border border-[#1F4743] text-[#143532] dark:text-[#A2D9CE]"
               }
             >
-              <span className="font-black uppercase tracking-wider">
+              <span className="font-bold uppercase tracking-wider">
                 {isIIRSPair ? "Co-Registration Validated:" : "Registration Verified:"}
               </span>
               <span className="ml-2">{result.message}</span>
               {isIIRSPair && (
-                <span className="ml-2 inline-block rounded-full border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+                <span className="ml-2 inline-block retro-outset px-2 py-0.2 text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
                   Spectral Projection: Validated via TMC-2 Bridge
                 </span>
               )}
@@ -1362,81 +1396,87 @@ export default function RegistrationLauncher() {
 
           <div className="grid gap-4 xl:grid-cols-[1.45fr_1fr]">
             {/* Visual Artifacts */}
-            <div className="space-y-4">
-              <div className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-slate-950 p-3">
-                <div className="mb-3 flex items-center justify-between px-1">
+            <div className="space-y-3">
+              <div className="retro-outset p-2.5 bg-[#E7E2D6] dark:bg-[#1A201E]">
+                <div className="mb-2 flex items-center justify-between px-1 font-mono">
                   <div>
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-300">Primary Visual Proof</p>
-                    <h4 className="mt-1 text-sm font-bold text-white">Continuity Checkerboard Registration QA</h4>
+                    <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#1F4743] dark:text-[#52938B]">Primary Visual Proof</p>
+                    <h4 className="mt-0.5 text-xs font-bold text-[#1E2321] dark:text-[#E7E2D6]">Continuity Checkerboard Registration QA</h4>
                   </div>
-                  <span className="rounded-md bg-emerald-400/10 px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-emerald-300">
+                  <span className="retro-inset px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-[#E8F8F5] dark:bg-[#0E201B] text-[#1F4743] dark:text-emerald-300">
                     50 px alternating blocks
                   </span>
                 </div>
 
                 {absoluteUrl(result.visual_url) ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={absoluteUrl(result.visual_url)!}
-                    alt="Continuity checkerboard QA"
-                    className="max-h-[470px] w-full rounded-lg object-contain"
-                    onError={(e) => {
-                      const img = e.currentTarget as HTMLImageElement;
-                      if (!img.src.includes("/images/registered/region_001/checkerboard_qa.png")) {
-                        img.src = imageUrl("/images/registered/region_001/checkerboard_qa.png");
-                      }
-                    }}
-                  />
+                  <div className="retro-inset bg-[#0A0D0C] p-1 flex items-center justify-center">
+                    <img
+                      src={absoluteUrl(result.visual_url)!}
+                      alt="Continuity checkerboard QA"
+                      className="max-h-[470px] w-full object-contain"
+                      onError={(e) => {
+                        const img = e.currentTarget as HTMLImageElement;
+                        if (!img.src.includes("/images/registered/region_001/checkerboard_qa.png")) {
+                          img.src = imageUrl("/images/registered/region_001/checkerboard_qa.png");
+                        }
+                      }}
+                    />
+                  </div>
                 ) : (
-                  <div className="flex min-h-[260px] items-center justify-center rounded-lg bg-slate-900 text-xs text-slate-500">
+                  <div className="flex min-h-[260px] items-center justify-center retro-inset bg-[#0A0D0C] text-xs font-mono text-[#777]">
                     No checkerboard artifact returned.
                   </div>
                 )}
               </div>
 
-              <div className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-3">
-                <div className="mb-2 flex items-center justify-between">
-                  <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">Registered Warped Source Image</h4>
-                  <span className="text-[10px] font-mono text-slate-400">Homography Reprojected</span>
+              <div className="retro-outset p-2.5 bg-[#E7E2D6] dark:bg-[#1A201E]">
+                <div className="mb-1.5 flex items-center justify-between font-mono">
+                  <h4 className="text-xs font-bold text-[#1E2321] dark:text-[#E7E2D6]">Registered Warped Source Image</h4>
+                  <span className="text-[10px] text-[#717874] dark:text-[#8C9893]">Homography Reprojected</span>
                 </div>
                 {absoluteUrl(result.warped_url) ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={absoluteUrl(result.warped_url)!}
-                    alt="Registered warped source"
-                    className="max-h-[250px] w-full rounded-lg bg-slate-950 object-contain"
-                    onError={(e) => {
-                      const img = e.currentTarget as HTMLImageElement;
-                      if (!img.src.includes("/images/registered/region_001/registered_ohrc.png")) {
-                        img.src = imageUrl("/images/registered/region_001/registered_ohrc.png");
-                      }
-                    }}
-                  />
+                  <div className="retro-inset bg-[#0A0D0C] p-1 flex items-center justify-center">
+                    <img
+                      src={absoluteUrl(result.warped_url)!}
+                      alt="Registered warped source"
+                      className="max-h-[250px] w-full object-contain"
+                      onError={(e) => {
+                        const img = e.currentTarget as HTMLImageElement;
+                        if (!img.src.includes("/images/registered/region_001/registered_ohrc.png")) {
+                          img.src = imageUrl("/images/registered/region_001/registered_ohrc.png");
+                        }
+                      }}
+                    />
+                  </div>
                 ) : (
-                  <div className="flex min-h-[120px] items-center justify-center rounded-lg bg-slate-100 dark:bg-white/5 text-xs text-slate-400">
+                  <div className="flex min-h-[120px] items-center justify-center retro-inset bg-[#0A0D0C] text-xs font-mono text-[#777]">
                     No warped image returned.
                   </div>
                 )}
               </div>
 
               {absoluteUrl(result.quiver_url) ? (
-                <div className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-3">
-                  <div className="mb-2 flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100">Residual Displacement Vectors</h4>
-                    <span className="text-[10px] font-mono text-slate-400">Per-inlier reprojection error</span>
+                <div className="retro-outset p-2.5 bg-[#E7E2D6] dark:bg-[#1A201E]">
+                  <div className="mb-1.5 flex items-center justify-between font-mono">
+                    <h4 className="text-xs font-bold text-[#1E2321] dark:text-[#E7E2D6]">Residual Displacement Vectors</h4>
+                    <span className="text-[10px] text-[#717874] dark:text-[#8C9893]">Per-inlier reprojection error</span>
                   </div>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={absoluteUrl(result.quiver_url)!}
-                    alt="Residual displacement vector quiver plot"
-                    className="max-h-[250px] w-full rounded-lg bg-slate-950 object-contain"
-                  />
+                  <div className="retro-inset bg-[#0A0D0C] p-1 flex items-center justify-center">
+                    <img
+                      src={absoluteUrl(result.quiver_url)!}
+                      alt="Residual displacement vector quiver plot"
+                      className="max-h-[250px] w-full object-contain"
+                    />
+                  </div>
                 </div>
               ) : null}
             </div>
 
             {/* Telemetry Metric Cards */}
-            <div className="grid grid-cols-2 content-start gap-3">
+            <div className="grid grid-cols-2 content-start gap-2.5">
               <MetricCard
                 label="In-Sample Fit RMSE"
                 value={format(fitRmse)}
@@ -1464,14 +1504,14 @@ export default function RegistrationLauncher() {
                 }
               />
               {isIIRSPair ? (
-                <div className="rounded-xl border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 p-4">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600 dark:text-emerald-300">
+                <div className="retro-inset bg-[#E8F8F5] dark:bg-[#0E201B] border border-[#1F4743] p-3">
+                  <p className="text-[10px] font-mono font-bold uppercase tracking-[0.16em] text-[#1F4743] dark:text-emerald-400">
                     Spectral Projection
                   </p>
-                  <p className="mt-2 text-sm font-black leading-snug tracking-tight text-emerald-800 dark:text-emerald-200">
+                  <p className="mt-1 text-xs font-mono font-bold leading-snug tracking-tight text-[#143532] dark:text-emerald-200">
                     Spectral Projection: Validated via TMC-2 Bridge
                   </p>
-                  <p className="mt-1 text-[10px] text-emerald-600 dark:text-emerald-300">
+                  <p className="mt-1 text-[10px] font-mono text-[#555C58] dark:text-emerald-400">
                     0 direct inliers by design — composed H_TMC→IIRS · H_OHRC→TMC overlay
                   </p>
                 </div>
@@ -1524,15 +1564,15 @@ export default function RegistrationLauncher() {
                 hint={psnrVal === null ? "No overlap rasters in this run" : null}
               />
 
-              <div className={`col-span-2 rounded-xl border p-4 ${qualityTone}`}>
+              <div className={`col-span-2 retro-outset p-3 font-mono ${qualityTone}`}>
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-black uppercase tracking-[0.16em] opacity-70">Quality Tier</p>
-                  <span className="rounded-md border border-indigo-200 dark:border-indigo-900/50 bg-white/80 dark:bg-white/5 px-2 py-0.5 text-[9px] font-mono font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300 shadow-sm">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] opacity-70">Quality Tier</p>
+                  <span className="retro-inset px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider bg-white/60 dark:bg-black/30">
                     Estimator: {outlierMethod}
                   </span>
                 </div>
-                <p className="mt-1 text-2xl font-black tracking-tight">{qualityTier.replaceAll("_", " ")}</p>
-                <p className="mt-1 text-[11px] opacity-80">
+                <p className="mt-1 text-xl font-bold tracking-tight">{qualityTier.replaceAll("_", " ")}</p>
+                <p className="mt-0.5 text-[11px] opacity-80">
                   {metrics?.validation_status || "Sub-pixel geometric consensus verified (< 1.0 px)"}
                 </p>
               </div>
@@ -1540,21 +1580,21 @@ export default function RegistrationLauncher() {
           </div>
 
           {/* View Mode Toggle: 2D Planar Verification vs 3D Lunar Globe */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 dark:border-[#1b2029] pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#AAA496] dark:border-[#2D3835] pb-2 font-mono">
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => setResultView("2d")}
-                className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+                className={`flex items-center gap-2 px-3 py-1 text-xs font-bold transition ${
                   resultView === "2d"
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/20 hover:text-slate-900 dark:hover:text-slate-100"
+                    ? "retro-inset bg-[#DDD7C8] dark:bg-[#0F1211] text-[#1E2321] dark:text-[#E7E2D6]"
+                    : "retro-button text-[#555C58] dark:text-[#8C9893]"
                 }`}
               >
                 <span>🔍 2D Planar Verification</span>
                 <span
-                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                    resultView === "2d" ? "bg-indigo-500/80 text-white" : "bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300"
+                  className={`px-1.5 py-0.2 text-[10px] ${
+                    resultView === "2d" ? "retro-outset bg-[#28557E] text-white" : "retro-inset bg-[#C8C2B5] dark:bg-[#1A201E]"
                   }`}
                 >
                   {points.length}
@@ -1563,17 +1603,17 @@ export default function RegistrationLauncher() {
               <button
                 type="button"
                 onClick={() => setResultView("3d")}
-                className={`flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-xs font-bold transition ${
+                className={`flex items-center gap-2 px-3 py-1 text-xs font-bold transition ${
                   resultView === "3d"
-                    ? "bg-indigo-600 text-white shadow-sm"
-                    : "bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/20 hover:text-slate-900 dark:hover:text-slate-100"
+                    ? "retro-inset bg-[#DDD7C8] dark:bg-[#0F1211] text-[#1E2321] dark:text-[#E7E2D6]"
+                    : "retro-button text-[#555C58] dark:text-[#8C9893]"
                 }`}
               >
                 <span>🌕 3D Lunar Globe Tie-Points</span>
                 {moonPoints.length > 0 && (
                   <span
-                    className={`rounded-full px-1.5 py-0.2 text-[10px] ${
-                      resultView === "3d" ? "bg-indigo-500/80 text-white" : "bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300"
+                    className={`px-1.5 py-0.2 text-[10px] ${
+                      resultView === "3d" ? "retro-outset bg-[#28557E] text-white" : "retro-inset bg-[#C8C2B5] dark:bg-[#1A201E]"
                     }`}
                   >
                     {moonPoints.filter((p) => p.georeferenced).length}
@@ -1583,7 +1623,7 @@ export default function RegistrationLauncher() {
             </div>
 
             {resultView === "3d" && (
-              <span className="text-[11px] text-slate-500 dark:text-slate-400">
+              <span className="text-[11px] text-[#717874] dark:text-[#8C9893]">
                 Drag to rotate sphere · Scroll to zoom
               </span>
             )}
@@ -1609,9 +1649,8 @@ export default function RegistrationLauncher() {
               />
             </div>
           ) : (
-            /* 3D Lunar Globe View — real LROC texture, true-coordinate footprints,
-               generous bottom coordinate readout (never crops the limb). */
-            <div className="relative flex h-[640px] w-full flex-col overflow-hidden rounded-2xl border border-slate-800/80 bg-gradient-to-b from-slate-950 via-[#0a0f1d] to-slate-950 shadow-inner">
+            /* 3D Lunar Globe View */
+            <div className="relative flex h-[640px] w-full flex-col overflow-hidden retro-inset bg-[#0A0D0C]">
               <div className="relative w-full flex-1">
                 <LunarGlobe
                   tiePoints={moonPoints}
@@ -1622,67 +1661,66 @@ export default function RegistrationLauncher() {
                 />
                 {/* Globe Overlay HUD */}
                 <div className="pointer-events-none absolute left-4 top-4 z-20 flex flex-col gap-1.5">
-                  <div className="flex items-center gap-2 rounded-lg border border-white/10 bg-slate-900/85 px-3 py-1.5 shadow backdrop-blur">
-                    <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span className="text-xs font-mono font-bold text-slate-200">
+                  <div className="flex items-center gap-2 retro-outset bg-[#E7E2D6] dark:bg-[#1A201E] px-2.5 py-1 text-xs font-mono font-bold text-[#1E2321] dark:text-[#E7E2D6]">
+                    <span className="h-2 w-2 bg-emerald-500 animate-pulse" />
+                    <span>
                       {moonPointsLoading
                         ? "Fetching 3D coordinates..."
                         : `${moonPoints.filter((p) => p.georeferenced).length} Georeferenced Lunar Coordinates`}
                     </span>
                   </div>
                   {result?.job_id && (
-                    <span className="text-[10px] font-mono text-slate-400">
+                    <span className="retro-inset bg-black/60 px-2 py-0.5 text-[10px] font-mono text-[#DDD]">
                       Region/Job: {result.job_id}
                       {activeFootprint ? ` · ${footprints.length} regions plotted` : ""}
                     </span>
                   )}
                 </div>
 
-                <div className="pointer-events-none absolute bottom-3 right-4 z-20 rounded-lg border border-white/10 bg-slate-900/85 px-3 py-1.5 text-[11px] font-medium text-slate-300 backdrop-blur">
+                <div className="pointer-events-none absolute bottom-3 right-4 z-20 retro-outset bg-[#E7E2D6] dark:bg-[#1A201E] px-2.5 py-1 text-[11px] font-mono font-bold text-[#1E2321] dark:text-[#E7E2D6]">
                   Spherical Projection · True Lunar Coordinate Mapping
                 </div>
               </div>
 
-              {/* Bottom coordinate readout — real selenographic numbers + space
-                  below the limb so the globe never touches the panel edge. */}
-              <div className="z-20 grid grid-cols-2 gap-3 border-t border-white/10 bg-slate-950/90 px-4 py-4 backdrop-blur sm:grid-cols-4">
+              {/* Bottom coordinate readout */}
+              <div className="z-20 grid grid-cols-2 gap-3 border-t border-[#AAA496] dark:border-[#2D3835] bg-[#E7E2D6] dark:bg-[#161B19] px-4 py-3 font-mono sm:grid-cols-4">
                 <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Active region</p>
-                  <p className="mt-1 font-mono text-xs font-bold text-amber-300">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#555C58] dark:text-[#8C9893]">Active region</p>
+                  <p className="mt-0.5 text-xs font-bold text-[#28557E] dark:text-cyan-300">
                     {activeFootprint?.id ?? result?.job_id ?? "—"}
                   </p>
-                  <p className="font-mono text-[10px] text-slate-500">
+                  <p className="text-[10px] text-[#717874] dark:text-[#8C9893]">
                     {footprints.length} validated footprints
                   </p>
                 </div>
                 <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Centre (lat, lon)</p>
-                  <p className="mt-1 font-mono text-xs font-bold text-slate-100">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#555C58] dark:text-[#8C9893]">Centre (lat, lon)</p>
+                  <p className="mt-0.5 text-xs font-bold text-[#1E2321] dark:text-[#E7E2D6]">
                     {activeCenter ? `${activeCenter.lat.toFixed(4)}°, ${to180(activeCenter.lon360).toFixed(4)}°` : "—"}
                   </p>
-                  <p className="font-mono text-[10px] text-slate-500">
+                  <p className="text-[10px] text-[#717874] dark:text-[#8C9893]">
                     {activeCenter ? `lon 0–360: ${(((activeCenter.lon360 % 360) + 360) % 360).toFixed(4)}°` : "planetocentric"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Bounds W/E/S/N</p>
-                  <p className="mt-1 font-mono text-[11px] font-bold text-slate-100">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#555C58] dark:text-[#8C9893]">Bounds W/E/S/N</p>
+                  <p className="mt-0.5 text-[11px] font-bold text-[#1E2321] dark:text-[#E7E2D6]">
                     {activeFootprint
                       ? `${activeFootprint.west_lon.toFixed(3)} / ${activeFootprint.east_lon.toFixed(3)}`
                       : "—"}
                   </p>
-                  <p className="font-mono text-[10px] text-slate-500">
+                  <p className="text-[10px] text-[#717874] dark:text-[#8C9893]">
                     {activeFootprint
                       ? `${activeFootprint.south_lat.toFixed(4)} / ${activeFootprint.north_lat.toFixed(4)}`
                       : "deg"}
                   </p>
                 </div>
                 <div>
-                  <p className="text-[9px] font-black uppercase tracking-[0.18em] text-slate-500">Footprint · tie-points</p>
-                  <p className="mt-1 font-mono text-xs font-bold text-slate-100">
+                  <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#555C58] dark:text-[#8C9893]">Footprint · tie-points</p>
+                  <p className="mt-0.5 text-xs font-bold text-[#1E2321] dark:text-[#E7E2D6]">
                     {activeSize ? `${activeSize.widthKm.toFixed(2)} × ${activeSize.heightKm.toFixed(2)} km` : "—"}
                   </p>
-                  <p className="font-mono text-[10px] text-slate-500">
+                  <p className="text-[10px] text-[#717874] dark:text-[#8C9893]">
                     {moonPoints.filter((p) => p.georeferenced).length} georeferenced · drag to rotate
                   </p>
                 </div>
@@ -1691,13 +1729,13 @@ export default function RegistrationLauncher() {
           )}
 
           {/* Action Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 retro-outset bg-[#E7E2D6] dark:bg-[#1A201E] p-3 font-mono">
             <div>
-              <p className="text-xs font-bold text-slate-800 dark:text-slate-100">{points.length} verified correspondences mapped</p>
-              <p className="mt-1 text-[10px] text-slate-500 dark:text-slate-400">
-                <span className="text-emerald-500">●</span> High Confidence (&gt;0.8){" "}
-                <span className="ml-2 text-amber-500">●</span> Review (&gt;0.5){" "}
-                <span className="ml-2 text-rose-400">●</span> Low Confidence
+              <p className="text-xs font-bold text-[#1E2321] dark:text-[#E7E2D6]">{points.length} verified correspondences mapped</p>
+              <p className="mt-0.5 text-[10px] text-[#555C58] dark:text-[#8C9893]">
+                <span className="text-emerald-600 font-bold">●</span> High Confidence (&gt;0.8){" "}
+                <span className="ml-2 text-amber-600 font-bold">●</span> Review (&gt;0.5){" "}
+                <span className="ml-2 text-rose-600 font-bold">●</span> Low Confidence
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -1707,7 +1745,7 @@ export default function RegistrationLauncher() {
                   download={`ISRO_Registration_Report_${result.job_id}.pdf`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-600 bg-indigo-600 px-3.5 py-2 text-[11px] font-bold text-white shadow-sm transition hover:bg-indigo-700 hover:shadow"
+                  className="retro-button bg-[#28557E] hover:bg-[#1E3F5E] text-white px-3 py-1.5 text-xs font-mono font-bold inline-flex items-center gap-1.5 border-t-[#6795BE] border-l-[#6795BE] border-r-[#0E2031] border-b-[#0E2031]"
                 >
                   <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -1727,13 +1765,14 @@ export default function RegistrationLauncher() {
             <button
               type="button"
               onClick={reset}
-              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-4 py-2.5 text-xs font-bold text-slate-700 dark:text-slate-300 shadow-sm transition hover:bg-slate-50 dark:hover:bg-white/10"
+              className="retro-button px-3.5 py-1.5 text-xs font-mono font-bold text-[#1E2321] dark:text-[#E7E2D6]"
             >
               ← Register Another Pair
             </button>
           </div>
         </div>
       )}
+      </div>
     </section>
   );
 }

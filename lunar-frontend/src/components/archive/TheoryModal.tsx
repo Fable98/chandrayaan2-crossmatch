@@ -6,80 +6,102 @@ interface Props {
 
 export default function TheoryModal({ onClose }: Props) {
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm animate-fade-in">
-      <div className="relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] text-slate-800 dark:text-slate-200 shadow-2xl">
-        {/* Header Bar */}
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] px-6 py-4">
-          <div className="flex items-center gap-2.5">
-            <span className="rounded-lg border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#4F46E5] dark:text-indigo-300">
-              Methodology
-            </span>
-            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
-              Projective Homography &amp; Registration Pipeline
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fade-in font-mono">
+      <div className="retro-outset relative flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden bg-[#E7E2D6] dark:bg-[#1A201E] text-[#1E2321] dark:text-[#E7E2D6] shadow-2xl">
+        {/* Retro Window Titlebar */}
+        <div className="flex items-center justify-between bg-[#1F4743] px-3 py-1.5 text-xs font-bold font-mono text-white select-none shrink-0 border-b border-[#143532]">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">📐</span>
+            <span className="tracking-wider uppercase">
+              METHODOLOGY // PROJECTIVE HOMOGRAPHY &amp; REGISTRATION PIPELINE
             </span>
           </div>
 
-          <button
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 text-xs text-slate-400 transition hover:bg-slate-50 dark:hover:bg-white/10 hover:text-slate-700 dark:hover:text-slate-200"
-            title="Close"
-          >
-            ✕
-          </button>
+          <div className="flex items-center space-x-1">
+            <button
+              type="button"
+              className="window-ctrl-btn"
+              title="Minimize"
+              tabIndex={-1}
+            >
+              _
+            </button>
+            <button
+              type="button"
+              className="window-ctrl-btn"
+              title="Maximize"
+              tabIndex={-1}
+            >
+              □
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="window-ctrl-btn hover:bg-rose-700 hover:text-white font-bold"
+              title="Close [Esc]"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Body Content */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+          <div className="border-b border-[#8B8579] dark:border-[#2D3835] pb-3">
+            <h2 className="text-base font-bold text-[#1E2321] dark:text-[#E7E2D6]">
               Mathematical &amp; Algorithmic Framework
             </h2>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+            <p className="mt-1 text-xs text-[#555C58] dark:text-[#8C9893]">
               Cross-sensor alignment between disparate orbital passes and extreme solar incidence reversals.
             </p>
           </div>
 
-          <div className="border-t border-slate-100 dark:border-[#1b2029] pt-4 text-xs leading-relaxed text-slate-600 dark:text-slate-300 space-y-4">
+          <div className="text-xs leading-relaxed text-[#4A524E] dark:text-[#A8B2AD] space-y-3">
             <p>
               In planetary cross-matching between high-resolution optical cameras (OHRC, 0.25 m/px) and monoscopic terrain camera (TMC-2 single view, 4 m/px) and hyperspectral camera, sensor viewing geometries differ radically. Due to non-repeat orbital tracks, the angle of solar incidence often reverses by &gt;160°, rendering traditional pixel intensity metrics invalid.
             </p>
 
-            <div className="rounded-xl border border-slate-200/80 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 p-4 text-xs">
-              <span className="text-[#4F46E5] dark:text-indigo-300 font-mono block mb-1 font-bold">Planar Projective Transform:</span>
-              <span className="font-mono text-slate-800 dark:text-slate-200">s · [x&apos;, y&apos;, 1]ᵀ = H · [x, y, 1]ᵀ</span>
-              <p className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
+            <div className="retro-inset p-3 bg-[#DED8CB]/50 dark:bg-[#141817] text-xs">
+              <span className="text-[#1F4743] dark:text-teal-300 font-mono block mb-1 font-bold">
+                [PLANAR PROJECTIVE TRANSFORM FORMULATION]
+              </span>
+              <span className="font-mono font-bold text-[#1E2321] dark:text-[#E7E2D6] block py-1">
+                s · [x&apos;, y&apos;, 1]ᵀ = H · [x, y, 1]ᵀ
+              </span>
+              <p className="mt-1 text-[11px] text-[#555C58] dark:text-[#8C9893]">
                 Where H is a 3×3 matrix with 8 degrees of freedom calculated via Random Sample Consensus (RANSAC) on dense Transformer-based correspondences (LoFTR).
               </p>
             </div>
 
-            <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+            <h4 className="text-xs font-bold text-[#1E2321] dark:text-[#E7E2D6] uppercase tracking-wider pt-2">
               Key Pipeline Steps:
             </h4>
-            <ul className="list-disc list-inside space-y-2 text-slate-600 dark:text-slate-300">
+            <ul className="list-disc list-inside space-y-1.5 text-[#4A524E] dark:text-[#A8B2AD]">
               <li>
-                <strong className="text-slate-900 dark:text-slate-100">Local Feature Transformer (LoFTR):</strong> Establishes semi-dense correspondences without explicit detector bottlenecks, allowing matching inside steep crater shadows.
+                <strong className="text-[#1E2321] dark:text-[#E7E2D6]">Local Feature Transformer (LoFTR):</strong> Establishes semi-dense correspondences without explicit detector bottlenecks, allowing matching inside steep crater shadows.
               </li>
               <li>
-                <strong className="text-slate-900 dark:text-slate-100">RANSAC Homography:</strong> Filters out erroneous correspondences caused by inverted shadow edges with sub-pixel tolerance (threshold &lt; 3.0 px).
+                <strong className="text-[#1E2321] dark:text-[#E7E2D6]">RANSAC Homography:</strong> Filters out erroneous correspondences caused by inverted shadow edges with sub-pixel tolerance (threshold &lt; 3.0 px).
               </li>
               <li>
-                <strong className="text-slate-900 dark:text-slate-100">Sub-Pixel Refinement:</strong> Minimizes reprojection error to achieve an RMSE &lt; 0.5 px across the shared terrain footprint.
+                <strong className="text-[#1E2321] dark:text-[#E7E2D6]">Sub-Pixel Refinement:</strong> Minimizes reprojection error to achieve an RMSE &lt; 0.5 px across the shared terrain footprint.
               </li>
             </ul>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-slate-100 dark:border-[#1b2029] bg-slate-50/50 dark:bg-white/5 px-6 py-3 text-xs">
-          <span className="text-slate-500 dark:text-slate-400 font-medium">Chandrayaan-2 Registration Pipeline</span>
+        <div className="flex items-center justify-between border-t border-[#8B8579] dark:border-[#2D3835] bg-[#DED8CB] dark:bg-[#141817] px-4 py-2 text-xs">
+          <span className="text-[#555C58] dark:text-[#8C9893] font-medium">ISRO Chandrayaan-2 Registration Pipeline</span>
           <button
             onClick={onClose}
-            className="rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] px-4 py-1.5 text-xs font-semibold text-white transition shadow-sm"
+            className="retro-button-primary px-4 py-1 text-xs font-mono font-bold"
           >
-            Done
+            Acknowledge [OK]
           </button>
         </div>
       </div>
     </div>
   );
 }
+

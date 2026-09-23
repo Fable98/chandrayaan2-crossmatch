@@ -17,52 +17,69 @@ interface Props {
 
 export default function InfoModal({ content, onClose }: Props) {
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm animate-fade-in">
-      <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] text-slate-800 dark:text-slate-200 shadow-2xl">
-        {/* Header Bar */}
-        <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] px-6 py-4">
-          <div className="flex items-center gap-2.5">
-            <span className="rounded-lg border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#4F46E5] dark:text-indigo-300">
-              {content.tag}
-            </span>
-            <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
-              {content.title}
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-fade-in font-mono">
+      <div className="retro-outset relative flex max-h-[90vh] w-full max-w-2xl flex-col overflow-hidden bg-[#E7E2D6] dark:bg-[#1A201E] text-[#1E2321] dark:text-[#E7E2D6] shadow-2xl">
+        {/* Retro Window Titlebar */}
+        <div className="flex items-center justify-between bg-[#1F4743] px-3 py-1.5 text-xs font-bold font-mono text-white select-none shrink-0 border-b border-[#143532]">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">ℹ️</span>
+            <span className="tracking-wider uppercase">
+              {content.tag} // {content.title}
             </span>
           </div>
 
-          <button
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 text-xs text-slate-400 transition hover:bg-slate-50 dark:hover:bg-white/10 hover:text-slate-700 dark:hover:text-slate-200"
-            title="Close"
-          >
-            ✕
-          </button>
+          <div className="flex items-center space-x-1">
+            <button
+              type="button"
+              className="window-ctrl-btn"
+              title="Minimize"
+              tabIndex={-1}
+            >
+              _
+            </button>
+            <button
+              type="button"
+              className="window-ctrl-btn"
+              title="Maximize"
+              tabIndex={-1}
+            >
+              □
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="window-ctrl-btn hover:bg-rose-700 hover:text-white font-bold"
+              title="Close [Esc]"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-6">
-          <div>
-            <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
+          <div className="border-b border-[#8B8579] dark:border-[#2D3835] pb-3">
+            <h3 className="text-base font-bold text-[#1E2321] dark:text-[#E7E2D6]">
               {content.subtitle}
             </h3>
           </div>
 
-          <div className="space-y-4 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+          <div className="space-y-3 text-xs leading-relaxed text-[#4A524E] dark:text-[#A8B2AD]">
             {content.paragraphs.map((p, idx) => (
               <p key={idx}>{p}</p>
             ))}
           </div>
 
           {content.specs && (
-            <div className="rounded-xl border border-slate-200/80 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 p-4">
-              <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 block mb-3">
-                Technical Specifications &amp; Details
+            <div className="retro-inset p-3 bg-[#DED8CB]/50 dark:bg-[#141817]">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#555C58] dark:text-[#8C9893] block mb-2">
+                Technical Specifications &amp; Parameters
               </span>
-              <div className="space-y-2 text-xs font-mono">
+              <div className="space-y-1.5 text-xs font-mono">
                 {content.specs.map((s, idx) => (
-                  <div key={idx} className="flex justify-between border-b border-slate-200/50 dark:border-[#1b2029] pb-2">
-                    <span className="text-slate-500 dark:text-slate-400 font-sans">{s.label}</span>
-                    <span className="text-slate-900 dark:text-slate-100 font-bold">{s.value}</span>
+                  <div key={idx} className="flex justify-between border-b border-[#B9B2A5]/50 dark:border-[#2D3835] pb-1">
+                    <span className="text-[#555C58] dark:text-[#8C9893]">{s.label}</span>
+                    <span className="text-[#1E2321] dark:text-[#E7E2D6] font-bold">{s.value}</span>
                   </div>
                 ))}
               </div>
@@ -71,16 +88,17 @@ export default function InfoModal({ content, onClose }: Props) {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between border-t border-slate-100 dark:border-[#1b2029] bg-slate-50/50 dark:bg-white/5 px-6 py-3 text-xs">
-          <span className="text-slate-500 dark:text-slate-400 font-medium">ISRO Chandrayaan-2 Cross-Match</span>
+        <div className="flex items-center justify-between border-t border-[#8B8579] dark:border-[#2D3835] bg-[#DED8CB] dark:bg-[#141817] px-4 py-2 text-xs">
+          <span className="text-[#555C58] dark:text-[#8C9893] font-medium">ISRO Chandrayaan-2 Cross-Match</span>
           <button
             onClick={onClose}
-            className="rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] px-4 py-1.5 text-xs font-semibold text-white transition shadow-sm"
+            className="retro-button-primary px-4 py-1 text-xs font-mono font-bold"
           >
-            Done
+            OK [Enter]
           </button>
         </div>
       </div>
     </div>
   );
 }
+

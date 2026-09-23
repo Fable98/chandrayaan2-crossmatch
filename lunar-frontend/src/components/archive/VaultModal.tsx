@@ -42,39 +42,53 @@ export default function VaultModal({
   });
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-slate-900/40 p-4 backdrop-blur-sm animate-fade-in">
-      <div className="relative flex max-h-[90vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] text-slate-800 dark:text-slate-200 shadow-2xl">
-        {/* Header Bar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="rounded-lg border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-[#4F46E5] dark:text-indigo-300">
-                  Archive Vault
-                </span>
-                <span className="text-base font-bold text-slate-900 dark:text-slate-100">
-                  Lunar Cross-Match Products
-                </span>
-              </div>
-              <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-                {triplets.length} validated regions · Chandrayaan-2 multi-sensor archive
-              </p>
-            </div>
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/60 p-3 sm:p-6 backdrop-blur-xs animate-fade-in font-mono">
+      <div className="retro-outset relative flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden bg-[#E7E2D6] dark:bg-[#1A201E] text-[#1E2321] dark:text-[#E7E2D6] shadow-2xl">
+        {/* Retro Window Titlebar */}
+        <div className="flex items-center justify-between bg-[#1F4743] px-3 py-1.5 text-xs font-bold font-mono text-white select-none shrink-0 border-b border-[#143532]">
+          <div className="flex items-center gap-2">
+            <span className="text-sm">🗄️</span>
+            <span className="tracking-wider uppercase">
+              ARCHIVE VAULT // LUNAR MULTI-SENSOR PRODUCTS
+            </span>
+            <span className="retro-inset px-2 py-0.5 text-[10px] font-mono font-bold text-black border-t-[#8B8579] border-l-[#8B8579] border-r-white border-b-white">
+              [{filteredTriplets.length}/{triplets.length} REGIONS]
+            </span>
           </div>
 
-          <button
-            onClick={onClose}
-            className="flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 text-xs text-slate-400 transition hover:bg-slate-50 dark:hover:bg-white/10 hover:text-slate-700 dark:hover:text-slate-200"
-            title="Close"
-          >
-            ✕
-          </button>
+          <div className="flex items-center space-x-1">
+            <button
+              type="button"
+              className="window-ctrl-btn"
+              title="Minimize"
+              tabIndex={-1}
+            >
+              _
+            </button>
+            <button
+              type="button"
+              className="window-ctrl-btn"
+              title="Maximize"
+              tabIndex={-1}
+            >
+              □
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="window-ctrl-btn hover:bg-rose-700 hover:text-white font-bold"
+              title="Close [Esc]"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Filter & Search Toolbar */}
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 dark:border-[#1b2029] bg-slate-50/50 dark:bg-white/5 px-6 py-3">
-          {/* Filter Pills */}
-          <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#8B8579] dark:border-[#2D3835] bg-[#DED8CB] dark:bg-[#141817] px-4 py-2.5 shrink-0">
+          {/* Filter Buttons */}
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-bold text-[#555C58] dark:text-[#8C9893] uppercase mr-1">Filter:</span>
             <FilterButton
               active={filter === "all"}
               onClick={() => setFilter("all")}
@@ -107,29 +121,37 @@ export default function VaultModal({
             />
           </div>
 
-          {/* Search */}
-          <div className="flex items-center gap-2 rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-1.5 text-xs text-slate-700 dark:text-slate-200 focus-within:border-[#4F46E5]">
-            <svg className="h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+          {/* Search Box */}
+          <div className="flex items-center gap-2 retro-inset bg-white dark:bg-[#0A0D0C] px-2.5 py-1 text-xs text-[#1E2321] dark:text-[#E7E2D6]">
+            <span className="text-[#79827D] text-xs">🔍</span>
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search regions…"
-              className="w-40 bg-transparent text-xs text-slate-800 dark:text-slate-200 placeholder-slate-400 focus:outline-none sm:w-56"
+              placeholder="Search regions by ID..."
+              className="w-40 bg-transparent text-xs font-mono text-[#1E2321] dark:text-[#E7E2D6] placeholder-[#79827D] outline-none sm:w-56"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch("")}
+                className="text-[10px] text-[#79827D] hover:text-[#1E2321] dark:hover:text-white"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Vault Grid Content */}
-        <div className="flex-1 overflow-y-auto p-6 bg-slate-50/30 dark:bg-white/5">
+        {/* Vault Grid Recessed Well */}
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 bg-[#D6D0C2] dark:bg-[#0F1312] retro-inset m-2 sm:m-3">
           {deleteError && (
-            <div className="mb-4 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 px-4 py-2.5 text-xs font-medium text-rose-700 dark:text-rose-300">
-              Delete failed: {deleteError}
+            <div className="retro-inset mb-3 border-l-4 border-l-rose-600 bg-rose-100 dark:bg-rose-950/50 p-2.5 text-xs font-mono text-rose-800 dark:text-rose-200">
+              [SYSTEM ERROR] Delete failed: {deleteError}
             </div>
           )}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {filteredTriplets.map((t, idx) => {
               const { widthKm, heightKm } = footprintSizeKm(t.bounds);
 
@@ -158,29 +180,28 @@ export default function VaultModal({
               return (
                 <div
                   key={t.id}
-                  className="group flex flex-col justify-between rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-white/5 p-4 shadow-sm transition-all hover:border-[#4F46E5]/40 hover:shadow-md"
+                  className="retro-outset group flex flex-col justify-between p-3 bg-[#E7E2D6] dark:bg-[#1A201E] hover:border-[#1F4743] transition-colors"
                 >
                   <div>
                     {/* Top line */}
                     <div className="mb-2 flex items-center justify-between">
-                      <span className="font-mono text-[11px] text-slate-400">
+                      <span className="font-mono text-xs font-bold text-[#555C58] dark:text-[#8C9893]">
                         #{String(idx + 1).padStart(2, "0")}
                       </span>
-                      <span className="rounded-md border border-indigo-100 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 px-2 py-0.5 text-[10px] font-bold text-[#4F46E5] dark:text-indigo-300">
+                      <span className="retro-inset px-2 py-0.5 text-[10px] font-mono font-bold bg-[#F6F3EC] dark:bg-[#141817] text-[#1F4743] dark:text-teal-300">
                         {badge}
                       </span>
                     </div>
 
-                    {/* Image Preview: contain-fit so non-square tiles (e.g. LRO
-                        reference swaths) are never edge-cropped. */}
-                    <div className="relative aspect-square overflow-hidden rounded-xl border border-slate-100 dark:border-[#1b2029] bg-black">
+                    {/* Image Preview */}
+                    <div className="retro-inset relative aspect-square overflow-hidden bg-[#0A0D0C] p-1 flex items-center justify-center">
                       {filter === "lro" && failedThumbs.has(thumbUrl) ? (
-                        <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 p-4 text-center">
-                          <span className="rounded-md border border-amber-300 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">
-                            LRO reference unavailable
+                        <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 p-3 text-center">
+                          <span className="retro-inset px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-300 border border-amber-500">
+                            LRO UNAVAILABLE
                           </span>
-                          <span className="text-[10px] leading-relaxed text-slate-400">
-                            Real CDR tile missing for {t.id} — no proxy substituted
+                          <span className="text-[10px] leading-relaxed text-[#8C9893]">
+                            Real CDR tile missing for {t.id}
                           </span>
                         </div>
                       ) : (
@@ -188,15 +209,11 @@ export default function VaultModal({
                         <img
                           src={thumbUrl}
                           alt={t.id}
-                          className="h-full w-full object-contain transition-transform duration-300 group-hover:scale-105"
+                          className="h-full w-full object-contain transition-transform duration-200 group-hover:scale-102"
                           onError={(e) => {
                             if (filter === "lro") {
                               setFailedThumbs((prev) => new Set(prev).add(thumbUrl));
                             } else {
-                              // Guard against error-loop: only swap when the
-                              // fallback differs from the URL that just failed
-                              // (previously re-set the identical ohrc URL, so a
-                              // genuine 404 retried forever on a black tile).
                               const fallback = imageUrl(filter === "iirs" ? "/images/iirs/iirs_overlay.png" : `/images/ohrc/${t.id}`);
                               const img = e.currentTarget as HTMLImageElement;
                               if (img.src !== fallback && !img.dataset.fbk) {
@@ -212,76 +229,78 @@ export default function VaultModal({
                     </div>
 
                     {/* Region Metadata */}
-                    <div className="mt-3">
-                      <h4 className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-[#4F46E5] dark:group-hover:text-indigo-300 transition">
+                    <div className="mt-2.5">
+                      <h4 className="text-xs font-bold font-mono text-[#1E2321] dark:text-[#E7E2D6] truncate">
                         {t.id}
                       </h4>
-                      <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
+                      <p className="mt-0.5 text-xs font-mono text-[#555C58] dark:text-[#8C9893]">
                         {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km
                       </p>
-                      <p className="mt-0.5 text-[11px] text-slate-400 font-mono">
+                      <p className="mt-0.5 text-[11px] text-[#79827D] dark:text-[#697571] font-mono">
                         {t.bounds.west_lon.toFixed(2)}°E, {t.bounds.north_lat.toFixed(2)}°N
                       </p>
                     </div>
                   </div>
 
-                  {/* Actions */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-[#1b2029] flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400">
-                        {t.dem_available ? "DEM available" : "Mono"}
+                  {/* Actions Toolbar */}
+                  <div className="mt-3 pt-2.5 border-t border-[#B9B2A5] dark:border-[#2D3835] flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="retro-inset px-1.5 py-0.5 text-[9px] font-mono font-bold bg-[#EFEBE0] dark:bg-[#141817] text-[#555C58] dark:text-[#8C9893]">
+                        {t.dem_available ? "DEM 3D" : "MONO"}
                       </span>
                       <a
                         href={`${API_BASE}/api/registration/report/${t.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 rounded-md border border-slate-200 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:text-slate-300 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-700 dark:hover:text-rose-300 hover:border-rose-200 dark:hover:border-rose-900/50 transition-all"
+                        className="retro-button inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-mono font-bold text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/40"
                         title="Download ISRO Verification Report (PDF)"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        <svg className="h-2.5 w-2.5 text-rose-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
+                        <span>📄</span>
                         <span>PDF</span>
                       </a>
                     </div>
-                    <button
-                      onClick={() => {
-                        onClose();
-                        onSelectRegion(t.id, targetView);
-                      }}
-                      className="rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] px-3 py-1.5 text-xs font-semibold text-white transition-all shadow-sm"
-                    >
-                      Inspect →
-                    </button>
-                    {onDeleteRegion && (
+
+                    <div className="flex items-center gap-1.5">
                       <button
-                        disabled={deletingId === t.id}
-                        title={/^region_\d+$/i.test(t.id) ? "Delete curated seed (requires force confirm)" : "Delete this dataset"}
-                        onClick={async (e) => {
-                          e.stopPropagation();
-                          const curated = /^region_\d+$/i.test(t.id);
-                          const ok = window.confirm(
-                            curated
-                              ? `Delete curated seed '${t.id}'? Its on-disk bundle will be removed (restorable via git). Continue?`
-                              : `Delete dataset '${t.id}'? Its tiles, matches and registration products will be removed from disk. Continue?`
-                          );
-                          if (!ok) return;
-                          setDeleteError(null);
-                          setDeletingId(t.id);
-                          try {
-                            await onDeleteRegion(t.id);
-                          } catch (err) {
-                            setDeleteError(err instanceof Error ? err.message : "Delete failed");
-                          } finally {
-                            setDeletingId(null);
-                          }
+                        onClick={() => {
+                          onClose();
+                          onSelectRegion(t.id, targetView);
                         }}
-                        className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-slate-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 hover:text-rose-700 dark:hover:text-rose-300 hover:border-rose-200 dark:hover:border-rose-900/50 transition-all shadow-sm disabled:opacity-50"
+                        className="retro-button-primary px-2.5 py-1 text-xs font-mono font-bold flex items-center gap-1"
                       >
-                        {deletingId === t.id ? "…" : "🗑"}
+                        <span>Inspect</span>
+                        <span>→</span>
                       </button>
-                    )}
+                      {onDeleteRegion && (
+                        <button
+                          disabled={deletingId === t.id}
+                          title={/^region_\d+$/i.test(t.id) ? "Delete curated seed (requires force confirm)" : "Delete this dataset"}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            const curated = /^region_\d+$/i.test(t.id);
+                            const ok = window.confirm(
+                              curated
+                               ? `Delete curated seed '${t.id}'? Its on-disk bundle will be removed (restorable via git). Continue?`
+                               : `Delete dataset '${t.id}'? Its tiles, matches and registration products will be removed from disk. Continue?`
+                            );
+                            if (!ok) return;
+                            setDeleteError(null);
+                            setDeletingId(t.id);
+                            try {
+                              await onDeleteRegion(t.id);
+                            } catch (err) {
+                              setDeleteError(err instanceof Error ? err.message : "Delete failed");
+                            } finally {
+                              setDeletingId(null);
+                            }
+                          }}
+                          className="retro-button px-2 py-1 text-xs font-mono font-bold text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/40 disabled:opacity-50"
+                        >
+                          {deletingId === t.id ? "…" : "🗑"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               );
@@ -289,34 +308,39 @@ export default function VaultModal({
           </div>
 
           {filteredTriplets.length === 0 && (
-            <div className="py-20 text-center text-xs text-slate-400">
+            <div className="retro-outset p-10 text-center text-xs font-mono text-[#555C58] dark:text-[#8C9893] bg-[#E7E2D6] dark:bg-[#1A201E] my-6">
               {search ? (
-                <>No regions matching "{search}".</>
+                <>No region matches search query "{search}".</>
               ) : filter === "lro" ? (
                 <div className="space-y-3">
-                  <p className="font-semibold text-slate-600 dark:text-slate-300">No external reference datasets matched current filters.</p>
+                  <p className="font-bold text-[#1E2321] dark:text-[#E7E2D6]">
+                    No external NASA LRO reference datasets matched active filter.
+                  </p>
                   <button
                     onClick={() => setFilter("all")}
-                    className="rounded-xl bg-[#4F46E5] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#4338CA] transition"
+                    className="retro-button-primary px-4 py-1.5 text-xs font-mono font-bold"
                   >
                     View All Payloads
                   </button>
                 </div>
               ) : (
-                <>No regions found.</>
+                <>No archive products found.</>
               )}
             </div>
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-slate-100 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] px-6 py-3 text-xs text-slate-500 dark:text-slate-400">
-          <span>Chandrayaan-2 Cross-Match Repository</span>
+        {/* Retro Window Bottom Status Bar */}
+        <div className="flex items-center justify-between border-t border-[#8B8579] dark:border-[#2D3835] bg-[#DED8CB] dark:bg-[#141817] px-4 py-2 text-xs font-mono text-[#555C58] dark:text-[#8C9893] shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 bg-emerald-500 inline-block animate-pulse" />
+            <span>Chandrayaan-2 Cross-Match Multi-Sensor Repository // SAC-ISRO</span>
+          </div>
           <button
             onClick={onClose}
-            className="hover:text-slate-900 dark:hover:text-slate-100 font-medium transition-colors"
+            className="retro-button px-3 py-1 text-xs font-mono font-bold text-[#1E2321] dark:text-[#E7E2D6]"
           >
-            Close ✕
+            Close [Esc] ✕
           </button>
         </div>
       </div>
@@ -336,13 +360,15 @@ function FilterButton({
   return (
     <button
       onClick={onClick}
-      className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
+      className={`px-2.5 py-1 text-xs font-mono font-bold ${
         active
-          ? "bg-[#4F46E5] text-white shadow-sm"
-          : "border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-slate-100"
+          ? "retro-button-primary active-pressed"
+          : "retro-button bg-[#E7E2D6] dark:bg-[#222927] text-[#1E2321] dark:text-[#E7E2D6] hover:bg-[#F0ECE1] dark:hover:bg-[#2D3835]"
       }`}
     >
       {label}
     </button>
   );
 }
+
+

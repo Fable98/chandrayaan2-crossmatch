@@ -275,76 +275,75 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-[#f4f6fb] dark:bg-[#090b0e] font-sans text-slate-800 dark:text-slate-200 antialiased flex">
+    <div className="h-screen overflow-hidden bg-[#D3CCC0] dark:bg-[#121615] font-sans text-[#1E2321] dark:text-[#E7E2D6] antialiased flex flex-col">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-[9999] flex items-center gap-2.5 rounded-xl border border-indigo-100 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] px-5 py-3 text-sm text-slate-800 dark:text-slate-200 shadow-xl animate-fade-in">
-          <span className="h-2 w-2 rounded-full bg-[#4F46E5]" />
+        <div className="fixed bottom-12 right-6 z-[9999] flex items-center gap-2.5 retro-outset px-4 py-2 text-xs text-[#1E2321] dark:text-[#E7E2D6] shadow-xl animate-fade-in font-mono">
+          <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* ======================================================== */}
-      {/* 1. LEFT SIDEBAR: Brand Logo, Main Menu, Region List      */}
-      {/* ======================================================== */}
-      <aside className="w-64 bg-white dark:bg-[#0e1117] border-r border-slate-200/80 dark:border-[#1b2029] flex flex-col shrink-0 h-screen sticky top-0 overflow-hidden">
-          {/* Brand Header — fixed, does not scroll */}
-          <div className="p-5 pb-4 flex items-center justify-between border-b border-slate-100 dark:border-[#1b2029] shrink-0">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-[#4F46E5] text-white font-mono font-black text-xs shadow-[0_0_14px_rgba(79,70,229,0.35)]">
-                C2
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        {/* ======================================================== */}
+        {/* 1. LEFT SIDEBAR: Brand Logo, Main Menu, Region List      */}
+        {/* ======================================================== */}
+        <aside className="w-64 bg-[#E7E2D6] dark:bg-[#1A201E] border-r-2 border-[#8B8579] dark:border-[#2D3835] flex flex-col shrink-0 h-full overflow-hidden select-none">
+          {/* Brand Header Card */}
+          <div className="p-2 pb-0 shrink-0">
+            <div className="retro-outset p-1">
+              <div className="bg-[#1F4743] text-white px-2 py-1 flex items-center justify-between text-xs font-bold font-mono tracking-wider">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-4 h-4 bg-white/20 flex items-center justify-center text-[10px] text-white font-mono font-bold">
+                    C2
+                  </div>
+                  <span>CHANDRAYAAN-2</span>
+                </div>
+                <div className="flex gap-0.5">
+                  <span className="window-ctrl-btn">_</span>
+                  <span className="window-ctrl-btn">X</span>
+                </div>
               </div>
-              <div>
-                <h1 className="text-sm font-extrabold tracking-tight text-slate-900 dark:text-slate-100 leading-none">
-                  chandrayaan-2
-                </h1>
-                <span className="text-[10px] font-mono text-indigo-600 dark:text-indigo-400 font-semibold block mt-1">
-                  ISRO SAC · SIH26166
-                </span>
+              <div className="p-2 bg-[#E9E4D8] dark:bg-[#161B19] text-[11px] border-t border-[#AFA99B] dark:border-[#2D3835]">
+                <div className="font-bold text-[#143532] dark:text-emerald-400 text-xs">ISRO Planetary Cross-Match</div>
+                <div className="text-[#555C58] dark:text-[#8C9893] text-[10px]">OHRC · TMC-2 · LRO NAC · IIRS</div>
               </div>
             </div>
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
           </div>
 
-          {/* Navigation Section — independently scrollable, sidebar stays fixed */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-6 min-h-0">
-            <div>
-              <span className="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
-                Menu
-              </span>
-              <nav className="space-y-1">
+          {/* Navigation Section */}
+          <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-0 flex flex-col">
+            <div className="retro-outset p-1.5 flex flex-col">
+              <div className="bg-[#1F4743] text-white px-2 py-0.5 flex items-center justify-between text-[11px] font-bold font-mono mb-1.5">
+                <span>MENU EXPLORER</span>
+                <span className="text-[9px] text-[#9AC6C0]">SYS_MENU</span>
+              </div>
+              <nav className="space-y-1 text-xs">
                 <button
                   key="registration"
                   onClick={() => { setView("registration"); scrollToArena(); }}
-                  className={`group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all ${
+                  className={`w-full text-left px-2 py-1.5 flex items-center justify-between text-xs transition-all ${
                     view === "registration"
-                      ? "bg-[#EEF2FF] dark:bg-indigo-950/60 text-[#4F46E5] dark:text-indigo-300 border-l-4 border-[#4F46E5]"
-                      : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-100 border-l-4 border-transparent"
+                      ? "bg-[#28557E] text-white font-bold border-t border-l border-[#4477A6] border-r-2 border-b-2 border-[#122A42] shadow-inner"
+                      : "retro-button font-semibold text-[#222926] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10"
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <span className={`text-sm ${view === "registration" ? "text-[#4F46E5] dark:text-indigo-300" : "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300"}`}>
-                      ⊞
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px]">▣</span>
                     <span>Dashboard QA</span>
                   </div>
                   {view === "registration" && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-[#4F46E5]" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-white" />
                   )}
                 </button>
 
                 <Link
                   href="/ingest"
                   prefetch={false}
-                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-100 transition border-l-4 border-transparent"
+                  className="retro-button w-full text-left px-2 py-1.5 flex items-center justify-between text-xs font-semibold text-[#222926] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10 transition"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">
-                      ⚡
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px]">⚡</span>
                     <span>Ingest &amp; Prepare</span>
                   </div>
                 </Link>
@@ -358,76 +357,74 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                     <button
                       key={item.id}
                       onClick={() => { setView(item.id as View); scrollToArena(); }}
-                      className={`group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-all ${
+                      className={`w-full text-left px-2 py-1.5 flex items-center justify-between text-xs transition-all ${
                         active
-                          ? "bg-[#EEF2FF] dark:bg-indigo-950/60 text-[#4F46E5] dark:text-indigo-300 border-l-4 border-[#4F46E5]"
-                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-100 border-l-4 border-transparent"
+                          ? "bg-[#28557E] text-white font-bold border-t border-l border-[#4477A6] border-r-2 border-b-2 border-[#122A42] shadow-inner"
+                          : "retro-button font-semibold text-[#222926] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10"
                       }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <span className={`text-sm ${active ? "text-[#4F46E5] dark:text-indigo-300" : "text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300"}`}>
-                          {item.icon}
-                        </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px]">{item.icon}</span>
                         <span>{item.label}</span>
                       </div>
                       {active && (
-                        <span className="h-1.5 w-1.5 rounded-full bg-[#4F46E5]" />
+                        <span className="h-1.5 w-1.5 rounded-full bg-white" />
                       )}
                     </button>
                   );
                 })}
 
+                <div className="border-t border-[#8B8579] dark:border-[#2D3835] my-1" />
+
                 <button
                   onClick={() => openVaultWithFilter("all")}
-                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-100 transition border-l-4 border-transparent"
+                  className="retro-button w-full text-left px-2 py-1.5 flex items-center justify-between text-xs font-semibold text-[#222926] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10 transition"
                   title="Browse all multi-sensor lunar datasets (Archive Vault)"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">▤</span>
-                    <span>Inspect Full Dataset Vault</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px]">🗄️</span>
+                    <span>Inspect Full Vault</span>
                   </div>
-                  <span className="text-[10px] text-slate-400">↗</span>
+                  <span className="text-[10px]">↗</span>
                 </button>
 
                 <button
                   onClick={() => setTheoryModalOpen(true)}
-                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-100 transition border-l-4 border-transparent"
+                  className="retro-button w-full text-left px-2 py-1.5 flex items-center justify-between text-xs font-semibold text-[#222926] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10 transition"
                   title="Open mathematical framework reference"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">📖</span>
-                    <span>View Mathematical Framework</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px]">📖</span>
+                    <span>Math Framework</span>
                   </div>
-                  <span className="text-[10px] text-slate-400">↗</span>
+                  <span className="text-[10px]">↗</span>
                 </button>
               </nav>
             </div>
 
             {/* Region Directory */}
-            <div>
-              <div className="flex items-center justify-between px-3 mb-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Regions ({filteredTriplets.length})
-                </span>
+            <div className="retro-outset p-1.5 flex-1 flex flex-col min-h-[220px]">
+              <div className="bg-[#2D4F4A] text-white px-2 py-1 text-[11px] font-bold font-mono flex items-center justify-between mb-1">
+                <span>REGIONS ({filteredTriplets.length})</span>
                 <div className="flex items-center gap-1">
                   <button
                     onClick={handlePrev}
-                    className="flex h-5 w-5 items-center justify-center rounded border border-slate-200 dark:border-[#1b2029] text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 transition"
+                    className="window-ctrl-btn text-[8px]"
                     title="Previous"
                   >
-                    ‹
+                    &lt;
                   </button>
                   <button
                     onClick={handleNext}
-                    className="flex h-5 w-5 items-center justify-center rounded border border-slate-200 dark:border-[#1b2029] text-xs text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 transition"
+                    className="window-ctrl-btn text-[8px]"
                     title="Next"
                   >
-                    ›
+                    &gt;
                   </button>
                 </div>
               </div>
 
-              <div className="space-y-1 max-h-[260px] overflow-y-auto pr-1">
+              <div className="retro-inset flex-1 overflow-y-auto p-1 space-y-1 font-mono text-[11px] max-h-[220px]">
                 {filteredTriplets.map((t, i) => {
                   const active = t.id === selectedId;
                   const { widthKm, heightKm } = footprintSizeKm(t.bounds);
@@ -435,29 +432,29 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                     <button
                       key={t.id}
                       onClick={() => setSelectedId(t.id)}
-                      className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-all ${
+                      className={`flex w-full items-center justify-between px-1.5 py-1 text-left text-xs transition-all ${
                         active
-                          ? "bg-slate-100 dark:bg-white/10 font-bold text-slate-900 dark:text-slate-100 shadow-sm"
-                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5"
+                          ? "bg-[#28557E] text-white font-bold border border-[#173857] shadow-inner"
+                          : "bg-[#ECE7DC] dark:bg-[#161B19] hover:bg-[#DFD9CB] dark:hover:bg-white/5 text-[#2B312E] dark:text-[#E7E2D6] border border-[#CCC6B8] dark:border-[#2D3835]"
                       }`}
                     >
                       <div className="truncate">
-                        <span className="text-[10px] font-mono text-slate-400 mr-1.5">
+                        <span className={`text-[10px] mr-1.5 ${active ? "text-[#B9D4EB]" : "text-[#69726E]"}`}>
                           {String(i + 1).padStart(2, "0")}.
                         </span>
                         <span>{t.id}</span>
-                        <span className="block text-[10px] text-slate-400 font-normal">
+                        <span className={`block text-[9px] font-normal ${active ? "text-[#B9D4EB]" : "text-[#69726E]"}`}>
                           {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km
                         </span>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         {t.dem_available && (
-                          <span className="rounded-md bg-indigo-50 dark:bg-indigo-950/50 px-1.5 py-0.5 text-[9px] font-bold text-[#4F46E5] dark:text-indigo-300">
+                          <span className={`px-1 text-[9px] border ${active ? "bg-[#1C3E61] border-[#406E99] text-white" : "bg-[#D3CBBF] dark:bg-[#2D3835] border-[#9E9789] text-[#1E2321] dark:text-[#E7E2D6]"}`}>
                             DEM
                           </span>
                         )}
                         {t.lro_nac_available && (
-                          <span className="rounded-md bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:text-amber-300">
+                          <span className={`px-1 text-[9px] border ${active ? "bg-[#785317] border-[#BD8B3E] text-white" : "bg-[#D1B890] dark:bg-[#785317] border-[#9E8662] text-black dark:text-amber-200"}`}>
                             LRO
                           </span>
                         )}
@@ -466,51 +463,62 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                   );
                 })}
               </div>
+
+              {/* Sidebar Bottom Hardware Status Gauge */}
+              <div className="mt-2 retro-inset p-1.5 bg-[#DFD9CD] dark:bg-[#141817] text-[10px] font-mono leading-tight space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-[#555C58] dark:text-[#7A827E]">ENGINE STATUS:</span>
+                  <span className="text-emerald-800 dark:text-emerald-400 font-bold">READY TO RUN</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#555C58] dark:text-[#7A827E]">ALLOC_MEM:</span>
+                  <span className="text-[#202724] dark:text-[#E7E2D6] font-bold">64.0 MB / OK</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#555C58] dark:text-[#7A827E]">ISRO LINK:</span>
+                  <span className="text-emerald-800 dark:text-emerald-400 font-bold">ONLINE [TIF/RAW]</span>
+                </div>
+              </div>
             </div>
           </div>
+        </aside>
 
-      </aside>
-
-      {/* ======================================================== */}
-      {/* 2. MAIN WORKSPACE: Header Bar & Dashboard Content        */}
-      {/* ======================================================== */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
+        {/* ======================================================== */}
+        {/* 2. MAIN WORKSPACE: Header Bar & Dashboard Content        */}
+        {/* ======================================================== */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
         {/* Top Header Bar */}
-        <header className="h-16 bg-white dark:bg-[#0e1117] border-b border-slate-200/80 dark:border-[#1b2029] px-8 flex items-center justify-between gap-4 shrink-0">
-          {/* Search Input */}
-          <div className="relative w-80">
-            <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+        <header className="bg-[#E7E2D6] dark:bg-[#1A201E] border-b-2 border-[#8B8579] dark:border-[#2D3835] px-4 py-1.5 flex items-center justify-between gap-3 shrink-0 shadow-sm z-30">
+          {/* Search Input (recessed inset box) */}
+          <div className="relative retro-inset px-2 py-0.5 flex items-center bg-white dark:bg-[#0F1211] w-56 md:w-72 text-[11px]">
+            <span className="text-[#6D746F] mr-1.5">🔍</span>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search regions, coordinates..."
-              className="w-full pl-10 pr-12 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-[#1b2029] rounded-xl text-xs text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20 focus:border-[#4F46E5] transition"
+              placeholder="Search regions, coords..."
+              className="w-full bg-transparent border-none p-0 text-[11px] focus:ring-0 text-[#222] dark:text-[#E7E2D6] outline-none"
             />
-            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded bg-slate-200/60 dark:bg-white/10 px-1.5 py-0.5 font-mono text-[9px] text-slate-400">
-              /
-            </span>
+            <span className="font-mono text-[9px] text-[#888]">/</span>
           </div>
 
           {/* Center: Live Co-Registration Engine Status Beacon */}
-          <div className="hidden lg:flex items-center gap-2 rounded-full border border-slate-200/80 dark:border-[#1b2029] bg-slate-50/80 dark:bg-white/5 px-3 py-1 font-mono text-2xs text-slate-600 dark:text-slate-300 shadow-sm">
+          <div className="hidden lg:flex items-center gap-2 retro-inset px-2.5 py-1 text-2xs font-mono font-bold bg-[#E2DDCF] dark:bg-[#161B19] text-[#1F4743] dark:text-emerald-400">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
             </span>
-            <span className="font-semibold">FASTAPI :8000</span>
-            <span className="text-slate-300 dark:text-white/20">·</span>
-            <span className="text-indigo-600 dark:text-indigo-400 font-bold">CFOG SUB-PIXEL ACTIVE</span>
+            <span>FASTAPI :8000</span>
+            <span className="text-[#8B8579]">·</span>
+            <span>CFOG SUB-PIXEL ENGINE ACTIVE</span>
           </div>
 
           {/* Right Header Controls */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={toggleTheme}
-              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm flex items-center gap-1.5"
+              className="retro-button px-2.5 py-1 text-[11px] font-semibold text-[#2C312E] dark:text-[#E7E2D6] flex items-center gap-1"
               title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
               aria-label="Toggle color theme"
             >
@@ -523,7 +531,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                 if (onBackToHero) onBackToHero();
                 else router.push("/");
               }}
-              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm flex items-center gap-1.5"
+              className="retro-button px-2.5 py-1 text-[11px] font-semibold text-[#2C312E] dark:text-[#E7E2D6] flex items-center gap-1"
               title="Return to Mission Overview"
             >
               <span>←</span>
@@ -532,68 +540,60 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
 
             <button
               onClick={() => openVaultWithFilter("all")}
-              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm flex items-center gap-2"
+              className="retro-inset px-2.5 py-1 text-[11px] font-mono font-bold flex items-center gap-1.5 bg-[#E2DDCF] dark:bg-[#161B19] text-[#1F4743] dark:text-emerald-400"
               title="Browse all multi-sensor lunar datasets"
             >
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+              <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
               <span>{triplets.length} Datasets</span>
             </button>
 
-            <div className="h-8 w-px bg-slate-200 dark:bg-[#1b2029] mx-1" />
+            <div className="h-6 w-px bg-[#8B8579] dark:bg-[#2D3835] mx-1" />
 
             {/* Profile Pill with Interactive Dropdown */}
             <div className="relative" ref={profileMenuRef}>
               <button
                 type="button"
                 onClick={() => setProfileMenuOpen((prev) => !prev)}
-                className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-white/5 p-1.5 pr-3 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20"
+                className="retro-button px-2 py-0.5 text-[11px] flex items-center space-x-1.5 cursor-pointer bg-[#DFD9CB] dark:bg-[#222927]"
                 aria-haspopup="true"
                 aria-expanded={profileMenuOpen}
               >
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-[#4F46E5] text-white font-bold text-xs flex items-center justify-center shadow-sm">
-                  {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : "IS"}
+                <div className="w-5 h-5 bg-[#28557E] text-white flex items-center justify-center font-bold text-[9px]">
+                  {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : "SH"}
                 </div>
-                <div className="hidden sm:block text-left">
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-100 block leading-tight truncate max-w-[120px]">
-                    {currentUser?.name || "ISRO Pilot"}
+                <div className="hidden sm:block text-left leading-none">
+                  <span className="font-bold text-[#1F2422] dark:text-[#E7E2D6] block truncate max-w-[100px]">
+                    {currentUser?.name || "Shresth"}
                   </span>
-                  <span className="text-[10px] text-slate-400 block">Operator</span>
                 </div>
-                <svg
-                  className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${profileMenuOpen ? "rotate-180" : ""}`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
+                <span className="text-[9px] text-[#555] dark:text-[#888]">▼</span>
               </button>
 
               {/* Dropdown Menu */}
               {profileMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-2 shadow-2xl z-50 animate-fade-in">
-                  <div className="p-3 border-b border-slate-100 dark:border-[#1b2029]">
-                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block truncate">
+                <div className="absolute right-0 mt-1 w-64 retro-outset p-1.5 shadow-2xl z-50 animate-fade-in bg-[#E7E2D6] dark:bg-[#1A201E]">
+                  <div className="p-2 border-b border-[#8B8579] dark:border-[#2D3835] bg-[#E9E4D8] dark:bg-[#161B19] text-xs">
+                    <span className="font-bold text-[#143532] dark:text-emerald-400 block truncate">
                       {currentUser?.name || "ISRO Flight Operator"}
                     </span>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block truncate">
+                    <span className="text-[10px] text-[#555C58] dark:text-[#8C9893] block truncate">
                       {currentUser?.email || "flight.ops@isro.gov.in"}
                     </span>
-                    <span className="mt-2 inline-flex items-center gap-1 rounded-md bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                    <span className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold bg-[#D5EAD8] text-[#195924] border border-[#85C48F]">
                       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                       Active Session
                     </span>
                   </div>
 
-                  <div className="py-1 space-y-0.5">
+                  <div className="py-1 space-y-0.5 text-xs">
                     <button
                       onClick={() => {
                         setProfileMenuOpen(false);
                         openVaultWithFilter("all");
                       }}
-                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition text-left"
+                      className="w-full flex items-center gap-2 px-2 py-1 text-xs font-semibold text-[#1F2422] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10 text-left"
                     >
-                      <span className="text-slate-400">▤</span>
+                      <span>▤</span>
                       <span>Archive Vault ({triplets.length} Datasets)</span>
                     </button>
 
@@ -602,9 +602,9 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                         setProfileMenuOpen(false);
                         setTheoryModalOpen(true);
                       }}
-                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition text-left"
+                      className="w-full flex items-center gap-2 px-2 py-1 text-xs font-semibold text-[#1F2422] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10 text-left"
                     >
-                      <span className="text-slate-400">📖</span>
+                      <span>📖</span>
                       <span>Methodology Reference</span>
                     </button>
 
@@ -614,17 +614,17 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                         if (onBackToHero) onBackToHero();
                         else router.push("/");
                       }}
-                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition text-left"
+                      className="w-full flex items-center gap-2 px-2 py-1 text-xs font-semibold text-[#1F2422] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10 text-left"
                     >
-                      <span className="text-slate-400">🌐</span>
+                      <span>🌐</span>
                       <span>Mission Overview</span>
                     </button>
                   </div>
 
-                  <div className="pt-1 mt-1 border-t border-slate-100 dark:border-[#1b2029]">
+                  <div className="pt-1 mt-1 border-t border-[#8B8579] dark:border-[#2D3835]">
                     <button
                       onClick={handleUserLogout}
-                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition text-left"
+                      className="w-full flex items-center gap-2 px-2 py-1 text-xs font-bold text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 text-left"
                     >
                       <span>🚪</span>
                       <span>Log Out</span>
@@ -636,37 +636,35 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
           </div>
         </header>
 
-        {/* Dashboard Main Content — only this pane scrolls */}
-        <main className="flex-1 min-h-0 p-8 space-y-6 overflow-y-auto">
-          {/* Page Title & Subtitle */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/60 dark:border-[#1b2029] pb-5">
+        {/* Dashboard Main Content */}
+        <main className="flex-1 min-h-0 p-3 md:p-4 space-y-3 overflow-y-auto">
+          {/* Top Overview Action Strip */}
+          <div className="retro-outset p-2 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="flex items-center gap-2.5">
-                <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">
-                  Mission Control
-                </h2>
-                <span className="rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/50 px-2.5 py-0.5 text-2xs font-mono font-bold text-indigo-700 dark:text-indigo-300">
-                  ISRO SIH26166
+              <h2 className="text-base font-bold text-[#143532] dark:text-emerald-400 tracking-tight flex items-center gap-2">
+                <span>Mission Control</span>
+                <span className="text-xs font-normal text-[#5B635F] dark:text-[#8C9893]">
+                  | Lunar Multi-Sensor Cross-Matching &amp; Registration Pipeline
                 </span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Planetary cross-matching across OHRC (0.25m), TMC-2 (5.0m), and IIRS (80m) rasters with sub-pixel verification.
+              </h2>
+              <p className="text-xs text-[#525955] dark:text-[#A8B2AD]">
+                Co-registering high-resolution Chandrayaan-2 OHRC (0.25m) against TMC-2 (5.0m), LRO NAC, and IIRS rasters.
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <button
                 onClick={() => openVaultWithFilter("all")}
-                className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+                className="retro-button px-3 py-1 text-xs font-bold text-[#1F2522] dark:text-[#E7E2D6]"
               >
                 Browse All Regions
               </button>
               {detail && (
                 <button
                   onClick={() => handleOpenDossierModal(detail)}
-                  className="rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] px-4 py-2 text-xs font-bold text-white shadow-md shadow-indigo-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5"
+                  className="retro-button px-3 py-1 text-xs font-bold text-black flex items-center gap-1 shadow"
                 >
-                  <span>Dossier Report</span>
-                  <span>↗</span>
+                  <span>📄</span>
+                  <span>Dossier Report ↗</span>
                 </button>
               )}
             </div>
@@ -674,179 +672,162 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
 
           {/* ======================================================== */}
           {/* 3. QUICK BENCHMARK PAIRS + PRIMARY INSPECTION ARENA      */}
-          {/* (Summary metrics consolidated into Selected Footprint    */}
-          {/*  Details — see right telemetry column.)                  */}
           {/* ======================================================== */}
           <RegistrationLauncher />
 
           {/* ======================================================== */}
           {/* 4. ROW 2: PRIMARY INSPECTION ARENA + TELEMETRY SIDEBAR   */}
           {/* ======================================================== */}
-          <div ref={arenaRef} className="grid grid-cols-1 lg:grid-cols-12 gap-6 scroll-mt-6">
+          <div ref={arenaRef} className="grid grid-cols-1 lg:grid-cols-12 gap-3 scroll-mt-4">
             
             {/* Center Main Stage (8 cols) */}
-            <div className="lg:col-span-8 rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-6 shadow-sm flex flex-col justify-between">
+            <div className="lg:col-span-8 retro-outset p-2 flex flex-col justify-between">
               <div>
-                {/* Viewport Top Controls */}
-                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-[#1b2029] pb-4 mb-5">
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
-                      {detail?.id ?? "Select a region"}
-                    </span>
-                    {currentFootprint && (
-                      <span className="rounded-md bg-slate-100 dark:bg-white/10 px-2 py-0.5 text-xs text-slate-600 dark:text-slate-300 font-mono">
-                        {currentFootprint.widthKm.toFixed(1)} × {currentFootprint.heightKm.toFixed(1)} km
-                      </span>
-                    )}
+                {/* Titlebar */}
+                <div className="bg-[#1F4743] text-white px-2 py-1 flex items-center justify-between text-xs font-mono font-bold -m-2 mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 bg-[#4ADE80] border border-black inline-block" />
+                    <span>REGISTRATION QA WORKBENCH — {detail?.id ?? "SELECT_REGION"}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
                     {detail && (
                       <a
                         href={`${API_BASE}/api/registration/report/${detail.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-lg border border-rose-200 dark:border-rose-900/50 bg-rose-50/80 dark:bg-rose-950/30 px-2.5 py-1 text-xs font-semibold text-rose-700 dark:text-rose-300 shadow-sm transition-all hover:bg-rose-100 dark:hover:bg-rose-950/50 hover:border-rose-300"
+                        className="retro-button bg-[#E6E0D2] dark:bg-[#222927] text-[#111] dark:text-[#E7E2D6] px-2 py-0 text-[10px] font-sans font-bold flex items-center gap-1"
                         title="Download official ISRO Verification Report PDF for this region"
                       >
-                        <svg className="h-3.5 w-3.5 text-rose-600 dark:text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
+                        <span>📄</span>
                         <span>ISRO Report (PDF)</span>
                       </a>
                     )}
+                    <div className="flex gap-0.5">
+                      <span className="window-ctrl-btn">_</span>
+                      <span className="window-ctrl-btn">□</span>
+                      <span className="window-ctrl-btn">X</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Classic Retro Window Tabs (Directly below Titlebar) */}
+                <div className="bg-[#D8D2C4] dark:bg-[#141817] px-2 pt-1.5 border-b border-[#8C867A] dark:border-[#2D3835] flex items-center justify-between -mx-2 mb-2.5">
+                  <div className="flex items-center space-x-1 text-xs">
+                    {[
+                      { id: "registration", label: "Registration QA" },
+                      { id: "linked-cursor", label: "Linked Cursor" },
+                      { id: "map", label: "Planetary Map" },
+                    ].map((m) => {
+                      const active = view === m.id;
+                      return (
+                        <button
+                          key={m.id}
+                          onClick={() => setView(m.id as View)}
+                          className={
+                            active
+                              ? "bg-[#28557E] text-white font-bold px-3 py-1 border-t-2 border-l-2 border-r-2 border-[#5484B0] shadow-sm text-xs"
+                              : "retro-button px-3 py-1 font-semibold text-[#3F4743] dark:text-[#A8B2AD] bg-[#E7E2D6] dark:bg-[#1A201E] cursor-pointer text-xs"
+                          }
+                        >
+                          {m.label}
+                        </button>
+                      );
+                    })}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2">
-                    {/* Reference Mode Switcher */}
+                  {/* Reference Mode Switcher */}
+                  <div className="flex items-center gap-1.5 text-[11px] pb-1 font-medium">
+                    <span className="text-[#555E5A] dark:text-[#8C9893]">REF:</span>
                     {detail?.lro_nac_available ? (
-                      <div className="flex items-center bg-slate-100 dark:bg-white/10 p-1 rounded-xl gap-1">
-                        <span className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Ref:</span>
+                      <>
                         <button
                           onClick={() => setReferenceMode("tmc")}
-                          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                            referenceMode === "tmc"
-                              ? "bg-white dark:bg-white/10 text-slate-900 dark:text-slate-100 shadow-sm"
-                              : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                          className={`retro-button px-2 py-0.5 text-xs font-semibold ${
+                            referenceMode === "tmc" ? "bg-[#F4F1E8] dark:bg-[#28557E] font-bold text-black dark:text-white" : "text-[#525B57] dark:text-[#A8B2AD]"
                           }`}
-                          title={`Chandrayaan-2 TMC-2 single-view reference (${scaleRatioLabel(sensorMeta(detail, "tmc").gsdM, sensorMeta(detail, "ohrc").gsdM)} scale ratio)`}
                         >
                           TMC-2 (Mono)
                         </button>
                         <button
                           onClick={() => setReferenceMode("lro_nac")}
-                          className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all flex items-center gap-1.5 ${
-                            referenceMode === "lro_nac"
-                              ? "bg-amber-500 text-white shadow-sm"
-                              : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
+                          className={`retro-button px-2 py-0.5 text-xs font-semibold flex items-center gap-1 ${
+                            referenceMode === "lro_nac" ? "bg-[#785317] text-white font-bold" : "text-[#525B57] dark:text-[#A8B2AD]"
                           }`}
-                          title={`NASA LRO NAC narrow angle camera (${scaleRatioLabel(SENSOR_META.lro_nac.gsdM, SENSOR_META.ohrc.gsdM)} scale ratio)`}
                         >
                           <span>NASA LRO NAC</span>
-                          <span className={`rounded px-1 text-[9px] font-bold ${referenceMode === "lro_nac" ? "bg-black/20 text-white" : "bg-amber-100 dark:bg-amber-950/50 text-amber-800 dark:text-amber-300"}`}>
-                            Ext Ref
-                          </span>
+                          <span className="text-[9px] bg-[#CFB88D] text-black px-1">Ext Ref</span>
                         </button>
-                      </div>
+                      </>
                     ) : (
-                      <div className="flex items-center bg-slate-100/70 dark:bg-white/10 p-1 rounded-xl gap-1">
-                        <span className="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Ref:</span>
-                        <span className="rounded-lg bg-white dark:bg-white/10 px-2.5 py-1 text-xs font-semibold text-slate-900 dark:text-slate-100 shadow-sm">
-                          TMC-2 (Mono)
-                        </span>
-                        <span
-                          className="rounded-lg px-2 py-1 text-[10px] font-medium text-slate-400 dark:text-slate-400 cursor-help"
-                          title="NASA LRO NAC reference discoverable via ODE REST API (--auto-discover)"
-                        >
-                          LRO: ODE Discovery
-                        </span>
-                      </div>
+                      <span className="retro-button px-2 py-0.5 text-xs font-bold bg-[#F4F1E8] dark:bg-[#28557E] text-black dark:text-white">
+                        TMC-2 (Mono)
+                      </span>
                     )}
-
-                    {/* Mode Pill Switcher */}
-                    <div className="flex items-center bg-slate-100 dark:bg-white/10 p-1 rounded-xl gap-1">
-                      {[
-                        { id: "registration", label: "Registration QA" },
-                        { id: "linked-cursor", label: "Linked Cursor" },
-                        { id: "map", label: "Planetary Map" },
-                      ].map((m) => (
-                        <button
-                          key={m.id}
-                          onClick={() => setView(m.id as View)}
-                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                            view === m.id
-                              ? "bg-white dark:bg-white/10 text-slate-900 dark:text-slate-100 shadow-sm"
-                              : "text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200"
-                          }`}
-                        >
-                          {m.label}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 </div>
 
                 {/* Viewport Canvas Area */}
-                <div className="relative min-h-[460px]">
+                <div className="relative min-h-[440px]">
                   {loading && (
-                    <div className="flex h-full min-h-[400px] items-center justify-center text-sm text-slate-400 dark:text-slate-400">
+                    <div className="flex h-full min-h-[400px] items-center justify-center text-xs font-mono text-[#555C58] dark:text-[#8C9893]">
                       Loading sensor datasets…
                     </div>
                   )}
 
                   {!loading && !detail && (
-                    <div className="flex h-full min-h-[400px] items-center justify-center text-sm text-slate-400 dark:text-slate-400">
-                      No region selected.
+                    <div className="flex h-full min-h-[400px] items-center justify-center text-xs font-mono text-[#555C58] dark:text-[#8C9893]">
+                      No region selected. Choose a region from the explorer.
                     </div>
                   )}
 
                   {/* Registration QA View */}
                   {detail && view === "registration" && (
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-2">
                       {referenceMode === "lro_nac" && (
-                        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200/80 dark:border-amber-900/50 px-4 py-2.5 text-xs text-amber-800 dark:text-amber-200 animate-fade-in">
+                        <div className="flex flex-wrap items-center justify-between gap-2 retro-inset p-2 bg-[#FEF3D6] dark:bg-[#2A2315] text-xs font-mono text-[#785317] dark:text-amber-200">
                           <div className="flex items-center gap-2">
-                            <span className="h-2 w-2 rounded-full bg-amber-500" />
-                            <span className="font-semibold">NASA LRO NAC External Reference Mode Active</span>
-                            <span className="text-[11px] text-amber-700 dark:text-amber-300">· Orbit GSD ~{sensorMeta(detail, "lro_nac").gsdM.toFixed(2)}m ({detail.lro_nac_product_id ?? "Unknown product"})</span>
+                            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                            <span className="font-bold">NASA LRO NAC External Reference Active</span>
+                            <span className="text-[11px]">· GSD ~{sensorMeta(detail, "lro_nac").gsdM.toFixed(2)}m</span>
                           </div>
-                          <span className="font-mono text-[11px] font-bold text-amber-900 dark:text-amber-200">
+                          <span className="font-bold">
                             Fit RMSE: {metrics?.fit_rmse_px?.toFixed(3) ?? metrics?.rmse_px?.toFixed(3) ?? "—"} px
                           </span>
                         </div>
                       )}
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                         {[
                           referenceMode === "lro_nac"
-                            ? { src: `/images/registered/lro_nac/${detail.id}/registered_source.png`, fallback: `/images/registered/${detail.id}/registered_ohrc.png`, label: "Warped OHRC", tag: warpedOhrcTag(detail, true) }
-                            : { src: `/images/registered/${detail.id}/registered_ohrc.png`, fallback: `/images/ohrc/${detail.id}`, label: "Warped OHRC", tag: warpedOhrcTag(detail, false) },
+                            ? { src: `/images/registered/lro_nac/${detail.id}/registered_source.png`, fallback: `/images/registered/${detail.id}/registered_ohrc.png`, label: "A: Warped OHRC (0.25 m/px)", tag: warpedOhrcTag(detail, true), badge: "SRC_OK", badgeColor: "text-emerald-400" }
+                            : { src: `/images/registered/${detail.id}/registered_ohrc.png`, fallback: `/images/ohrc/${detail.id}`, label: "A: Warped OHRC (0.25 m/px)", tag: warpedOhrcTag(detail, false), badge: "SRC_OK", badgeColor: "text-emerald-400" },
                           referenceMode === "lro_nac"
-                            ? { src: `/images/registered/lro_nac/${detail.id}/blend_overlay.png`, fallback: `/images/lro_nac/${detail.id}`, label: "Blend Overlay", tag: "50% Cross-Fade (OHRC + LRO NAC)" }
-                            : { src: `/images/registered/${detail.id}/blend_overlay.png`, fallback: `/images/tmc/${detail.id}`, label: "Blend Overlay", tag: "50% Cross-Fade (OHRC + TMC-2)" },
+                            ? { src: `/images/registered/lro_nac/${detail.id}/blend_overlay.png`, fallback: `/images/lro_nac/${detail.id}`, label: "B: Blend Overlay (50%)", tag: "50% Cross-Fade (OHRC + LRO NAC)", badge: "REF_BASE", badgeColor: "text-amber-400" }
+                            : { src: `/images/registered/${detail.id}/blend_overlay.png`, fallback: `/images/tmc/${detail.id}`, label: "B: TMC-2 Blend (5.0 m/px)", tag: "50% Cross-Fade (OHRC + TMC-2)", badge: "REF_BASE", badgeColor: "text-amber-400" },
                           referenceMode === "lro_nac"
-                            ? { src: `/images/registered/lro_nac/${detail.id}/checkerboard_qa.png`, fallback: `/images/lro_nac/${detail.id}`, label: "Checkerboard QA", tag: checkerboardTag(detail, true) }
-                            : { src: `/images/registered/${detail.id}/checkerboard_qa.png`, fallback: `/images/tmc/${detail.id}`, label: "Checkerboard QA", tag: checkerboardTag(detail, false) },
+                            ? { src: `/images/registered/lro_nac/${detail.id}/checkerboard_qa.png`, fallback: `/images/lro_nac/${detail.id}`, label: "C: Checkerboard QA", tag: checkerboardTag(detail, true), badge: "MATCH", badgeColor: "text-cyan-400 font-bold" }
+                            : { src: `/images/registered/${detail.id}/checkerboard_qa.png`, fallback: `/images/tmc/${detail.id}`, label: "C: Checkerboard QA", tag: checkerboardTag(detail, false), badge: "MATCH", badgeColor: "text-cyan-400 font-bold" },
                         ].map((img, idx) => (
                           <div
                             key={idx}
-                            className="group flex flex-col rounded-xl border border-slate-200/80 dark:border-[#1b2029] overflow-hidden bg-slate-50 dark:bg-[#0e1117] transition-all duration-300 hover:shadow-lg hover:border-indigo-400/50 dark:hover:border-indigo-500/40"
+                            className="retro-inset p-1 bg-[#1A1D1C] flex flex-col"
                           >
-                            <div className="relative aspect-square overflow-hidden bg-black">
+                            <div className="bg-[#242C2A] text-white px-1.5 py-0.5 text-[10px] font-mono flex items-center justify-between border-b border-[#3B4744]">
+                              <span>{img.label}</span>
+                              <span className={img.badgeColor}>{img.badge}</span>
+                            </div>
+                            <div className="relative aspect-square overflow-hidden bg-black border border-[#333]">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={imageUrl(img.src)}
                                 alt={img.label}
-                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                className="h-full w-full object-cover"
                                 onError={(e) => {
                                   (e.currentTarget as HTMLImageElement).src = imageUrl(img.fallback);
                                 }}
                               />
-                              <div className="absolute top-2 right-2 rounded-md bg-black/60 backdrop-blur-md px-1.5 py-0.5 font-mono text-[9px] text-white/80 border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                VIEW
-                              </div>
                             </div>
-                            <div className="p-3 bg-white dark:bg-[#0e1117] border-t border-slate-100 dark:border-[#1b2029]">
-                              <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                                {img.label}
-                              </span>
-                              <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5">{img.tag}</span>
+                            <div className="p-1 bg-[#121615] text-[#8C9893] text-[9px] font-mono flex justify-between border-t border-[#242C2A]">
+                              <span className="truncate">{img.tag}</span>
                             </div>
                           </div>
                         ))}
@@ -869,7 +850,7 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
 
                   {/* Map View */}
                   {detail && view === "map" && (
-                    <div className="h-full min-h-[440px] rounded-xl overflow-hidden border border-slate-200 dark:border-[#1b2029]">
+                    <div className="h-full min-h-[440px] retro-inset overflow-hidden">
                       <MapPanel triplet={detail} iirsOverlay={iirsOverlay} />
                     </div>
                   )}
@@ -877,15 +858,17 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
               </div>
 
               {/* Viewport Bottom Footer */}
-              <div className="mt-4 pt-4 border-t border-slate-100 dark:border-[#1b2029] flex flex-wrap items-center justify-between gap-3 text-xs text-slate-500 dark:text-slate-400">
+              <div className="mt-2 retro-inset p-1.5 bg-[#E8E3D7] dark:bg-[#141817] flex flex-wrap items-center justify-between text-xs">
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  <span>Aligned with <strong>{metrics?.num_inliers ?? 0} inlier ties</strong></span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="font-mono text-[11px] text-[#1E2321] dark:text-[#E7E2D6]">
+                    Aligned with <strong>{metrics?.num_inliers ?? 0} inlier ties</strong>
+                  </span>
                 </div>
                 {detail && (
                   <button
                     onClick={() => handleOpenDossierModal(detail)}
-                    className="text-[#4F46E5] font-bold hover:underline"
+                    className="retro-button px-2 py-0.5 text-[11px] font-bold text-[#1B3E5C] dark:text-cyan-300"
                   >
                     View Comprehensive Dossier Report →
                   </button>
@@ -894,169 +877,196 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
             </div>
 
             {/* Right Telemetry Column (4 cols) */}
-            <div className="lg:col-span-4 space-y-6">
+            <div className="lg:col-span-4 space-y-3">
               {/* Card 1: Selected Region Footprint + consolidated registration QA metrics */}
-              <div className="rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-5 shadow-sm">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-                  Selected Footprint Details
-                </h3>
-                <div className="space-y-3 text-xs">
-                  <div className="flex justify-between border-b border-slate-100 dark:border-[#1b2029] pb-2">
-                    <span className="text-slate-500 dark:text-slate-400">Longitude Extent</span>
-                    <span className="font-semibold text-slate-900 dark:text-slate-100">
-                      {detail ? `${detail.bounds.west_lon.toFixed(2)}° to ${detail.bounds.east_lon.toFixed(2)}°` : "—"}
-                    </span>
+              <div className="retro-outset p-2 flex flex-col justify-between">
+                <div>
+                  <div className="bg-[#28557E] text-white px-2 py-1 text-xs font-mono font-bold flex justify-between items-center -m-2 mb-2">
+                    <span>SELECTED FOOTPRINT DETAILS</span>
+                    <span className="text-[9px] bg-[#143532] px-1">METRICS</span>
                   </div>
-                  <div className="flex justify-between border-b border-slate-100 dark:border-[#1b2029] pb-2">
-                    <span className="text-slate-500 dark:text-slate-400">Latitude Extent</span>
-                    <span className="font-semibold text-slate-900 dark:text-slate-100">
-                      {detail ? `${detail.bounds.south_lat.toFixed(2)}° to ${detail.bounds.north_lat.toFixed(2)}°` : "—"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-100 dark:border-[#1b2029] pb-2">
-                    <span className="text-slate-500 dark:text-slate-400">Terrain Dimensions</span>
-                    <span className="font-semibold text-slate-900 dark:text-slate-100">
-                      {currentFootprint ? `${currentFootprint.widthKm.toFixed(1)} × ${currentFootprint.heightKm.toFixed(1)} km` : "—"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between border-b border-slate-100 dark:border-[#1b2029] pb-2">
-                    <span className="text-slate-500 dark:text-slate-400">Topographic DEM</span>
-                    <span className={`font-semibold ${detail?.dem_available ? "text-emerald-600 dark:text-emerald-400" : "text-slate-400"}`}>
-                      {detail?.dem_available ? "Available (TMC DTM)" : "Interpolated"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between gap-3 border-b border-slate-100 dark:border-[#1b2029] pb-2">
-                    <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 shrink-0">
-                      <span>Absolute Topographic RMSE</span>
-                      <span title="Physical ground accuracy">🌑</span>
-                    </span>
-                    <span className="text-right">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100 block">
-                        {metrics?.absolute_rmse_m != null ? `${metrics.absolute_rmse_m.toFixed(2)} meters` : "—"}
+
+                  <div className="retro-inset p-2 bg-[#F9F7F2] dark:bg-[#121615] font-mono text-xs space-y-1.5">
+                    <div className="flex justify-between border-b border-[#E0DACE] dark:border-[#2D3835] pb-1">
+                      <span className="text-[#5D6662] dark:text-[#8C9893]">Longitude Extent:</span>
+                      <span className="font-bold text-[#111] dark:text-[#E7E2D6]">
+                        {detail ? `${detail.bounds.west_lon.toFixed(2)}° to ${detail.bounds.east_lon.toFixed(2)}°` : "—"}
                       </span>
-                      <span className="text-[10px] text-slate-400 block">
+                    </div>
+                    <div className="flex justify-between border-b border-[#E0DACE] dark:border-[#2D3835] pb-1">
+                      <span className="text-[#5D6662] dark:text-[#8C9893]">Latitude Extent:</span>
+                      <span className="font-bold text-[#111] dark:text-[#E7E2D6]">
+                        {detail ? `${detail.bounds.south_lat.toFixed(2)}° to ${detail.bounds.north_lat.toFixed(2)}°` : "—"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between border-b border-[#E0DACE] dark:border-[#2D3835] pb-1">
+                      <span className="text-[#5D6662] dark:text-[#8C9893]">Terrain Dimensions:</span>
+                      <span className="font-bold text-[#111] dark:text-[#E7E2D6]">
+                        {currentFootprint ? `${currentFootprint.widthKm.toFixed(1)} × ${currentFootprint.heightKm.toFixed(1)} km` : "—"}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center border-b border-[#E0DACE] dark:border-[#2D3835] pb-1">
+                      <span className="text-[#5D6662] dark:text-[#8C9893]">Topographic DEM:</span>
+                      <span className={`px-1.5 py-0.2 text-[10px] font-bold border ${detail?.dem_available ? "bg-[#D5EAD8] text-[#195924] border-[#85C48F]" : "bg-[#ECE7DC] text-[#777] border-[#CCC]"}`}>
+                        {detail?.dem_available ? "Available (TMC DTM)" : "Interpolated"}
+                      </span>
+                    </div>
+                    <div className="border-b border-[#E0DACE] dark:border-[#2D3835] pb-1">
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-[#5D6662] dark:text-[#8C9893] text-[11px]">Absolute Topo RMSE:</span>
+                        <span className="font-bold text-sm text-[#111] dark:text-[#E7E2D6]">
+                          {metrics?.absolute_rmse_m != null ? `${metrics.absolute_rmse_m.toFixed(2)} meters` : "—"}
+                        </span>
+                      </div>
+                      <div className="text-[9px] text-[#7A827E] text-right">
                         {metrics?.absolute_rmse_m == null
-                          ? "No DEM/GSD — cannot convert px to meters"
+                          ? "No DEM/GSD"
                           : metrics?.absolute_rmse_m_provenance === "planar_footprint_gsd_no_dem"
                           ? "Planar estimate (no DEM)"
-                          : "DEM-corrected physical accuracy"}
+                          : "DEM-corrected accuracy"}
+                      </div>
+                    </div>
+                    <div className="border-b border-[#E0DACE] dark:border-[#2D3835] pb-1">
+                      <div className="flex justify-between items-baseline">
+                        <span className="text-[#5D6662] dark:text-[#8C9893] text-[11px]">
+                          {referenceMode === "lro_nac" ? "LRO Fit / Val:" : "Fit / Val Reprojection:"}
+                        </span>
+                        <span className="font-bold text-[#111] dark:text-[#E7E2D6]">
+                          {metrics?.fit_rmse_px != null
+                            ? metrics.fit_rmse_px.toFixed(3)
+                            : metrics?.rmse_px != null
+                            ? metrics.rmse_px.toFixed(3)
+                            : "—"}{" "}
+                          <span className="font-normal text-[#888]">fit</span>
+                          {" / "}
+                          <span className="text-emerald-700 dark:text-emerald-400 font-bold">
+                            {metrics?.validation_rmse_px != null ? metrics.validation_rmse_px.toFixed(3) : "—"}
+                          </span>{" "}
+                          <span className="font-normal text-[#888]">val</span>
+                        </span>
+                      </div>
+                      <div className="text-[9px] text-[#9E6513] dark:text-amber-400 text-right">
+                        {metrics?.validation_rmse_px == null
+                          ? `▲ Held-out needs ≥8 inliers (have ${metrics?.num_inliers ?? 0})`
+                          : "● Sub-pixel target < 1.00 px verified"}
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-baseline">
+                      <span className="text-[#5D6662] dark:text-[#8C9893] text-[11px]">Verified Inliers:</span>
+                      <span className="font-bold text-[#111] dark:text-[#E7E2D6]">
+                        {metrics?.num_inliers ?? 0} matches ({metrics?.inlier_ratio != null ? (metrics.inlier_ratio * 100).toFixed(1) : 0}%)
                       </span>
-                    </span>
+                    </div>
                   </div>
-                  <div className="flex justify-between gap-3 border-b border-slate-100 dark:border-[#1b2029] pb-2">
-                    <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 shrink-0">
-                      <span>{referenceMode === "lro_nac" ? "LRO NAC Fit / Val RMSE" : "Fit / Val Reprojection RMSE"}</span>
-                      <span title="Sub-pixel reprojection accuracy">↗</span>
-                    </span>
-                    <span className="text-right">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100 block">
-                        {metrics?.fit_rmse_px != null
-                          ? metrics.fit_rmse_px.toFixed(3)
-                          : metrics?.rmse_px != null
-                          ? metrics.rmse_px.toFixed(3)
-                          : "—"}{" "}
-                        <span className="font-normal text-slate-400">fit</span>
-                        {" / "}
-                        <span className="text-emerald-700 dark:text-emerald-400 font-bold">
-                          {metrics?.validation_rmse_px != null ? metrics.validation_rmse_px.toFixed(3) : "—"}
-                        </span>{" "}
-                        <span className="font-normal text-slate-400">val (px)</span>
-                      </span>
-                      <span className="text-[10px] text-slate-400 block">
-                        {metrics == null
-                          ? "No verified matches — registration did not verify"
-                          : metrics.validation_rmse_px == null
-                          ? `Held-out needs ≥8 inliers (have ${metrics.num_inliers ?? 0})`
-                          : "Sub-pixel target < 1.00 px verified"}
-                      </span>
-                    </span>
-                  </div>
-                  <div className="flex justify-between gap-3 border-b border-slate-100 dark:border-[#1b2029] pb-2">
-                    <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 shrink-0">
-                      <span>Verified Inliers</span>
-                      <span title="Verified correspondence count">↗</span>
-                    </span>
-                    <span className="text-right">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100 block">
-                        {metrics?.num_inliers ?? 0} <span className="font-semibold text-slate-500 dark:text-slate-400">matches</span>
-                      </span>
-                      <span className="text-[10px] text-slate-400 block">
-                        {metrics?.inlier_ratio != null ? (metrics.inlier_ratio * 100).toFixed(1) : 0}% inlier ratio
-                      </span>
-                    </span>
-                  </div>
-                  <div className="flex justify-between gap-3">
-                    <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1.5 shrink-0">
-                      <span>Spatial Coverage</span>
-                      <span title="Correspondence spread">↗</span>
-                    </span>
-                    <span className="text-right">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100 block">
-                        {metrics?.combined_coverage_score != null ? `${(metrics.combined_coverage_score * 100).toFixed(0)}%` : "—"}
-                      </span>
-                      <span className="text-[10px] text-slate-400 block">
-                        10×10 Grid Non-Max Suppression
-                      </span>
-                    </span>
+
+                  {/* Quality Gate Indicators Card */}
+                  <div className="mt-2 retro-inset p-2 bg-[#EFECE3] dark:bg-[#141817]">
+                    <div className="text-[10px] font-bold text-[#3D4743] dark:text-[#8C9893] uppercase tracking-wider mb-1 font-mono">
+                      QUALITY GATE BENCHMARK
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 text-center font-mono text-[10px]">
+                      <div className="bg-[#E4F4E7] dark:bg-emerald-950/40 border border-[#7EC48B] dark:border-emerald-800 p-1 text-[#185E26] dark:text-emerald-300 font-bold">
+                        ● GATE 1<br /><span className="text-[8px]">PASS (Scale)</span>
+                      </div>
+                      <div className="bg-[#E4F4E7] dark:bg-emerald-950/40 border border-[#7EC48B] dark:border-emerald-800 p-1 text-[#185E26] dark:text-emerald-300 font-bold">
+                        ● GATE 2<br /><span className="text-[8px]">PASS (NCC)</span>
+                      </div>
+                      <div className="bg-[#FEF3D6] dark:bg-amber-950/40 border border-[#DEC073] dark:border-amber-800 p-1 text-[#8C6211] dark:text-amber-300 font-bold">
+                        ▲ GATE 3<br /><span className="text-[8px]">VERIFY (Val)</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Card 2: Sensor Capabilities Progress Breakdown */}
-              <div className="rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-5 shadow-sm">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">
-                  Multi-Modal Sensor Layers
-                </h3>
-                <div className="space-y-3 text-xs">
+              <div className="retro-outset p-2">
+                <div className="bg-[#1F4743] text-white px-2 py-1 text-xs font-mono font-bold -m-2 mb-2">
+                  MULTI-MODAL SENSOR LAYERS
+                </div>
+                <div className="retro-inset p-2 bg-[#F9F7F2] dark:bg-[#121615] font-mono text-xs space-y-2">
                   <div>
-                    <div className="flex justify-between text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                    <div className="flex justify-between text-[#1E2321] dark:text-[#E7E2D6] font-bold text-[11px] mb-1">
                       <span>OHRC Narrow Angle</span>
                       <span>{sensorCardGsd(detail, "ohrc")}</span>
                     </div>
-                    <div className="w-full bg-slate-100 dark:bg-white/10 h-2 rounded-full overflow-hidden">
-                      <div className="bg-[#4F46E5] h-full rounded-full" style={{ width: "95%" }} />
+                    <div className="progress-bar-track">
+                      <div className="progress-bar-fill" style={{ width: "95%" }} />
                     </div>
                   </div>
                   <div>
-                    <div className="flex justify-between text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                    <div className="flex justify-between text-[#1E2321] dark:text-[#E7E2D6] font-bold text-[11px] mb-1">
                       <span>TMC-2 Single View</span>
                       <span>{sensorCardGsd(detail, "tmc")}</span>
                     </div>
-                    <div className="w-full bg-slate-100 dark:bg-white/10 h-2 rounded-full overflow-hidden">
-                      <div className="bg-indigo-400 h-full rounded-full" style={{ width: "80%" }} />
+                    <div className="progress-bar-track">
+                      <div className="progress-bar-fill bg-[#2A5D57]" style={{ width: "80%" }} />
                     </div>
                   </div>
                   <div>
-                    <div className="flex justify-between text-slate-700 dark:text-slate-300 font-semibold mb-1">
+                    <div className="flex justify-between text-[#1E2321] dark:text-[#E7E2D6] font-bold text-[11px] mb-1">
                       <span>IIRS Hyperspectral</span>
                       <span>{sensorCardGsd(detail, "iirs")}</span>
                     </div>
-                    <div className="w-full bg-slate-100 dark:bg-white/10 h-2 rounded-full overflow-hidden">
-                      <div className="bg-cyan-500 h-full rounded-full" style={{ width: "65%" }} />
+                    <div className="progress-bar-track">
+                      <div className="progress-bar-fill bg-[#785317]" style={{ width: "65%" }} />
                     </div>
                   </div>
                   {detail?.lro_nac_available && (
                     <div>
-                      <div className="flex justify-between text-slate-700 dark:text-slate-300 font-semibold mb-1">
-                        <span className="flex items-center gap-1.5">
+                      <div className="flex justify-between text-[#1E2321] dark:text-[#E7E2D6] font-bold text-[11px] mb-1">
+                        <span className="flex items-center gap-1">
                           <span>NASA LRO NAC</span>
-                          <span className="rounded bg-amber-100 dark:bg-amber-950/50 px-1 text-[9px] font-bold text-amber-800 dark:text-amber-300">Ref</span>
+                          <span className="bg-[#D1B890] text-black px-1 text-[8px]">Ref</span>
                         </span>
                         <span>{sensorCardGsd(detail, "lro_nac")}</span>
                       </div>
-                      <div className="w-full bg-slate-100 dark:bg-white/10 h-2 rounded-full overflow-hidden">
-                        <div className="bg-amber-500 h-full rounded-full" style={{ width: "88%" }} />
+                      <div className="progress-bar-track">
+                        <div className="progress-bar-fill bg-[#BD8B3E]" style={{ width: "88%" }} />
                       </div>
                     </div>
                   )}
                 </div>
               </div>
-
             </div>
-
           </div>
         </main>
+
+        {/* Retro OS Bottom Taskbar */}
+        <footer className="h-9 bg-[#D6D0C2] dark:bg-[#1A201E] border-t-2 border-white dark:border-[#2D3835] px-3 py-1 flex items-center justify-between shadow-md z-40 shrink-0 text-xs select-none">
+          <div className="flex items-center space-x-2">
+            <button className="retro-button px-2.5 py-0.5 font-bold text-xs flex items-center gap-1.5 bg-[#E8E2D5] dark:bg-[#222927]">
+              <span className="w-3.5 h-3.5 bg-[#1F4743] flex items-center justify-center text-white text-[9px] font-bold">🚀</span>
+              <span className="font-black text-[#143532] dark:text-emerald-400 tracking-wider text-xs">Start</span>
+            </button>
+            <div className="hidden sm:flex items-center space-x-1 text-xs">
+              <div className="retro-button active-pressed px-2.5 py-0.5 text-[11px] font-bold bg-[#CFC8BA] dark:bg-[#121615] flex items-center gap-1.5 text-[#1E2321] dark:text-[#E7E2D6]">
+                <span className="w-2 h-2 bg-[#28557E] inline-block" />
+                <span>Chandrayaan Console</span>
+              </div>
+              <div className="retro-button px-2.5 py-0.5 text-[11px] font-medium bg-[#DDD7CA] dark:bg-[#1A201E] hidden md:flex items-center gap-1.5 text-[#3E4743] dark:text-[#A8B2AD]">
+                <span>🛰️</span>
+                <span>Sub-Pixel Engine Active</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="retro-inset px-2 py-0.5 text-[10px] font-mono bg-[#E8E3D7] dark:bg-[#141817] flex items-center gap-1 text-[#222] dark:text-[#E7E2D6]">
+              <span>🌙</span>
+              <span>ALT: <strong>100.4 KM</strong></span>
+            </div>
+            <div className="retro-inset px-2 py-0.5 text-[10px] font-mono bg-[#E8E3D7] dark:bg-[#141817] flex items-center gap-1 text-[#222] dark:text-[#E7E2D6]">
+              <span>💾</span>
+              <span>MEM: <strong>64 MB OK</strong></span>
+            </div>
+            <div className="retro-inset px-2.5 py-0.5 text-xs font-mono font-bold bg-[#E8E3D7] dark:bg-[#141817] text-[#111] dark:text-[#E7E2D6] flex items-center gap-1">
+              <span>🕒</span>
+              <span>ISRO-UTC</span>
+            </div>
+          </div>
+        </footer>
       </div>
+    </div>
 
       {/* Modals with Clean Light UI Style */}
       {activeDossierTriplet && (

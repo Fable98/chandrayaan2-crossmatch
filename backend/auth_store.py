@@ -206,3 +206,27 @@ def create_user(user: dict) -> dict:
     users.append(user)
     _save_users_json(users)
     return user
+
+
+def update_user(user_id: str, updates: dict) -> Optional[dict]:
+    """Update fields on an existing user."""
+    try:
+        if _ensure_engine():
+            assert _SessionLocal is not None and _UserModel is not None
+            with _SessionLocal() as session:
+                row = session.query(_UserModel).filter(_UserModel.id == user_id).first()
+                if row:
+                    for k, v in updates.items():
+                        if hasattr(row, k):
+                            setattr(row, k, v)
+                    session.commit()
+                    return find_user_by_id(user_id)
+    except Exception as exc:
+        logger.warning("DB user update failed (%s); falling back to JSON.", exc)
+    users = _load_users_json()
+    for u in users:
+        if u.get("id") == user_id:
+            u.update(updates)
+            _save_users_json(users)
+            return u
+    return None
