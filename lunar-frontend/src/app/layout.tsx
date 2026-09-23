@@ -29,9 +29,9 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Astralynx — Step Into the Celestial Frontier",
+  title: "Chandrayaan-2 Multi-Modal Lunar Co-Registration · ISRO SIH26166",
   description:
-    "Discover the fusion of cosmic exploration and intelligent innovation, where every step unveils a universe powered by AI.",
+    "Autonomous sub-pixel geometric co-registration and planetary cross-matching engine for Chandrayaan-2 OHRC (0.25m), TMC-2 (5.0m), and IIRS (80m) payloads.",
 };
 
 export default function RootLayout({

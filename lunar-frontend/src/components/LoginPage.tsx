@@ -93,6 +93,33 @@ export default function LoginPage({ onLoginSuccess }: Props) {
     }
   };
 
+  const handleQuickDemoLogin = async () => {
+    setError(null);
+    setLoading(true);
+    const demoEmail = "pilot@isro.gov.in";
+    const demoPass = "Chandrayaan2024!";
+    const demoName = "ISRO Flight Operator";
+
+    try {
+      try {
+        await login(demoEmail, demoPass);
+      } catch {
+        // If demo user does not exist in local db, register it
+        await register(demoName, demoEmail, demoPass);
+      }
+      setShowSuccess(true);
+      setTimeout(() => {
+        onLoginSuccess();
+      }, 700);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "FastAPI server error";
+      setError(`Quick demo access: ${message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <section className="dark relative min-h-screen w-full select-none overflow-x-hidden overflow-y-auto bg-[#000000] font-sans text-white flex flex-col justify-between">
       {/* Always-dark cinematic entry (see ExploreMoonHero): pinned `dark` keeps
@@ -118,10 +145,29 @@ export default function LoginPage({ onLoginSuccess }: Props) {
       </div>
 
       {/* Floating Particle / Glow Effects */}
-      <div className="pointer-events-none fixed inset-0 z-[1]">
+      {/* Twinkling Space Stars */}
+      <div className="pointer-events-none fixed inset-0 z-[1] overflow-hidden">
+        {[
+          { top: "15%", left: "12%", delay: "0.2s" },
+          { top: "28%", left: "84%", delay: "1.4s" },
+          { top: "65%", left: "15%", delay: "0.8s" },
+          { top: "78%", left: "78%", delay: "2.1s" },
+          { top: "42%", left: "92%", delay: "1.7s" },
+          { top: "85%", left: "45%", delay: "0.5s" },
+        ].map((star, i) => (
+          <div
+            key={i}
+            className="absolute h-1 w-1 rounded-full bg-white shadow-[0_0_6px_#3fb5c9] animate-star-twinkle"
+            style={{
+              top: star.top,
+              left: star.left,
+              animationDelay: star.delay,
+            }}
+          />
+        ))}
         {/* Teal nebula glow behind card area */}
         <div
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-[0.06]"
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-[0.08]"
           style={{
             background:
               "radial-gradient(circle, rgba(63,181,201,0.5) 0%, transparent 70%)",
@@ -129,14 +175,37 @@ export default function LoginPage({ onLoginSuccess }: Props) {
         />
       </div>
 
-      {/* Top Bar */}
+      {/* Top Bar with Mission Branding */}
       <header
-        className={`relative z-30 flex h-14 shrink-0 items-center justify-between border-b border-white/5 px-6 transition-all duration-1000 md:px-12 ${
+        className={`relative z-30 flex h-16 shrink-0 items-center justify-between border-b border-white/[0.08] bg-black/40 backdrop-blur-md px-6 transition-all duration-1000 md:px-12 ${
           isLoaded ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
         }`}
       >
-        <div />
-        <div />
+        <div className="flex items-center gap-3">
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal to-[#1B2CC1] p-0.5 shadow-[0_0_12px_rgba(63,181,201,0.3)]">
+            <div className="flex h-full w-full items-center justify-center rounded-md bg-black">
+              <span className="font-mono text-xs font-black text-teal">C2</span>
+            </div>
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-xs tracking-wider text-white">
+                CHANDRAYAAN-2
+              </span>
+              <span className="rounded bg-teal/20 px-1.5 py-0.5 text-[9px] font-mono font-bold text-teal uppercase">
+                ISRO SAC
+              </span>
+            </div>
+            <span className="text-[10px] text-ink-dim block font-mono">
+              Planetary Co-Registration System
+            </span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-2xs text-ink-dim">
+          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span>PORTAL SECURED</span>
+        </div>
       </header>
 
       {/* Main Content — Login Card */}
@@ -359,6 +428,19 @@ export default function LoginPage({ onLoginSuccess }: Props) {
                     )}
                   </span>
                 </button>
+
+                {/* One-Click Quick Demo Login */}
+                <div className="mt-3">
+                  <button
+                    type="button"
+                    onClick={handleQuickDemoLogin}
+                    disabled={loading}
+                    className="w-full flex items-center justify-center gap-2 rounded-lg border border-teal/40 bg-teal/10 py-2.5 text-xs font-semibold text-teal shadow-[0_0_15px_rgba(63,181,201,0.12)] transition-all duration-200 hover:bg-teal/20 hover:border-teal/60 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+                  >
+                    <span className="text-amber-400">⚡</span>
+                    <span>Quick Demo Pilot Access (Instant Evaluation)</span>
+                  </button>
+                </div>
 
               </form>
 

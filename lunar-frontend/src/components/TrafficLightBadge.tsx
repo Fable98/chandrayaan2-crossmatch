@@ -76,10 +76,13 @@ export default function TrafficLightBadge({
       className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${STYLE[known]}`}
       title={tipParts.join(" · ")}
     >
-      <span className="h-1.5 w-1.5 rounded-full bg-current" />
+      <span className="relative flex h-2 w-2">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 bg-current" />
+        <span className="relative inline-flex rounded-full h-2 w-2 bg-current" />
+      </span>
       {known}
       {conf !== null ? ` · ${conf}` : ""}
-      <span className="font-medium normal-case tracking-normal opacity-80">
+      <span className="font-medium normal-case tracking-normal opacity-85">
         {LABEL[known]}
       </span>
     </span>
