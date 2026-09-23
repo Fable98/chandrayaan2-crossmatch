@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 
 interface Props {
   onBackToHero?: () => void;
@@ -8,6 +8,7 @@ interface Props {
 }
 
 export default function AboutPage({ onBackToHero, onOpenConsole }: Props) {
+  const [selectedSensor, setSelectedSensor] = useState<"OHRC" | "TMC" | "IIRS" | "LRO_NAC">("OHRC");
   return (
     <div className="dark min-h-screen bg-[#08080a] font-sans text-[#f0f2f5] selection:bg-[#2c2619] selection:text-[#f3df9b]">
       {/* Always-dark briefing aesthetic (obsidian/gold): pinned `dark` keeps
@@ -102,6 +103,73 @@ export default function AboutPage({ onBackToHero, onOpenConsole }: Props) {
             invert and elongate by hundreds of percent, rendering standard gradient-based descriptors
             (SIFT, SURF, ORB) and photometric matchers completely ineffective.
           </p>
+
+          {/* Interactive Scale Gap Visualizer */}
+          <div className="mt-8 rounded-2xl border border-white/10 bg-[#121217]/90 p-6 backdrop-blur-xl shadow-2xl">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 pb-4">
+              <div>
+                <span className="font-mono text-2xs uppercase tracking-wider text-teal font-semibold">
+                  Interactive Scale Gap Simulator
+                </span>
+                <h4 className="text-sm font-bold text-white mt-0.5">
+                  Resolution &amp; Footprint Disparity Comparator
+                </h4>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5 bg-black/40 p-1 rounded-xl border border-white/10">
+                {[
+                  { id: "OHRC", label: "OHRC (0.25m)" },
+                  { id: "TMC", label: "TMC-2 (5.0m)" },
+                  { id: "IIRS", label: "IIRS (80m)" },
+                  { id: "LRO_NAC", label: "LRO NAC (0.5m)" },
+                ].map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => setSelectedSensor(s.id as "OHRC" | "TMC" | "IIRS" | "LRO_NAC")}
+                    className={`rounded-lg px-3 py-1 font-mono text-xs font-semibold transition-all ${
+                      selectedSensor === s.id
+                        ? "bg-teal/20 text-teal border border-teal/40 shadow-sm"
+                        : "text-ink-dim hover:text-white"
+                    }`}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Dynamic Comparison Panel */}
+            <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="rounded-xl border border-white/5 bg-black/40 p-4 transition-all hover:border-teal/30">
+                <span className="text-2xs text-ink-dim uppercase font-mono block">Ground Sample Distance</span>
+                <span className="text-xl font-black text-teal font-mono block mt-1">
+                  {selectedSensor === "OHRC" ? "0.25 m/px" : selectedSensor === "TMC" ? "5.0 m/px" : selectedSensor === "IIRS" ? "80.0 m/px" : "0.50 m/px"}
+                </span>
+                <span className="text-2xs text-ink-faint block mt-1">
+                  {selectedSensor === "OHRC" ? "Highest resolution lunar optical payload in orbit" : selectedSensor === "TMC" ? "20× scale ratio relative to OHRC" : selectedSensor === "IIRS" ? "320× scale disparity relative to OHRC" : "NASA narrow-angle cross-calibration reference"}
+                </span>
+              </div>
+
+              <div className="rounded-xl border border-white/5 bg-black/40 p-4 transition-all hover:border-amber-400/30">
+                <span className="text-2xs text-ink-dim uppercase font-mono block">Coverage per 512px Tile</span>
+                <span className="text-xl font-black text-amber-300 font-mono block mt-1">
+                  {selectedSensor === "OHRC" ? "128 × 128 m" : selectedSensor === "TMC" ? "2.56 × 2.56 km" : selectedSensor === "IIRS" ? "40.96 × 40.96 km" : "256 × 256 m"}
+                </span>
+                <span className="text-2xs text-ink-faint block mt-1">
+                  {selectedSensor === "OHRC" ? "Fine boulders, rover tracks, rim slopes" : selectedSensor === "TMC" ? "Entire impact crater rim structure" : selectedSensor === "IIRS" ? "Regional mare & highlands geological units" : "Orbital validation benchmark footprint"}
+                </span>
+              </div>
+
+              <div className="rounded-xl border border-white/5 bg-black/40 p-4 transition-all hover:border-emerald-400/30">
+                <span className="text-2xs text-ink-dim uppercase font-mono block">Optimal Alignment Method</span>
+                <span className="text-xl font-black text-emerald-400 font-mono block mt-1">
+                  {selectedSensor === "OHRC" ? "Moving Target" : selectedSensor === "TMC" ? "CFOG Multi-Scale" : selectedSensor === "IIRS" ? "Coarse Selenodesy" : "Mutual Information"}
+                </span>
+                <span className="text-2xs text-ink-faint block mt-1">
+                  {selectedSensor === "OHRC" ? "Pre-warped by DEM relief correction" : selectedSensor === "TMC" ? "Phase congruency + Log-Gabor pyramid" : selectedSensor === "IIRS" ? "Band-ratio radiance absorption co-registration" : "Cross-agency photometric NCC / MI"}
+                </span>
+              </div>
+            </div>
+          </div>
 
           {/* 4 Payload Cards */}
           <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">

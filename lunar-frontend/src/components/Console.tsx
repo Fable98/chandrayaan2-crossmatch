@@ -289,18 +289,24 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
       {/* ======================================================== */}
       <aside className="w-64 bg-white dark:bg-[#0e1117] border-r border-slate-200/80 dark:border-[#1b2029] flex flex-col shrink-0 h-screen sticky top-0 overflow-hidden">
           {/* Brand Header — fixed, does not scroll */}
-          <div className="p-6 pb-5 flex items-center justify-between border-b border-slate-100 dark:border-[#1b2029] shrink-0">
+          <div className="p-5 pb-4 flex items-center justify-between border-b border-slate-100 dark:border-[#1b2029] shrink-0">
             <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#4F46E5] text-white font-black text-base shadow-sm">
-                c
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-[#4F46E5] text-white font-mono font-black text-xs shadow-[0_0_14px_rgba(79,70,229,0.35)]">
+                C2
               </div>
               <div>
-                <h1 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-slate-100 leading-none">
-                  chandrayaan
+                <h1 className="text-sm font-extrabold tracking-tight text-slate-900 dark:text-slate-100 leading-none">
+                  chandrayaan-2
                 </h1>
-                <span className="text-[10px] font-medium text-slate-400">Cross-Match Console</span>
+                <span className="text-[10px] font-mono text-indigo-600 dark:text-indigo-400 font-semibold block mt-1">
+                  ISRO SAC · SIH26166
+                </span>
               </div>
             </div>
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
           </div>
 
           {/* Navigation Section — independently scrollable, sidebar stays fixed */}
@@ -480,9 +486,23 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search for regions, coordinates..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-[#1b2029] rounded-xl text-xs text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20 focus:border-[#4F46E5] transition"
+              placeholder="Search regions, coordinates..."
+              className="w-full pl-10 pr-12 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-[#1b2029] rounded-xl text-xs text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20 focus:border-[#4F46E5] transition"
             />
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded bg-slate-200/60 dark:bg-white/10 px-1.5 py-0.5 font-mono text-[9px] text-slate-400">
+              /
+            </span>
+          </div>
+
+          {/* Center: Live Co-Registration Engine Status Beacon */}
+          <div className="hidden lg:flex items-center gap-2 rounded-full border border-slate-200/80 dark:border-[#1b2029] bg-slate-50/80 dark:bg-white/5 px-3 py-1 font-mono text-2xs text-slate-600 dark:text-slate-300 shadow-sm">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span className="font-semibold">FASTAPI :8000</span>
+            <span className="text-slate-300 dark:text-white/20">·</span>
+            <span className="text-indigo-600 dark:text-indigo-400 font-bold">CFOG SUB-PIXEL ACTIVE</span>
           </div>
 
           {/* Right Header Controls */}
@@ -619,26 +639,31 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
         {/* Dashboard Main Content — only this pane scrolls */}
         <main className="flex-1 min-h-0 p-8 space-y-6 overflow-y-auto">
           {/* Page Title & Subtitle */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/60 dark:border-[#1b2029] pb-5">
             <div>
-              <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-                Dashboard
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                A quick view of your planetary cross-matching and multi-sensor registration pipeline.
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">
+                  Mission Control
+                </h2>
+                <span className="rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/50 px-2.5 py-0.5 text-2xs font-mono font-bold text-indigo-700 dark:text-indigo-300">
+                  ISRO SIH26166
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Planetary cross-matching across OHRC (0.25m), TMC-2 (5.0m), and IIRS (80m) rasters with sub-pixel verification.
               </p>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => openVaultWithFilter("all")}
-                className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition shadow-sm"
+                className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] px-4 py-2 text-xs font-bold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition shadow-sm hover:scale-[1.02] active:scale-[0.98]"
               >
                 Browse All Regions
               </button>
               {detail && (
                 <button
                   onClick={() => handleOpenDossierModal(detail)}
-                  className="rounded-xl bg-[#4F46E5] px-4 py-2 text-xs font-bold text-white hover:bg-[#4338CA] transition shadow-sm flex items-center gap-1.5"
+                  className="rounded-xl bg-[#4F46E5] hover:bg-[#4338CA] px-4 py-2 text-xs font-bold text-white shadow-md shadow-indigo-500/20 transition-all hover:scale-[1.02] active:scale-[0.98] flex items-center gap-1.5"
                 >
                   <span>Dossier Report</span>
                   <span>↗</span>
@@ -799,21 +824,29 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
                             ? { src: `/images/registered/lro_nac/${detail.id}/checkerboard_qa.png`, fallback: `/images/lro_nac/${detail.id}`, label: "Checkerboard QA", tag: checkerboardTag(detail, true) }
                             : { src: `/images/registered/${detail.id}/checkerboard_qa.png`, fallback: `/images/tmc/${detail.id}`, label: "Checkerboard QA", tag: checkerboardTag(detail, false) },
                         ].map((img, idx) => (
-                          <div key={idx} className="flex flex-col rounded-xl border border-slate-200/70 dark:border-[#1b2029] overflow-hidden bg-slate-50 dark:bg-white/5">
+                          <div
+                            key={idx}
+                            className="group flex flex-col rounded-xl border border-slate-200/80 dark:border-[#1b2029] overflow-hidden bg-slate-50 dark:bg-[#0e1117] transition-all duration-300 hover:shadow-lg hover:border-indigo-400/50 dark:hover:border-indigo-500/40"
+                          >
                             <div className="relative aspect-square overflow-hidden bg-black">
                               {/* eslint-disable-next-line @next/next/no-img-element */}
                               <img
                                 src={imageUrl(img.src)}
                                 alt={img.label}
-                                className="h-full w-full object-cover transition-transform duration-300 hover:scale-105"
+                                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
                                 onError={(e) => {
                                   (e.currentTarget as HTMLImageElement).src = imageUrl(img.fallback);
                                 }}
                               />
+                              <div className="absolute top-2 right-2 rounded-md bg-black/60 backdrop-blur-md px-1.5 py-0.5 font-mono text-[9px] text-white/80 border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                VIEW
+                              </div>
                             </div>
-                            <div className="p-3 bg-white dark:bg-[#0e1117]">
-                              <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block">{img.label}</span>
-                              <span className="text-[10px] text-slate-500 dark:text-slate-400">{img.tag}</span>
+                            <div className="p-3 bg-white dark:bg-[#0e1117] border-t border-slate-100 dark:border-[#1b2029]">
+                              <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                {img.label}
+                              </span>
+                              <span className="text-[10px] text-slate-500 dark:text-slate-400 block mt-0.5">{img.tag}</span>
                             </div>
                           </div>
                         ))}
