@@ -52,7 +52,7 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="bg-[#f4f6fb] text-slate-800 dark:bg-[#070d14] dark:text-[#f0f4f5] font-sans antialiased">
+      <body className="bg-[#DED8CB] text-[#1E2321] dark:bg-[#121615] dark:text-[#E7E2D6] font-sans antialiased">
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

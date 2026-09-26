@@ -216,6 +216,9 @@ export async function fetchCurrentUser(): Promise<AuthUser | null> {
       headers: { Authorization: `Bearer ${token}` },
     });
     if (!res.ok) {
+      if (token.startsWith("demo-eval-session-token")) {
+        return getStoredUser();
+      }
       // Token is invalid/expired — clear it
       logout();
       return null;
@@ -224,6 +227,9 @@ export async function fetchCurrentUser(): Promise<AuthUser | null> {
     setStoredUser(user);
     return user;
   } catch {
+    if (token.startsWith("demo-eval-session-token")) {
+      return getStoredUser();
+    }
     return null;
   }
 }

@@ -132,33 +132,39 @@ export default function LinkedCursorPanel({ tripletId, points, referenceMode = "
   const refSrc = isLro ? imageUrl(`/images/lro_nac/${tripletId}`) : imageUrl(`/images/tmc/${tripletId}`);
 
   return (
-    <div className="flex h-full flex-col overflow-hidden rounded-xl border border-border bg-panel text-ink shadow-panel">
+    <div className="flex h-full flex-col overflow-hidden retro-outset bg-panel text-ink">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-border bg-panel-raised px-5 py-3">
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-2xs uppercase tracking-widest text-teal">
+      <div className="flex items-center justify-between border-b border-[#8B8579] dark:border-[#2D3835] bg-[#1F4743] text-white px-3 py-1 font-mono">
+        <div className="flex items-center gap-2.5">
+          <span className="w-2 h-2 bg-[#428178] border border-white/40" />
+          <span className="font-mono text-2xs uppercase tracking-widest text-[#E7E2D6] font-bold">
             Sub-Pixel Match Verification
           </span>
-          <span className="text-xs text-ink-dim font-mono">
+          <span className="text-xs text-[#C8C2B5] font-mono">
             {points.length} verified tie points
           </span>
           {typeof overlapPct === "number" && (
             <span
               title="Shared OHRC+TMC-2+IIRS footprint overlap from triplet matching"
-              className="rounded-full border border-teal/30 bg-teal/10 px-2 py-0.5 font-mono text-[11px] font-bold text-teal"
+              className="retro-inset px-2 py-0.2 font-mono text-[10px] font-bold text-black border-t-[#8B8579] border-l-[#8B8579] border-r-white border-b-white"
             >
               {overlapPct.toFixed(1)}% overlap
             </span>
           )}
         </div>
-        <span className="rounded bg-teal/10 border border-teal/30 px-2 py-0.5 font-mono text-3xs uppercase tracking-wider text-teal">
-          Stage 4: LK Refinement
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className="retro-inset px-2 py-0.2 font-mono text-3xs uppercase tracking-wider font-bold text-black border-t-[#8B8579] border-l-[#8B8579] border-r-white border-b-white">
+            Stage 4: LK Refinement
+          </span>
+          <button type="button" className="window-ctrl-btn">_</button>
+          <button type="button" className="window-ctrl-btn">□</button>
+          <button type="button" className="window-ctrl-btn">X</button>
+        </div>
       </div>
 
       {notice && points.length === 0 && (
-        <div className="mx-5 mt-4 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 px-4 py-2.5 font-mono text-[11px] leading-relaxed text-amber-800 dark:text-amber-200">
-          <span className="font-black uppercase tracking-wider">No correspondence dots: </span>
+        <div className="mx-4 mt-3 retro-inset bg-[#FFFBEB] dark:bg-[#201414] border border-[#D97706] px-3 py-2 font-mono text-[11px] leading-relaxed text-[#B45309] dark:text-amber-200">
+          <span className="font-bold uppercase tracking-wider">No correspondence dots: </span>
           {notice}
         </div>
       )}

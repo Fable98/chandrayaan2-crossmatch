@@ -4,113 +4,309 @@
 
 @import "leaflet/dist/leaflet.css";
 
+html {
+  font-size: 115%;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* 15% typography scale for arbitrary pixel utility classes */
+.text-\[8px\] { font-size: 9.2px !important; }
+.text-\[9px\] { font-size: 10.35px !important; }
+.text-\[10px\] { font-size: 11.5px !important; }
+.text-\[11px\] { font-size: 12.65px !important; }
+.text-\[12px\] { font-size: 13.8px !important; }
+.text-\[13px\] { font-size: 14.95px !important; }
+.text-\[14px\] { font-size: 16.1px !important; }
+.text-\[15px\] { font-size: 17.25px !important; }
+.text-\[16px\] { font-size: 18.4px !important; }
+.text-\[18px\] { font-size: 20.7px !important; }
+.text-\[20px\] { font-size: 23px !important; }
+.text-\[22px\] { font-size: 25.3px !important; }
+.text-\[24px\] { font-size: 27.6px !important; }
+
 :root {
-  /* Light theme (default: no `dark` class on <html>). The dark values live
-     under `.dark` below. `--c-*` triplets drive the tailwind surface tokens
-     (void/panel/border/ink) so token-based components theme automatically. */
+  /* Chandrayaan Retro OS Console — Light Theme Tokens */
   color-scheme: light;
-  --c-void: 244 246 251;
-  --c-panel: 255 255 255;
-  --c-panel-raised: 238 241 246;
-  --c-border: 226 232 240;
-  --c-border-bright: 203 213 225;
-  --c-ink: 15 23 42;
-  --c-ink-dim: 71 85 105;
-  --c-ink-faint: 148 163 184;
-  --bg-primary: #f4f6fb;
-  --bg-secondary: #ffffff;
-  --bg-surface: #eef1f6;
-  --bg-elevated: #e8edf5;
-  --bg-glass: rgba(255, 255, 255, 0.78);
-  --bg-glass-hover: rgba(238, 241, 246, 0.92);
-  --bg-log: #f8fafc;
-  --accent-primary: #6366f1;
-  --accent-secondary: #818cf8;
-  --accent-glow: rgba(99, 102, 241, 0.25);
-  --accent-success: #34d399;
-  --accent-success-bg: rgba(52, 211, 153, 0.12);
-  --accent-warning: #fbbf24;
-  --accent-warning-bg: rgba(251, 191, 36, 0.12);
-  --accent-danger: #f87171;
-  --accent-danger-bg: rgba(248, 113, 113, 0.12);
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #94a3b8;
-  --border-subtle: rgba(15, 23, 42, 0.08);
-  --border-default: rgba(15, 23, 42, 0.14);
-  --border-active: rgba(99, 102, 241, 0.5);
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  --retro-bg: #DED8CB;
+  --retro-panel: #E7E2D6;
+  --retro-panel-light: #EFEBE0;
+  --retro-surface-light: #F6F3EC;
+  --retro-surface-dark: #C9C3B4;
+  --retro-teal: #1F4743;
+  --retro-teal-dark: #143532;
+  --retro-teal-light: #2A5D57;
+  --retro-blue: #28557E;
+  --retro-blue-dark: #1E3F5E;
+  --retro-border-light: #FFFFFF;
+  --retro-border-gray: #8B8579;
+  --retro-border-dark: #3E3B34;
+  --retro-green-led: #4ADE80;
+  --retro-amber-led: #F59E0B;
+
+  /* Theme-aware Tailwind surface tokens */
+  --c-void: 222 216 203;          /* #DED8CB */
+  --c-panel: 231 226 214;         /* #E7E2D6 */
+  --c-panel-raised: 239 235 224;  /* #EFEBE0 */
+  --c-border: 185 178 165;        /* #B9B2A5 */
+  --c-border-bright: 255 255 255;
+  --c-ink: 30 35 33;              /* #1E2321 */
+  --c-ink-dim: 85 92 88;          /* #555C58 */
+  --c-ink-faint: 139 133 121;     /* #8B8579 */
+
+  --bg-primary: #DED8CB;
+  --bg-secondary: #E7E2D6;
+  --bg-surface: #F6F3EC;
+  --bg-elevated: #DFD9CC;
+  --bg-glass: rgba(231, 226, 214, 0.94);
+  --bg-glass-hover: rgba(223, 217, 204, 0.96);
+  --bg-log: #F6F3EC;
+  --accent-primary: #1F4743;
+  --accent-secondary: #28557E;
+  --accent-glow: rgba(40, 85, 126, 0.25);
+  --accent-success: #166534;
+  --accent-success-bg: rgba(74, 222, 128, 0.2);
+  --accent-warning: #92400e;
+  --accent-warning-bg: rgba(245, 158, 11, 0.2);
+  --accent-danger: #991b1b;
+  --accent-danger-bg: rgba(239, 68, 68, 0.15);
+  --text-primary: #1E2321;
+  --text-secondary: #4A524E;
+  --text-muted: #79827D;
+  --border-subtle: #A8A295;
+  --border-default: #8B8579;
+  --border-active: #28557E;
+  --radius-sm: 2px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
   --radius-full: 9999px;
-  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
-  --shadow-lg: 0 8px 32px rgba(15, 23, 42, 0.12);
-  --shadow-glow: 0 0 40px var(--accent-glow);
+  --shadow-md: 1px 1px 0px rgba(0, 0, 0, 0.2);
+  --shadow-lg: 2px 2px 0px rgba(0, 0, 0, 0.25);
+  --shadow-glow: none;
   --font-sans: var(--font-inter), sans-serif;
   --font-mono: var(--font-plex-mono), monospace;
 }
 
 .dark {
-  /* Dark theme: previous hard-coded values, now scoped to the `dark` class
-     toggled by ThemeProvider. */
+  /* Chandrayaan Retro OS Console — Dark Workstation Tokens */
   color-scheme: dark;
-  --c-void: 9 11 14;
-  --c-panel: 14 17 23;
-  --c-panel-raised: 20 24 32;
-  --c-border: 27 32 41;
-  --c-border-bright: 40 48 61;
-  --c-ink: 240 242 245;
-  --c-ink-dim: 154 163 175;
-  --c-ink-faint: 92 101 116;
-  --bg-primary: #0a0e1a;
-  --bg-secondary: #111827;
-  --bg-surface: #1a2035;
-  --bg-elevated: #1f2a44;
-  --bg-glass: rgba(26, 32, 53, 0.72);
-  --bg-glass-hover: rgba(31, 42, 68, 0.85);
-  --bg-log: #0d1117;
-  --text-primary: #f1f5f9;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --border-subtle: rgba(148, 163, 184, 0.1);
-  --border-default: rgba(148, 163, 184, 0.18);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --retro-bg: #121615;
+  --retro-panel: #1A201E;
+  --retro-panel-light: #222927;
+  --retro-surface-light: #161B19;
+  --retro-surface-dark: #0A0D0C;
+  --retro-teal: #1F4743;
+  --retro-teal-dark: #143532;
+  --retro-teal-light: #2D645E;
+  --retro-blue: #28557E;
+  --retro-blue-dark: #1E3F5E;
+  --retro-border-light: #3A4541;
+  --retro-border-gray: #242C2A;
+  --retro-border-dark: #0A0D0C;
+  --retro-green-led: #4ADE80;
+  --retro-amber-led: #F59E0B;
+
+  --c-void: 18 22 21;             /* #121615 */
+  --c-panel: 26 32 30;            /* #1A201E */
+  --c-panel-raised: 34 41 39;     /* #222927 */
+  --c-border: 45 56 53;           /* #2D3835 */
+  --c-border-bright: 74 93 88;
+  --c-ink: 231 226 214;           /* #E7E2D6 */
+  --c-ink-dim: 168 178 173;       /* #A8B2AD */
+  --c-ink-faint: 105 117 113;     /* #697571 */
+
+  --bg-primary: #121615;
+  --bg-secondary: #1A201E;
+  --bg-surface: #141817;
+  --bg-elevated: #222927;
+  --bg-glass: rgba(26, 32, 30, 0.92);
+  --bg-glass-hover: rgba(34, 41, 39, 0.96);
+  --bg-log: #0A0D0C;
+  --accent-primary: #2D645E;
+  --accent-secondary: #3B72A0;
+  --accent-glow: rgba(59, 114, 160, 0.25);
+  --accent-success: #4ade80;
+  --accent-success-bg: rgba(74, 222, 128, 0.15);
+  --accent-warning: #fbbf24;
+  --accent-warning-bg: rgba(251, 191, 36, 0.15);
+  --accent-danger: #f87171;
+  --accent-danger-bg: rgba(248, 113, 113, 0.15);
+  --text-primary: #E7E2D6;
+  --text-secondary: #A8B2AD;
+  --text-muted: #697571;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-default: rgba(255, 255, 255, 0.16);
+  --border-active: #3B72A0;
+  --shadow-md: 1px 1px 0px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 2px 2px 0px rgba(0, 0, 0, 0.7);
 }
 
 ::selection {
-  background: #16343d;
-  color: #3fb5c9;
+  background: var(--retro-teal);
+  color: #FFFFFF;
 }
 
-/* Leaflet ships its own control chrome; retint it to match the console
-   instead of leaving the default white/blue Leaflet look. */
+/* ======================================================== */
+/* Classic Retro OS 3D Bevels & UI Kit Classes              */
+/* ======================================================== */
+
+/* Classic 90s OS 3D Bevel Outset */
+.retro-outset {
+  border-top: 2px solid var(--retro-border-light);
+  border-left: 2px solid var(--retro-border-light);
+  border-right: 2px solid var(--retro-border-dark);
+  border-bottom: 2px solid var(--retro-border-dark);
+  background-color: var(--retro-panel);
+}
+
+/* Classic 90s OS 3D Inset / Recessed Wells */
+.retro-inset {
+  border-top: 2px solid var(--retro-border-gray);
+  border-left: 2px solid var(--retro-border-gray);
+  border-right: 2px solid var(--retro-border-light);
+  border-bottom: 2px solid var(--retro-border-light);
+  background-color: var(--retro-surface-light);
+}
+
+.retro-inset-dark {
+  border-top: 2px solid #111;
+  border-left: 2px solid #111;
+  border-right: 2px solid #555;
+  border-bottom: 2px solid #555;
+  background-color: #0A0D0C;
+}
+
+/* Standard Classic Interactive Button */
+.retro-button {
+  border-top: 2px solid var(--retro-border-light);
+  border-left: 2px solid var(--retro-border-light);
+  border-right: 2px solid var(--retro-border-dark);
+  border-bottom: 2px solid var(--retro-border-dark);
+  background-color: var(--retro-panel);
+  box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.15);
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  transition: none;
+  cursor: pointer;
+  user-select: none;
+}
+.retro-button:active,
+.retro-button.active-pressed {
+  border-top: 2px solid var(--retro-border-dark);
+  border-left: 2px solid var(--retro-border-dark);
+  border-right: 2px solid var(--retro-border-light);
+  border-bottom: 2px solid var(--retro-border-light);
+  background-color: #D6D0C2;
+}
+.dark .retro-button:active,
+.dark .retro-button.active-pressed {
+  background-color: #121615;
+}
+
+/* Primary Accent Retro Button (Teal / Steel Blue) */
+.retro-button-primary {
+  border-top: 2px solid #5984AD !important;
+  border-left: 2px solid #5984AD !important;
+  border-right: 2px solid #102942 !important;
+  border-bottom: 2px solid #102942 !important;
+  background-color: #28557E !important;
+  color: #FFFFFF !important;
+  box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  user-select: none;
+  transition: none;
+}
+.retro-button-primary:hover {
+  background-color: #316493 !important;
+}
+.retro-button-primary:active,
+.retro-button-primary.active-pressed {
+  border-top: 2px solid #102942 !important;
+  border-left: 2px solid #102942 !important;
+  border-right: 2px solid #5984AD !important;
+  border-bottom: 2px solid #5984AD !important;
+  background-color: #1C3F61 !important;
+  color: #FFFFFF !important;
+}
+
+
+/* Window Header Bar Controls [_] [□] [X] */
+.window-ctrl-btn {
+  width: 18px;
+  height: 16px;
+  border-top: 1.5px solid var(--retro-border-light);
+  border-left: 1.5px solid var(--retro-border-light);
+  border-right: 1.5px solid var(--retro-border-dark);
+  border-bottom: 1.5px solid var(--retro-border-dark);
+  background: var(--retro-panel);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 900;
+  color: #111;
+  cursor: pointer;
+  user-select: none;
+  line-height: 1;
+}
+.window-ctrl-btn:active {
+  border-top: 1.5px solid var(--retro-border-dark);
+  border-left: 1.5px solid var(--retro-border-dark);
+  border-right: 1.5px solid var(--retro-border-light);
+  border-bottom: 1.5px solid var(--retro-border-light);
+}
+.dark .window-ctrl-btn {
+  color: #E7E2D6;
+}
+
+/* Procedural Crater Surface Simulation for Offline Precision Visuals */
+.lunar-surface-texture {
+  background-color: #2b2e2d;
+  background-image: 
+    radial-gradient(ellipse at 40% 45%, #464c4a 0%, #1f2221 65%),
+    radial-gradient(circle at 65% 30%, #565d5a 1px, transparent 15px),
+    radial-gradient(circle at 25% 70%, #161817 2px, transparent 25px),
+    radial-gradient(circle at 80% 80%, #3d4240 1px, transparent 18px);
+  background-size: 100% 100%, 80px 80px, 95px 95px, 60px 60px;
+}
+
+.checkerboard-overlay {
+  background-image: linear-gradient(45deg, #181c1a 25%, transparent 25%), 
+                    linear-gradient(-45deg, #181c1a 25%, transparent 25%), 
+                    linear-gradient(45deg, transparent 75%, #181c1a 75%), 
+                    linear-gradient(-45deg, transparent 75%, #181c1a 75%);
+  background-size: 24px 24px;
+  background-position: 0 0, 0 12px, 12px -12px, -12px 0px;
+}
+
+/* Leaflet retinting for retro workstation */
 .leaflet-container {
-  background: #e8ebf1;
+  background: var(--retro-surface-dark);
   font-family: var(--font-inter), var(--font-plex-sans), sans-serif;
 }
 .dark .leaflet-container {
   background: #090b0e;
 }
 .leaflet-control-zoom a {
-  background: #ffffff !important;
-  color: #0f172a !important;
-  border-color: #e2e8f0 !important;
-  border-radius: 6px !important;
+  background: var(--retro-panel) !important;
+  color: var(--text-primary) !important;
+  border-top: 2px solid var(--retro-border-light) !important;
+  border-left: 2px solid var(--retro-border-light) !important;
+  border-right: 2px solid var(--retro-border-dark) !important;
+  border-bottom: 2px solid var(--retro-border-dark) !important;
+  border-radius: 2px !important;
 }
 .dark .leaflet-control-zoom a {
-  background: #141820 !important;
-  color: #f0f2f5 !important;
-  border-color: #1b2029 !important;
+  background: var(--retro-panel) !important;
+  color: #E7E2D6 !important;
+  border-color: #3A4541 !important;
 }
 .leaflet-control-zoom a:hover {
-  background: #eef1f6 !important;
-  color: #0e7490 !important;
+  background: var(--retro-surface-light) !important;
+  color: var(--retro-blue) !important;
 }
 .dark .leaflet-control-zoom a:hover {
-  background: #1c232f !important;
-  color: #3fb5c9 !important;
+  background: #242C2A !important;
+  color: #FFFFFF !important;
 }
 .leaflet-control-attribution {
   display: none !important;
@@ -135,28 +331,26 @@
 }
 
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
 .animate-fade-in {
-  animation: fade-in 400ms ease-out both;
+  animation: fade-in 200ms ease-out both;
 }
 
-/* -- Glass panels ------------------------------------------- */
+/* -- Retro Glass & Workstation Panels ---------------------- */
 .glass-panel {
-  background: var(--bg-glass);
-  backdrop-filter: blur(20px) saturate(1.4);
-  -webkit-backdrop-filter: blur(20px) saturate(1.4);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  transition: border-color 250ms cubic-bezier(0.16, 1, 0.3, 1),
-              box-shadow 250ms cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--retro-panel);
+  border-top: 2px solid var(--retro-border-light);
+  border-left: 2px solid var(--retro-border-light);
+  border-right: 2px solid var(--retro-border-dark);
+  border-bottom: 2px solid var(--retro-border-dark);
+  box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.2);
 }
 .glass-panel:hover {
-  border-color: var(--border-default);
-  box-shadow: var(--shadow-lg);
+  border-top-color: var(--retro-border-light);
+  border-left-color: var(--retro-border-light);
 }
 
 /* -- Buttons ------------------------------------------------ */
@@ -165,29 +359,33 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 10px 20px;
+  padding: 8px 16px;
   font-family: var(--font-sans);
-  font-size: 0.875rem;
-  font-weight: 600;
-  border: none;
-  border-radius: var(--radius-md);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  border-top: 2px solid var(--retro-border-light);
+  border-left: 2px solid var(--retro-border-light);
+  border-right: 2px solid var(--retro-border-dark);
+  border-bottom: 2px solid var(--retro-border-dark);
   cursor: pointer;
-  transition: all 150ms cubic-bezier(0.16, 1, 0.3, 1);
   user-select: none;
   white-space: nowrap;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  color: white;
-  box-shadow: 0 2px 12px var(--accent-glow);
+  background: var(--retro-blue);
+  color: #FFFFFF;
+  box-shadow: 1px 1px 0px rgba(0, 0, 0, 0.2);
 }
 .btn-primary:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 20px var(--accent-glow), var(--shadow-glow);
+  background: #346896;
 }
 .btn-primary:active {
-  transform: translateY(0);
+  border-top: 2px solid var(--retro-border-dark);
+  border-left: 2px solid var(--retro-border-dark);
+  border-right: 2px solid var(--retro-border-light);
+  border-bottom: 2px solid var(--retro-border-light);
+  background: var(--retro-blue-dark);
 }
 .btn-primary:disabled {
   opacity: 0.5;
@@ -197,80 +395,93 @@
 }
 
 .btn-secondary {
-  background: var(--bg-elevated);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-default);
+  background: var(--retro-panel);
+  color: var(--text-primary);
+  border-top: 2px solid var(--retro-border-light);
+  border-left: 2px solid var(--retro-border-light);
+  border-right: 2px solid var(--retro-border-dark);
+  border-bottom: 2px solid var(--retro-border-dark);
 }
 .btn-secondary:hover {
-  background: var(--bg-glass-hover);
-  color: var(--text-primary);
-  border-color: var(--border-active);
+  background: var(--retro-surface-light);
+}
+.btn-secondary:active {
+  border-top: 2px solid var(--retro-border-dark);
+  border-left: 2px solid var(--retro-border-dark);
+  border-right: 2px solid var(--retro-border-light);
+  border-bottom: 2px solid var(--retro-border-light);
 }
 
 .btn-danger {
-  background: var(--accent-danger-bg);
-  color: var(--accent-danger);
-  border: 1px solid rgba(248, 113, 113, 0.25);
+  background: #A32828;
+  color: #FFFFFF;
+  border-top: 2px solid #FF8080;
+  border-left: 2px solid #FF8080;
+  border-right: 2px solid #4D0000;
+  border-bottom: 2px solid #4D0000;
 }
 .btn-danger:hover {
-  background: rgba(248, 113, 113, 0.2);
+  background: #B83232;
 }
 
-.btn-sm { padding: 6px 12px; font-size: 0.75rem; }
-.btn-lg { padding: 14px 28px; font-size: 1rem; }
+.btn-sm { padding: 4px 8px; font-size: 0.75rem; }
+.btn-lg { padding: 12px 24px; font-size: 0.9375rem; }
 
 /* -- Badges ------------------------------------------------- */
 .badge {
   display: inline-flex;
   align-items: center;
-  padding: 3px 10px;
-  font-size: 0.7rem;
+  padding: 2px 8px;
+  font-size: 0.6875rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  border-radius: var(--radius-full);
+  border: 1px solid var(--retro-border-gray);
+  border-radius: 2px;
 }
 .badge-pass {
-  background: var(--accent-success-bg);
-  color: var(--accent-success);
-  border: 1px solid rgba(52, 211, 153, 0.3);
+  background: #D5EAD8;
+  color: #195924;
+  border: 1px solid #85C48F;
 }
 .badge-fail {
-  background: var(--accent-danger-bg);
-  color: var(--accent-danger);
-  border: 1px solid rgba(248, 113, 113, 0.3);
+  background: #FCE8E8;
+  color: #991B1B;
+  border: 1px solid #F87171;
 }
 .badge-pending {
-  background: var(--accent-warning-bg);
-  color: var(--accent-warning);
-  border: 1px solid rgba(251, 191, 36, 0.3);
+  background: #FEF3D6;
+  color: #8C6211;
+  border: 1px solid #DEC073;
 }
 .badge-running {
-  background: var(--accent-glow);
-  color: var(--accent-secondary);
-  border: 1px solid var(--border-active);
+  background: #D3E5F5;
+  color: #133D63;
+  border: 1px solid #86AECF;
 }
 
 /* -- Progress bar ------------------------------------------- */
 .progress-bar-track {
   width: 100%;
-  height: 6px;
-  background: var(--bg-elevated);
-  border-radius: var(--radius-full);
+  height: 8px;
+  background: var(--retro-surface-light);
+  border-top: 1px solid var(--retro-border-gray);
+  border-left: 1px solid var(--retro-border-gray);
+  border-right: 1px solid var(--retro-border-light);
+  border-bottom: 1px solid var(--retro-border-light);
   overflow: hidden;
 }
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
-  border-radius: var(--radius-full);
-  transition: width 400ms cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--retro-blue);
+  transition: width 300ms ease;
   position: relative;
 }
 .progress-bar-fill::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
   animation: progress-shimmer 2s infinite;
 }
 
@@ -281,33 +492,46 @@
 
 /* -- Log console -------------------------------------------- */
 .log-console {
-  background: var(--bg-log);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  padding: 16px;
+  background: var(--retro-surface-light);
+  border-top: 2px solid var(--retro-border-gray);
+  border-left: 2px solid var(--retro-border-gray);
+  border-right: 2px solid var(--retro-border-light);
+  border-bottom: 2px solid var(--retro-border-light);
+  padding: 12px;
   font-family: var(--font-mono);
   font-size: 0.75rem;
-  line-height: 1.7;
-  color: var(--text-secondary);
+  line-height: 1.6;
+  color: var(--text-primary);
   max-height: 260px;
   overflow-y: auto;
   scroll-behavior: smooth;
 }
+.dark .log-console {
+  background: #0A0D0C;
+  border-top: 2px solid #111;
+  border-left: 2px solid #111;
+  border-right: 2px solid #444;
+  border-bottom: 2px solid #444;
+  color: #A8B2AD;
+}
 .log-console::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
 }
 .log-console::-webkit-scrollbar-track {
-  background: transparent;
+  background: var(--retro-panel);
 }
 .log-console::-webkit-scrollbar-thumb {
-  background: var(--border-default);
-  border-radius: 3px;
+  background: var(--retro-border-gray);
+  border-top: 1px solid var(--retro-border-light);
+  border-left: 1px solid var(--retro-border-light);
+  border-right: 1px solid var(--retro-border-dark);
+  border-bottom: 1px solid var(--retro-border-dark);
 }
 .log-line { padding: 1px 0; }
 .log-line--info  { color: var(--text-secondary); }
-.log-line--stage { color: var(--accent-secondary); font-weight: 500; }
-.log-line--error { color: var(--accent-danger); }
-.log-line--ok    { color: var(--accent-success); }
+.log-line--stage { color: var(--retro-blue); font-weight: 700; }
+.log-line--error { color: #B91C1C; }
+.log-line--ok    { color: #15803D; }
 
 /* -- Pulse Ring animation for DropZone ---------------------- */
 @keyframes pulse-ring {
@@ -321,10 +545,10 @@
 }
 
 .spinner {
-  width: 18px;
-  height: 18px;
-  border: 2px solid var(--border-default);
-  border-top-color: var(--accent-secondary);
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--retro-border-gray);
+  border-top-color: var(--retro-blue);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
