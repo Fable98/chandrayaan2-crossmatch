@@ -1,6 +1,7 @@
-# Chandrayaan-2 Multi-Modal Cross-Sensor Image Correspondence
+# ATHERA: Chandrayaan-2 Multi-Modal Cross-Sensor Image Correspondence
 
 ### SIH Problem Statement 26166
+**Project**: **ATHERA**  
 **Title**: Multi-modal, Sun angle and scale invariant image correspondence using Chandrayaan-2 optical images (OHRC, TMC and IIRS)  
 **Organization**: Indian Space Research Organisation (ISRO)
 
@@ -8,7 +9,7 @@
 
 ## 1. Executive Summary
 
-This repository provides an open, reproducible, and photogrammetrically defensible pipeline for cross-sensor image correspondence between Chandrayaan-2 orbital instruments:
+**ATHERA** provides an open, reproducible, and photogrammetrically defensible pipeline for cross-sensor image correspondence between Chandrayaan-2 orbital instruments:
 - **Orbiter High-Resolution Camera (OHRC)**: High-resolution panchromatic imaging (~0.25–0.32 m GSD).
 - **Terrain Mapping Camera-2 (TMC-2)**: Panchromatic imaging (~4–5 m GSD). Supports single NCF view registration as well as along-track triplet stereo photogrammetry (Fore +26°, Nadir 0°, Aft -26°, $B/H \approx 0.9755$), delivering dense disparity and photogrammetric DEM reconstruction (`ML_model/tmc_stereo.py`).
 - **Imaging Infrared Spectrometer (IIRS)**: Hyperspectral sensor (~70–80 m GSD) across 256 contiguous bands (~0.8–5.0 µm) providing mineralogical and volatile signatures. Stored test crops are single-band PCA proxies; direct sub-meter IIRS tie-points are unphysical.
@@ -27,7 +28,7 @@ This repository provides an open, reproducible, and photogrammetrically defensib
 
 ## 2. Error Boundaries & Quality Gates (Addressing Q24: What Happens on Failure / Incorrect Prediction?)
 
-A critical requirement for planetary photogrammetry is knowing **when not to register**. When an algorithm forces a transformation across non-overlapping, featureless, or extreme shadow-inverted scenes, unconstrained projective models produce catastrophic distortions. This pipeline implements **four deterministic Quality Gates** that intercept incorrect predictions and fail cleanly without silent data corruption:
+A critical requirement for planetary photogrammetry is knowing **when not to register**. When an algorithm forces a transformation across non-overlapping, featureless, or extreme shadow-inverted scenes, unconstrained projective models produce catastrophic distortions. **ATHERA** implements **four deterministic Quality Gates** that intercept incorrect predictions and fail cleanly without silent data corruption:
 
 ```text
 Raw Candidate Matches
@@ -69,13 +70,13 @@ Raw Candidate Matches
 ### Explicit Qualification: Per-Point Tracking Precision vs. Full-Scene Fit RMSE
 > [!IMPORTANT]
 > **We do not claim blanket "sub-pixel accuracy achieved" across all real orbital crops.**  
-> While individual feature points achieve genuine sub-pixel tracking precision (0.08–0.31 px forward-backward error under Lucas-Kanade optical flow), the overall homography fit RMSE across real Chandrayaan-2 datasets ranges from **0.99 px to 1.83 px** (`region_001`: 1.27 px, `region_003`: 0.99 px, `region_006`: 1.30 px). The project maintains scientific integrity by distinguishing per-point sub-pixel tracking capability from full-scene registration residuals under physical lunar terrain relief.
+> While individual feature points achieve genuine sub-pixel tracking precision (0.08–0.31 px forward-backward error under Lucas-Kanade optical flow), the overall homography fit RMSE across real Chandrayaan-2 datasets ranges from **0.99 px to 1.83 px** (`region_001`: 1.27 px, `region_003`: 0.99 px, `region_006`: 1.30 px). The ATHERA project maintains scientific integrity by distinguishing per-point sub-pixel tracking capability from full-scene registration residuals under physical lunar terrain relief.
 
 ---
 
 ## 🚀 Official ISRO Evaluation Wrapper
 
-Evaluators can run the complete pipeline directly on hidden test datasets using the official CLI evaluation script. No code modification or manual configuration is required.
+Evaluators can run the complete ATHERA pipeline directly on hidden test datasets using the official CLI evaluation script. No code modification or manual configuration is required.
 
 ```bash
 python scripts/isro_official_evaluator.py --input_dir <path_to_isro_test_data> --output_dir ./eval_results --use_dem=True
@@ -88,7 +89,7 @@ This command will:
 
 ---
 
-## 🛰️ Pipeline Architecture
+## 🛰️ ATHERA Pipeline Architecture
 
 ```text
 PDS4 Metadata Ingestion -> Common Physical-GSD Normalization -> DEM Relief Compensation -> Phase Congruency & CFOG Extraction -> Dynamic Grid NMS -> RANSAC + Sub-Pixel Refinement -> Absolute RMSE (Meters) Calculation
@@ -104,7 +105,7 @@ PDS4 Metadata Ingestion -> Common Physical-GSD Normalization -> DEM Relief Compe
 7. **Absolute RMSE (Meters) Calculation:** Computes DEM-corrected physical error on the lunar surface.
 
 ### 🧠 Why We Chose Deterministic Structural Matching Over Deep Learning
-During our development, we rigorously evaluated state-of-the-art Deep Learning matchers (such as LoFTR and Kornia-based architectures) for this Problem Statement. Our empirical ablation studies proved that DL models fail catastrophically on cross-sensor, illumination-mismatched lunar data.
+During our development of ATHERA, we rigorously evaluated state-of-the-art Deep Learning matchers (such as LoFTR and Kornia-based architectures) for this Problem Statement. Our empirical ablation studies proved that DL models fail catastrophically on cross-sensor, illumination-mismatched lunar data.
 
 Because Chandrayaan-2 and reference sensors capture the moon at drastically different sun angles, the "brightness constancy constraint" that neural networks rely on is violently broken by lunar shadows and crater rim reversals.
 
@@ -159,7 +160,7 @@ Empirical evaluation across all 8 multi-sensor Chandrayaan-2 test regions, bench
 
 ## 7. LRO NAC Reference-Image Registration Benchmark (Closing PS "Lunar Reference Images" Requirement)
 
-SIH Problem Statement 26166 explicitly mandates image correspondence between Chandrayaan-2 optical sensors and **Lunar reference images**. This requirement is addressed via direct registration between Chandrayaan-2 **OHRC (Source/Moving)** and NASA **LRO Narrow Angle Camera (Reference/Fixed)** products.
+SIH Problem Statement 26166 explicitly mandates image correspondence between Chandrayaan-2 optical sensors and **Lunar reference images**. This requirement is addressed in ATHERA via direct registration between Chandrayaan-2 **OHRC (Source/Moving)** and NASA **LRO Narrow Angle Camera (Reference/Fixed)** products.
 
 ### Strategic Physical Framework: Why LRO NAC Yields Defensible Sub-Pixel Accuracy
 While internal Chandrayaan-2 pairs span extreme resolution disparities (OHRC $\leftrightarrow$ TMC-2 at $\sim 20\times$, OHRC $\rightarrow$ IIRS at $\sim 275$–$300\times$ overlay only), the OHRC native resolution ($\sim 0.25$–$0.32\,\text{m/px}$) and LRO NAC native resolution ($\sim 0.9$–$1.1\,\text{m/px}$) form a tightly coupled **$\sim 3.6$–$4.5\times$ physical scale ratio**. Both instruments are panchromatic optical imagers capturing visible lunar reflectance (OHRC: 450–700 nm; NAC: 400–750 nm).
@@ -186,7 +187,7 @@ Consequently, this pairing does not require the heavy multi-spectral dimensional
 
 ### 7.1 Automated LRO NAC Frame Discovery via Washington University ODE REST API
 
-To scale beyond manually curated LRO NAC frame IDs (`M1417670274LC` and `M1413636095LC` hardcoded for `region_001`, `region_003`, and `region_006`), the pipeline includes automated frame discovery via Washington University's Orbital Data Explorer (ODE) REST API ([`ML_model/lro_ode_client.py`](ML_model/lro_ode_client.py)).
+To scale beyond manually curated LRO NAC frame IDs (`M1417670274LC` and `M1413636095LC` hardcoded for `region_001`, `region_003`, and `region_006`), the ATHERA pipeline includes automated frame discovery via Washington University's Orbital Data Explorer (ODE) REST API ([`ML_model/lro_ode_client.py`](ML_model/lro_ode_client.py)).
 
 #### Architectural Rationale: Why ODE REST?
 - **Direct Spatial Bounding Box Queries**: Washington University ODE REST provides structured query parameters (`minlat`, `maxlat`, `westernlon`, `easternlon`, `target=moon`, `ihid=lro`, `iid=lroc`, `pt=EDRNAC`), returning product footprints and direct USGS/PDS image and label download URLs in structured JSON.
@@ -213,9 +214,9 @@ Options:
 
 ---
 
-## 7.5. Capability Status
+## 7.5. ATHERA Capability Status
 
-The following audit matrix documents the exact operational status of each algorithmic capability in this repository. In accordance with strict photogrammetric integrity, capabilities are marked **✅ Verified** only if supported by passing regression tests or published empirical benchmark outputs in this repository. Capabilities that are implemented in code but lack flight data, end-to-end ground truth validation, or rigorous benchmark verification are transparently tagged **⚠️ Implemented, not verified here**.
+The following audit matrix documents the exact operational status of each algorithmic capability in ATHERA. In accordance with strict photogrammetric integrity, capabilities are marked **✅ Verified** only if supported by passing regression tests or published empirical benchmark outputs in this repository. Capabilities that are implemented in code but lack flight data, end-to-end ground truth validation, or rigorous benchmark verification are transparently tagged **⚠️ Implemented, not verified here**.
 
 | Capability | Status | Verification Reference & Technical Notes |
 | :--- | :---: | :--- |
@@ -255,9 +256,9 @@ The following audit matrix documents the exact operational status of each algori
 
 ---
 
-## 🏆 8-Phase AI-Augmented Photogrammetry Pipeline
+## 🏆 ATHERA 8-Phase AI-Augmented Photogrammetry Pipeline
 
-Our solution is decomposed into 8 distinct phases, each addressing a specific challenge from the Problem Statement:
+The ATHERA architecture is decomposed into 8 distinct phases, each addressing a specific challenge from the Problem Statement:
 
 | Phase | Name | Purpose | Method | Implementation status |
 | :--- | :--- | :--- | :--- | :--- |
@@ -295,7 +296,7 @@ Four deterministic Quality Gates + triplet closed-loop guard (§2) prevent fake 
 A single IIRS ground sampling cell integrates radiance over approximately $320 \times 320$ OHRC pixels. Any detector (SIFT, LoFTR, Phase Congruency) claiming dozens of sub-pixel tie-points across this gap is hallucinating false spatial resolution — an **unphysical spatial reconstruction** that assigns metre-scale mineral boundaries to a spectrometer footprint that is intrinsically decametric. Such a result would violate the Nyquist-Shannon sampling limit of the IIRS focal plane and corrupt downstream Spectral Angle Mapper (SAM) mineralogy with aliased geometry.
 
 ### The Chained Composition Solution
-We therefore never directly estimate $H_{\text{OHRC}\to\text{IIRS}}$. Instead, IIRS is treated as a **spatial-spectral contextual overlay**: structural geometry is solved on defensible optical legs and then projected into the spectral domain via the TMC-2 intermediate bridge:
+In ATHERA, we therefore never directly estimate $H_{\text{OHRC}\to\text{IIRS}}$. Instead, IIRS is treated as a **spatial-spectral contextual overlay**: structural geometry is solved on defensible optical legs and then projected into the spectral domain via the TMC-2 intermediate bridge:
 
 ```text
 H_OHRC->IIRS = H_TMC->IIRS · H_OHRC->TMC
@@ -345,7 +346,7 @@ python3 -m uvicorn backend.main:app --host 0.0.0.0 --port 8000
 cd lunar-frontend && npm run dev
 ```
 
-Run the frontend from within the `lunar-frontend/` directory. The backend exposes REST endpoints for registration, metrics, and product generation consumed by the mission console dashboard.
+Run the frontend from within the `lunar-frontend/` directory. The backend exposes REST endpoints for registration, metrics, and product generation consumed by the ATHERA mission console dashboard.
 
 ---
 
