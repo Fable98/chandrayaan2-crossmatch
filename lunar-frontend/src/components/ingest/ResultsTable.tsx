@@ -266,25 +266,49 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
                                 </span>
                               </div>
 
-                              <div className="grid grid-cols-3 gap-2">
-                                {(['ohrc', 'tmc', 'iirs'] as const).map((s) => (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
-                                    key={s}
-                                    src={imageUrl(`/images/${s}/${t.region_id}`)}
-                                    alt={`${t.region_id} ${s}`}
-                                    className="h-24 w-full rounded-lg border border-slate-200 bg-slate-900 object-cover"
-                                    loading="lazy"
-                                    onError={(e) => {
-                                      (e.currentTarget as HTMLImageElement).style.display = 'none';
-                                    }}
-                                  />
+                              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                {[
+                                  { sensor: 'ohrc', label: 'OHRC Primary', gsd: '0.25 m/px' },
+                                  { sensor: 'tmc', label: 'TMC-2 Stereo', gsd: '5.0 m/px' },
+                                  { sensor: 'iirs', label: 'IIRS Hyperspectral', gsd: '80 m/px' },
+                                ].map(({ sensor, label, gsd }) => (
+                                  <a
+                                    key={sensor}
+                                    href={imageUrl(`/images/${sensor}/${t.region_id}`)}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="group flex flex-col rounded-xl border border-slate-200/80 dark:border-[#1b2029] overflow-hidden bg-slate-50 dark:bg-[#0e1117] transition-all duration-300 hover:shadow-lg hover:border-indigo-400/50 dark:hover:border-indigo-500/40"
+                                  >
+                                    <div className="relative h-28 overflow-hidden bg-black">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img
+                                        src={imageUrl(`/images/${sensor}/${t.region_id}`)}
+                                        alt={`${t.region_id} ${sensor}`}
+                                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                        loading="lazy"
+                                        onError={(e) => {
+                                          (e.currentTarget as HTMLImageElement).style.display = 'none';
+                                        }}
+                                      />
+                                      <div className="absolute top-2 right-2 rounded-md bg-black/60 backdrop-blur-md px-1.5 py-0.5 font-mono text-[9px] text-white/80 border border-white/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                                        VIEW ↗
+                                      </div>
+                                    </div>
+                                    <div className="p-2.5 bg-white dark:bg-[#0e1117] border-t border-slate-100 dark:border-[#1b2029] flex items-center justify-between">
+                                      <span className="text-xs font-bold text-slate-900 dark:text-slate-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                        {label}
+                                      </span>
+                                      <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                                        {gsd}
+                                      </span>
+                                    </div>
+                                  </a>
                                 ))}
                               </div>
 
-                              <div className="flex items-center gap-2 flex-wrap font-mono text-[10px] text-slate-600 dark:text-slate-400">
+                              <div className="flex items-center gap-2 flex-wrap font-mono text-[10px] text-slate-600 dark:text-slate-400 pt-1">
                                 <span
-                                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-bold uppercase tracking-wider ${
+                                  className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 font-bold uppercase tracking-wider ${
                                     t.matching?.status === 'success'
                                       ? 'border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300'
                                       : 'border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 text-slate-500 dark:text-slate-400'
@@ -297,7 +321,7 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
                                     ` · ${t.matching.fit_rmse_px.toFixed(2)}px`}
                                 </span>
                                 <span
-                                  className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 font-bold uppercase tracking-wider ${
+                                  className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-1 font-bold uppercase tracking-wider ${
                                     t.registration?.status === 'success'
                                       ? 'border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300'
                                       : 'border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 text-slate-500 dark:text-slate-400'
@@ -328,28 +352,31 @@ export default function ResultsTable({ triplets, containment }: ResultsTableProp
                                   }
                                 />
                                 <a
-                                  className="underline hover:text-[#4F46E5]"
+                                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-700 hover:text-indigo-600 dark:hover:text-indigo-300 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xs"
                                   href={imageUrl(`/images/registered/${t.region_id}/checkerboard_qa.png`)}
                                   target="_blank"
                                   rel="noreferrer"
                                 >
-                                  checkerboard grid
+                                  <span>▦</span>
+                                  <span>Checkerboard QA ↗</span>
                                 </a>
                                 <a
-                                  className="underline hover:text-[#4F46E5]"
+                                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-700 hover:text-indigo-600 dark:hover:text-indigo-300 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xs"
                                   href={imageUrl(`/images/registered/${t.region_id}/blend_overlay.png`)}
                                   target="_blank"
                                   rel="noreferrer"
                                 >
-                                  blend
+                                  <span>◈</span>
+                                  <span>Blend Overlay ↗</span>
                                 </a>
                                 <a
-                                  className="underline hover:text-[#4F46E5]"
+                                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-2.5 py-1 text-[10px] font-semibold text-slate-700 dark:text-slate-300 hover:border-indigo-300 dark:hover:border-indigo-700 hover:text-indigo-600 dark:hover:text-indigo-300 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xs"
                                   href={imageUrl(`/images/registered/${t.region_id}/displacement_quiver.png`)}
                                   target="_blank"
                                   rel="noreferrer"
                                 >
-                                  quiver
+                                  <span>➔</span>
+                                  <span>Vector Quiver ↗</span>
                                 </a>
                               </div>
                             </div>
