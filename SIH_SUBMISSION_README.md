@@ -1,5 +1,6 @@
 # SIH Submission — ISRO Problem Statement Compliance
 
+**Project:** ATHERA  
 **Problem:** Multi-modal, Sun angle and scale invariant image correspondence
 using Chandrayaan-2 optical images (OHRC, TMC and IIRS).
 

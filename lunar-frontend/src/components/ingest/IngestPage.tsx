@@ -329,18 +329,24 @@ export default function IngestPage() {
       <aside className="w-64 bg-white dark:bg-[#0e1117] border-r border-slate-200/80 dark:border-[#1b2029] flex flex-col shrink-0 h-screen sticky top-0 overflow-hidden">
         <div className="flex-1 overflow-y-auto min-h-0">
           {/* Brand Header */}
-          <div className="p-6 pb-5 flex items-center justify-between border-b border-slate-100 dark:border-[#1b2029] shrink-0">
+          <div className="p-5 pb-4 flex items-center justify-between border-b border-slate-100 dark:border-[#1b2029] shrink-0">
             <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#4F46E5] text-white font-black text-base shadow-sm group-hover:scale-105 transition-transform">
-                c
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-[#4F46E5] text-white font-mono font-black text-xs shadow-[0_0_14px_rgba(79,70,229,0.35)] group-hover:scale-105 transition-transform">
+                C2
               </div>
               <div>
-                <h1 className="text-base font-extrabold tracking-tight text-slate-900 dark:text-slate-100 leading-none">
-                  chandrayaan
+                <h1 className="text-sm font-extrabold tracking-tight text-slate-900 dark:text-slate-100 leading-none">
+                  chandrayaan-2
                 </h1>
-                <span className="text-[10px] font-medium text-slate-400">Cross-Match Console</span>
+                <span className="text-[10px] font-mono text-indigo-600 dark:text-indigo-400 font-semibold block mt-1">
+                  ISRO SAC · SIH26166
+                </span>
               </div>
             </Link>
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
           </div>
 
           {/* Navigation Section */}
@@ -490,9 +496,23 @@ export default function IngestPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search for regions, coordinates..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-[#1b2029] rounded-xl text-xs text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20 focus:border-[#4F46E5] transition"
+              placeholder="Search regions, coordinates..."
+              className="w-full pl-10 pr-12 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-[#1b2029] rounded-xl text-xs text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20 focus:border-[#4F46E5] transition"
             />
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded bg-slate-200/60 dark:bg-white/10 px-1.5 py-0.5 font-mono text-[9px] text-slate-400">
+              /
+            </span>
+          </div>
+
+          {/* Center: Live Ingestion Pipeline Status Beacon */}
+          <div className="hidden lg:flex items-center gap-2 rounded-full border border-slate-200/80 dark:border-[#1b2029] bg-slate-50/80 dark:bg-white/5 px-3 py-1 font-mono text-2xs text-slate-600 dark:text-slate-300 shadow-sm">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+            <span className="font-semibold">FASTAPI :8000</span>
+            <span className="text-slate-300 dark:text-white/20">·</span>
+            <span className="text-indigo-600 dark:text-indigo-400 font-bold">INGESTION PIPELINE READY</span>
           </div>
 
           {/* Right Header Controls */}
@@ -500,7 +520,7 @@ export default function IngestPage() {
             <button
               type="button"
               onClick={toggleTheme}
-              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm flex items-center gap-1.5"
+              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm flex items-center gap-1.5"
               title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
               aria-label="Toggle color theme"
             >
@@ -510,7 +530,7 @@ export default function IngestPage() {
 
             <button
               onClick={() => router.push("/")}
-              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm flex items-center gap-1.5"
+              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm flex items-center gap-1.5"
               title="Return to Mission Overview"
             >
               <span>←</span>
@@ -519,7 +539,7 @@ export default function IngestPage() {
 
             <button
               onClick={() => setVaultOpen(true)}
-              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm flex items-center gap-2"
+              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm flex items-center gap-2"
               title="Browse all multi-sensor lunar datasets"
             >
               <span className="h-2 w-2 rounded-full bg-emerald-500" />
@@ -533,16 +553,16 @@ export default function IngestPage() {
               <button
                 type="button"
                 onClick={() => setProfileMenuOpen((prev) => !prev)}
-                className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-white/5 p-1.5 pr-3 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20"
+                className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-white/5 p-1.5 pr-3 hover:bg-slate-50 dark:hover:bg-white/10 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20"
                 aria-haspopup="true"
                 aria-expanded={profileMenuOpen}
               >
                 <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-[#4F46E5] text-white font-bold text-xs flex items-center justify-center shadow-sm">
-                  {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : "SH"}
+                  {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : "IS"}
                 </div>
                 <div className="hidden sm:block text-left">
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-100 block leading-tight truncate max-w-[120px]">
-                    {currentUser?.name || "Shresth"}
+                    {currentUser?.name || "ISRO Pilot"}
                   </span>
                   <span className="text-[10px] text-slate-400 block">Operator</span>
                 </div>
@@ -627,14 +647,18 @@ export default function IngestPage() {
         {/* Ingest Main Content */}
         <main className="flex-1 min-h-0 overflow-y-auto p-8 space-y-6">
           {/* Top Title & Subtitle + Action Tabs */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/60 dark:border-[#1b2029] pb-5">
             <div>
-              <h2 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-slate-100">
-                Ingest &amp; Prepare
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                Drop your PRADAN zip files below to automatically discover, match, and
-                process Chandrayaan-2 OHRC + TMC-2 + IIRS triplets.
+              <div className="flex items-center gap-2.5">
+                <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">
+                  Ingest &amp; Prepare
+                </h2>
+                <span className="rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/50 px-2.5 py-0.5 text-2xs font-mono font-bold text-indigo-700 dark:text-indigo-300">
+                  ISRO SIH26166
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                Drop raw PRADAN archives to automatically discover, match, and process Chandrayaan-2 OHRC + TMC-2 + IIRS triplets with sub-pixel verification.
               </p>
             </div>
 
@@ -643,9 +667,9 @@ export default function IngestPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab("new")}
-                className={`rounded-xl px-4 py-2 text-xs font-bold transition shadow-sm ${
+                className={`rounded-xl px-4 py-2 text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm ${
                   activeTab === "new"
-                    ? "bg-[#4F46E5] text-white shadow-indigo-200"
+                    ? "bg-[#4F46E5] text-white shadow-md shadow-indigo-500/20"
                     : "border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10"
                 }`}
               >
@@ -658,9 +682,9 @@ export default function IngestPage() {
                   setActiveTab("history");
                   loadHistoryJobs();
                 }}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition shadow-sm ${
+                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm ${
                   activeTab === "history"
-                    ? "bg-[#4F46E5] text-white shadow-indigo-200"
+                    ? "bg-[#4F46E5] text-white shadow-md shadow-indigo-500/20"
                     : "border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10"
                 }`}
               >
@@ -680,9 +704,9 @@ export default function IngestPage() {
 
               <Link
                 href="/?view=console"
-                className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm flex items-center gap-1.5"
+                className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm flex items-center gap-1.5"
               >
-                <span>Open Dashboard</span>
+                <span>Mission Dashboard</span>
                 <span>↗</span>
               </Link>
             </div>
@@ -811,7 +835,7 @@ export default function IngestPage() {
                             type="button"
                             onClick={clearFiles}
                             disabled={isProcessing}
-                            className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm disabled:opacity-40"
+                            className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm disabled:opacity-40"
                           >
                             Clear All
                           </button>
@@ -820,7 +844,7 @@ export default function IngestPage() {
                             type="button"
                             onClick={handleStart}
                             disabled={isProcessing}
-                            className="flex items-center gap-2 rounded-xl bg-[#4F46E5] px-6 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white shadow-sm transition hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:opacity-40"
+                            className="flex items-center gap-2 rounded-xl bg-[#4F46E5] px-6 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white shadow-md shadow-indigo-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:opacity-40"
                           >
                             {isProcessing ? (
                               <>
@@ -1018,7 +1042,7 @@ export default function IngestPage() {
                         <button
                           type="button"
                           onClick={clearFiles}
-                          className="rounded-xl bg-[#4F46E5] px-6 py-3 text-xs font-black uppercase tracking-wider text-white shadow-sm hover:bg-[#4338CA] transition"
+                          className="rounded-xl bg-[#4F46E5] px-6 py-3 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-indigo-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all hover:bg-[#4338CA]"
                         >
                           Process Another Batch
                         </button>
@@ -1047,7 +1071,7 @@ export default function IngestPage() {
                           type="button"
                           onClick={handleDeleteSelectedJobs}
                           disabled={deletingJobs}
-                          className="flex items-center gap-1.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 px-3.5 py-1.5 text-xs font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-950/50 transition shadow-sm disabled:opacity-50"
+                          className="flex items-center gap-1.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 px-3.5 py-1.5 text-xs font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-950/50 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm disabled:opacity-50"
                         >
                           <span>{deletingJobs ? "Deleting..." : `🗑 Delete selected (${selectedJobs.size})`}</span>
                         </button>
@@ -1056,7 +1080,7 @@ export default function IngestPage() {
                         type="button"
                         onClick={loadHistoryJobs}
                         disabled={historyLoading}
-                        className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 transition shadow-sm disabled:opacity-50"
+                        className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm disabled:opacity-50"
                       >
                         <span>{historyLoading ? "Refreshing..." : "↻ Refresh History"}</span>
                       </button>
@@ -1189,7 +1213,7 @@ export default function IngestPage() {
                                     <button
                                       type="button"
                                       onClick={() => handleSelectHistoricalJob(job.job_id)}
-                                      className="rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 px-3 py-1 font-mono text-xs font-bold text-[#4F46E5] dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 transition shadow-xs"
+                                      className="rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 px-3 py-1 font-mono text-xs font-bold text-[#4F46E5] dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xs"
                                     >
                                       Load Results →
                                     </button>
@@ -1202,7 +1226,7 @@ export default function IngestPage() {
                                         setPhase("processing");
                                         setActiveTab("new");
                                       }}
-                                      className="rounded-lg border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/30 px-3 py-1 font-mono text-xs font-bold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/50 transition shadow-xs"
+                                      className="rounded-lg border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/30 px-3 py-1 font-mono text-xs font-bold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/50 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xs"
                                     >
                                       Attach &amp; Monitor
                                     </button>
@@ -1213,7 +1237,7 @@ export default function IngestPage() {
                                       title="Delete this history entry"
                                       onClick={() => handleDeleteHistoryJob(job.job_id)}
                                       disabled={deletingJobs}
-                                      className="rounded-lg border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-2.5 py-1 text-xs font-bold text-slate-400 dark:text-slate-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-700 dark:hover:text-rose-300 hover:border-rose-200 dark:hover:border-rose-900/50 transition shadow-xs disabled:opacity-50"
+                                      className="rounded-lg border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-2.5 py-1 text-xs font-bold text-slate-400 dark:text-slate-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-700 dark:hover:text-rose-300 hover:border-rose-200 dark:hover:border-rose-900/50 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xs disabled:opacity-50"
                                     >
                                       🗑
                                     </button>
