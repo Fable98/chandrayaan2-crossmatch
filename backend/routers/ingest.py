@@ -207,6 +207,7 @@ async def _run_ingest_job(job_id: str, input_dir: Path, config: IngestConfig):
         str(_INGEST_SCRIPT),
         str(input_dir),
         "--output-dir", str(_PROCESSED_TRIPLETS),
+        "--run-id", job_id,
         "--containment", str(config.containment),
         "--tile-size", str(config.tile_size),
         "--verbose",
@@ -265,26 +266,32 @@ async def _run_ingest_job(job_id: str, input_dir: Path, config: IngestConfig):
                     summary_lines.append(ln)
             job["summary"] = "\n".join(summary_lines) if summary_lines else "Pipeline completed."
 
-            manifest_path = _PIPELINE_ROOT / "user_triplets.json"
             per_run_path = _PROCESSED_TRIPLETS / ".last_run_triplets.json"
             triplets: list[dict[str, Any]] = []
-            # Prefer the per-run triplet list written by this exact job
-            # (Stage 5 of ingest_and_prepare.py). Falls back to the filtered
-            # manifest history when the file is missing/stale.
+            matched_run = False
+            # Read the per-run triplet list written by this exact job.
             if per_run_path.exists():
                 try:
                     per_run = json.loads(per_run_path.read_text(encoding="utf-8"))
                     if isinstance(per_run, dict):
-                        if str(per_run.get("job_input_dir")) == str(input_dir):
+                        if per_run.get("run_id") == job_id or str(per_run.get("job_input_dir")) == str(input_dir):
                             triplets = per_run.get("triplets", [])
+                            matched_run = True
                     elif isinstance(per_run, list):
                         triplets = per_run
+                        matched_run = True
                 except (OSError, ValueError):
                     triplets = []
-            if not triplets and manifest_path.exists():
-                with manifest_path.open("r", encoding="utf-8") as f:
-                    triplets = [t for t in json.load(f) if _is_true_triplet(t)]
-            job["triplets"] = [_enrich_ingest_triplet(t) for t in triplets]
+
+            # Honest reporting: If this run completed and produced 0 triplets,
+            # report 0 triplets! Never fall back to user_triplets.json history.
+            if matched_run:
+                job["triplets"] = [_enrich_ingest_triplet(t) for t in triplets]
+                if not triplets:
+                    LOG.info("Job %s: 0 valid triplets found in this upload", job_id)
+            else:
+                job["triplets"] = []
+                LOG.info("Job %s: 0 valid triplets found in this upload (no matching per-run record)", job_id)
             # Reload the in-memory catalog so the new region_auto_* folders
             # immediately serve /images, /matches, /footprint like the
             # curated data regions (no manual /refresh round-trip).

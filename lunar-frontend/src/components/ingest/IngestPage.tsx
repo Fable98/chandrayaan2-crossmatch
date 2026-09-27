@@ -322,142 +322,145 @@ export default function IngestPage() {
   const isProcessing = phase === "processing" || phase === "queued";
 
   return (
-    <div className="h-screen overflow-hidden bg-[#f4f6fb] dark:bg-[#090b0e] font-sans text-slate-800 dark:text-slate-200 antialiased flex">
-      {/* ======================================================== */}
-      {/* 1. LEFT SIDEBAR: Brand Logo, Main Menu, Region List      */}
-      {/* ======================================================== */}
-      <aside className="w-64 bg-white dark:bg-[#0e1117] border-r border-slate-200/80 dark:border-[#1b2029] flex flex-col shrink-0 h-screen sticky top-0 overflow-hidden">
-        <div className="flex-1 overflow-y-auto min-h-0">
-          {/* Brand Header */}
-          <div className="p-5 pb-4 flex items-center justify-between border-b border-slate-100 dark:border-[#1b2029] shrink-0">
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-[#4F46E5] text-white font-mono font-black text-xs shadow-[0_0_14px_rgba(79,70,229,0.35)] group-hover:scale-105 transition-transform">
-                C2
+    <div className="h-screen overflow-hidden bg-[#D3CCC0] dark:bg-[#121615] font-sans text-[#1E2321] dark:text-[#E7E2D6] antialiased flex flex-col">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        {/* ======================================================== */}
+        {/* 1. LEFT SIDEBAR: Brand Logo, Main Menu, Region List      */}
+        {/* ======================================================== */}
+        <aside className="w-64 bg-[#E7E2D6] dark:bg-[#1A201E] border-r-2 border-[#8B8579] dark:border-[#2D3835] flex flex-col shrink-0 h-full overflow-hidden select-none">
+          {/* Brand Header Card */}
+          <div className="p-2 pb-0 shrink-0">
+            <div className="retro-outset p-1">
+              <div className="bg-[#1F4743] text-white px-2 py-1 flex items-center justify-between text-xs font-bold font-mono tracking-wider">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-4 h-4 bg-white/20 flex items-center justify-center text-[10px] text-white font-mono font-bold">
+                    C2
+                  </div>
+                  <span>CHANDRAYAAN-2</span>
+                </div>
+                <div className="flex gap-0.5">
+                  <span className="window-ctrl-btn">_</span>
+                  <span className="window-ctrl-btn">X</span>
+                </div>
               </div>
-              <div>
-                <h1 className="text-sm font-extrabold tracking-tight text-slate-900 dark:text-slate-100 leading-none">
-                  chandrayaan-2
-                </h1>
-                <span className="text-[10px] font-mono text-indigo-600 dark:text-indigo-400 font-semibold block mt-1">
-                  ISRO SAC · SIH26166
-                </span>
+              <div className="p-2 bg-[#E9E4D8] dark:bg-[#161B19] text-[11px] border-t border-[#AFA99B] dark:border-[#2D3835]">
+                <div className="font-bold text-[#143532] dark:text-emerald-400 text-xs">ISRO Planetary Cross-Match</div>
+                <div className="text-[#555C58] dark:text-[#8C9893] text-[10px]">OHRC · TMC-2 · LRO NAC · IIRS</div>
               </div>
-            </Link>
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
+            </div>
           </div>
 
           {/* Navigation Section */}
-          <div className="p-4 space-y-6">
-            <div>
-              <span className="px-3 text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-2">
-                Menu
-              </span>
-              <nav className="space-y-1">
+          <div className="flex-1 overflow-y-auto p-2 space-y-2 min-h-0 flex flex-col">
+            <div className="retro-outset p-1.5 flex flex-col">
+              <div className="bg-[#1F4743] text-white px-2 py-0.5 flex items-center justify-between text-[11px] font-bold font-mono mb-1.5">
+                <span>MENU EXPLORER</span>
+                <span className="text-[9px] text-[#9AC6C0]">SYS_MENU</span>
+              </div>
+              <nav className="space-y-1 text-xs">
                 <Link
                   href="/?view=console"
-                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-100 transition border-l-4 border-transparent"
+                  prefetch={false}
+                  className="retro-button w-full text-left px-2 py-1.5 flex items-center justify-between text-xs font-semibold text-[#222926] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10 transition"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">
-                      ⊞
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px]">▣</span>
                     <span>Dashboard QA</span>
                   </div>
                 </Link>
 
                 <div
-                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold bg-[#EEF2FF] dark:bg-indigo-950/60 text-[#4F46E5] dark:text-indigo-300 border-l-4 border-[#4F46E5]"
+                  className="w-full text-left px-2 py-1.5 flex items-center justify-between text-xs transition-all bg-[#28557E] text-white font-bold border-t border-l border-[#4477A6] border-r-2 border-b-2 border-[#122A42] shadow-inner"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-[#4F46E5] dark:text-indigo-300">
-                      ⚡
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px]">⚡</span>
                     <span>Ingest &amp; Prepare</span>
                   </div>
-                  <span className="h-1.5 w-1.5 rounded-full bg-[#4F46E5]" />
+                  <span className="h-1.5 w-1.5 rounded-full bg-white" />
                 </div>
 
                 <Link
                   href="/?view=console&subview=linked-cursor"
-                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-100 transition border-l-4 border-transparent"
+                  prefetch={false}
+                  className="retro-button w-full text-left px-2 py-1.5 flex items-center justify-between text-xs font-semibold text-[#222926] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10 transition"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">
-                      ⊙
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px]">⊙</span>
                     <span>Linked Cursor</span>
                   </div>
                 </Link>
 
                 <Link
                   href="/?view=console&subview=map"
-                  className="group flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-100 transition border-l-4 border-transparent"
+                  prefetch={false}
+                  className="retro-button w-full text-left px-2 py-1.5 flex items-center justify-between text-xs font-semibold text-[#222926] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10 transition"
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">
-                      ☵
-                    </span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px]">☵</span>
                     <span>Planetary Map</span>
                   </div>
                 </Link>
 
+                <div className="border-t border-[#8B8579] dark:border-[#2D3835] my-1" />
+
                 <button
-                  type="button"
                   onClick={() => setVaultOpen(true)}
-                  className="group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-100 transition border-l-4 border-transparent"
+                  className="retro-button w-full text-left px-2 py-1.5 flex items-center justify-between text-xs font-semibold text-[#222926] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10 transition"
+                  title="Browse all multi-sensor lunar datasets (Archive Vault)"
                 >
-                  <span className="text-sm text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">▤</span>
-                  <span>Archive Vault</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px]">🗄️</span>
+                    <span>Inspect Full Vault</span>
+                  </div>
+                  <span className="text-[10px]">↗</span>
                 </button>
 
                 <button
-                  type="button"
                   onClick={() => setTheoryModalOpen(true)}
-                  className="group flex w-full items-center gap-3 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-slate-100 transition border-l-4 border-transparent"
+                  className="retro-button w-full text-left px-2 py-1.5 flex items-center justify-between text-xs font-semibold text-[#222926] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10 transition"
+                  title="Open mathematical framework reference"
                 >
-                  <span className="text-sm text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300">📖</span>
-                  <span>Methodology</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px]">📖</span>
+                    <span>Math Framework</span>
+                  </div>
+                  <span className="text-[10px]">↗</span>
                 </button>
               </nav>
             </div>
 
             {/* Region Directory */}
-            <div>
-              <div className="flex items-center justify-between px-3 mb-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block">
-                  Regions ({filteredTriplets.length})
-                </span>
+            <div className="retro-outset p-1.5 flex-1 flex flex-col min-h-[220px]">
+              <div className="bg-[#2D4F4A] text-white px-2 py-1 text-[11px] font-bold font-mono flex items-center justify-between mb-1">
+                <span>REGIONS ({filteredTriplets.length})</span>
               </div>
 
-              <div className="space-y-1 max-h-[260px] overflow-y-auto pr-1">
+              <div className="retro-inset flex-1 overflow-y-auto p-1 space-y-1 font-mono text-[11px] max-h-[220px]">
                 {filteredTriplets.map((t, i) => {
                   const { widthKm, heightKm } = footprintSizeKm(t.bounds);
                   return (
                     <Link
                       key={t.id}
                       href={`/?view=console&region=${t.id}`}
-                      className="flex w-full items-center justify-between rounded-xl px-3 py-2 text-left text-xs transition-all text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/5 dark:hover:text-slate-200"
+                      className="flex w-full items-center justify-between px-1.5 py-1 text-left text-xs transition-all bg-[#ECE7DC] dark:bg-[#161B19] hover:bg-[#DFD9CB] dark:hover:bg-white/5 text-[#2B312E] dark:text-[#E7E2D6] border border-[#CCC6B8] dark:border-[#2D3835]"
                     >
                       <div className="truncate">
-                        <span className="text-[10px] font-mono text-slate-400 mr-1.5">
+                        <span className="text-[10px] mr-1.5 text-[#69726E]">
                           {String(i + 1).padStart(2, "0")}.
                         </span>
                         <span>{t.id}</span>
-                        <span className="block text-[10px] text-slate-400 font-normal">
+                        <span className="block text-[9px] font-normal text-[#69726E]">
                           {widthKm.toFixed(1)} × {heightKm.toFixed(1)} km
                         </span>
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
                         {t.dem_available && (
-                          <span className="rounded-md bg-indigo-50 dark:bg-indigo-950/50 px-1.5 py-0.5 text-[9px] font-bold text-[#4F46E5] dark:text-indigo-300">
+                          <span className="px-1 text-[9px] border bg-[#D3CBBF] dark:bg-[#2D3835] border-[#9E9789] text-[#1E2321] dark:text-[#E7E2D6]">
                             DEM
                           </span>
                         )}
                         {t.lro_nac_available && (
-                          <span className="rounded-md bg-amber-50 dark:bg-amber-950/50 px-1.5 py-0.5 text-[9px] font-bold text-amber-700 dark:text-amber-300">
+                          <span className="px-1 text-[9px] border bg-[#D1B890] dark:bg-[#785317] border-[#9E8662] text-black dark:text-amber-200">
                             LRO
                           </span>
                         )}
@@ -466,312 +469,277 @@ export default function IngestPage() {
                   );
                 })}
               </div>
+
+              {/* Sidebar Bottom Hardware Status Gauge */}
+              <div className="mt-2 retro-inset p-1.5 bg-[#DFD9CD] dark:bg-[#141817] text-[10px] font-mono leading-tight space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-[#555C58] dark:text-[#7A827E]">ENGINE STATUS:</span>
+                  <span className="text-emerald-800 dark:text-emerald-400 font-bold">READY TO RUN</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#555C58] dark:text-[#7A827E]">ALLOC_MEM:</span>
+                  <span className="text-[#202724] dark:text-[#E7E2D6] font-bold">64.0 MB / OK</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#555C58] dark:text-[#7A827E]">ISRO LINK:</span>
+                  <span className="text-emerald-800 dark:text-emerald-400 font-bold">ONLINE [TIF/RAW]</span>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </aside>
+        </aside>
 
-      {/* ======================================================== */}
-      {/* 2. MAIN WORKSPACE: Header Bar & Ingest Content           */}
-      {/* ======================================================== */}
-      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
-        {/* Top Header Bar */}
-        <header className="h-16 bg-white dark:bg-[#0e1117] border-b border-slate-200/80 dark:border-[#1b2029] px-8 flex items-center justify-between gap-4 shrink-0">
-          {/* Search Input */}
-          <div className="relative w-80">
-            <svg
-              className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+        {/* ======================================================== */}
+        {/* 2. MAIN WORKSPACE: Header Bar & Ingest Content           */}
+        {/* ======================================================== */}
+        <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+          {/* Top Header Bar */}
+          <header className="bg-[#E7E2D6] dark:bg-[#1A201E] border-b-2 border-[#8B8579] dark:border-[#2D3835] px-4 py-1.5 flex items-center justify-between gap-3 shrink-0 shadow-sm z-30 select-none">
+            {/* Search Input */}
+            <div className="relative retro-inset px-2 py-0.5 flex items-center bg-white dark:bg-[#0F1211] w-56 md:w-72 text-[11px]">
+              <span className="text-[#6D746F] mr-1.5">🔍</span>
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search regions, coords..."
+                className="w-full bg-transparent border-none p-0 text-[11px] focus:ring-0 text-[#222] dark:text-[#E7E2D6] outline-none"
               />
-            </svg>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search regions, coordinates..."
-              className="w-full pl-10 pr-12 py-2 bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-[#1b2029] rounded-xl text-xs text-slate-700 dark:text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20 focus:border-[#4F46E5] transition"
-            />
-            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded bg-slate-200/60 dark:bg-white/10 px-1.5 py-0.5 font-mono text-[9px] text-slate-400">
-              /
-            </span>
-          </div>
+              <span className="font-mono text-[9px] text-[#888]">/</span>
+            </div>
 
-          {/* Center: Live Ingestion Pipeline Status Beacon */}
-          <div className="hidden lg:flex items-center gap-2 rounded-full border border-slate-200/80 dark:border-[#1b2029] bg-slate-50/80 dark:bg-white/5 px-3 py-1 font-mono text-2xs text-slate-600 dark:text-slate-300 shadow-sm">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-            </span>
-            <span className="font-semibold">FASTAPI :8000</span>
-            <span className="text-slate-300 dark:text-white/20">·</span>
-            <span className="text-indigo-600 dark:text-indigo-400 font-bold">INGESTION PIPELINE READY</span>
-          </div>
+            {/* Center: Live Ingestion Pipeline Status Beacon */}
+            <div className="hidden lg:flex items-center gap-2 retro-inset px-2.5 py-1 text-2xs font-mono font-bold bg-[#E2DDCF] dark:bg-[#161B19] text-[#1F4743] dark:text-emerald-400">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+              </span>
+              <span>FASTAPI :8000</span>
+              <span className="text-[#8B8579]">·</span>
+              <span>INGESTION PIPELINE READY</span>
+            </div>
 
-          {/* Right Header Controls */}
-          <div className="flex items-center gap-3">
-            <button
-              type="button"
-              onClick={toggleTheme}
-              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm flex items-center gap-1.5"
-              title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-              aria-label="Toggle color theme"
-            >
-              <span>{theme === "dark" ? "☀" : "🌙"}</span>
-              <span className="hidden sm:inline">{theme === "dark" ? "Light" : "Dark"}</span>
-            </button>
-
-            <button
-              onClick={() => router.push("/")}
-              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm flex items-center gap-1.5"
-              title="Return to Mission Overview"
-            >
-              <span>←</span>
-              <span>Back</span>
-            </button>
-
-            <button
-              onClick={() => setVaultOpen(true)}
-              className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-4 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm flex items-center gap-2"
-              title="Browse all multi-sensor lunar datasets"
-            >
-              <span className="h-2 w-2 rounded-full bg-emerald-500" />
-              <span>{triplets.length} Datasets</span>
-            </button>
-
-            <div className="h-8 w-px bg-slate-200 dark:bg-[#1b2029] mx-1" />
-
-            {/* Profile Pill with Interactive Dropdown */}
-            <div className="relative" ref={profileMenuRef}>
+            {/* Right Header Controls */}
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setProfileMenuOpen((prev) => !prev)}
-                className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-white/5 p-1.5 pr-3 hover:bg-slate-50 dark:hover:bg-white/10 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-[#4F46E5]/20"
-                aria-haspopup="true"
-                aria-expanded={profileMenuOpen}
+                onClick={toggleTheme}
+                className="retro-button px-2.5 py-1 text-[11px] font-semibold text-[#2C312E] dark:text-[#E7E2D6] flex items-center gap-1"
+                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                aria-label="Toggle color theme"
               >
-                <div className="h-8 w-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-[#4F46E5] text-white font-bold text-xs flex items-center justify-center shadow-sm">
-                  {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : "IS"}
-                </div>
-                <div className="hidden sm:block text-left">
-                  <span className="text-xs font-bold text-slate-800 dark:text-slate-100 block leading-tight truncate max-w-[120px]">
-                    {currentUser?.name || "ISRO Pilot"}
-                  </span>
-                  <span className="text-[10px] text-slate-400 block">Operator</span>
-                </div>
-                <svg
-                  className={`h-3.5 w-3.5 text-slate-400 transition-transform duration-200 ${
-                    profileMenuOpen ? "rotate-180" : ""
-                  }`}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+                <span>{theme === "dark" ? "☀" : "🌙"}</span>
+                <span className="hidden sm:inline">{theme === "dark" ? "Light" : "Dark"}</span>
+              </button>
+
+              <button
+                onClick={() => router.push("/")}
+                className="retro-button px-2.5 py-1 text-[11px] font-semibold text-[#2C312E] dark:text-[#E7E2D6] flex items-center gap-1"
+                title="Return to Mission Overview"
+              >
+                <span>←</span>
+                <span>Back</span>
+              </button>
+
+              <button
+                onClick={() => setVaultOpen(true)}
+                className="retro-inset px-2.5 py-1 text-[11px] font-mono font-bold flex items-center gap-1.5 bg-[#E2DDCF] dark:bg-[#161B19] text-[#1F4743] dark:text-emerald-400"
+                title="Browse all multi-sensor lunar datasets"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
+                <span>{triplets.length} Datasets</span>
+              </button>
+
+              <div className="h-6 w-px bg-[#8B8579] dark:bg-[#2D3835] mx-1" />
+
+              {/* Profile Pill with Interactive Dropdown */}
+              <div className="relative" ref={profileMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setProfileMenuOpen((prev) => !prev)}
+                  className="retro-button px-2 py-0.5 text-[11px] flex items-center space-x-1.5 cursor-pointer bg-[#DFD9CB] dark:bg-[#222927]"
+                  aria-haspopup="true"
+                  aria-expanded={profileMenuOpen}
                 >
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-
-              {/* Dropdown Menu */}
-              {profileMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-2 shadow-2xl z-50 animate-fade-in">
-                  <div className="p-3 border-b border-slate-100 dark:border-[#1b2029]">
-                    <span className="text-xs font-bold text-slate-900 dark:text-slate-100 block truncate">
-                      {currentUser?.name || "ISRO Flight Operator"}
-                    </span>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block truncate">
-                      {currentUser?.email || "flight.ops@isro.gov.in"}
-                    </span>
-                    <span className="mt-2 inline-flex items-center gap-1 rounded-md bg-emerald-50 dark:bg-emerald-950/50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                      Active Session
+                  <div className="w-5 h-5 bg-[#28557E] text-white flex items-center justify-center font-bold text-[9px]">
+                    {currentUser?.name ? currentUser.name.slice(0, 2).toUpperCase() : "SH"}
+                  </div>
+                  <div className="hidden sm:block text-left leading-none">
+                    <span className="font-bold text-[#1F2422] dark:text-[#E7E2D6] block truncate max-w-[100px]">
+                      {currentUser?.name || "Shresth"}
                     </span>
                   </div>
+                  <span className="text-[9px] text-[#555] dark:text-[#888]">▼</span>
+                </button>
 
-                  <div className="py-1 space-y-0.5">
-                    <button
-                      onClick={() => {
-                        setProfileMenuOpen(false);
-                        setVaultOpen(true);
-                      }}
-                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition text-left"
-                    >
-                      <span className="text-slate-400">▤</span>
-                      <span>Archive Vault ({triplets.length} Datasets)</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setProfileMenuOpen(false);
-                        setTheoryModalOpen(true);
-                      }}
-                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition text-left"
-                    >
-                      <span className="text-slate-400">📖</span>
-                      <span>Methodology Reference</span>
-                    </button>
-
-                    <button
-                      onClick={() => {
-                        setProfileMenuOpen(false);
-                        router.push("/");
-                      }}
-                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition text-left"
-                    >
-                      <span className="text-slate-400">🌐</span>
-                      <span>Mission Overview</span>
-                    </button>
-                  </div>
-
-                  <div className="pt-1 mt-1 border-t border-slate-100 dark:border-[#1b2029]">
-                    <button
-                      onClick={handleUserLogout}
-                      className="w-full flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition text-left"
-                    >
-                      <span>🚪</span>
-                      <span>Log Out</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
-
-        {/* Ingest Main Content */}
-        <main className="flex-1 min-h-0 overflow-y-auto p-8 space-y-6">
-          {/* Top Title & Subtitle + Action Tabs */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/60 dark:border-[#1b2029] pb-5">
-            <div>
-              <div className="flex items-center gap-2.5">
-                <h2 className="text-2xl font-black tracking-tight text-slate-900 dark:text-slate-100">
-                  Ingest &amp; Prepare
-                </h2>
-                <span className="rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800/50 px-2.5 py-0.5 text-2xs font-mono font-bold text-indigo-700 dark:text-indigo-300">
-                  ISRO SIH26166
-                </span>
-              </div>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Drop raw PRADAN archives to automatically discover, match, and process Chandrayaan-2 OHRC + TMC-2 + IIRS triplets with sub-pixel verification.
-              </p>
-            </div>
-
-            {/* Tab Controls & Direct Link to Dashboard */}
-            <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-              <button
-                type="button"
-                onClick={() => setActiveTab("new")}
-                className={`rounded-xl px-4 py-2 text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm ${
-                  activeTab === "new"
-                    ? "bg-[#4F46E5] text-white shadow-md shadow-indigo-500/20"
-                    : "border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10"
-                }`}
-              >
-                ＋ New Batch Ingestion
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab("history");
-                  loadHistoryJobs();
-                }}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm ${
-                  activeTab === "history"
-                    ? "bg-[#4F46E5] text-white shadow-md shadow-indigo-500/20"
-                    : "border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10"
-                }`}
-              >
-                <span>📂 Previous Ingestion Runs</span>
-                {historyJobs.length > 0 && (
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
-                      activeTab === "history"
-                        ? "bg-white/20 text-white"
-                        : "bg-slate-100 dark:bg-white/10 text-slate-600 dark:text-slate-300"
-                    }`}
-                  >
-                    {historyJobs.length}
-                  </span>
-                )}
-              </button>
-
-              <Link
-                href="/?view=console"
-                className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 transition-all hover:scale-[1.02] active:scale-[0.98] shadow-sm flex items-center gap-1.5"
-              >
-                <span>Mission Dashboard</span>
-                <span>↗</span>
-              </Link>
-            </div>
-          </div>
-
-          {/* Auth Guard Check */}
-          {!authChecked ? (
-            <div className="rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-12 text-center shadow-sm max-w-xl mx-auto space-y-4">
-              <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-[#4F46E5] border-r-transparent" />
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Verifying credentials...</p>
-            </div>
-          ) : !isAuthed ? (
-            <div className="rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-12 text-center shadow-sm max-w-xl mx-auto space-y-4">
-              <div className="text-4xl">🔐</div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">
-                Sign in Required for Ingestion
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                The ingest pipeline writes to disk and launches processing jobs, so uploads require an
-                authenticated operator session. Please sign in from the home page, then return here.
-              </p>
-              <div className="pt-2">
-                <Link
-                  href="/"
-                  className="inline-flex items-center gap-2 rounded-xl bg-[#4F46E5] px-5 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-[#4338CA] transition"
-                >
-                  Go to Sign In
-                </Link>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* TAB 1: NEW BATCH INGESTION */}
-              {activeTab === "new" && (
-                <section className="rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-5 shadow-sm md:p-6 space-y-6">
-                  {/* Card Header Bar */}
-                  <div className="flex flex-col justify-between gap-3 border-b border-slate-100 dark:border-[#1b2029] pb-5 md:flex-row md:items-center">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-[#4F46E5] shadow-[0_0_0_4px_rgba(79,70,229,.12)]" />
-                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#4F46E5]">
-                          Live Ingestion Pipeline
-                        </p>
-                      </div>
-                      <h3 className="mt-1 text-xl font-black tracking-tight text-slate-900 dark:text-slate-100">
-                        Upload PRADAN Archives
-                      </h3>
-                      <p className="mt-1 max-w-2xl text-xs text-slate-500 dark:text-slate-400">
-                        Drop your PRADAN zip files below to automatically extract PDS4 metadata, match
-                        overlapping OHRC + TMC-2 + IIRS triplets, and generate pipeline artifacts.
-                      </p>
+                {/* Dropdown Menu */}
+                {profileMenuOpen && (
+                  <div className="absolute right-0 mt-1 w-64 retro-outset p-1.5 shadow-2xl z-50 animate-fade-in bg-[#E7E2D6] dark:bg-[#1A201E]">
+                    <div className="p-2 border-b border-[#8B8579] dark:border-[#2D3835] bg-[#E9E4D8] dark:bg-[#161B19] text-xs">
+                      <span className="font-bold text-[#143532] dark:text-emerald-400 block truncate">
+                        {currentUser?.name || "ISRO Flight Operator"}
+                      </span>
+                      <span className="text-[10px] text-[#555C58] dark:text-[#8C9893] block truncate">
+                        {currentUser?.email || "flight.ops@isro.gov.in"}
+                      </span>
+                      <span className="mt-1 inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-bold bg-[#D5EAD8] text-[#195924] border border-[#85C48F]">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                        Active Session
+                      </span>
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`rounded-full border px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${
-                          phase === "processing" || phase === "queued"
-                            ? "border-indigo-300 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 text-[#4F46E5] dark:text-indigo-300 animate-pulse"
-                            : phase === "done"
-                            ? "border-emerald-300 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
-                            : phase === "error"
-                            ? "border-rose-300 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300"
-                            : "border-slate-200 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400"
-                        }`}
+                    <div className="py-1 space-y-0.5 text-xs">
+                      <button
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          setVaultOpen(true);
+                        }}
+                        className="w-full flex items-center gap-2 px-2 py-1 text-xs font-semibold text-[#1F2422] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10 text-left"
                       >
+                        <span>▤</span>
+                        <span>Archive Vault ({triplets.length} Datasets)</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          setTheoryModalOpen(true);
+                        }}
+                        className="w-full flex items-center gap-2 px-2 py-1 text-xs font-semibold text-[#1F2422] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10 text-left"
+                      >
+                        <span>📖</span>
+                        <span>Methodology Reference</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setProfileMenuOpen(false);
+                          router.push("/");
+                        }}
+                        className="w-full flex items-center gap-2 px-2 py-1 text-xs font-semibold text-[#1F2422] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10 text-left"
+                      >
+                        <span>🌐</span>
+                        <span>Mission Overview</span>
+                      </button>
+                    </div>
+
+                    <div className="pt-1 mt-1 border-t border-[#8B8579] dark:border-[#2D3835]">
+                      <button
+                        onClick={handleUserLogout}
+                        className="w-full flex items-center gap-2 px-2 py-1 text-xs font-bold text-red-700 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-950/40 text-left"
+                      >
+                        <span>🚪</span>
+                        <span>Log Out</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </header>
+
+          {/* Ingest Main Content */}
+          <main className="flex-1 min-h-0 overflow-y-auto p-3 sm:p-4 space-y-3">
+            {/* Top Title & Subtitle + Action Tabs */}
+            <div className="retro-outset p-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold font-mono tracking-tight text-[#1E2321] dark:text-[#E7E2D6]">
+                      INGEST &amp; PREPARE
+                    </h2>
+                    <span className="retro-inset px-2 py-0.5 text-[9px] font-mono font-bold bg-[#1F4743] text-white">
+                      ISRO SIH26166
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-[#555C58] dark:text-[#8C9893] mt-0.5 font-sans">
+                    Drop raw PRADAN archives to automatically discover, match, and process Chandrayaan-2 OHRC + TMC-2 + IIRS triplets with sub-pixel verification.
+                  </p>
+                </div>
+
+                {/* Tab Controls & Direct Link to Dashboard */}
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("new")}
+                    className={`px-3 py-1.5 text-xs font-bold transition-all ${
+                      activeTab === "new"
+                        ? "retro-button-primary font-bold shadow-inner"
+                        : "retro-button text-[#222926] dark:text-[#E7E2D6]"
+                    }`}
+                  >
+                    ＋ New Batch Ingestion
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab("history");
+                      loadHistoryJobs();
+                    }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold transition-all ${
+                      activeTab === "history"
+                        ? "retro-button-primary font-bold shadow-inner"
+                        : "retro-button text-[#222926] dark:text-[#E7E2D6]"
+                    }`}
+                  >
+                    <span>📂 Previous Runs</span>
+                    {historyJobs.length > 0 && (
+                      <span className="retro-inset px-1 py-0.2 text-[9px] font-mono bg-[#143532] text-white">
+                        {historyJobs.length}
+                      </span>
+                    )}
+                  </button>
+
+                  <Link
+                    href="/?view=console"
+                    className="retro-button px-3 py-1.5 text-xs font-bold text-[#222926] dark:text-[#E7E2D6] flex items-center gap-1"
+                  >
+                    <span>Mission Dashboard</span>
+                    <span>↗</span>
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            {/* Auth Guard Check */}
+            {!authChecked ? (
+              <div className="retro-outset p-8 text-center max-w-md mx-auto space-y-3 font-mono">
+                <div className="inline-block h-6 w-6 animate-spin border-2 border-[#1F4743] border-r-transparent" />
+                <p className="text-xs text-[#555C58] dark:text-[#8C9893]">Verifying credentials...</p>
+              </div>
+            ) : !isAuthed ? (
+              <div className="retro-outset p-8 text-center max-w-md mx-auto space-y-3 font-mono">
+                <div className="text-3xl">🔐</div>
+                <h3 className="text-sm font-bold text-[#1E2321] dark:text-[#E7E2D6]">
+                  SIGN IN REQUIRED FOR INGESTION
+                </h3>
+                <p className="text-xs text-[#555C58] dark:text-[#8C9893] leading-relaxed font-sans">
+                  The ingest pipeline writes to disk and launches processing jobs, so uploads require an
+                  authenticated operator session. Please sign in from the home page, then return here.
+                </p>
+                <div className="pt-2">
+                  <Link
+                    href="/"
+                    className="retro-button-primary px-4 py-2 text-xs font-bold font-mono inline-block"
+                  >
+                    GO TO SIGN IN
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* TAB 1: NEW BATCH INGESTION */}
+                {activeTab === "new" && (
+                  <section className="retro-outset p-1 space-y-3">
+                    {/* Card Header Bar */}
+                    <div className="bg-[#1F4743] text-white px-2.5 py-1 flex items-center justify-between text-xs font-bold font-mono tracking-wider">
+                      <div className="flex items-center gap-2">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                        <span>LIVE INGESTION PIPELINE // UPLOAD PRADAN ARCHIVES</span>
+                      </div>
+
+                      <div className="retro-inset px-2 py-0.5 bg-[#143532] text-white text-[10px] font-mono font-bold">
                         {isProcessing
                           ? "PROCESSING..."
                           : phase === "done"
@@ -781,481 +749,479 @@ export default function IngestPage() {
                           : "READY TO RUN"}
                       </div>
                     </div>
-                  </div>
 
-                  {/* Drop Zone */}
-                  {(phase === "idle" || phase === "queued") && (
-                    <DropZone
-                      onFilesSelected={handleFilesSelected}
-                      disabled={isProcessing}
-                    />
-                  )}
+                    <div className="p-3 bg-[#E7E2D6] dark:bg-[#1A201E] space-y-3">
+                      {/* Drop Zone */}
+                      {(phase === "idle" || phase === "queued") && (
+                        <DropZone
+                          onFilesSelected={handleFilesSelected}
+                          disabled={isProcessing}
+                        />
+                      )}
 
-                  {/* Uploaded File List & Actions */}
-                  {files.length > 0 && phase !== "done" && (
-                    <div className="space-y-4 animate-fade-in">
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        {files.map((f) => (
-                          <div
-                            key={f.name}
-                            className="inline-flex items-center gap-2 rounded-xl border border-slate-200 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 px-3 py-1.5 text-xs text-slate-700 dark:text-slate-200 shadow-xs"
-                          >
-                            <span>📦</span>
-                            <span className="font-medium max-w-[200px] truncate">{f.name}</span>
-                            <span className="font-mono text-[10px] text-slate-400">
-                              {fmtSize(f.size)}
-                            </span>
-                            {!isProcessing && (
+                      {/* Uploaded File List & Actions */}
+                      {files.length > 0 && phase !== "done" && (
+                        <div className="space-y-3 animate-fade-in">
+                          <div className="flex flex-wrap gap-1.5 pt-1">
+                            {files.map((f) => (
+                              <div
+                                key={f.name}
+                                className="retro-inset px-2.5 py-1 text-xs font-mono text-[#1E2321] dark:text-[#E7E2D6] bg-[#ECE7DC] dark:bg-[#161B19] flex items-center gap-2"
+                              >
+                                <span>📦</span>
+                                <span className="font-semibold max-w-[200px] truncate">{f.name}</span>
+                                <span className="text-[10px] text-[#555C58] dark:text-[#8C9893]">
+                                  {fmtSize(f.size)}
+                                </span>
+                                {!isProcessing && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeFile(f.name)}
+                                    className="text-[#888] hover:text-red-600 transition px-1 text-sm leading-none font-bold"
+                                    title="Remove file"
+                                  >
+                                    &times;
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+
+                          {/* Stats and Action Buttons */}
+                          <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-[#8B8579]/40 dark:border-[#2D3835]">
+                            <div className="flex items-center gap-3 text-xs font-mono text-[#555C58] dark:text-[#8C9893]">
+                              <span>
+                                FILES: <strong className="text-[#1E2321] dark:text-[#E7E2D6]">{files.length}</strong>
+                              </span>
+                              <span>
+                                TOTAL: <strong className="text-[#1E2321] dark:text-[#E7E2D6]">{fmtSize(totalSize)}</strong>
+                              </span>
+                            </div>
+
+                            <div className="flex items-center gap-2">
                               <button
                                 type="button"
-                                onClick={() => removeFile(f.name)}
-                                className="text-slate-400 hover:text-rose-600 transition px-1 text-sm leading-none"
-                                title="Remove file"
+                                onClick={clearFiles}
+                                disabled={isProcessing}
+                                className="retro-button px-3 py-1.5 text-xs font-bold text-[#1E2321] dark:text-[#E7E2D6] disabled:opacity-40"
                               >
-                                &times;
+                                Clear All
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={handleStart}
+                                disabled={isProcessing}
+                                className="retro-button-primary px-4 py-1.5 text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-2 disabled:opacity-40"
+                              >
+                                {isProcessing ? (
+                                  <>
+                                    <span className="h-2.5 w-2.5 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+                                    <span>Running Pipeline...</span>
+                                  </>
+                                ) : (
+                                  <span>Start Ingestion ({files.length})</span>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Advanced Pipeline Configuration Accordion */}
+                      {phase === "idle" && (
+                        <div className="retro-outset p-2 bg-[#E9E4D8] dark:bg-[#161B19]">
+                          <button
+                            type="button"
+                            onClick={() => setShowConfig(!showConfig)}
+                            className="w-full flex items-center justify-between text-left font-mono"
+                          >
+                            <span className="text-xs font-bold uppercase tracking-wider text-[#1E2321] dark:text-[#E7E2D6]">
+                              Pipeline Configuration
+                            </span>
+                            <span className="text-xs font-bold text-[#28557E] dark:text-cyan-400">
+                              {showConfig ? "▲ Hide Configuration" : "▼ Show Advanced"}
+                            </span>
+                          </button>
+
+                          {showConfig && (
+                            <div className="mt-3 pt-3 border-t border-[#8B8579]/40 dark:border-[#2D3835] space-y-3 font-mono animate-fade-in">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#555C58] dark:text-[#8C9893] mb-1">
+                                    Min Containment ({Math.round(config.containment * 100)}%)
+                                  </label>
+                                  <input
+                                    type="range"
+                                    min="0.5"
+                                    max="1.0"
+                                    step="0.05"
+                                    value={config.containment}
+                                    onChange={(e) =>
+                                      setConfig({ ...config, containment: parseFloat(e.target.value) })
+                                    }
+                                    className="w-full accent-[#28557E]"
+                                  />
+                                </div>
+
+                                <div>
+                                  <label className="block text-[10px] font-bold uppercase tracking-wider text-[#555C58] dark:text-[#8C9893] mb-1">
+                                    Tile Size (px)
+                                  </label>
+                                  <select
+                                    value={config.tileSize}
+                                    onChange={(e) =>
+                                      setConfig({ ...config, tileSize: parseInt(e.target.value) })
+                                    }
+                                    className="retro-inset w-full px-2 py-1 text-xs font-mono font-bold bg-[#ECE7DC] dark:bg-[#161B19] text-[#1E2321] dark:text-[#E7E2D6] outline-none"
+                                  >
+                                    <option value={256}>256 × 256</option>
+                                    <option value={512}>512 × 512 (Standard)</option>
+                                    <option value={1024}>1024 × 1024</option>
+                                  </select>
+                                </div>
+                              </div>
+
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-wider text-[#555C58] dark:text-[#8C9893] mb-1">
+                                  Max Time Gap (Days, Optional)
+                                </label>
+                                <input
+                                  type="number"
+                                  placeholder="e.g. 180 (empty = any)"
+                                  value={config.maxTimeGapDays ?? ""}
+                                  onChange={(e) =>
+                                    setConfig({
+                                      ...config,
+                                      maxTimeGapDays: e.target.value ? parseFloat(e.target.value) : null,
+                                    })
+                                  }
+                                  className="retro-inset w-full px-2 py-1 text-xs font-mono bg-white dark:bg-[#0F1211] text-[#1E2321] dark:text-[#E7E2D6] outline-none"
+                                />
+                              </div>
+
+                              <div className="flex flex-wrap gap-3 pt-1 text-xs text-[#1E2321] dark:text-[#E7E2D6]">
+                                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={config.noLargeAoi}
+                                    onChange={(e) =>
+                                      setConfig({ ...config, noLargeAoi: e.target.checked })
+                                    }
+                                    className="accent-[#28557E]"
+                                  />
+                                  Skip Large-AOI IIRS
+                                </label>
+
+                                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={config.noInvariants}
+                                    onChange={(e) =>
+                                      setConfig({ ...config, noInvariants: e.target.checked })
+                                    }
+                                    className="accent-[#28557E]"
+                                  />
+                                  Skip Invariant Maps
+                                </label>
+
+                                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={config.requireDates}
+                                    onChange={(e) =>
+                                      setConfig({ ...config, requireDates: e.target.checked })
+                                    }
+                                    className="accent-[#28557E]"
+                                  />
+                                  Require Dates
+                                </label>
+
+                                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={config.noMatching}
+                                    onChange={(e) =>
+                                      setConfig({ ...config, noMatching: e.target.checked })
+                                    }
+                                    className="accent-[#28557E]"
+                                  />
+                                  Skip Matching (linked-cursor dots)
+                                </label>
+
+                                <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                                  <input
+                                    type="checkbox"
+                                    checked={config.noRegistration}
+                                    onChange={(e) =>
+                                      setConfig({ ...config, noRegistration: e.target.checked })
+                                    }
+                                    className="accent-[#28557E]"
+                                  />
+                                  Skip Registration QA (grid/blend/quiver)
+                                </label>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Error banner */}
+                      {phase === "error" && error && !status && (
+                        <div className="retro-outset p-3 text-xs font-mono text-rose-800 dark:text-rose-200 bg-[#EED2D2] dark:bg-[#3D1A1A] border border-rose-600 animate-fade-in space-y-2">
+                          <div>
+                            <strong className="font-bold">ERROR:</strong> {error}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {sessionExpired ? (
+                              <Link
+                                href="/"
+                                className="retro-button-primary px-3 py-1 text-xs font-bold font-mono"
+                              >
+                                Go to Sign In
+                              </Link>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={clearFiles}
+                                className="retro-button px-3 py-1 text-xs font-bold text-[#1E2321] dark:text-[#E7E2D6]"
+                              >
+                                Start Over
                               </button>
                             )}
                           </div>
-                        ))}
-                      </div>
-
-                      {/* Stats and Action Buttons */}
-                      <div className="flex flex-wrap items-center justify-between gap-4 pt-2 border-t border-slate-100 dark:border-[#1b2029]">
-                        <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400 font-medium">
-                          <span>
-                            Files: <strong className="font-mono text-slate-800 dark:text-slate-100">{files.length}</strong>
-                          </span>
-                          <span>
-                            Total: <strong className="font-mono text-slate-800 dark:text-slate-100">{fmtSize(totalSize)}</strong>
-                          </span>
                         </div>
+                      )}
 
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={clearFiles}
-                            disabled={isProcessing}
-                            className="rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/10 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm disabled:opacity-40"
-                          >
-                            Clear All
-                          </button>
+                      {/* Processing progress */}
+                      {status && (phase === "processing" || phase === "done" || phase === "error") && (
+                        <ProcessingProgress status={status} />
+                      )}
 
-                          <button
-                            type="button"
-                            onClick={handleStart}
-                            disabled={isProcessing}
-                            className="flex items-center gap-2 rounded-xl bg-[#4F46E5] px-6 py-2.5 text-xs font-black uppercase tracking-[0.12em] text-white shadow-md shadow-indigo-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all hover:bg-[#4338CA] disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            {isProcessing ? (
-                              <>
-                                <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/40 border-t-white" />
-                                <span>Running Pipeline...</span>
-                              </>
-                            ) : (
-                              <span>Start Ingestion ({files.length})</span>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
+                      {/* Results */}
+                      {phase === "done" && (resultTriplets.length > 0 || status) && (
+                        <div className="space-y-3 animate-fade-in">
+                          <ResultsTable
+                            triplets={resultTriplets}
+                            containment={config.containment}
+                          />
 
-                  {/* Advanced Pipeline Configuration Accordion */}
-                  {phase === "idle" && (
-                    <div className="rounded-xl border border-slate-200/80 dark:border-[#1b2029] bg-slate-50/50 dark:bg-white/5 p-4 transition">
-                      <button
-                        type="button"
-                        onClick={() => setShowConfig(!showConfig)}
-                        className="w-full flex items-center justify-between text-left focus:outline-none"
-                      >
-                        <span className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
-                          Pipeline Configuration
-                        </span>
-                        <span className="text-xs font-bold text-[#4F46E5]">
-                          {showConfig ? "▲ Hide Configuration" : "▼ Show Advanced"}
-                        </span>
-                      </button>
-
-                      {showConfig && (
-                        <div className="mt-4 pt-4 border-t border-slate-200/70 dark:border-[#1b2029] space-y-4 animate-fade-in">
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div>
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                                Min Containment ({Math.round(config.containment * 100)}%)
-                              </label>
-                              <input
-                                type="range"
-                                min="0.5"
-                                max="1.0"
-                                step="0.05"
-                                value={config.containment}
-                                onChange={(e) =>
-                                  setConfig({ ...config, containment: parseFloat(e.target.value) })
-                                }
-                                className="w-full accent-[#4F46E5]"
-                              />
-                            </div>
-
-                            <div>
-                              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                                Tile Size (px)
-                              </label>
-                              <select
-                                value={config.tileSize}
-                                onChange={(e) =>
-                                  setConfig({ ...config, tileSize: parseInt(e.target.value) })
-                                }
-                                className="w-full rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3 py-2 text-xs font-semibold text-slate-700 dark:text-slate-200 outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-indigo-100"
-                              >
-                                <option value={256}>256 × 256</option>
-                                <option value={512}>512 × 512 (Standard)</option>
-                                <option value={1024}>1024 × 1024</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          <div>
-                            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">
-                              Max Time Gap (Days, Optional)
-                            </label>
-                            <input
-                              type="number"
-                              placeholder="e.g. 180 (empty = any)"
-                              value={config.maxTimeGapDays ?? ""}
-                              onChange={(e) =>
-                                setConfig({
-                                  ...config,
-                                  maxTimeGapDays: e.target.value ? parseFloat(e.target.value) : null,
-                                })
-                              }
-                              className="w-full rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3 py-2 text-xs font-mono text-slate-700 dark:text-slate-200 outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-indigo-100"
-                            />
-                          </div>
-
-                          <div className="flex flex-wrap gap-4 pt-1">
-                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={config.noLargeAoi}
-                                onChange={(e) =>
-                                  setConfig({ ...config, noLargeAoi: e.target.checked })
-                                }
-                                className="rounded accent-[#4F46E5]"
-                              />
-                              Skip Large-AOI IIRS
-                            </label>
-
-                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={config.noInvariants}
-                                onChange={(e) =>
-                                  setConfig({ ...config, noInvariants: e.target.checked })
-                                }
-                                className="rounded accent-[#4F46E5]"
-                              />
-                              Skip Invariant Maps
-                            </label>
-
-                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={config.requireDates}
-                                onChange={(e) =>
-                                  setConfig({ ...config, requireDates: e.target.checked })
-                                }
-                                className="rounded accent-[#4F46E5]"
-                              />
-                              Require Dates
-                            </label>
-
-                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={config.noMatching}
-                                onChange={(e) =>
-                                  setConfig({ ...config, noMatching: e.target.checked })
-                                }
-                                className="rounded accent-[#4F46E5]"
-                              />
-                              Skip Matching (linked-cursor dots)
-                            </label>
-
-                            <label className="flex items-center gap-2 text-xs font-medium text-slate-700 dark:text-slate-300 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={config.noRegistration}
-                                onChange={(e) =>
-                                  setConfig({ ...config, noRegistration: e.target.checked })
-                                }
-                                className="rounded accent-[#4F46E5]"
-                              />
-                              Skip Registration QA (grid/blend/quiver)
-                            </label>
+                          <div className="pt-2 text-center">
+                            <button
+                              type="button"
+                              onClick={clearFiles}
+                              className="retro-button-primary px-5 py-2 text-xs font-mono font-bold uppercase tracking-wider"
+                            >
+                              Process Another Batch
+                            </button>
                           </div>
                         </div>
                       )}
                     </div>
-                  )}
+                  </section>
+                )}
 
-                  {/* Error banner */}
-                  {phase === "error" && error && !status && (
-                    <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 p-4 text-xs text-rose-700 dark:text-rose-300 font-medium space-y-2 animate-fade-in">
-                      <div>
-                        <strong className="font-bold">Error:</strong> {error}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {sessionExpired ? (
-                          <Link
-                            href="/"
-                            className="rounded-lg bg-[#4F46E5] px-3 py-1.5 text-xs font-bold text-white hover:bg-[#4338CA] transition"
-                          >
-                            Go to Sign In
-                          </Link>
-                        ) : (
+                {/* TAB 2: PREVIOUS INGESTION RUNS */}
+                {activeTab === "history" && (
+                  <section className="retro-outset p-1 space-y-3 animate-fade-in">
+                    <div className="bg-[#1F4743] text-white px-2.5 py-1 flex items-center justify-between text-xs font-bold font-mono tracking-wider">
+                      <span>HISTORICAL INGESTION RUNS // ARCHIVE JOB JOURNAL</span>
+                      <div className="flex items-center gap-1.5">
+                        {selectedJobs.size > 0 && (
                           <button
                             type="button"
-                            onClick={clearFiles}
-                            className="rounded-lg border border-rose-300 dark:border-rose-900/50 bg-white dark:bg-white/5 px-3 py-1 text-xs font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                            onClick={handleDeleteSelectedJobs}
+                            disabled={deletingJobs}
+                            className="retro-button px-2 py-0 text-[10px] font-mono font-bold text-red-700 dark:text-red-400 disabled:opacity-50"
                           >
-                            Start Over
+                            {deletingJobs ? "DELETING..." : `DELETE SELECTED (${selectedJobs.size})`}
                           </button>
                         )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Processing progress */}
-                  {status && (phase === "processing" || phase === "done" || phase === "error") && (
-                    <ProcessingProgress status={status} />
-                  )}
-
-                  {/* Results */}
-                  {phase === "done" && (resultTriplets.length > 0 || status) && (
-                    <div className="space-y-4 animate-fade-in">
-                      <ResultsTable
-                        triplets={resultTriplets}
-                        containment={config.containment}
-                      />
-
-                      <div className="pt-2 text-center">
                         <button
                           type="button"
-                          onClick={clearFiles}
-                          className="rounded-xl bg-[#4F46E5] px-6 py-3 text-xs font-black uppercase tracking-wider text-white shadow-md shadow-indigo-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all hover:bg-[#4338CA]"
+                          onClick={loadHistoryJobs}
+                          disabled={historyLoading}
+                          className="retro-button px-2 py-0 text-[10px] font-mono font-bold text-[#1E2321] dark:text-[#E7E2D6] disabled:opacity-50"
                         >
-                          Process Another Batch
+                          {historyLoading ? "REFRESHING..." : "↻ REFRESH"}
                         </button>
                       </div>
                     </div>
-                  )}
-                </section>
-              )}
 
-              {/* TAB 2: PREVIOUS INGESTION RUNS */}
-              {activeTab === "history" && (
-                <section className="rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-5 shadow-sm md:p-6 space-y-5 animate-fade-in">
-                  <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#1b2029] pb-4">
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-900 dark:text-slate-100">
-                        Previous Ingestion Runs
-                      </h3>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Inspect history and replay discovery results from past PRADAN archive batches.
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      {selectedJobs.size > 0 && (
-                        <button
-                          type="button"
-                          onClick={handleDeleteSelectedJobs}
-                          disabled={deletingJobs}
-                          className="flex items-center gap-1.5 rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 px-3.5 py-1.5 text-xs font-semibold text-rose-700 dark:text-rose-300 hover:bg-rose-100 dark:hover:bg-rose-950/50 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm disabled:opacity-50"
-                        >
-                          <span>{deletingJobs ? "Deleting..." : `🗑 Delete selected (${selectedJobs.size})`}</span>
-                        </button>
+                    <div className="p-3 bg-[#E7E2D6] dark:bg-[#1A201E] space-y-3">
+                      {historyError && (
+                        <div className="retro-outset p-2 text-xs font-mono text-rose-800 dark:text-rose-200 bg-[#EED2D2] dark:bg-[#3D1A1A] border border-rose-600">
+                          {historyError}
+                        </div>
                       )}
-                      <button
-                        type="button"
-                        onClick={loadHistoryJobs}
-                        disabled={historyLoading}
-                        className="flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-3.5 py-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/10 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-sm disabled:opacity-50"
-                      >
-                        <span>{historyLoading ? "Refreshing..." : "↻ Refresh History"}</span>
-                      </button>
-                    </div>
-                  </div>
 
-                  {historyError && (
-                    <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 p-4 text-xs text-rose-700 dark:text-rose-300 font-medium">
-                      {historyError}
-                    </div>
-                  )}
+                      {historyLoading && historyJobs.length === 0 && (
+                        <div className="retro-inset p-8 text-center space-y-2 bg-[#DFD9CD] dark:bg-[#141817]">
+                          <div className="h-5 w-5 animate-spin mx-auto border-2 border-[#1F4743] border-t-transparent" />
+                          <p className="font-mono text-xs text-[#555C58] dark:text-[#8C9893]">
+                            Loading historical ingestion records...
+                          </p>
+                        </div>
+                      )}
 
-                  {historyLoading && historyJobs.length === 0 && (
-                    <div className="flex h-48 flex-col items-center justify-center gap-3 rounded-xl border border-slate-200 dark:border-[#1b2029] bg-slate-50/50 dark:bg-white/5 p-8 text-center">
-                      <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#4F46E5] border-t-transparent" />
-                      <p className="font-mono text-xs text-slate-500 dark:text-slate-400">Loading historical ingestion records...</p>
-                    </div>
-                  )}
+                      {!historyLoading && historyJobs.length === 0 && !historyError && (
+                        <div className="retro-inset p-8 text-center space-y-2 bg-[#DFD9CD] dark:bg-[#141817] font-mono">
+                          <span className="text-2xl">📦</span>
+                          <h4 className="text-xs font-bold text-[#1E2321] dark:text-[#E7E2D6]">
+                            NO PREVIOUS INGESTION RUNS
+                          </h4>
+                          <p className="text-[11px] text-[#555C58] dark:text-[#8C9893] max-w-md mx-auto">
+                            No past ingestion jobs were found on the backend. Upload raw Chandrayaan-2 PRADAN ZIP bundles to start your first discovery run.
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setActiveTab("new")}
+                            className="retro-button-primary px-3 py-1 text-xs font-bold mt-2"
+                          >
+                            Upload PRADAN Files Now
+                          </button>
+                        </div>
+                      )}
 
-                  {!historyLoading && historyJobs.length === 0 && !historyError && (
-                    <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-slate-200 dark:border-[#1b2029] bg-slate-50/50 dark:bg-white/5 p-12 text-center">
-                      <span className="text-3xl">📦</span>
-                      <h4 className="text-sm font-bold text-slate-900 dark:text-slate-100">No Previous Ingestion Runs</h4>
-                      <p className="max-w-md text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                        No past ingestion jobs were found on the backend. Upload raw Chandrayaan-2 PRADAN ZIP bundles to start your first discovery run.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab("new")}
-                        className="mt-2 rounded-xl bg-[#4F46E5] px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-[#4338CA] transition"
-                      >
-                        Upload PRADAN Files Now
-                      </button>
-                    </div>
-                  )}
-
-                  {historyJobs.length > 0 && (
-                    <div className="overflow-hidden rounded-xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117]">
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr className="border-b border-slate-200/80 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                            <th className="py-3 px-4">
-                              <input
-                                type="checkbox"
-                                aria-label="Select all jobs"
-                                checked={historyJobs.length > 0 && selectedJobs.size === historyJobs.length}
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedJobs(new Set(historyJobs.map((j) => j.job_id)));
-                                  } else {
-                                    setSelectedJobs(new Set());
-                                  }
-                                }}
-                                className="rounded accent-[#4F46E5]"
-                              />
-                            </th>
-                            <th className="py-3 px-4">Job ID</th>
-                            <th className="py-3 px-4">Status</th>
-                            <th className="py-3 px-4">Current Stage</th>
-                            <th className="py-3 px-4">Progress</th>
-                            <th className="py-3 px-4">Started</th>
-                            <th className="py-3 px-4 text-right">Action</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100 dark:divide-[#1b2029]">
-                          {historyJobs.map((job) => {
-                            const statusColor =
-                              job.status === "completed"
-                                ? "border-emerald-200 dark:border-emerald-900/50 bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300"
-                                : job.status === "running"
-                                ? "border-indigo-200 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 text-[#4F46E5] dark:text-indigo-300 animate-pulse"
-                                : job.status === "failed"
-                                ? "border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300"
-                                : "border-slate-200 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400";
-
-                            return (
-                              <tr key={job.job_id} className="transition hover:bg-slate-50/60 dark:hover:bg-white/5">
-                                <td className="py-3.5 px-4">
+                      {historyJobs.length > 0 && (
+                        <div className="overflow-x-auto retro-inset p-0.5 bg-[#DFD9CD] dark:bg-[#161B19]">
+                          <table className="w-full text-left text-xs border-collapse">
+                            <thead>
+                              <tr className="border-b-2 border-[#8B8579] dark:border-[#2D3835] bg-[#E7E2D6] dark:bg-[#1A201E] text-[10px] font-mono font-bold uppercase tracking-wider text-[#1E2321] dark:text-[#E7E2D6]">
+                                <th className="py-2 px-3">
                                   <input
                                     type="checkbox"
-                                    aria-label={`Select job ${job.job_id}`}
-                                    checked={selectedJobs.has(job.job_id)}
+                                    aria-label="Select all jobs"
+                                    checked={historyJobs.length > 0 && selectedJobs.size === historyJobs.length}
                                     onChange={(e) => {
-                                      setSelectedJobs((prev) => {
-                                        const next = new Set(prev);
-                                        if (e.target.checked) {
-                                          next.add(job.job_id);
-                                        } else {
-                                          next.delete(job.job_id);
-                                        }
-                                        return next;
-                                      });
+                                      if (e.target.checked) {
+                                        setSelectedJobs(new Set(historyJobs.map((j) => j.job_id)));
+                                      } else {
+                                        setSelectedJobs(new Set());
+                                      }
                                     }}
-                                    className="rounded accent-[#4F46E5]"
+                                    className="accent-[#28557E]"
                                   />
-                                </td>
-                                <td className="py-3.5 px-4 font-mono font-semibold text-slate-900 dark:text-slate-100">
-                                  {job.job_id.slice(0, 8)}...{job.job_id.slice(-4)}
-                                </td>
-                                <td className="py-3.5 px-4">
-                                  <span
-                                    className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${statusColor}`}
-                                  >
-                                    <span className="h-1.5 w-1.5 rounded-full bg-current" />
-                                    {job.status}
-                                  </span>
-                                </td>
-                                <td className="py-3.5 px-4 text-slate-600 dark:text-slate-400 font-mono text-[11px]">
-                                  {job.stage || "—"}
-                                </td>
-                                <td className="py-3.5 px-4">
-                                  <div className="flex items-center gap-2">
-                                    <div className="h-1.5 w-24 overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
-                                      <div
-                                        className="h-full bg-[#4F46E5] transition-all duration-300"
-                                        style={{ width: `${job.progress_pct || 0}%` }}
-                                      />
-                                    </div>
-                                    <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 font-semibold">
-                                      {Math.round(job.progress_pct || 0)}%
-                                    </span>
-                                  </div>
-                                </td>
-                                <td className="py-3.5 px-4 font-mono text-[10px] text-slate-500 dark:text-slate-400">
-                                  {job.started_at ? new Date(job.started_at).toLocaleString() : "—"}
-                                </td>
-                                <td className="py-3.5 px-4 text-right">
-                                  <div className="flex items-center justify-end gap-2">
-                                  {job.status === "completed" && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleSelectHistoricalJob(job.job_id)}
-                                      className="rounded-lg border border-indigo-200 dark:border-indigo-900/50 bg-indigo-50 dark:bg-indigo-950/30 px-3 py-1 font-mono text-xs font-bold text-[#4F46E5] dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-950/50 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xs"
-                                    >
-                                      Load Results →
-                                    </button>
-                                  )}
-                                  {job.status === "running" && (
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setJobId(job.job_id);
-                                        setPhase("processing");
-                                        setActiveTab("new");
-                                      }}
-                                      className="rounded-lg border border-blue-200 dark:border-blue-900/50 bg-blue-50 dark:bg-blue-950/30 px-3 py-1 font-mono text-xs font-bold text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-950/50 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xs"
-                                    >
-                                      Attach &amp; Monitor
-                                    </button>
-                                  )}
-                                  {job.status !== "running" && job.status !== "pending" && (
-                                    <button
-                                      type="button"
-                                      title="Delete this history entry"
-                                      onClick={() => handleDeleteHistoryJob(job.job_id)}
-                                      disabled={deletingJobs}
-                                      className="rounded-lg border border-slate-200 dark:border-[#1b2029] bg-white dark:bg-white/5 px-2.5 py-1 text-xs font-bold text-slate-400 dark:text-slate-300 hover:bg-rose-50 dark:hover:bg-rose-950/40 hover:text-rose-700 dark:hover:text-rose-300 hover:border-rose-200 dark:hover:border-rose-900/50 hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xs disabled:opacity-50"
-                                    >
-                                      🗑
-                                    </button>
-                                  )}
-                                  </div>
-                                </td>
+                                </th>
+                                <th className="py-2 px-3">Job ID</th>
+                                <th className="py-2 px-3">Status</th>
+                                <th className="py-2 px-3">Current Stage</th>
+                                <th className="py-2 px-3">Progress</th>
+                                <th className="py-2 px-3">Started</th>
+                                <th className="py-2 px-3 text-right">Action</th>
                               </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                            </thead>
+                            <tbody className="divide-y divide-[#8B8579]/30 dark:divide-[#2D3835] font-mono text-xs">
+                              {historyJobs.map((job) => {
+                                const statusColor =
+                                  job.status === "completed"
+                                    ? "bg-[#D3E8D7] dark:bg-[#193A24] text-[#134E26] dark:text-[#88D49E] border border-[#7BB887]"
+                                    : job.status === "running"
+                                    ? "bg-[#28557E] text-white border border-[#173857] animate-pulse"
+                                    : job.status === "failed"
+                                    ? "bg-[#EED2D2] dark:bg-[#3D1A1A] text-[#7A1D1D] dark:text-[#E89898] border border-rose-500"
+                                    : "bg-[#DFD9CD] dark:bg-[#141817] text-[#555C58] dark:text-[#8C9893]";
+
+                                return (
+                                  <tr key={job.job_id} className="hover:bg-[#D5CFC1] dark:hover:bg-white/5 transition">
+                                    <td className="py-2 px-3">
+                                      <input
+                                        type="checkbox"
+                                        aria-label={`Select job ${job.job_id}`}
+                                        checked={selectedJobs.has(job.job_id)}
+                                        onChange={(e) => {
+                                          setSelectedJobs((prev) => {
+                                            const next = new Set(prev);
+                                            if (e.target.checked) {
+                                              next.add(job.job_id);
+                                            } else {
+                                              next.delete(job.job_id);
+                                            }
+                                            return next;
+                                          });
+                                        }}
+                                        className="accent-[#28557E]"
+                                      />
+                                    </td>
+                                    <td className="py-2 px-3 font-bold text-[#1E2321] dark:text-[#E7E2D6]">
+                                      {job.job_id.slice(0, 8)}...{job.job_id.slice(-4)}
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      <span className={`retro-inset px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider inline-flex items-center gap-1 ${statusColor}`}>
+                                        <span className="h-1.5 w-1.5 rounded-full bg-current" />
+                                        {job.status}
+                                      </span>
+                                    </td>
+                                    <td className="py-2 px-3 text-[#555C58] dark:text-[#8C9893] text-[11px]">
+                                      {job.stage || "—"}
+                                    </td>
+                                    <td className="py-2 px-3">
+                                      <div className="flex items-center gap-2">
+                                        <div className="h-2 w-20 retro-inset bg-[#ECE7DC] dark:bg-[#141817] overflow-hidden">
+                                          <div
+                                            className="h-full bg-[#28557E]"
+                                            style={{ width: `${job.progress_pct || 0}%` }}
+                                          />
+                                        </div>
+                                        <span className="text-[10px] text-[#555C58] dark:text-[#8C9893] font-bold">
+                                          {Math.round(job.progress_pct || 0)}%
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="py-2 px-3 text-[10px] text-[#555C58] dark:text-[#8C9893]">
+                                      {job.started_at ? new Date(job.started_at).toLocaleString() : "—"}
+                                    </td>
+                                    <td className="py-2 px-3 text-right">
+                                      <div className="flex items-center justify-end gap-1.5">
+                                        {job.status === "completed" && (
+                                          <button
+                                            type="button"
+                                            onClick={() => handleSelectHistoricalJob(job.job_id)}
+                                            className="retro-button-primary px-2 py-0.5 text-[10px] font-mono font-bold"
+                                          >
+                                            LOAD RESULTS →
+                                          </button>
+                                        )}
+                                        {job.status === "running" && (
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              setJobId(job.job_id);
+                                              setPhase("processing");
+                                              setActiveTab("new");
+                                            }}
+                                            className="retro-button px-2 py-0.5 text-[10px] font-mono font-bold text-[#1E2321] dark:text-[#E7E2D6]"
+                                          >
+                                            ATTACH &amp; MONITOR
+                                          </button>
+                                        )}
+                                        {job.status !== "running" && job.status !== "pending" && (
+                                          <button
+                                            type="button"
+                                            title="Delete this history entry"
+                                            onClick={() => handleDeleteHistoryJob(job.job_id)}
+                                            disabled={deletingJobs}
+                                            className="retro-button px-2 py-0.5 text-xs text-rose-700 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/40 disabled:opacity-50"
+                                          >
+                                            🗑
+                                          </button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
                     </div>
-                  )}
-                </section>
-              )}
-            </>
-          )}
-        </main>
+                  </section>
+                )}
+              </>
+            )}
+          </main>
+        </div>
       </div>
 
       {/* Modals Shared with Dashboard */}

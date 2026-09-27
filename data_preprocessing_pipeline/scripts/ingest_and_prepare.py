@@ -20,7 +20,9 @@ import math
 import os
 import shutil
 import sys
+import uuid
 import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Cap GDAL's block cache BEFORE rasterio is imported. Default is ~5% of host
@@ -94,8 +96,8 @@ def _to_u8(arr: np.ndarray) -> np.ndarray:
 def stage_unzip_and_discover(input_dir: Path, staging_dir: Path) -> Path:
     """Extract all .zip files under *input_dir* into *staging_dir*.
 
-    Returns the staging directory (which also includes any pre-extracted
-    files already present in input_dir).
+    *staging_dir* is scoped per-run so extractions from previous runs
+    never contaminate this run. Returns the staging directory.
     """
     staging_dir.mkdir(parents=True, exist_ok=True)
     zips = sorted(
@@ -103,15 +105,16 @@ def stage_unzip_and_discover(input_dir: Path, staging_dir: Path) -> Path:
     )
 
     if zips:
-        LOG.info("Found %d zip file(s) to extract", len(zips))
+        LOG.info("Found %d zip file(s) to extract into run staging %s", len(zips), staging_dir)
     else:
         LOG.info("No zip files found; treating input_dir as pre-extracted labels")
 
     for zp in zips:
         dest = staging_dir / zp.stem
-        if dest.exists():
-            LOG.debug("Already extracted: %s", dest)
+        if dest.exists() and any(dest.iterdir()):
+            LOG.debug("Already extracted in current run staging: %s", dest)
             continue
+        dest.mkdir(parents=True, exist_ok=True)
         LOG.info("Extracting %s -> %s", zp.name, dest)
         try:
             with zipfile.ZipFile(zp, "r") as zf:
@@ -192,7 +195,10 @@ def stage_match_triplets(
         max_per_region=max_per_region,
     )
     clean = [strip_internal(r) for r in selected]
-    LOG.info("Discovered %d valid triplet(s)", len(clean))
+    if len(clean) == 0:
+        LOG.warning("0 valid triplets found in this upload (raw candidates evaluated: %d)", len(raw))
+    else:
+        LOG.info("Discovered %d valid triplet(s)", len(clean))
     return clean
 
 
@@ -1172,6 +1178,7 @@ def stage_update_manifest(
     manifest_path: Path,
     output_dir: Path | None = None,
     job_input_dir: Path | None = None,
+    run_id: str | None = None,
 ):
     """Append new triplet entries to user_triplets.json.
 
@@ -1276,9 +1283,18 @@ def stage_update_manifest(
         existing_keys.add(key)
         added += 1
 
+    def _clean_for_json(obj: Any) -> Any:
+        if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+            return None
+        if isinstance(obj, dict):
+            return {k: _clean_for_json(v) for k, v in obj.items()}
+        if isinstance(obj, list):
+            return [_clean_for_json(v) for v in obj]
+        return obj
+
     manifest_path.parent.mkdir(parents=True, exist_ok=True)
     with manifest_path.open("w", encoding="utf-8") as f:
-        json.dump(existing, f, indent=2)
+        json.dump(_clean_for_json(existing), f, indent=2)
 
     LOG.info("Updated %s: %d new entries (%d total)", manifest_path, added, len(existing))
 
@@ -1291,7 +1307,8 @@ def stage_update_manifest(
                 json.dump(
                     {
                         "job_input_dir": str(job_input_dir) if job_input_dir else None,
-                        "triplets": this_run,
+                        "run_id": run_id,
+                        "triplets": _clean_for_json(this_run),
                     },
                     f,
                     indent=2,
@@ -1381,6 +1398,24 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help="Where to write processed region folders (default: processed_triplets)",
     )
     p.add_argument(
+        "--run-id",
+        type=str,
+        default=None,
+        help="Run identifier used to scope staging directories and results (default: auto-generated)",
+    )
+    p.add_argument(
+        "--staging-dir",
+        type=Path,
+        default=None,
+        help="Explicit directory to use for unzipping. If not provided, a per-run staging directory is created.",
+    )
+    p.add_argument(
+        "--include-library-dir",
+        type=Path,
+        default=None,
+        help="Optional persistent library directory to scan for previously ingested products (explicit opt-in only)",
+    )
+    p.add_argument(
         "--containment",
         type=float,
         default=0.8,
@@ -1452,18 +1487,33 @@ def main(argv: list[str] | None = None) -> int:
         LOG.error("Input directory does not exist: %s", input_dir)
         return 1
 
+    # Scope staging directory per run so extractions never contaminate subsequent runs
+    run_id = args.run_id or f"run_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}"
+    if args.staging_dir:
+        staging_dir = args.staging_dir.resolve()
+    else:
+        staging_dir = output_dir / ".staging" / run_id
+    staging_dir.mkdir(parents=True, exist_ok=True)
+
     # -- Stage 1: Unzip & Discover --
     LOG.info("=" * 60)
-    LOG.info("Stage 1/7: Unzip & Discover")
+    LOG.info("Stage 1/7: Unzip & Discover (Run: %s)", run_id)
     LOG.info("=" * 60)
-    staging_dir = output_dir / ".staging"
     stage_unzip_and_discover(input_dir, staging_dir)
 
     # -- Stage 2: Parse Metadata --
     LOG.info("=" * 60)
     LOG.info("Stage 2/7: Parse Metadata")
     LOG.info("=" * 60)
-    gdf = stage_parse_metadata([input_dir, staging_dir])
+    search_dirs = [input_dir, staging_dir]
+    if args.include_library_dir:
+        lib_dir = args.include_library_dir.resolve()
+        if lib_dir.exists():
+            LOG.info("Explicit library opt-in: scanning persistent library %s", lib_dir)
+            search_dirs.append(lib_dir)
+        else:
+            LOG.warning("Persistent library directory does not exist: %s", lib_dir)
+    gdf = stage_parse_metadata(search_dirs)
 
     # -- Stage 3: Batch Triplet Matching --
     LOG.info("=" * 60)
@@ -1477,8 +1527,25 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     if not triplets:
-        LOG.warning("No valid triplets discovered -- nothing to process")
-        print("\n  No OHRC + TMC-2 + IIRS triplets found in the input data.\n")
+        msg = f"0 new triplets found in this upload (no valid intersecting OHRC + TMC-2 + IIRS products with >= {args.containment*100:.0f}% overlap)"
+        LOG.warning(msg)
+        print(f"\n  {msg}\n")
+        if output_dir is not None:
+            try:
+                per_run_path = output_dir / ".last_run_triplets.json"
+                with per_run_path.open("w", encoding="utf-8") as f:
+                    json.dump(
+                        {
+                            "job_input_dir": str(input_dir),
+                            "run_id": run_id,
+                            "triplets": [],
+                            "message": msg,
+                        },
+                        f,
+                        indent=2,
+                    )
+            except OSError as exc:
+                LOG.warning("Could not write per-run triplets file: %s", exc)
         return 0
 
     # -- Stage 4: Process --
@@ -1514,7 +1581,7 @@ def main(argv: list[str] | None = None) -> int:
     if not manifest_path.is_absolute():
         # Default to being relative to the pipeline root
         manifest_path = _PIPELINE_ROOT / manifest_path
-    stage_update_manifest(results, manifest_path, output_dir, input_dir)
+    stage_update_manifest(results, manifest_path, output_dir, input_dir, run_id=run_id)
 
     # -- Stage 7: Summary --
     LOG.info("=" * 60)

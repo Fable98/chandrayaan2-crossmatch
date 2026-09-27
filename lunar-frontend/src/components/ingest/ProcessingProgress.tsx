@@ -51,131 +51,116 @@ export default function ProcessingProgress({ status }: ProcessingProgressProps) 
   };
 
   return (
-    <div className="rounded-2xl border border-slate-200/80 dark:border-[#1b2029] bg-white dark:bg-[#0e1117] p-6 shadow-sm space-y-5 animate-fade-in">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          {isRunning && (
-            <span className="relative flex h-3 w-3">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75" />
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-[#4F46E5]" />
-            </span>
-          )}
-          {isDone && (
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-700 dark:text-emerald-300 text-xs font-bold shadow-sm">
-              ✓
-            </span>
-          )}
-          {isFailed && (
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-100 dark:bg-rose-950/50 text-rose-700 dark:text-rose-300 text-xs font-bold shadow-sm">
-              ✕
-            </span>
-          )}
-          <div>
-            <span className="text-sm font-extrabold text-slate-900 dark:text-slate-100 tracking-tight block">
-              {status.stage}
-            </span>
-            <span className="text-[10px] font-mono text-slate-400">
-              Pipeline Stage {(stageIdx >= 0 ? stageIdx + 1 : 1)} of {STAGE_LABELS.length - 1}
-            </span>
-          </div>
-        </div>
-
+    <div className="retro-outset p-1 animate-fade-in">
+      {/* Window Title Bar */}
+      <div className="bg-[#1F4743] text-white px-2.5 py-1 flex items-center justify-between text-xs font-bold font-mono tracking-wider">
         <div className="flex items-center gap-2">
-          <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-slate-200 dark:border-[#1b2029] bg-slate-50 dark:bg-white/5 px-2.5 py-1 font-mono text-[10px] text-slate-600 dark:text-slate-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-            ISRO PIPELINE DAEMON
+          {isRunning && (
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+            </span>
+          )}
+          {isDone && <span className="text-emerald-300 font-bold">✓</span>}
+          {isFailed && <span className="text-rose-300 font-bold">✕</span>}
+          <span>PIPELINE TELEMETRY MONITOR // {status.stage.toUpperCase()}</span>
+        </div>
+        <div className="flex items-center gap-2 font-mono text-[10px]">
+          <span className="retro-inset px-2 py-0.5 bg-[#143532] text-white font-bold">
+            STAGE {(stageIdx >= 0 ? stageIdx + 1 : 1)} / {STAGE_LABELS.length - 1}
           </span>
-          <span className="font-mono text-xs font-extrabold text-[#4F46E5] dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1 rounded-xl border border-indigo-100 dark:border-indigo-900/50 shadow-xs">
+          <span className="retro-inset px-2 py-0.5 bg-[#28557E] text-white font-bold">
             {Math.round(status.progress_pct)}%
           </span>
         </div>
       </div>
 
-      {/* Modern Shimmer Progress Bar */}
-      <div className="relative h-2.5 w-full rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden shadow-inner">
-        <div
-          className="h-full bg-gradient-to-r from-indigo-500 via-[#4F46E5] to-cyan-400 transition-all duration-300 rounded-full relative"
-          style={{ width: `${status.progress_pct}%` }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent animate-[progress-shimmer_2s_infinite]" />
-        </div>
-      </div>
-
-      {/* Stage chips */}
-      <div className="flex gap-1.5">
-        {STAGE_LABELS.slice(0, 7).map((label, i) => {
-          let bg = 'bg-slate-200 dark:bg-white/10';
-          if (i < stageIdx || isDone) bg = 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.3)]';
-          else if (i === stageIdx && isRunning) bg = 'bg-[#4F46E5] shadow-[0_0_10px_rgba(79,70,229,0.4)] animate-pulse';
-          else if (isFailed && i === stageIdx) bg = 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.3)]';
-          return (
-            <div
-              key={label}
-              className={`h-2 flex-1 rounded-full transition-all duration-300 ${bg}`}
-              title={label}
-            />
-          );
-        })}
-      </div>
-
-      {/* Error banner */}
-      {isFailed && status.error && (
-        <div className="rounded-xl border border-rose-200 dark:border-rose-900/50 bg-rose-50 dark:bg-rose-950/30 p-4 text-xs text-rose-700 dark:text-rose-300 font-medium animate-fade-in space-y-1">
-          <div className="font-bold flex items-center gap-1.5">
-            <span>⚠️</span> Pipeline Failure:
+      <div className="p-3 bg-[#E7E2D6] dark:bg-[#1A201E] space-y-3">
+        {/* Retro Inset Progress Bar */}
+        <div className="retro-inset h-4 bg-[#DFD9CD] dark:bg-[#0A0D0C] p-0.5 overflow-hidden">
+          <div
+            className="h-full bg-[#28557E] transition-all duration-300 flex items-center justify-end pr-1 text-[9px] font-mono text-white font-bold"
+            style={{ width: `${Math.max(5, status.progress_pct)}%` }}
+          >
+            {Math.round(status.progress_pct)}%
           </div>
-          <div className="font-mono text-[11px] leading-relaxed break-words">{status.error}</div>
         </div>
-      )}
 
-      {/* Terminal / Log console with Aerospace HUD styling */}
-      <div className="space-y-2 pt-1">
-        <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider text-slate-400">
-          <div className="flex items-center gap-2">
-            {/* Terminal Window Controls */}
-            <div className="flex items-center gap-1.5">
-              <span className="h-2.5 w-2.5 rounded-full bg-rose-500/80" />
-              <span className="h-2.5 w-2.5 rounded-full bg-amber-500/80" />
-              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500/80" />
-            </div>
-            <span className="font-mono text-[10px] text-slate-500 dark:text-slate-400 ml-1">
-              pipeline-runtime.log
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] text-slate-400">
-              {status.log_lines.length} lines
-            </span>
-            {status.log_lines.length > 0 && (
-              <button
-                type="button"
-                onClick={copyLogs}
-                className="rounded-md border border-slate-200 dark:border-slate-800 bg-white/60 dark:bg-white/5 px-2 py-0.5 text-[10px] font-mono text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition"
-                title="Copy log to clipboard"
+        {/* Stage Chips */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-1">
+          {STAGE_LABELS.slice(0, 7).map((label, i) => {
+            const finished = i < stageIdx || isDone;
+            const current = i === stageIdx && isRunning;
+            const failed = isFailed && i === stageIdx;
+            return (
+              <div
+                key={label}
+                className={`retro-inset px-1.5 py-1 text-center font-mono text-[9px] truncate ${
+                  finished
+                    ? 'bg-[#D3E8D7] dark:bg-[#193A24] text-[#134E26] dark:text-[#88D49E] font-bold border border-[#7BB887]'
+                    : current
+                    ? 'bg-[#28557E] text-white font-bold border border-[#173857]'
+                    : failed
+                    ? 'bg-[#EED2D2] dark:bg-[#3D1A1A] text-[#7A1D1D] dark:text-[#E89898] font-bold'
+                    : 'bg-[#DFD9CD] dark:bg-[#141817] text-[#69726E] dark:text-[#7A8581]'
+                }`}
+                title={label}
               >
-                Copy
-              </button>
+                {i + 1}. {label.replace('...', '')}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Error banner */}
+        {isFailed && status.error && (
+          <div className="retro-outset p-2 text-xs font-mono text-rose-800 dark:text-rose-200 bg-[#EED2D2] dark:bg-[#3D1A1A] border border-rose-600 animate-fade-in space-y-1">
+            <div className="font-bold flex items-center gap-1.5 text-xs">
+              <span>⚠️</span> PIPELINE EXECUTION FAILURE:
+            </div>
+            <div className="text-[11px] leading-relaxed break-words">{status.error}</div>
+          </div>
+        )}
+
+        {/* Terminal Console */}
+        <div className="retro-outset p-0.5">
+          <div className="bg-[#2D4F4A] text-white px-2 py-0.5 text-[10px] font-mono font-bold flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <span>CONSOLE LOG // pipeline-runtime.log</span>
+              <span className="text-[#88BDB6]">({status.log_lines.length} lines)</span>
+            </div>
+            <div className="flex items-center gap-1">
+              {status.log_lines.length > 0 && (
+                <button
+                  type="button"
+                  onClick={copyLogs}
+                  className="retro-button px-1.5 py-0 text-[9px] font-mono text-[#222] dark:text-[#E7E2D6]"
+                  title="Copy log to clipboard"
+                >
+                  COPY
+                </button>
+              )}
+              <span className="window-ctrl-btn text-[8px]">_</span>
+              <span className="window-ctrl-btn text-[8px]">X</span>
+            </div>
+          </div>
+
+          <div
+            ref={logRef}
+            className="retro-inset-dark p-3 font-mono text-[11px] leading-relaxed text-[#4ADE80] max-h-72 overflow-y-auto space-y-0.5 select-text"
+          >
+            {status.log_lines.map((line, i) => (
+              <div key={i} className={getLogLineClass(line)}>
+                {line}
+              </div>
+            ))}
+            {status.log_lines.length === 0 && (
+              <div className="text-[#889B95] italic flex items-center gap-2">
+                <span className="h-2 w-2 animate-ping rounded-full bg-emerald-400" />
+                <span>Awaiting telemetry stream from ingestion backend...</span>
+              </div>
             )}
           </div>
-        </div>
-
-        <div
-          ref={logRef}
-          className="rounded-xl bg-[#090d14] p-4 font-mono text-xs leading-relaxed text-slate-300 border border-slate-800/80 shadow-2xl max-h-72 overflow-y-auto space-y-1"
-        >
-          {status.log_lines.map((line, i) => (
-            <div key={i} className={getLogLineClass(line)}>
-              {line}
-            </div>
-          ))}
-          {status.log_lines.length === 0 && (
-            <div className="text-slate-500 italic flex items-center gap-2">
-              <span className="h-2 w-2 animate-ping rounded-full bg-indigo-400" />
-              <span>Awaiting telemetry stream from ingestion backend...</span>
-            </div>
-          )}
         </div>
       </div>
     </div>

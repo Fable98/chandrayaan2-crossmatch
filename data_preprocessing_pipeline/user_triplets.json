@@ -108,5 +108,78 @@
     "spatial_uniformity": 0.8953,
     "quality_tier": "LOW_CONFIDENCE",
     "registered_products_dir": "registration_output/lro_nac/region_006"
+  },
+  {
+    "ohrc_product_id": "ch2_ohr_ncp_20250612t2031048828_d_img_d18",
+    "tmc2_product_id": "ch2_tmc_nca_20200607t2239162106_d_img_d18",
+    "iirs_product_id": "ch2_iir_nri_20200607t2239153893_d_img_d18",
+    "overlap_ohrc_tmc_pct": 100.0,
+    "overlap_ohrc_iirs_pct": 89.779,
+    "overlap_triplet_pct": 89.779,
+    "ohrc_sun_azimuth_deg": 201.213126,
+    "ohrc_sun_elevation_deg": 28.312566,
+    "ohrc_incidence_deg": null,
+    "tmc2_sun_azimuth_deg": 203.756456,
+    "tmc2_sun_elevation_deg": 41.766894,
+    "tmc2_incidence_deg": null,
+    "iirs_sun_azimuth_deg": null,
+    "iirs_sun_elevation_deg": null,
+    "iirs_incidence_deg": null,
+    "ohrc_gsd_m": 0.28,
+    "tmc2_gsd_m": 5.41,
+    "iirs_gsd_m": 86.5,
+    "ohrc_acquisition_utc": "2025-06-12T20:31:04.882800+00:00",
+    "tmc2_acquisition_utc": "2020-06-07T22:39:16.210600+00:00",
+    "iirs_acquisition_utc": "2020-06-07T22:39:15.389300+00:00",
+    "ohrc_label": "/Users/shresthkumar/chandrayaan2-crossmatch/data_preprocessing_pipeline/processed_triplets/.staging/upload_1/data/calibrated/20250612/ch2_ohr_ncp_20250612T2031048828_d_img_d18.xml",
+    "tmc2_label": "/Users/shresthkumar/chandrayaan2-crossmatch/data_preprocessing_pipeline/processed_triplets/.staging/upload_2/data/calibrated/20200607/ch2_tmc_nca_20200607T2239162106_d_img_d18.xml",
+    "iirs_label": "/Users/shresthkumar/chandrayaan2-crossmatch/data_preprocessing_pipeline/processed_triplets/.staging/upload_0/data/raw/20200607/ch2_iir_nri_20200607T2239153893_d_img_d18.xml",
+    "intersection_wkt": "POLYGON ((355.296075 61.005387, 355.47449479529615 60.96608292664197, 355.4721943836672 60.2655641430874, 355.463956 60.179172, 355.42377 60.134667, 355.223415 60.179807, 355.189332 60.135375, 355.261774 60.960827, 355.296075 61.005387))",
+    "region_id": "region_auto_002",
+    "bounds": {
+      "west_lon": 355.223415,
+      "east_lon": 355.542673,
+      "south_lat": 60.179172,
+      "north_lat": 61.005387
+    },
+    "bounds_iirs": {
+      "west_lon": 354.030165,
+      "east_lon": 355.475699,
+      "south_lat": 60.262279500000005,
+      "north_lat": 60.9222795
+    },
+    "bounds_optical": {
+      "west_lon": 355.223415,
+      "east_lon": 355.542673,
+      "south_lat": 60.179172,
+      "north_lat": 61.005387
+    },
+    "images": {
+      "ohrc": "/images/ohrc/region_auto_002",
+      "tmc": "/images/tmc/region_auto_002",
+      "iirs": "/images/iirs/region_auto_002",
+      "dem": "/images/dem/region_auto_002"
+    },
+    "matches_url": "/triplets/region_auto_002/matches",
+    "footprint_url": "/triplets/region_auto_002/footprint",
+    "registered": {
+      "warped": "/images/registered/region_auto_002/registered_ohrc.png",
+      "blend": "/images/registered/region_auto_002/blend_overlay.png",
+      "checkerboard": "/images/registered/region_auto_002/checkerboard_qa.png",
+      "quiver": "/images/registered/region_auto_002/displacement_quiver.png"
+    },
+    "matching": {
+      "status": "registration_failed",
+      "inlier_count": 0,
+      "fit_rmse_px": 1.7857,
+      "inlier_ratio": 0.8095,
+      "spatial_coverage": 0.56,
+      "spatial_uniformity": 0.4053,
+      "message": "Safety guardrails tripped: held_out_rmse 2.995px > 2.50px (poor generalization)"
+    },
+    "registration": {
+      "status": "failed",
+      "reason": "insufficient_correspondences for registration QA (0 < 4, homography=missing)"
+    }
   }
 ]

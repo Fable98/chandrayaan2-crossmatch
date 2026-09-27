@@ -157,7 +157,15 @@ export default function Console({ onBackToHero, onLogout }: Props = {}) {
     const matchesFor = (key: string) =>
       api.getMatches(key).catch((err) => {
         if (matchKey !== selectedId && err instanceof ApiError && err.status === 404) {
-          return api.getMatches(selectedId);
+          return api.getMatches(selectedId).catch((fallbackErr) => {
+            if (fallbackErr instanceof ApiError && fallbackErr.status === 404) {
+              return { triplet_id: selectedId, num_matches: 0, homography: null, matches: [], metrics: null } as any;
+            }
+            throw fallbackErr;
+          });
+        }
+        if (err instanceof ApiError && err.status === 404) {
+          return { triplet_id: key, num_matches: 0, homography: null, matches: [], metrics: null } as any;
         }
         throw err;
       });

@@ -21,18 +21,22 @@ for _p in (str(REPO_ROOT), str(SCRIPTS_DIR)):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-# Stub heavy modules BEFORE importing the script under test.
-_STUBBED_MODULES = [
+# Stub heavy modules BEFORE importing the script under test only if missing.
+_STUBBED_MODULES = []
+for _name in [
     "select_triplets",
     "lunar_pipeline",
     "lunar_pipeline.ingest",
     "lunar_pipeline.sensors",
     "lunar_pipeline.illumination",
     "pyproj",
-]
-for _name in _STUBBED_MODULES:
-    if _name not in sys.modules:
-        sys.modules[_name] = MagicMock()
+]:
+    try:
+        __import__(_name)
+    except Exception:
+        if _name not in sys.modules:
+            sys.modules[_name] = MagicMock()
+            _STUBBED_MODULES.append(_name)
 
 
 @pytest.fixture(scope="module", autouse=True)

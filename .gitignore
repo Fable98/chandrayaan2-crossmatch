@@ -287,3 +287,4 @@ benchmarks/large_iirs_benchmark_output/
 # --- OS ---
 .DS_Store
 backend/data/users.json
+hp(bg)/*_original.mp4

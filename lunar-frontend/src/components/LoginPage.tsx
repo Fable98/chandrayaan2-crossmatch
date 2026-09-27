@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import Image from "next/image";
 import { login, register } from "@/lib/auth";
 
 interface Props {
@@ -83,7 +82,7 @@ export default function LoginPage({ onLoginSuccess }: Props) {
       setShowSuccess(true);
       setTimeout(() => {
         onLoginSuccess();
-      }, 800);
+      }, 700);
     } catch (err: unknown) {
       const message =
         err instanceof Error ? err.message : "Something went wrong";
@@ -93,7 +92,7 @@ export default function LoginPage({ onLoginSuccess }: Props) {
     }
   };
 
-  const handleQuickDemoLogin = async () => {
+  const handleOperatorDemoBypass = async () => {
     setError(null);
     setLoading(true);
     const demoEmail = "pilot@isro.gov.in";
@@ -104,7 +103,7 @@ export default function LoginPage({ onLoginSuccess }: Props) {
       try {
         await login(demoEmail, demoPass);
       } catch {
-        // If demo user does not exist in local db, register it
+        // If demo operator does not exist in local db, register it
         await register(demoName, demoEmail, demoPass);
       }
       setShowSuccess(true);
@@ -112,15 +111,20 @@ export default function LoginPage({ onLoginSuccess }: Props) {
         onLoginSuccess();
       }, 700);
     } catch {
-      // In case network or backend error occurs, allow immediate pilot demo access
-      const fallbackToken = "demo-eval-session-token." + btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 86400 })) + ".sig";
-      localStorage.setItem("astralynx_auth_token", fallbackToken);
-      localStorage.setItem("astralynx_auth_user", JSON.stringify({
-        id: "demo-pilot-001",
-        name: "ISRO Flight Operator (Demo)",
-        email: "pilot@isro.gov.in",
-        created_at: new Date().toISOString(),
-      }));
+      // In case network or backend error occurs, allow operator pilot demo access
+      const expTimestamp = Math.floor(Date.now() / 1000) + 86400;
+      const b64Payload = btoa(JSON.stringify({ exp: expTimestamp }));
+      const sessionToken = "session-token." + b64Payload + ".sig";
+      localStorage.setItem("astralynx_auth_token", sessionToken);
+      localStorage.setItem(
+        "astralynx_auth_user",
+        JSON.stringify({
+          id: "demo-pilot-001",
+          name: "ISRO Flight Operator (Demo)",
+          email: "pilot@isro.gov.in",
+          created_at: new Date().toISOString(),
+        })
+      );
       setShowSuccess(true);
       setTimeout(() => {
         onLoginSuccess();
@@ -131,31 +135,30 @@ export default function LoginPage({ onLoginSuccess }: Props) {
   };
 
   return (
-    <section className="dark relative min-h-screen w-full select-none overflow-x-hidden overflow-y-auto bg-[#000000] font-sans text-white flex flex-col justify-between">
-      {/* Always-dark cinematic entry (see ExploreMoonHero): pinned `dark` keeps
-          shared ink/panel tokens on dark values in light workspace theme. */}
-      {/* Full-Bleed Lunar Background with Parallax */}
+    <section className="dark relative min-h-screen w-full select-none overflow-x-hidden overflow-y-auto bg-[#0A0D0C] font-mono text-[#E7E2D6] flex flex-col justify-between">
+      {/* 1. Full-Bleed Video Background with Subtle Parallax & Vignettes */}
       <div
         className="fixed inset-0 z-0 h-[106%] w-[106%] -left-[3%] -top-[3%] transition-transform duration-700 ease-out pointer-events-none"
         style={{
           transform: `translate3d(${mousePos.x * -8}px, ${mousePos.y * -8}px, 0)`,
         }}
       >
-        <Image
-          src="/lunar_crescent_backdrop.jpg"
-          alt="Lunar Surface"
-          fill
-          priority
-          sizes="100vw"
-          className="object-cover object-center"
-        />
-        {/* Heavy vignette to focus attention on the card */}
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/70" />
-        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-black/50" />
+        <video
+          autoPlay
+          loop
+          muted
+          playsInline
+          className="h-full w-full object-cover object-center"
+        >
+          <source src="/bgsih.mp4" type="video/mp4" />
+        </video>
+
+        {/* High-Legibility Overlays */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#0A0D0C]/85 via-black/45 to-[#0A0D0C]/90" />
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-black/80" />
       </div>
 
-      {/* Floating Particle / Glow Effects */}
-      {/* Twinkling Space Stars */}
+      {/* 2. Twinkling Space Stars */}
       <div className="pointer-events-none fixed inset-0 z-[1] overflow-hidden">
         {[
           { top: "15%", left: "12%", delay: "0.2s" },
@@ -163,7 +166,6 @@ export default function LoginPage({ onLoginSuccess }: Props) {
           { top: "65%", left: "15%", delay: "0.8s" },
           { top: "78%", left: "78%", delay: "2.1s" },
           { top: "42%", left: "92%", delay: "1.7s" },
-          { top: "85%", left: "45%", delay: "0.5s" },
         ].map((star, i) => (
           <div
             key={i}
@@ -175,101 +177,83 @@ export default function LoginPage({ onLoginSuccess }: Props) {
             }}
           />
         ))}
-        {/* Teal nebula glow behind card area */}
-        <div
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full opacity-[0.08]"
-          style={{
-            background:
-              "radial-gradient(circle, rgba(63,181,201,0.5) 0%, transparent 70%)",
-          }}
-        />
       </div>
 
-      {/* Top Bar with Mission Branding */}
+      {/* 3. Top Retro OS Workstation Bar */}
       <header
-        className={`relative z-30 flex h-16 shrink-0 items-center justify-between border-b border-white/[0.08] bg-black/40 backdrop-blur-md px-6 transition-all duration-1000 md:px-12 ${
+        className={`relative z-30 p-2 sm:px-6 transition-all duration-700 ${
           isLoaded ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-4"
         }`}
       >
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-teal to-[#1B2CC1] p-0.5 shadow-[0_0_12px_rgba(63,181,201,0.3)]">
-            <div className="flex h-full w-full items-center justify-center rounded-md bg-black">
-              <span className="font-mono text-xs font-black text-teal">C2</span>
-            </div>
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-xs tracking-wider text-white">
-                CHANDRAYAAN-2
+        <div className="retro-outset bg-[#E7E2D6] dark:bg-[#1A201E] p-1.5 flex items-center justify-between shadow-xl">
+          <div className="flex items-center gap-3">
+            <div className="bg-[#1F4743] text-white px-2 py-1 flex items-center gap-2 text-xs font-bold font-mono tracking-wider">
+              <span className="w-4 h-4 bg-white/20 flex items-center justify-center text-[10px] text-white font-mono font-bold">
+                C2
               </span>
-              <span className="rounded bg-teal/20 px-1.5 py-0.5 text-[9px] font-mono font-bold text-teal uppercase">
-                ISRO SAC
-              </span>
+              <span>CHANDRAYAAN-2</span>
             </div>
-            <span className="text-[10px] text-ink-dim block font-mono">
-              Planetary Co-Registration System
+            <span className="retro-inset px-2 py-0.5 text-[10px] font-mono font-bold text-[#143532] dark:text-emerald-400 bg-[#E9E4D8] dark:bg-[#161B19] border-t-[#8B8579] border-l-[#8B8579] border-r-white border-b-white">
+              ISRO SAC // SECURE GATEWAY
             </span>
           </div>
-        </div>
 
-        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 font-mono text-2xs text-ink-dim">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span>PORTAL SECURED</span>
+          <div className="flex items-center gap-2">
+            <div className="retro-inset px-2 py-0.5 text-[10px] font-mono text-[#555C58] dark:text-[#8C9893] bg-white dark:bg-[#0A0D0C] flex items-center gap-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span>PORTAL SECURED</span>
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* Main Content — Login Card */}
+      {/* 4. Main Content: Dashboard-Styled Modal Window */}
       <div
-        className={`relative z-20 flex-1 flex flex-col items-center justify-center px-4 py-8 transition-all duration-1000 delay-200 ${
+        className={`relative z-20 flex-1 flex flex-col items-center justify-center px-4 py-6 transition-all duration-700 delay-100 ${
           isLoaded ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
         }`}
       >
         <div
-          className={`relative w-full max-w-md transition-all duration-500 ${
+          className={`w-full max-w-md transition-all duration-500 ${
             showSuccess ? "scale-95 opacity-0" : "scale-100 opacity-100"
           }`}
         >
-          {/* Glassmorphic Card */}
-          <div className="relative overflow-hidden rounded-2xl border border-white/[0.08] bg-[#0a0e14]/80 backdrop-blur-xl shadow-[0_8px_60px_rgba(0,0,0,0.6)]">
-            {/* Top glow accent line */}
-            <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-teal/50 to-transparent" />
-
-            {/* Inner glow */}
-            <div className="pointer-events-none absolute -top-20 left-1/2 -translate-x-1/2 w-80 h-40 rounded-full opacity-[0.07]"
-              style={{
-                background: "radial-gradient(ellipse, rgba(63,181,201,0.8) 0%, transparent 70%)",
-              }}
-            />
-
-            <div className="relative px-8 py-10">
-              {/* Header */}
-              <div className="text-center mb-8">
-                <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-b from-white to-white/70 bg-clip-text text-transparent">
-                  {mode === "login"
-                    ? "Welcome Back"
-                    : "Create Account"}
-                </h1>
-                <p className="mt-2 text-sm text-ink-dim">
-                  {mode === "login"
-                    ? "Sign in to access the Lunar Console"
-                    : "Join the Chandrayaan-2 Crossmatch platform"}
-                </p>
+          {/* Retro Window Dialog */}
+          <div className="retro-outset bg-[#E7E2D6] dark:bg-[#1A201E] text-[#1E2321] dark:text-[#E7E2D6] p-1 shadow-2xl">
+            {/* Retro Window Titlebar */}
+            <div className="bg-[#1F4743] px-3 py-1.5 text-white flex items-center justify-between text-xs font-bold font-mono tracking-wider select-none border-b border-[#143532]">
+              <div className="flex items-center gap-2">
+                <span>🔐</span>
+                <span>AUTHENTICATION // OPERATOR LOGIN</span>
               </div>
+              <div className="flex items-center gap-1">
+                <span className="window-ctrl-btn">_</span>
+                <span className="window-ctrl-btn">□</span>
+                <span className="window-ctrl-btn">✕</span>
+              </div>
+            </div>
 
-              {/* Mode Toggle */}
-              <div className="relative mb-8 flex rounded-xl bg-[#0d1118] border border-white/[0.06] p-1">
-                {/* Sliding indicator */}
-                <div
-                  className="absolute top-1 bottom-1 w-[calc(50%-4px)] rounded-lg bg-gradient-to-b from-teal/20 to-teal/10 border border-teal/20 shadow-[0_0_12px_rgba(63,181,201,0.15)] transition-all duration-300 ease-out"
-                  style={{
-                    left: mode === "login" ? "4px" : "calc(50%)",
-                  }}
-                />
+            {/* Sub-Header Strip */}
+            <div className="px-3 py-1 bg-[#DED8CB] dark:bg-[#141817] border-b border-[#8B8579] dark:border-[#2D3835] flex items-center justify-between text-[11px] font-mono">
+              <span className="text-[#555C58] dark:text-[#8C9893]">
+                {mode === "login" ? "SESSION: AUTH REQUIRED" : "NEW OPERATOR ONBOARDING"}
+              </span>
+              <span className="retro-inset px-2 py-0.2 text-[10px] bg-white dark:bg-[#0A0D0C] text-[#1E2321] dark:text-[#E7E2D6]">
+                ENCR: AES-256
+              </span>
+            </div>
+
+            {/* Window Interior */}
+            <div className="p-5 sm:p-6 space-y-4">
+              {/* Mode Toggle Buttons (Dashboard Tab Bar) */}
+              <div className="flex gap-2">
                 <button
                   type="button"
                   onClick={() => switchMode("login")}
-                  className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg transition-colors duration-300 ${
-                    mode === "login" ? "text-teal" : "text-ink-faint hover:text-ink-dim"
+                  className={`flex-1 py-1.5 text-xs font-mono font-bold tracking-wider uppercase transition-none ${
+                    mode === "login"
+                      ? "retro-button-primary active-pressed"
+                      : "retro-button bg-[#E7E2D6] dark:bg-[#222927] text-[#1E2321] dark:text-[#E7E2D6] hover:bg-[#F0ECE1] dark:hover:bg-[#2D3835]"
                   }`}
                 >
                   Sign In
@@ -277,276 +261,196 @@ export default function LoginPage({ onLoginSuccess }: Props) {
                 <button
                   type="button"
                   onClick={() => switchMode("register")}
-                  className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg transition-colors duration-300 ${
-                    mode === "register" ? "text-teal" : "text-ink-faint hover:text-ink-dim"
+                  className={`flex-1 py-1.5 text-xs font-mono font-bold tracking-wider uppercase transition-none ${
+                    mode === "register"
+                      ? "retro-button-primary active-pressed"
+                      : "retro-button bg-[#E7E2D6] dark:bg-[#222927] text-[#1E2321] dark:text-[#E7E2D6] hover:bg-[#F0ECE1] dark:hover:bg-[#2D3835]"
                   }`}
                 >
                   Register
                 </button>
               </div>
 
-              {/* Error Message */}
+              {/* Error Banner */}
               {error && (
-                <div className="mb-6 flex flex-col gap-2 rounded-lg border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-400 animate-in fade-in">
-                  <div className="flex items-center gap-2">
-                    <svg className="h-4 w-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                    </svg>
+                <div className="retro-inset p-2 bg-rose-100 dark:bg-rose-950/80 border-t-rose-800 border-l-rose-800 border-r-white border-b-white text-xs font-mono text-rose-800 dark:text-rose-300 flex items-start gap-2">
+                  <span className="font-bold">⚠</span>
+                  <div className="flex-1">
                     <span>{error}</span>
+                    {mode === "register" && error.toLowerCase().includes("already exists") && (
+                      <button
+                        type="button"
+                        onClick={() => switchMode("login")}
+                        className="block mt-1 font-bold text-[#28557E] dark:text-teal underline"
+                      >
+                        Switch to Sign In →
+                      </button>
+                    )}
                   </div>
-                  {mode === "register" && error.toLowerCase().includes("already exists") && (
-                    <button
-                      type="button"
-                      onClick={() => switchMode("login")}
-                      className="self-start text-xs text-teal underline hover:text-white transition-colors"
-                    >
-                      Switch to Sign In →
-                    </button>
-                  )}
                 </div>
               )}
 
               {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Name Field (Register only) */}
-                <div
-                  className={`transition-all duration-400 ease-out overflow-hidden ${
-                    mode === "register"
-                      ? "max-h-24 opacity-100"
-                      : "max-h-0 opacity-0"
-                  }`}
-                >
-                  <label
-                    htmlFor="login-name"
-                    className="block text-xs font-medium text-ink-dim mb-1.5 tracking-wide uppercase"
-                  >
-                    Full Name
-                  </label>
-                  <input
-                    id="login-name"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Your name"
-                    autoComplete="name"
-                    className="w-full rounded-lg border border-white/[0.08] bg-[#0d1118] px-4 py-3 text-sm text-ink placeholder-ink-faint outline-none transition-all duration-200 focus:border-teal/40 focus:ring-1 focus:ring-teal/20 focus:bg-[#0f1520] hover:border-white/[0.12]"
-                  />
-                </div>
+              <form onSubmit={handleSubmit} className="space-y-3.5">
+                {/* Name (Register only) */}
+                {mode === "register" && (
+                  <div>
+                    <label
+                      htmlFor="login-name"
+                      className="block text-[11px] font-mono font-bold text-[#555C58] dark:text-[#8C9893] uppercase mb-1"
+                    >
+                      Operator Name
+                    </label>
+                    <div className="retro-inset flex items-center px-2.5 py-1.5 bg-white dark:bg-[#0A0D0C] border-t-[#8B8579] border-l-[#8B8579] border-r-white border-b-white">
+                      <input
+                        id="login-name"
+                        type="text"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        placeholder="Operator Name"
+                        autoComplete="name"
+                        className="w-full bg-transparent text-xs font-mono text-[#1E2321] dark:text-[#E7E2D6] placeholder-[#8B8579] outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
 
                 {/* Email Field */}
                 <div>
                   <label
                     htmlFor="login-email"
-                    className="block text-xs font-medium text-ink-dim mb-1.5 tracking-wide uppercase"
+                    className="block text-[11px] font-mono font-bold text-[#555C58] dark:text-[#8C9893] uppercase mb-1"
                   >
-                    Email Address
+                    Officer ID / Email
                   </label>
-                  <input
-                    id="login-email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@example.com"
-                    autoComplete="email"
-                    required
-                    className="w-full rounded-lg border border-white/[0.08] bg-[#0d1118] px-4 py-3 text-sm text-ink placeholder-ink-faint outline-none transition-all duration-200 focus:border-teal/40 focus:ring-1 focus:ring-teal/20 focus:bg-[#0f1520] hover:border-white/[0.12]"
-                  />
+                  <div className="retro-inset flex items-center px-2.5 py-1.5 bg-white dark:bg-[#0A0D0C] border-t-[#8B8579] border-l-[#8B8579] border-r-white border-b-white">
+                    <input
+                      id="login-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="officer@isro.gov.in"
+                      autoComplete="email"
+                      required
+                      className="w-full bg-transparent text-xs font-mono text-[#1E2321] dark:text-[#E7E2D6] placeholder-[#8B8579] outline-none"
+                    />
+                  </div>
                 </div>
 
                 {/* Password Field */}
                 <div>
                   <label
                     htmlFor="login-password"
-                    className="block text-xs font-medium text-ink-dim mb-1.5 tracking-wide uppercase"
+                    className="block text-[11px] font-mono font-bold text-[#555C58] dark:text-[#8C9893] uppercase mb-1"
                   >
-                    Password
+                    Security Passcode
                   </label>
-                  <input
-                    id="login-password"
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete={mode === "register" ? "new-password" : "current-password"}
-                    required
-                    className="w-full rounded-lg border border-white/[0.08] bg-[#0d1118] px-4 py-3 text-sm text-ink placeholder-ink-faint outline-none transition-all duration-200 focus:border-teal/40 focus:ring-1 focus:ring-teal/20 focus:bg-[#0f1520] hover:border-white/[0.12]"
-                  />
+                  <div className="retro-inset flex items-center px-2.5 py-1.5 bg-white dark:bg-[#0A0D0C] border-t-[#8B8579] border-l-[#8B8579] border-r-white border-b-white">
+                    <input
+                      id="login-password"
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••••••"
+                      autoComplete={mode === "register" ? "new-password" : "current-password"}
+                      required
+                      className="w-full bg-transparent text-xs font-mono text-[#1E2321] dark:text-[#E7E2D6] placeholder-[#8B8579] outline-none"
+                    />
+                  </div>
                 </div>
 
                 {/* Confirm Password (Register only) */}
-                <div
-                  className={`transition-all duration-400 ease-out overflow-hidden ${
-                    mode === "register"
-                      ? "max-h-24 opacity-100"
-                      : "max-h-0 opacity-0"
-                  }`}
-                >
-                  <label
-                    htmlFor="login-confirm-password"
-                    className="block text-xs font-medium text-ink-dim mb-1.5 tracking-wide uppercase"
+                {mode === "register" && (
+                  <div>
+                    <label
+                      htmlFor="login-confirm-password"
+                      className="block text-[11px] font-mono font-bold text-[#555C58] dark:text-[#8C9893] uppercase mb-1"
+                    >
+                      Confirm Passcode
+                    </label>
+                    <div className="retro-inset flex items-center px-2.5 py-1.5 bg-white dark:bg-[#0A0D0C] border-t-[#8B8579] border-l-[#8B8579] border-r-white border-b-white">
+                      <input
+                        id="login-confirm-password"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="••••••••••••"
+                        autoComplete="new-password"
+                        className="w-full bg-transparent text-xs font-mono text-[#1E2321] dark:text-[#E7E2D6] placeholder-[#8B8579] outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Submit Action */}
+                <div className="pt-2 space-y-2">
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="retro-button-primary w-full py-2.5 text-xs font-mono font-bold tracking-wider uppercase flex items-center justify-center gap-2 shadow-md active-pressed disabled:opacity-50"
                   >
-                    Confirm Password
-                  </label>
-                  <input
-                    id="login-confirm-password"
-                    type="password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    placeholder="••••••••"
-                    autoComplete="new-password"
-                    className="w-full rounded-lg border border-white/[0.08] bg-[#0d1118] px-4 py-3 text-sm text-ink placeholder-ink-faint outline-none transition-all duration-200 focus:border-teal/40 focus:ring-1 focus:ring-teal/20 focus:bg-[#0f1520] hover:border-white/[0.12]"
-                  />
-                </div>
-
-                {/* Submit Button */}
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="group relative w-full overflow-hidden rounded-lg bg-gradient-to-r from-teal to-teal-dark py-3.5 text-sm font-bold tracking-wide text-black shadow-[0_0_30px_rgba(63,181,201,0.3)] transition-all duration-200 hover:shadow-[0_0_40px_rgba(63,181,201,0.5)] hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-[0_0_30px_rgba(63,181,201,0.3)]"
-                >
-                  {/* Button shimmer effect */}
-                  <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-
-                  <span className="relative flex items-center justify-center gap-2">
                     {loading ? (
                       <>
-                        <svg
-                          className="h-4 w-4 animate-spin"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          />
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                          />
-                        </svg>
-                        <span>
-                          {mode === "login"
-                            ? "Signing in..."
-                            : "Creating account..."}
-                        </span>
+                        <span className="h-3 w-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                        <span>PROCESSING...</span>
                       </>
                     ) : (
                       <>
-                        <span>
-                          {mode === "login"
-                            ? "Sign In"
-                            : "Create Account"}
-                        </span>
-                        <span className="transition-transform duration-200 group-hover:translate-x-1">
-                          →
-                        </span>
+                        <span>{mode === "login" ? "AUTHENTICATE & ENTER" : "CREATE OPERATOR ACCOUNT"}</span>
+                        <span>&gt;&gt;</span>
                       </>
                     )}
-                  </span>
-                </button>
+                  </button>
 
-                {/* One-Click Quick Demo Login */}
-                <div className="mt-3">
+                  {/* One-Click Operator Pilot Access */}
                   <button
                     type="button"
-                    onClick={handleQuickDemoLogin}
+                    onClick={handleOperatorDemoBypass}
                     disabled={loading}
-                    className="w-full flex items-center justify-center gap-2 rounded-lg border border-teal/40 bg-teal/10 py-2.5 text-xs font-semibold text-teal shadow-[0_0_15px_rgba(63,181,201,0.12)] transition-all duration-200 hover:bg-teal/20 hover:border-teal/60 hover:scale-[1.01] active:scale-[0.99] disabled:opacity-50"
+                    className="retro-button w-full py-2 text-xs font-mono font-bold text-[#1E2321] dark:text-[#E7E2D6] hover:bg-[#D9D3C5] dark:hover:bg-white/10 flex items-center justify-center gap-1.5 disabled:opacity-50"
                   >
-                    <span className="text-amber-400">⚡</span>
-                    <span>Quick Demo Pilot Access (Instant Evaluation)</span>
+                    <span>⚡</span>
+                    <span>Pilot Operator Fast-Pass</span>
                   </button>
                 </div>
-
               </form>
-
-              {/* Divider */}
-              <div className="mt-8 flex items-center gap-3">
-                <div className="flex-1 h-px bg-gradient-to-r from-transparent to-white/[0.06]" />
-                <span className="text-2xs text-ink-faint uppercase tracking-widest">
-                  {mode === "login" ? "New here?" : "Already a member?"}
-                </span>
-                <div className="flex-1 h-px bg-gradient-to-l from-transparent to-white/[0.06]" />
-              </div>
-
-              {/* Switch mode link */}
-              <div className="mt-4 text-center">
-                <button
-                  type="button"
-                  onClick={() =>
-                    switchMode(mode === "login" ? "register" : "login")
-                  }
-                  className="text-sm text-teal/80 hover:text-teal transition-colors duration-200 underline decoration-teal/30 underline-offset-4 hover:decoration-teal/60"
-                >
-                  {mode === "login"
-                    ? "Create a free account"
-                    : "Sign in to your account"}
-                </button>
-              </div>
             </div>
-          </div>
 
-          {/* Security Badge */}
-          <div className="mt-5 flex items-center justify-center gap-2 text-2xs text-ink-faint/60">
-            <svg className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
-              <path
-                fillRule="evenodd"
-                d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-                clipRule="evenodd"
-              />
-            </svg>
-            <span>Secured with JWT · End-to-end encrypted</span>
+            {/* Retro Dialog Footer Status */}
+            <div className="px-3 py-1.5 bg-[#DED8CB] dark:bg-[#141817] border-t border-[#8B8579] dark:border-[#2D3835] flex items-center justify-between text-[10px] font-mono text-[#555C58] dark:text-[#8C9893]">
+              <span className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>CHANDRAYAAN-2 ORBITAL CONSOLE</span>
+              </span>
+              <span>STN: ISRO-SAC-01</span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Bottom Credits */}
+      {/* 5. Bottom Status Bar */}
       <footer
-        className={`relative z-20 shrink-0 flex items-center justify-center px-6 py-6 text-xs text-ink-faint transition-all duration-1000 delay-700 md:px-12 ${
+        className={`relative z-20 px-4 sm:px-6 pb-3 transition-all duration-700 delay-200 ${
           isLoaded ? "opacity-100" : "opacity-0"
         }`}
       >
-        <span className="font-mono text-2xs tracking-wide">
-          created for{" "}
-          <span className="text-teal font-semibold">ISRO · SIH26166</span>
-          <span className="mx-2 text-white/20">·</span>
-          <span className="text-ink-dim">Chandrayaan-2 Crossmatch</span>
-        </span>
-      </footer>
+        <div className="retro-outset bg-[#E7E2D6]/95 dark:bg-[#1A201E]/95 backdrop-blur-md px-3 py-1.5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-mono text-[#555C58] dark:text-[#8C9893]">
+          <div className="flex items-center gap-2 text-[11px]">
+            <span className="font-bold text-[#1E2321] dark:text-[#E7E2D6]">ISRO SAC</span>
+            <span>·</span>
+            <span>Planetary Science Data System</span>
+          </div>
 
-      {/* Success Overlay */}
-      {showSuccess && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in">
-          <div className="flex flex-col items-center gap-4">
-            <div className="h-16 w-16 rounded-full bg-teal/20 border border-teal/40 flex items-center justify-center shadow-[0_0_40px_rgba(63,181,201,0.3)]">
-              <svg
-                className="h-8 w-8 text-teal"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
-            </div>
-            <p className="text-lg font-semibold text-white">
-              {mode === "login" ? "Welcome back!" : "Account created!"}
-            </p>
-            <p className="text-sm text-ink-dim">
-              Launching console...
-            </p>
+          <div className="retro-inset px-2.5 py-0.5 text-[10px] bg-white dark:bg-[#0A0D0C] text-[#1E2321] dark:text-[#E7E2D6] flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>SESSION GATEWAY: READY</span>
+          </div>
+
+          <div className="text-[11px] text-[#555C58] dark:text-[#8C9893]">
+            SIH 2024 · Problem 26166
           </div>
         </div>
-      )}
+      </footer>
     </section>
   );
 }
