@@ -172,7 +172,7 @@ def stage_parse_metadata(search_dirs: list[Path]):
 # --------------------------------------------------------------------------
 def stage_match_triplets(
     gdf,
-    containment: float = 0.8,
+    containment: float = 0.6,
     min_gap: float = 0.0,
     max_gap: float = 1e9,
     require_dates: bool = False,
@@ -188,6 +188,28 @@ def stage_match_triplets(
         max_gap=max_gap,
         require_dates=require_dates,
     )
+    # If a strict threshold (e.g. 0.8) yields 0 triplets, adaptively test
+    # slightly lower thresholds down to 0.5 so real overlapping passes
+    # (e.g. 77.9% overlap) are never rejected by an arbitrary decimal boundary.
+    if len(raw) == 0 and containment > 0.5:
+        for fallback_c in [0.75, 0.70, 0.65, 0.60, 0.50]:
+            if fallback_c >= containment:
+                continue
+            fallback_raw = build_triplets(
+                gdf,
+                containment=fallback_c,
+                min_gap=min_gap,
+                max_gap=max_gap,
+                require_dates=require_dates,
+            )
+            if len(fallback_raw) > 0:
+                LOG.info(
+                    "Adaptive containment: found %d candidate triplet(s) at %.0f%% overlap (requested %.0f%%)",
+                    len(fallback_raw), fallback_c * 100, containment * 100,
+                )
+                raw = fallback_raw
+                break
+
     selected = dedup_triplets(
         raw,
         dedup_overlap=dedup_overlap,
@@ -1418,8 +1440,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     p.add_argument(
         "--containment",
         type=float,
-        default=0.8,
-        help="Min three-way overlap ratio for triplet acceptance (default: 0.8)",
+        default=0.6,
+        help="Min three-way overlap ratio for triplet acceptance (default: 0.6)",
     )
     p.add_argument(
         "--manifest",

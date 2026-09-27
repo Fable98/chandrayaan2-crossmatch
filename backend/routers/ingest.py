@@ -103,7 +103,7 @@ _UPLOAD_ROOT = _PIPELINE_ROOT / ".uploads"
 # Schemas
 # ---------------------------------------------------------------------------
 class IngestConfig(BaseModel):
-    containment: float = 0.8
+    containment: float = 0.6
     tile_size: int = 512
     no_large_aoi: bool = False
     no_invariants: bool = False
@@ -329,7 +329,7 @@ def _is_true_triplet(entry: dict[str, Any]) -> bool:
 @router.post("/upload")
 async def upload_and_ingest(
     files: list[UploadFile] = File(...),
-    containment: float = Form(0.8),
+    containment: float = Form(0.6),
     tile_size: int = Form(512),
     no_large_aoi: bool = Form(False),
     no_invariants: bool = Form(False),

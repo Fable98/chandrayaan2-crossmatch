@@ -181,5 +181,65 @@
       "status": "failed",
       "reason": "insufficient_correspondences for registration QA (0 < 4, homography=missing)"
     }
+  },
+  {
+    "ohrc_product_id": "ch2_ohr_ncp_20260331t0907044475_d_img_d18",
+    "tmc2_product_id": "ch2_tmc_ncf_20260607t2319176739_d_img_d18",
+    "iirs_product_id": "ch2_iir_nri_20240503t0015461934_d_img_d18",
+    "overlap_ohrc_tmc_pct": 100.0,
+    "overlap_ohrc_iirs_pct": 77.87,
+    "overlap_triplet_pct": 77.87,
+    "ohrc_sun_azimuth_deg": 89.352954,
+    "ohrc_sun_elevation_deg": 1.995957,
+    "ohrc_incidence_deg": null,
+    "tmc2_sun_azimuth_deg": 282.589369,
+    "tmc2_sun_elevation_deg": 59.703727,
+    "tmc2_incidence_deg": null,
+    "iirs_sun_azimuth_deg": 251.825945,
+    "iirs_sun_elevation_deg": 35.821946,
+    "iirs_incidence_deg": null,
+    "ohrc_gsd_m": 0.25,
+    "tmc2_gsd_m": 5.47,
+    "iirs_gsd_m": 84.71,
+    "ohrc_acquisition_utc": "2026-03-31T09:07:04.447500+00:00",
+    "tmc2_acquisition_utc": "2026-06-07T23:19:17.673900+00:00",
+    "iirs_acquisition_utc": "2024-05-03T00:15:46.193400+00:00",
+    "ohrc_label": "/Users/shresthkumar/chandrayaan2-crossmatch/data_preprocessing_pipeline/processed_triplets/.staging/272a24d1/upload_1/data/calibrated/20260331/ch2_ohr_ncp_20260331T0907044475_d_img_d18.xml",
+    "tmc2_label": "/Users/shresthkumar/chandrayaan2-crossmatch/data_preprocessing_pipeline/processed_triplets/.staging/272a24d1/upload_2/data/calibrated/20260607/ch2_tmc_ncf_20260607T2319176739_d_img_d18.xml",
+    "iirs_label": "/Users/shresthkumar/chandrayaan2-crossmatch/data_preprocessing_pipeline/processed_triplets/.staging/272a24d1/upload_0/data/raw/20240503/ch2_iir_nri_20240503T0015461934_d_img_d18.xml",
+    "intersection_wkt": "POLYGON ((296.19223 8.130369, 296.2101806547244 7.479560411509347, 296.10464308989503 7.4816795624131505, 296.086558 8.131984, 296.19223 8.130369))",
+    "region_id": "region_auto_007",
+    "bounds": {
+      "west_lon": 296.086558,
+      "east_lon": 296.215278,
+      "south_lat": 7.294754,
+      "north_lat": 8.131984
+    },
+    "bounds_iirs": {
+      "west_lon": 295.953921,
+      "east_lon": 296.737975,
+      "south_lat": 7.383369,
+      "north_lat": 8.043369
+    },
+    "bounds_optical": {
+      "west_lon": 296.086558,
+      "east_lon": 296.215278,
+      "south_lat": 7.294754,
+      "north_lat": 8.131984
+    },
+    "images": {
+      "ohrc": "/images/ohrc/region_auto_007",
+      "tmc": "/images/tmc/region_auto_007",
+      "iirs": "/images/iirs/region_auto_007",
+      "dem": "/images/dem/region_auto_007"
+    },
+    "matches_url": "/triplets/region_auto_007/matches",
+    "footprint_url": "/triplets/region_auto_007/footprint",
+    "registered": {
+      "warped": "/images/registered/region_auto_007/registered_ohrc.png",
+      "blend": "/images/registered/region_auto_007/blend_overlay.png",
+      "checkerboard": "/images/registered/region_auto_007/checkerboard_qa.png",
+      "quiver": "/images/registered/region_auto_007/displacement_quiver.png"
+    }
   }
 ]

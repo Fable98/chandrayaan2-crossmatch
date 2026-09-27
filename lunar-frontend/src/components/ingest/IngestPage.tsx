@@ -853,7 +853,7 @@ export default function IngestPage() {
                                   </label>
                                   <input
                                     type="range"
-                                    min="0.5"
+                                    min="0.3"
                                     max="1.0"
                                     step="0.05"
                                     value={config.containment}

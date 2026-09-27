@@ -43,7 +43,7 @@ export interface JobResult {
 }
 
 export const DEFAULT_CONFIG: IngestConfig = {
-  containment: 0.8,
+  containment: 0.6,
   tileSize: 512,
   noLargeAoi: false,
   noInvariants: false,
